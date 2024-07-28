@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Video History Tracker with IndexedDB
 // @namespace    http://tampermonkey.net/
-// @version      1.11
+// @version      1.12
 // @description  Store YouTube video timestamps using IndexedDB for larger storage capacity without expiry
 // @author       Edin User
 // @match        https://www.youtube.com/watch*
@@ -18,7 +18,9 @@
     const DB_VERSION = 1;
     const STORE_NAME = 'videoHistory';
     const DEBUG = false;
-    const SAVE_INTERVAL = 2000; // Save every 2 seconds
+    const SAVE_INTERVAL = 5000; // Save every 5 seconds
+    const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // Clean up once a day
+    const RECORD_LIFETIME = 3 * 30 * 24 * 60 * 60 * 1000; // 3 months in milliseconds
     let db;
     let saveIntervalId;
 
@@ -124,6 +126,32 @@
         }
     }
 
+    // Remove records older than RECORD_LIFETIME
+    function cleanupOldRecords() {
+        const threshold = Date.now() - RECORD_LIFETIME;
+        log('Cleaning up records older than', new Date(threshold));
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.openCursor();
+
+        request.onsuccess = function(event) {
+            const cursor = event.target.result;
+            if (cursor) {
+                if (cursor.value.timestamp < threshold) {
+                    log('Deleting old record:', cursor.value);
+                    cursor.delete();
+                }
+                cursor.continue();
+            } else {
+                log('Old record cleanup complete.');
+            }
+        };
+
+        request.onerror = function(event) {
+            log('Error during cleanup:', event.target.errorCode);
+        };
+    }
+
     // Start the interval to save the timestamp every few seconds
     function startSaveInterval() {
         if (saveIntervalId) {
@@ -226,10 +254,12 @@
 
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Open the database
+    // Open the database and set up cleanup interval
     openDB().then(() => {
         log('Database opened and ready.');
         initialize(); // Attempt to initialize immediately in case the video element is already present
+        cleanupOldRecords(); // Perform initial cleanup
+        setInterval(cleanupOldRecords, CLEANUP_INTERVAL); // Set up periodic cleanup
     }).catch(error => {
         log('Failed to open IndexedDB:', error);
     });
