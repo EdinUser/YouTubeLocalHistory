@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         YouTube Video History Tracker with IndexedDB
+// @name         Local YouTube Video History Tracker
 // @namespace    http://tampermonkey.net/
 // @version      1.13
 // @description  Store YouTube video timestamps using IndexedDB for larger storage capacity without expiry
