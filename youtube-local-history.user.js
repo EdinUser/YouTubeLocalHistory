@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Video History Tracker with IndexedDB
 // @namespace    http://tampermonkey.net/
-// @version      1.10
+// @version      1.11
 // @description  Store YouTube video timestamps using IndexedDB for larger storage capacity without expiry
 // @author       Edin User
 // @match        https://www.youtube.com/watch*
@@ -18,19 +18,28 @@
     const DB_VERSION = 1;
     const STORE_NAME = 'videoHistory';
     const DEBUG = false;
+    const SAVE_INTERVAL = 2000; // Save every 2 seconds
     let db;
+    let saveIntervalId;
 
-    function log(message) {
+    function log(message, data) {
         if (DEBUG) {
-            console.log(message);
+            console.log(message, data || '');
         }
     }
 
     log('YouTube Video History Tracker script is running.');
 
+    // Extract video ID from URL
+    function getVideoId() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('v') || window.location.pathname.split('/').pop();
+    }
+
     // Open the IndexedDB
     function openDB() {
         return new Promise((resolve, reject) => {
+            log('Opening IndexedDB...');
             const request = indexedDB.open(DB_NAME, DB_VERSION);
 
             request.onupgradeneeded = function(event) {
@@ -48,7 +57,7 @@
             };
 
             request.onerror = function(event) {
-                console.error('IndexedDB error:', event.target.errorCode);
+                log('IndexedDB error:', event.target.errorCode);
                 reject(event.target.errorCode);
             };
         });
@@ -59,21 +68,34 @@
         const video = document.querySelector('video');
         if (video) {
             const currentTime = video.currentTime;
-            const videoId = new URLSearchParams(window.location.search).get('v') || window.location.pathname.split('/').pop();
+            const videoId = getVideoId();
             if (videoId) {
+                log(`Saving timestamp for video ID ${videoId} at time ${currentTime}`);
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
                 const record = { videoId: videoId, time: currentTime, timestamp: Date.now() };
-                store.put(record);
-                log(`Timestamp saved for video ID ${videoId}: ${currentTime}`);
+                const request = store.put(record);
+
+                request.onsuccess = function() {
+                    log(`Timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
+                };
+
+                request.onerror = function(event) {
+                    log('Error saving record:', event.target.errorCode);
+                };
+            } else {
+                log('No video ID found.');
             }
+        } else {
+            log('No video element found.');
         }
     }
 
     // Load and set the saved timestamp
     function loadTimestamp() {
-        const videoId = new URLSearchParams(window.location.search).get('v') || window.location.pathname.split('/').pop();
+        const videoId = getVideoId();
         if (videoId) {
+            log(`Loading timestamp for video ID ${videoId}`);
             const transaction = db.transaction([STORE_NAME], 'readonly');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.get(videoId);
@@ -83,25 +105,56 @@
                 if (record) {
                     const video = document.querySelector('video');
                     if (video) {
+                        log(`Found record for video ID ${videoId}:`, record);
                         video.currentTime = record.time;
                         log(`Timestamp loaded for video ID ${videoId}: ${record.time}`);
+                    } else {
+                        log('No video element found.');
                     }
+                } else {
+                    log('No record found for video ID:', videoId);
                 }
             };
 
             request.onerror = function(event) {
-                console.error('Error fetching data from IndexedDB:', event.target.errorCode);
+                log('Error fetching data from IndexedDB:', event.target.errorCode);
             };
+        } else {
+            log('No video ID found in URL.');
         }
     }
 
-    // Initialize and set up event listeners
-    openDB().then(() => {
-        const video = document.querySelector('video');
+    // Start the interval to save the timestamp every few seconds
+    function startSaveInterval() {
+        if (saveIntervalId) {
+            clearInterval(saveIntervalId);
+        }
+        saveIntervalId = setInterval(() => {
+            saveTimestamp();
+        }, SAVE_INTERVAL);
+    }
 
+    // Initialize and set up event listeners
+    function initialize() {
+        const video = document.querySelector('video');
         if (video) {
+            log('Video element found on page. Setting up event listeners.');
+
             // Load timestamp when the video is loaded
             video.addEventListener('loadedmetadata', loadTimestamp);
+
+            // Start saving timestamp periodically when the video starts playing
+            video.addEventListener('play', () => {
+                log('Video started playing. Starting save interval.');
+                startSaveInterval();
+            });
+
+            // Stop saving timestamp when the video is paused
+            video.addEventListener('pause', () => {
+                log('Video paused. Clearing save interval.');
+                clearInterval(saveIntervalId);
+                saveTimestamp(); // Save timestamp when paused
+            });
 
             // Detect clicks on the progress bar
             const progressBar = document.querySelector('.ytp-progress-bar');
@@ -120,9 +173,64 @@
                 progressBar.addEventListener('mouseup', () => {
                     log('User interaction ended on progress bar (mouseup)');
                 });
+
+                progressBar.addEventListener('click', () => {
+                    log('User clicked on progress bar (click)');
+                    setTimeout(() => {
+                        video.pause();
+                        saveTimestamp();
+                        log('Timestamp saved after user clicked on progress bar (click)');
+                        video.play();
+                        log('Video resumed after saving timestamp');
+                    }, 100); // Delay to ensure the timestamp is correctly set
+                });
+
+                progressBar.addEventListener('touchstart', () => {
+                    log('User touched progress bar (touchstart)');
+                    setTimeout(() => {
+                        video.pause();
+                        saveTimestamp();
+                        log('Timestamp saved after user touched progress bar (touchstart)');
+                        video.play();
+                        log('Video resumed after saving timestamp');
+                    }, 100); // Delay to ensure the timestamp is correctly set
+                });
+
+                progressBar.addEventListener('touchend', () => {
+                    log('User touch ended on progress bar (touchend)');
+                });
+
+                log('Event listeners set up on progress bar.');
+            } else {
+                log('No progress bar found.');
             }
+        } else {
+            log('No video element found on page.');
         }
+    }
+
+    // Use a MutationObserver to wait for the video element
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.addedNodes.length) {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeName === 'VIDEO') {
+                        log('Video element added to the page.');
+                        observer.disconnect(); // Stop observing once the video is found
+                        initialize(); // Initialize the script
+                    }
+                });
+            }
+        });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Open the database
+    openDB().then(() => {
+        log('Database opened and ready.');
+        initialize(); // Attempt to initialize immediately in case the video element is already present
     }).catch(error => {
-        console.error('Failed to open IndexedDB:', error);
+        log('Failed to open IndexedDB:', error);
     });
 })();
