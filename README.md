@@ -5,6 +5,7 @@ Store your YouTube video history locally, without sending it to Google. This pro
 1. Browser Extensions (Firefox & Chrome)
 2. TamperMonkey/GreaseMonkey Script
 
+<<<<<<< HEAD
 ## Features
 
 - Store video history locally using IndexedDB
@@ -18,6 +19,17 @@ Store your YouTube video history locally, without sending it to Google. This pro
 - Works with PocketTube and other YouTube extensions
 
 ## Installation Options
+=======
+Then follow the instructions below:
+
+# Addons
+## Firefox
+https://addons.mozilla.org/en-US/firefox/addon/local-youtube-video-history/
+
+# TamperMonkey
+## Install
+Install first TamperMonkey or GreaseMonkey for your browser:
+>>>>>>> 8edf276 (Update README.md)
 
 ### Browser Extensions
 
@@ -37,6 +49,7 @@ Store your YouTube video history locally, without sending it to Google. This pro
 2. Visit [the script page](https://github.com/EdinUser/YouTubeLocalHistory/raw/main/youtube-local-history.user.js)
 3. Click "Install"
 
+<<<<<<< HEAD
 ## Usage
 
 1. First, turn off YouTube History:
@@ -89,3 +102,10 @@ The built extensions will be in the `dist` directory.
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details 
+=======
+and click "Install". That's it!
+
+## Support me
+If you want to support me: [Patreon](https://www.patreon.com/EdinUser)
+Any comments are welcomed!
+>>>>>>> 8edf276 (Update README.md)
