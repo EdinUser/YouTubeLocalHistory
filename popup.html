@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YouTube Video History Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 10px;
+            width: 600px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        h1 {
+            font-size: 16px;
+            margin: 0 0 10px;
+        }
+        p {
+            margin: 0 0 10px;
+        }
+        button {
+            padding: 10px;
+            background-color: #d9534f;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #c9302c;
+        }
+        .message {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            display: none;
+        }
+        .success {
+            border-color: #5cb85c;
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            border-color: #d9534f;
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .instructions {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #d9534f;
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .history-table th, .history-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .history-table th {
+            background-color: #f5f5f5;
+        }
+        .history-table tr:hover {
+            background-color: #f9f9f9;
+        }
+        .video-link {
+            color: #d9534f;
+            text-decoration: none;
+        }
+        .video-link:hover {
+            text-decoration: underline;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .no-history {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .tab-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .tab {
+            padding: 8px 18px;
+            background: #eee;
+            border: none;
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            font-weight: bold;
+            color: #d9534f;
+        }
+        .tab.active {
+            background: #d9534f;
+            color: #fff;
+        }
+        .settings-form {
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .settings-group {
+            margin-bottom: 15px;
+        }
+        .settings-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .settings-group input[type="number"],
+        .settings-group input[type="text"],
+        .settings-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+        .settings-group .help-text {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .color-preview {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            border: 1px solid #ddd;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>YouTube Video History Tracker</h1>
+    <div class="controls">
+        <div>
+            <button id="ytvhtClearHistory">Clear History</button>
+            <button id="ytvhtExportHistory">Export History</button>
+            <button id="ytvhtImportHistory">Import History</button>
+        </div>
+        <button id="ytvhtClosePopup">Close</button>
+    </div>
+    <div id="ytvhtMessage" class="message"></div>
+    
+    <div class="tab-bar">
+        <button id="ytvhtTabVideos" class="tab active">Videos</button>
+        <button id="ytvhtTabPlaylists" class="tab">Playlists</button>
+        <button id="ytvhtTabSettings" class="tab">Settings</button>
+    </div>
+    <div id="ytvhtHistoryContainer">
+        <table class="history-table" id="ytvhtVideosTable">
+            <thead>
+                <tr>
+                    <th>Video Title</th>
+                    <th>Progress</th>
+                    <th>Last Watched</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="ytvhtHistoryTable">
+                <!-- History items will be inserted here -->
+            </tbody>
+        </table>
+        <div id="ytvhtNoHistory" class="no-history" style="display: none;">
+            No history found. Start watching some videos!
+        </div>
+        <div id="ytvhtPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px;">
+            <button id="ytvhtPrevPage">Previous</button>
+            <span id="ytvhtPageInfo">Page 1 of 1</span>
+            <button id="ytvhtNextPage">Next</button>
+        </div>
+        <!-- Playlists Table -->
+        <table class="history-table" id="ytvhtPlaylistsTable" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Playlist Title</th>
+                    <th>Link</th>
+                    <th>Saved</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="ytvhtPlaylistsBody">
+                <!-- Playlist items will be inserted here -->
+            </tbody>
+        </table>
+        <div id="ytvhtNoPlaylists" class="no-history" style="display: none;">
+            No playlists saved yet. Visit a playlist to save it!
+        </div>
+        <div id="ytvhtPlaylistsPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px;">
+            <button id="ytvhtPrevPlaylistPage">Previous</button>
+            <span id="ytvhtPlaylistsPageInfo">Page 1 of 1</span>
+            <button id="ytvhtNextPlaylistPage">Next</button>
+        </div>
+    </div>
+    <div id="ytvhtSettingsContainer" style="display:none;">
+        <div class="settings-form">
+            <div class="settings-group">
+                <label for="ytvhtAutoCleanPeriod">Auto-clean Period (days)</label>
+                <input type="number" id="ytvhtAutoCleanPeriod" min="1" max="180" value="90">
+                <div class="help-text">Automatically remove history entries older than this many days (max 180 days)</div>
+            </div>
+            <div class="settings-group">
+                <label for="ytvhtPaginationCount">Items per Page</label>
+                <input type="number" id="ytvhtPaginationCount" min="5" max="20" value="10">
+                <div class="help-text">Number of items to show per page in history view (max 20)</div>
+            </div>
+            <div class="settings-group">
+                <label for="ytvhtOverlayTitle">Overlay Title</label>
+                <input type="text" id="ytvhtOverlayTitle" maxlength="12" value="viewed">
+                <div class="help-text">Text to show in the overlay (max 12 characters)</div>
+            </div>
+            <div class="settings-group">
+                <label for="ytvhtOverlayColor">Overlay Color</label>
+                <select id="ytvhtOverlayColor">
+                    <option value="blue">Blue</option>
+                    <option value="red">Red</option>
+                    <option value="green">Green</option>
+                    <option value="purple">Purple</option>
+                    <option value="orange">Orange</option>
+                </select>
+                <span id="ytvhtColorPreview" class="color-preview"></span>
+                <div class="help-text">Color of the progress bar overlay</div>
+            </div>
+            <div class="settings-group">
+                <label for="ytvhtOverlayLabelSize">Overlay Label Size</label>
+                <select id="ytvhtOverlayLabelSize">
+                    <option value="small">Small</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="large">Large</option>
+                    <option value="xlarge">Extra Large</option>
+                </select>
+                <div class="help-text">Size of the overlay label and progress bar</div>
+            </div>
+            <button id="ytvhtSaveSettings" style="margin-top: 10px;">Save Settings</button>
+        </div>
+    </div>
+
+    <div id="ytvhtInstructions" class="instructions" style="display:none;">
+        <p><strong>Script Execution Disabled</strong></p>
+        <p>If you are seeing this message, it means that script execution is disabled for this extension. Please follow these steps to enable it:</p>
+        <ul>
+            <li>Go to Firefox settings: <strong>about:preferences#privacy</strong></li>
+            <li>Ensure "Enhanced Tracking Protection" is set to "Standard" or "Custom" and does not block scripts</li>
+            <li>Check for any content blocking: click the shield icon in the address bar when the popup is open and ensure no scripts are blocked</li>
+        </ul>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
+
