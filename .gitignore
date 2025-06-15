@@ -1,0 +1,21 @@
+# Build artifacts
+*.crx
+*.pem
+*.zip
+*.xpi
+
+# Distribution files
+dist/
+
+# Node modules (if you add them later)
+node_modules/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db 
