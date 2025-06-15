@@ -7,12 +7,13 @@ mkdir -p dist
 VERSION=$(grep '"version"' chrome_extension/manifest.json | cut -d'"' -f4)
 
 # Package Chrome extension
-zip -r "dist/youtube-local-history-chrome-v$VERSION.zip" chrome_extension/* -x "chrome_extension/.*" -x "chrome_extension/README.md"
+(cd chrome_extension && zip -r "../dist/youtube-local-history-chrome-v$VERSION.zip" . -x ".*" -x "README.md")
 echo "Chrome extension packaged: dist/youtube-local-history-chrome-v$VERSION.zip"
 
 # Package Firefox extension
-zip -r "dist/youtube-local-history-firefox-v$VERSION.zip" firefox_extension/* -x "firefox_extension/.*" -x "firefox_extension/README.md"
+# For Firefox, we need to be in the extension directory to avoid including the directory in the zip
+(cd firefox_extension && zip -r "../dist/youtube-local-history-firefox-v$VERSION.zip" . -x ".*" -x "README.md")
 echo "Firefox extension packaged: dist/youtube-local-history-firefox-v$VERSION.zip"
 
-echo "\nPackaging complete!"
+echo -e "\nPackaging complete!"
 ls -lh dist/
