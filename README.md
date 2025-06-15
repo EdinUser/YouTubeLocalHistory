@@ -5,7 +5,6 @@ Store your YouTube video history locally, without sending it to Google. This pro
 1. Browser Extensions (Firefox & Chrome)
 2. TamperMonkey/GreaseMonkey Script
 
-<<<<<<< HEAD
 ## Features
 
 - Store video history locally using IndexedDB
@@ -29,8 +28,8 @@ https://addons.mozilla.org/en-US/firefox/addon/local-youtube-video-history/
 # TamperMonkey
 ## Install
 Install first TamperMonkey or GreaseMonkey for your browser:
->>>>>>> 8edf276 (Update README.md)
-
+- [TamperMonkey](https://www.tampermonkey.net/)
+- [GreaseMonkey](https://greasemonkey.github.io/greasemonkey/)
 ### Browser Extensions
 
 #### Firefox
@@ -38,10 +37,7 @@ Install first TamperMonkey or GreaseMonkey for your browser:
 2. Click "Add to Firefox"
 
 #### Chrome
-1. Download the latest release from the [Releases](https://github.com/EdinUser/YouTubeLocalHistory/releases) page
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode" in the top right
-4. Click "Load unpacked" and select the `chrome_extension` folder
+Pending
 
 ### TamperMonkey Script
 
@@ -79,21 +75,6 @@ Install first TamperMonkey or GreaseMonkey for your browser:
 
 ## Development
 
-### Building Extensions
-
-1. Clone the repository:
-```bash
-git clone https://github.com/EdinUser/YouTubeLocalHistory.git
-cd YouTubeLocalHistory
-```
-
-2. Build the extensions:
-```bash
-./package.sh
-```
-
-The built extensions will be in the `dist` directory.
-
 ## Support
 
 - Report issues on [GitHub Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues)
@@ -108,4 +89,3 @@ and click "Install". That's it!
 ## Support me
 If you want to support me: [Patreon](https://www.patreon.com/EdinUser)
 Any comments are welcomed!
->>>>>>> 8edf276 (Update README.md)
