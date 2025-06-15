@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "Local YouTube Video History Tracker",
+  "version": "2.1",
+  "description": "Store YouTube video timestamps using IndexedDB for larger storage capacity without expiry.",
+  "author": "Edin User",
+  "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "fallenangelbg@protonmail.com"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icon48.png"
+      ],
+      "matches": [
+        "*://*.youtube.com/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "YouTube History"
+  },
+  "icons": {
+    "48": "icon48.png",
+    "96": "icon96.png"
+  }
+}
+
