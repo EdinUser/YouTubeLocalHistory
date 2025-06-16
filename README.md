@@ -6,7 +6,6 @@ Store your YouTube video history locally, without sending it to Google. This pro
 2. TamperMonkey/GreaseMonkey Script
 
 ## Features
-
 - Store video history locally using IndexedDB
 - View your complete watch history
 - Export/Import history data
@@ -15,39 +14,35 @@ Store your YouTube video history locally, without sending it to Google. This pro
   - Auto-clean period (1-180 days)
   - Pagination count (1-20 items)
   - Overlay label text and color
-- Works with PocketTube and other YouTube extensions
+
+## Known Issues
+- The script may not work on some YouTube pages (e.g., Shorts, Live, etc.)
+- The extension is not working with extensions like YouTube, which creates iframes
 
 ## Installation Options
-=======
 Then follow the instructions below:
 
-# Addons
-## Firefox
-https://addons.mozilla.org/en-US/firefox/addon/local-youtube-video-history/
-
-# TamperMonkey
-## Install
-Install first TamperMonkey or GreaseMonkey for your browser:
-- [TamperMonkey](https://www.tampermonkey.net/)
-- [GreaseMonkey](https://greasemonkey.github.io/greasemonkey/)
-### Browser Extensions
-
-#### Firefox
+## Addons
+### Firefox
 1. Visit [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/local-youtube-video-history/)
 2. Click "Add to Firefox"
 
-#### Chrome
-Pending
+### Chrome
+1. Visit [Chrome Web Store](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
+2. Click "Add to Chrome"
+
+## TamperMonkey
+### Install
+Install first TamperMonkey or GreaseMonkey for your browser:
+- [TamperMonkey](https://www.tampermonkey.net/)
+- [GreaseMonkey](https://greasemonkey.github.io/greasemonkey/)
 
 ### TamperMonkey Script
-
 1. Install [TamperMonkey](https://www.tampermonkey.net/) for your browser
 2. Visit [the script page](https://github.com/EdinUser/YouTubeLocalHistory/raw/main/youtube-local-history.user.js)
 3. Click "Install"
 
-<<<<<<< HEAD
-## Usage
-
+# Usage
 1. First, turn off YouTube History:
    - Go to your Google profile
    - Select "Data & Privacy"
@@ -62,9 +57,8 @@ Pending
    - Browser Extensions: Click the extension icon in your toolbar
    - TamperMonkey: Click the TamperMonkey icon and select "YouTube Local History"
 
-## Settings
-
-### Browser Extensions
+# Settings
+## Browser Extensions
 - Click the extension icon
 - Go to the "Settings" tab
 - Customize:
@@ -73,18 +67,12 @@ Pending
   - Overlay label text
   - Overlay color
 
-## Development
-
 ## Support
-
 - Report issues on [GitHub Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues)
 - Star the repository if you find it useful!
 
 ## License
-
 MIT License - see [LICENSE](LICENSE) file for details 
-=======
-and click "Install". That's it!
 
 ## Support me
 If you want to support me: [Patreon](https://www.patreon.com/EdinUser)
