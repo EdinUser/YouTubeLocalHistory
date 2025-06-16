@@ -1,4 +1,4 @@
-(function() {
+(function () {
     'use strict';
 
     const DB_NAME = 'YouTubeHistoryDB';
@@ -15,7 +15,7 @@
         overlayColor: 'blue',
         overlayLabelSize: 'medium'
     };
-    
+
     // Color mapping for overlay colors
     const OVERLAY_COLORS = {
         blue: '#4285f4',
@@ -24,7 +24,14 @@
         purple: '#9c27b0',
         orange: '#ff9800'
     };
-    
+
+    const OVERLAY_LABEL_SIZE_MAP = {
+        small: {fontSize: 12, bar: 2},
+        medium: {fontSize: 16, bar: 3},
+        large: {fontSize: 22, bar: 4},
+        xlarge: {fontSize: 28, bar: 5}
+    };
+
     let db;
     let saveIntervalId;
     let isInitialized = false;
@@ -41,12 +48,12 @@
     // Extract video ID from any YouTube URL format
     function getVideoId() {
         const url = window.location.href;
-        
+
         // Try to get from URL parameters first
         const urlParams = new URLSearchParams(window.location.search);
         const videoId = urlParams.get('v');
         if (videoId) return videoId;
-        
+
         // Try to match various URL patterns
         const patterns = [
             /(?:youtube\.com\/watch\/([^\/\?]+))/i,  // youtube.com/watch/VIDEO_ID
@@ -55,14 +62,14 @@
             /(?:youtu\.be\/([^\/\?]+))/i,            // youtu.be/VIDEO_ID
             /(?:youtube\.com\/shorts\/([^\/\?]+))/i  // youtube.com/shorts/VIDEO_ID
         ];
-        
+
         for (const pattern of patterns) {
             const match = url.match(pattern);
             if (match && match[1]) {
                 return match[1];
             }
         }
-        
+
         // If no pattern matches, try the last path segment
         const pathSegments = window.location.pathname.split('/').filter(Boolean);
         if (pathSegments.length > 0) {
@@ -72,7 +79,7 @@
                 return lastSegment;
             }
         }
-        
+
         log('Could not extract video ID from URL:', url);
         return null;
     }
@@ -132,17 +139,17 @@
         if (!info) return;
 
         log('Saving playlist info:', info);
-        
+
         openDBWithMigration().then(database => {
             db = database;
             const transaction = db.transaction(['playlistHistory'], 'readwrite');
             const store = transaction.objectStore('playlistHistory');
-            
+
             const request = store.put(info);
-            request.onsuccess = function() {
+            request.onsuccess = function () {
                 log('Playlist info saved successfully:', info);
             };
-            request.onerror = function(event) {
+            request.onerror = function (event) {
                 log('Error saving playlist info:', event.target.error);
             };
         }).catch(error => {
@@ -155,36 +162,36 @@
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-            request.onupgradeneeded = function(event) {
+            request.onupgradeneeded = function (event) {
                 const db = event.target.result;
                 log('Database upgrade needed. Creating stores...');
-                
+
                 // Create video history store if it doesn't exist
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME, { keyPath: 'videoId' });
+                    db.createObjectStore(STORE_NAME, {keyPath: 'videoId'});
                     log('Created video history store');
                 }
-                
+
                 // Create playlist history store if it doesn't exist
                 if (!db.objectStoreNames.contains('playlistHistory')) {
-                    db.createObjectStore('playlistHistory', { keyPath: 'playlistId' });
+                    db.createObjectStore('playlistHistory', {keyPath: 'playlistId'});
                     log('Created playlist history store');
                 }
-                
+
                 // Create settings store if it doesn't exist
                 if (!db.objectStoreNames.contains('settings')) {
-                    db.createObjectStore('settings', { keyPath: 'id' });
+                    db.createObjectStore('settings', {keyPath: 'id'});
                     log('Created settings store');
                 }
             };
 
-            request.onsuccess = function(event) {
+            request.onsuccess = function (event) {
                 const database = event.target.result;
                 log('Database opened successfully');
                 resolve(database);
             };
 
-            request.onerror = function(event) {
+            request.onerror = function (event) {
                 log('Error opening database:', event.target.error);
                 reject(event.target.error);
             };
@@ -199,14 +206,14 @@
                 const transaction = db.transaction(['settings'], 'readonly');
                 const store = transaction.objectStore('settings');
                 const request = store.get('userSettings');
-                
-                request.onsuccess = function() {
+
+                request.onsuccess = function () {
                     const settings = request.result?.settings || DEFAULT_SETTINGS;
                     currentSettings = settings;
                     resolve(settings);
                 };
-                
-                request.onerror = function() {
+
+                request.onerror = function () {
                     reject(request.error);
                 };
             }).catch(reject);
@@ -229,13 +236,13 @@
             const store = transaction.objectStore(STORE_NAME);
             const request = store.get(videoId);
 
-            request.onsuccess = function(event) {
+            request.onsuccess = function (event) {
                 const record = event.target.result;
                 if (record) {
                     const video = document.querySelector('video');
                     if (video) {
                         log(`Found record for video ID ${videoId}:`, record);
-                        
+
                         // Wait for video to be ready
                         const setTime = () => {
                             if (record.time > 0 && record.time < video.duration) {
@@ -250,7 +257,7 @@
                             setTime();
                         } else {
                             log('Video not ready, waiting for loadedmetadata event');
-                            video.addEventListener('loadedmetadata', setTime, { once: true });
+                            video.addEventListener('loadedmetadata', setTime, {once: true});
                         }
                     } else {
                         log('No video element found.');
@@ -260,7 +267,7 @@
                 }
             };
 
-            request.onerror = function(event) {
+            request.onerror = function (event) {
                 log('Error fetching data from IndexedDB:', event.target.error);
             };
         }).catch(error => {
@@ -285,21 +292,21 @@
         const currentTime = video.currentTime;
         const duration = video.duration;
         const videoId = getVideoId();
-        
+
         if (!videoId) {
             log('No video ID found.');
             return;
         }
 
         log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
-        
+
         // Get video title from YouTube's page
-        const title = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim() || 
-                     document.querySelector('h1.title.style-scope.ytd-video-primary-info-renderer')?.textContent?.trim() ||
-                     'Unknown Title';
-        
-        const record = { 
-            videoId: videoId, 
+        const title = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim() ||
+            document.querySelector('h1.title.style-scope.ytd-video-primary-info-renderer')?.textContent?.trim() ||
+            'Unknown Title';
+
+        const record = {
+            videoId: videoId,
             time: currentTime,
             duration: duration,
             timestamp: Date.now(),
@@ -312,11 +319,11 @@
             const store = transaction.objectStore(STORE_NAME);
             const request = store.put(record);
 
-            request.onsuccess = function() {
+            request.onsuccess = function () {
                 log(`Timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
             };
 
-            request.onerror = function(event) {
+            request.onerror = function (event) {
                 log('Error saving record:', event.target.error);
                 // Try to reinitialize database and retry
                 openDBWithMigration().then(database => {
@@ -348,7 +355,7 @@
         const store = transaction.objectStore(STORE_NAME);
         const request = store.getAll();
 
-        request.onsuccess = function() {
+        request.onsuccess = function () {
             const records = request.result;
             let deletedCount = 0;
 
@@ -362,7 +369,7 @@
             log(`Cleaned up ${deletedCount} old records`);
         };
 
-        request.onerror = function(event) {
+        request.onerror = function (event) {
             log('Error during cleanup:', event.target.error);
         };
     }
@@ -379,9 +386,9 @@
     // Set up video tracking
     function setupVideoTracking(video) {
         log('Setting up video tracking for video element:', video);
-        
+
         let timestampLoaded = false;
-        
+
         // Function to ensure video is ready before loading timestamp
         const ensureVideoReady = () => {
             if (timestampLoaded) {
@@ -401,7 +408,7 @@
                         loadTimestamp();
                         timestampLoaded = true;
                     }
-                }, { once: true });
+                }, {once: true});
             }
         };
 
@@ -459,20 +466,20 @@
         });
 
         // Handle popup messages
-        chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+        chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             if (message.type === 'getHistory') {
                 openDBWithMigration().then(database => {
                     db = database;
                     const transaction = db.transaction([STORE_NAME], 'readonly');
                     const store = transaction.objectStore(STORE_NAME);
                     const request = store.getAll();
-                    
-                    request.onsuccess = function() {
+
+                    request.onsuccess = function () {
                         log('Sending history to popup:', request.result);
                         sendResponse({history: request.result});
                     };
-                    
-                    request.onerror = function() {
+
+                    request.onerror = function () {
                         log('Error getting history');
                         sendResponse({history: []});
                     };
@@ -502,7 +509,7 @@
     // Initialize database and set up event listeners
     function initializeIfNeeded() {
         if (isInitialized) {
-            return true; 
+            return true;
         }
 
         const video = document.querySelector('video');
@@ -517,16 +524,16 @@
 
                 // Start observing for thumbnails and process existing ones
                 log('Starting thumbnail observer and processing existing thumbnails.');
-                thumbnailObserver.observe(document.body, { childList: true, subtree: true });
+                thumbnailObserver.observe(document.body, {childList: true, subtree: true});
                 processExistingThumbnails();
 
                 isInitialized = true;
             }).catch(error => {
                 log('Error initializing database during video setup:', error);
             });
-            return true; 
+            return true;
         }
-        return false; 
+        return false;
     }
 
     // Try to save playlist with retries
@@ -542,17 +549,28 @@
         }
     }
 
-    // Start observing for video element and playlist changes
-    const initChecker = setInterval(() => {
-        log('Checking for video element...');
-        if (initializeIfNeeded()) {
-            log('Initialization successful. Stopping checker.');
-            clearInterval(initChecker);
-        }
-    }, 1000);
+    // Initialize immediately if possible
+    if (!initializeIfNeeded()) {
+        // If not ready, set up a MutationObserver to watch for changes
+        const initObserver = new MutationObserver((mutations, observer) => {
+            if (initializeIfNeeded()) {
+                log('Initialization successful via MutationObserver');
+                observer.disconnect();
+            }
+        });
 
-    // Initialize immediately and also retry if needed
-    initializeIfNeeded();
+        // Start observing the document with the configured parameters
+        initObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        // Fallback: Clean up after 10 seconds if still not initialized
+        setTimeout(() => {
+            initObserver.disconnect();
+            log('Initialization observer stopped after timeout');
+        }, 10000);
+    }
 
     // Add "Viewed" label and progress bar to thumbnails
     function addViewedLabelToThumbnail(thumbnailElement, videoId) {
@@ -577,7 +595,7 @@
             const transaction = db.transaction([STORE_NAME], 'readonly');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.get(videoId);
-            request.onsuccess = function() {
+            request.onsuccess = function () {
                 const record = request.result;
                 if (record) {
                     const size = OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium;
@@ -648,20 +666,20 @@
     }
 
     // Handle messages from popup
-    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+    chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         if (message.type === 'getHistory') {
             openDBWithMigration().then(database => {
                 db = database;
                 const transaction = db.transaction([STORE_NAME], 'readonly');
                 const store = transaction.objectStore(STORE_NAME);
                 const request = store.getAll();
-                
-                request.onsuccess = function() {
+
+                request.onsuccess = function () {
                     log('Sending history to popup:', request.result);
                     sendResponse({history: request.result});
                 };
-                
-                request.onerror = function() {
+
+                request.onerror = function () {
                     log('Error getting history');
                     sendResponse({history: []});
                 };
@@ -690,13 +708,13 @@
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
                 const request = store.clear();
-                
-                request.onsuccess = function() {
+
+                request.onsuccess = function () {
                     log('History cleared successfully');
                     sendResponse({status: 'success'});
                 };
-                
-                request.onerror = function() {
+
+                request.onerror = function () {
                     log('Error clearing history');
                     sendResponse({status: 'error'});
                 };
@@ -712,13 +730,13 @@
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
                 const request = store.delete(videoId);
-                
-                request.onsuccess = function() {
+
+                request.onsuccess = function () {
                     log('Record deleted successfully:', videoId);
                     sendResponse({status: 'success'});
                 };
-                
-                request.onerror = function() {
+
+                request.onerror = function () {
                     log('Error deleting record:', videoId);
                     sendResponse({status: 'error'});
                 };
@@ -733,13 +751,13 @@
                 const transaction = db.transaction(['playlistHistory'], 'readonly');
                 const store = transaction.objectStore('playlistHistory');
                 const request = store.getAll();
-                
-                request.onsuccess = function() {
+
+                request.onsuccess = function () {
                     log('Sending playlists to popup:', request.result);
                     sendResponse({playlists: request.result});
                 };
-                
-                request.onerror = function() {
+
+                request.onerror = function () {
                     log('Error getting playlists');
                     sendResponse({playlists: []});
                 };
@@ -755,13 +773,13 @@
                 const transaction = db.transaction(['playlistHistory'], 'readwrite');
                 const store = transaction.objectStore('playlistHistory');
                 const request = store.delete(playlistId);
-                
-                request.onsuccess = function() {
+
+                request.onsuccess = function () {
                     log('Playlist deleted successfully:', playlistId);
                     sendResponse({status: 'success'});
                 };
-                
-                request.onerror = function() {
+
+                request.onerror = function () {
                     log('Error deleting playlist:', playlistId);
                     sendResponse({status: 'error'});
                 };
@@ -776,7 +794,7 @@
 
     function showExtensionInfo() {
         // Check if we've already shown the info
-        chrome.storage.local.get(['infoShown'], function(result) {
+        chrome.storage.local.get(['infoShown'], function (result) {
             if (!result.infoShown) {
                 const topLevelButtons = document.querySelector('#top-level-buttons-computed');
                 if (!topLevelButtons) return;
@@ -834,7 +852,7 @@
                 closeButton.addEventListener('click', () => {
                     infoDiv.style.display = 'none';
                     // Remember that we've shown the info
-                    chrome.storage.local.set({ infoShown: true });
+                    chrome.storage.local.set({infoShown: true});
                 });
 
                 // Insert the info div
