@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Local YouTube Video History Tracker",
-    "version": "2.1.2",
+    "version": "2.1.3",
     "description": "Store YouTube video timestamps using IndexedDB for larger storage capacity without expiry.",
     "author": "Edin User",
     "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
