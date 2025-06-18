@@ -428,53 +428,35 @@ function deletePlaylist(playlistId) {
     });
 }
 
-// Load settings from IndexedDB
-function loadSettings() {
-    return new Promise((resolve, reject) => {
-        openDB().then(db => {
-            const transaction = db.transaction(['settings'], 'readonly');
-            const store = transaction.objectStore('settings');
-            const request = store.get('userSettings');
-            request.onsuccess = function() {
-                let settings = request.result?.settings || {};
-                let updated = false;
-                for (const key in DEFAULT_SETTINGS) {
-                    if (!(key in settings)) {
-                        settings[key] = DEFAULT_SETTINGS[key];
-                        updated = true;
-                    }
-                }
-                if (updated) {
-                    const writeTx = db.transaction(['settings'], 'readwrite');
-                    const writeStore = writeTx.objectStore('settings');
-                    writeStore.put({ id: 'userSettings', settings });
-                }
-                resolve(settings);
-            };
-            request.onerror = function() {
-                reject(request.error);
-            };
-        }).catch(reject);
-    });
+// Load settings from storage
+async function loadSettings() {
+    try {
+        let settings = await popupStorage.getSettings() || {};
+        let updated = false;
+        for (const key in DEFAULT_SETTINGS) {
+            if (!(key in settings)) {
+                settings[key] = DEFAULT_SETTINGS[key];
+                updated = true;
+            }
+        }
+        if (updated) {
+            await popupStorage.setSettings(settings);
+        }
+        return settings;
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        return DEFAULT_SETTINGS;
+    }
 }
 
-// Save settings to IndexedDB
-function saveSettings(settings) {
-    return new Promise((resolve, reject) => {
-        openDB().then(db => {
-            const transaction = db.transaction(['settings'], 'readwrite');
-            const store = transaction.objectStore('settings');
-            const request = store.put({ id: 'userSettings', settings });
-            
-            request.onsuccess = function() {
-                resolve();
-            };
-            
-            request.onerror = function() {
-                reject(request.error);
-            };
-        }).catch(reject);
-    });
+// Save settings to storage
+async function saveSettings(settings) {
+    try {
+        await popupStorage.setSettings(settings);
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        throw error;
+    }
 }
 
 // Update settings UI with current values
@@ -667,7 +649,10 @@ document.addEventListener('DOMContentLoaded', function() {
         prevPageBtn.addEventListener('click', goToPrevPage);
         nextPageBtn.addEventListener('click', goToNextPage);
         videosTab.addEventListener('click', () => switchTab('videos'));
-        playlistsTab.addEventListener('click', () => switchTab('playlists'));
+        playlistsTab.addEventListener('click', () => {
+            switchTab('playlists');
+            loadPlaylists();
+        });
         prevPlaylistBtn.addEventListener('click', goToPrevPlaylistPage);
         nextPlaylistBtn.addEventListener('click', goToNextPlaylistPage);
 

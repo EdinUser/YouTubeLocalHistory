@@ -157,7 +157,7 @@
         <button id="ytvhtClosePopup">Close</button>
     </div>
     <div id="ytvhtMessage" class="message"></div>
-    
+
     <div class="tab-bar">
         <button id="ytvhtTabVideos" class="tab active">Videos</button>
         <button id="ytvhtTabPlaylists" class="tab">Playlists</button>
@@ -217,19 +217,19 @@
                 <input type="number" id="ytvhtAutoCleanPeriod" min="1" max="180" value="90">
                 <div class="help-text">Automatically remove history entries older than this many days (max 180 days)</div>
             </div>
-            
+
             <div class="settings-group">
                 <label for="ytvhtPaginationCount">Items per Page</label>
                 <input type="number" id="ytvhtPaginationCount" min="5" max="20" value="10">
                 <div class="help-text">Number of items to show per page in history view (max 20)</div>
             </div>
-            
+
             <div class="settings-group">
                 <label for="ytvhtOverlayTitle">Overlay Title</label>
                 <input type="text" id="ytvhtOverlayTitle" maxlength="12" value="viewed">
                 <div class="help-text">Text to show in the overlay (max 12 characters)</div>
             </div>
-            
+
             <div class="settings-group">
                 <label for="ytvhtOverlayColor">Overlay Color</label>
                 <select id="ytvhtOverlayColor">
@@ -242,7 +242,7 @@
                 <span id="ytvhtColorPreview" class="color-preview"></span>
                 <div class="help-text">Color of the progress bar overlay</div>
             </div>
-            
+
             <div class="settings-group">
                 <label for="ytvhtOverlayLabelSize">Overlay Label Size</label>
                 <select id="ytvhtOverlayLabelSize">
@@ -253,7 +253,7 @@
                 </select>
                 <div class="help-text">Size of the overlay label and progress bar</div>
             </div>
-            
+
             <button id="ytvhtSaveSettings" style="margin-top: 10px;">Save Settings</button>
         </div>
     </div>
@@ -267,6 +267,7 @@
             <li>Check for any content blocking: click the shield icon in the address bar when the popup is open and ensure no scripts are blocked</li>
         </ul>
     </div>
+    <script src="popup-storage.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

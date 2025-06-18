@@ -5,6 +5,111 @@
     const DB_VERSION = 3; // Increment version for settings store
     const STORE_NAME = 'videoHistory';
     const DEBUG = false;
+
+    // Inject CSS to avoid CSP issues with inline styles
+    function injectCSS() {
+        if (document.getElementById('ytvht-styles')) return; // Already injected
+
+        const style = document.createElement('style');
+        style.id = 'ytvht-styles';
+        style.textContent = `
+            .ytvht-viewed-label {
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                padding: 8px 4px !important;
+                background-color: #4285f4 !important;
+                color: #fff !important;
+                font-size: 16px !important;
+                font-weight: bold !important;
+                z-index: 2 !important;
+                border-radius: 0 0 4px 0 !important;
+                pointer-events: none !important;
+            }
+            .ytvht-progress-bar {
+                position: absolute !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                height: 3px !important;
+                background-color: #4285f4 !important;
+                z-index: 2 !important;
+                pointer-events: none !important;
+            }
+            .ytvht-info {
+                position: absolute !important;
+                top: -120px !important;
+                right: 0 !important;
+                background: var(--yt-spec-brand-background-primary, #0f0f0f) !important;
+                border: 1px solid var(--yt-spec-text-secondary, #aaa) !important;
+                border-radius: 8px !important;
+                padding: 12px !important;
+                width: 300px !important;
+                z-index: 9999 !important;
+                color: var(--yt-spec-text-primary, #fff) !important;
+                font-size: 14px !important;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+            }
+            .ytvht-info-content {
+                display: flex !important;
+                align-items: start !important;
+                gap: 12px !important;
+            }
+            .ytvht-info-text {
+                flex-grow: 1 !important;
+            }
+            .ytvht-info-title {
+                font-weight: 500 !important;
+                margin-bottom: 8px !important;
+                color: #fff !important;
+            }
+            .ytvht-info-description {
+                color: #aaa !important;
+                line-height: 1.4 !important;
+            }
+            .ytvht-info-highlight {
+                color: #fff !important;
+                background: rgba(255,255,255,0.1) !important;
+                padding: 2px 6px !important;
+                border-radius: 4px !important;
+            }
+            .ytvht-close {
+                background: none !important;
+                border: none !important;
+                padding: 4px 8px !important;
+                cursor: pointer !important;
+                color: #aaa !important;
+                font-size: 20px !important;
+                opacity: 0.8 !important;
+                transition: opacity 0.2s !important;
+            }
+            .ytvht-close:hover {
+                opacity: 1 !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Update overlay CSS with current settings to avoid inline styles
+    function updateOverlayCSS(size, color) {
+        let styleElement = document.getElementById('ytvht-dynamic-styles');
+        if (!styleElement) {
+            styleElement = document.createElement('style');
+            styleElement.id = 'ytvht-dynamic-styles';
+            document.head.appendChild(styleElement);
+        }
+
+        styleElement.textContent = `
+            .ytvht-viewed-label {
+                padding: ${size.fontSize / 2}px 4px !important;
+                background-color: ${color} !important;
+                font-size: ${size.fontSize}px !important;
+            }
+            .ytvht-progress-bar {
+                height: ${size.bar}px !important;
+                background-color: ${color} !important;
+            }
+        `;
+    }
     const SAVE_INTERVAL = 5000; // Save every 5 seconds
     const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // Clean up once a day
     const RECORD_LIFETIME = 3 * 30 * 24 * 60 * 60 * 1000; // 3 months in milliseconds
@@ -15,7 +120,7 @@
         overlayColor: 'blue',
         overlayLabelSize: 'medium'
     };
-    
+
     // Color mapping for overlay colors
     const OVERLAY_COLORS = {
         blue: '#4285f4',
@@ -24,7 +129,7 @@
         purple: '#9c27b0',
         orange: '#ff9800'
     };
-    
+
     let db;
     let saveIntervalId;
     let isInitialized = false;
@@ -41,12 +146,12 @@
     // Extract video ID from any YouTube URL format
     function getVideoId() {
         const url = window.location.href;
-        
+
         // Try to get from URL parameters first
         const urlParams = new URLSearchParams(window.location.search);
         const videoId = urlParams.get('v');
         if (videoId) return videoId;
-        
+
         // Try to match various URL patterns
         const patterns = [
             /(?:youtube\.com\/watch\/([^\/\?]+))/i,  // youtube.com/watch/VIDEO_ID
@@ -55,14 +160,14 @@
             /(?:youtu\.be\/([^\/\?]+))/i,            // youtu.be/VIDEO_ID
             /(?:youtube\.com\/shorts\/([^\/\?]+))/i  // youtube.com/shorts/VIDEO_ID
         ];
-        
+
         for (const pattern of patterns) {
             const match = url.match(pattern);
             if (match && match[1]) {
                 return match[1];
             }
         }
-        
+
         // If no pattern matches, try the last path segment
         const pathSegments = window.location.pathname.split('/').filter(Boolean);
         if (pathSegments.length > 0) {
@@ -72,7 +177,7 @@
                 return lastSegment;
             }
         }
-        
+
         log('Could not extract video ID from URL:', url);
         return null;
     }
@@ -127,27 +232,18 @@
     }
 
     // Save playlist info
-    function savePlaylistInfo(playlistInfo = null) {
+    async function savePlaylistInfo(playlistInfo = null) {
         const info = playlistInfo || getPlaylistInfo();
         if (!info) return;
 
         log('Saving playlist info:', info);
-        
-        openDBWithMigration().then(database => {
-            db = database;
-            const transaction = db.transaction(['playlistHistory'], 'readwrite');
-            const store = transaction.objectStore('playlistHistory');
-            
-            const request = store.put(info);
-            request.onsuccess = function() {
-                log('Playlist info saved successfully:', info);
-            };
-            request.onerror = function(event) {
-                log('Error saving playlist info:', event.target.error);
-            };
-        }).catch(error => {
+
+        try {
+            await ytStorage.setPlaylist(info.playlistId, info);
+            log('Playlist info saved successfully:', info);
+        } catch (error) {
             log('Error saving playlist info:', error);
-        });
+        }
     }
 
     // Migration-safe DB open/upgrade routine
@@ -158,19 +254,19 @@
             request.onupgradeneeded = function(event) {
                 const db = event.target.result;
                 log('Database upgrade needed. Creating stores...');
-                
+
                 // Create video history store if it doesn't exist
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
                     db.createObjectStore(STORE_NAME, { keyPath: 'videoId' });
                     log('Created video history store');
                 }
-                
+
                 // Create playlist history store if it doesn't exist
                 if (!db.objectStoreNames.contains('playlistHistory')) {
                     db.createObjectStore('playlistHistory', { keyPath: 'playlistId' });
                     log('Created playlist history store');
                 }
-                
+
                 // Create settings store if it doesn't exist
                 if (!db.objectStoreNames.contains('settings')) {
                     db.createObjectStore('settings', { keyPath: 'id' });
@@ -191,30 +287,19 @@
         });
     }
 
-    // Load settings from IndexedDB
-    function loadSettings() {
-        return new Promise((resolve, reject) => {
-            openDBWithMigration().then(database => {
-                db = database;
-                const transaction = db.transaction(['settings'], 'readonly');
-                const store = transaction.objectStore('settings');
-                const request = store.get('userSettings');
-                
-                request.onsuccess = function() {
-                    const settings = request.result?.settings || DEFAULT_SETTINGS;
-                    currentSettings = settings;
-                    resolve(settings);
-                };
-                
-                request.onerror = function() {
-                    reject(request.error);
-                };
-            }).catch(reject);
-        });
+    // Load settings from storage
+    async function loadSettings() {
+        try {
+            const settings = await ytStorage.getSettings();
+            return settings;
+        } catch (error) {
+            log('Error loading settings:', error);
+            return null;
+        }
     }
 
     // Load and set the saved timestamp
-    function loadTimestamp() {
+    async function loadTimestamp() {
         const videoId = getVideoId();
         if (!videoId) {
             log('No video ID found in URL.');
@@ -223,59 +308,42 @@
 
         log(`Attempting to load timestamp for video ID: ${videoId} from URL: ${window.location.href}`);
 
-        openDBWithMigration().then(database => {
-            db = database;
-            const transaction = db.transaction([STORE_NAME], 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.get(videoId);
+        try {
+            const record = await ytStorage.getVideo(videoId);
+            if (record) {
+                const video = document.querySelector('video');
+                if (video) {
+                    log(`Found record for video ID ${videoId}:`, record);
 
-            request.onsuccess = function(event) {
-                const record = event.target.result;
-                if (record) {
-                    const video = document.querySelector('video');
-                    if (video) {
-                        log(`Found record for video ID ${videoId}:`, record);
-                        
-                        // Wait for video to be ready
-                        const setTime = () => {
-                            if (record.time > 0 && record.time < video.duration) {
-                                video.currentTime = record.time;
-                                log(`Timestamp set for video ID ${videoId}: ${record.time} (duration: ${video.duration})`);
-                            } else {
-                                log(`Invalid timestamp ${record.time} for video duration ${video.duration}, skipping`);
-                            }
-                        };
-
-                        if (video.readyState >= 1) {
-                            setTime();
+                    // Wait for video to be ready
+                    const setTime = () => {
+                        if (record.time > 0 && record.time < video.duration) {
+                            video.currentTime = record.time;
+                            log(`Timestamp set for video ID ${videoId}: ${record.time} (duration: ${video.duration})`);
                         } else {
-                            log('Video not ready, waiting for loadedmetadata event');
-                            video.addEventListener('loadedmetadata', setTime, { once: true });
+                            log(`Invalid timestamp ${record.time} for video duration ${video.duration}, skipping`);
                         }
+                    };
+
+                    if (video.readyState >= 1) {
+                        setTime();
                     } else {
-                        log('No video element found.');
+                        log('Video not ready, waiting for loadedmetadata event');
+                        video.addEventListener('loadedmetadata', setTime, {once: true});
                     }
                 } else {
-                    log('No record found for video ID:', videoId);
+                    log('No video element found.');
                 }
-            };
-
-            request.onerror = function(event) {
-                log('Error fetching data from IndexedDB:', event.target.error);
-            };
-        }).catch(error => {
+            } else {
+                log('No record found for video ID:', videoId);
+            }
+        } catch (error) {
             log('Error loading timestamp:', error);
-        });
+        }
     }
 
     // Save the current video timestamp
-    function saveTimestamp() {
-        if (!db) {
-            log('Database not initialized, retrying in 1 second...');
-            setTimeout(saveTimestamp, 1000);
-            return;
-        }
-
+    async function saveTimestamp() {
         const video = document.querySelector('video');
         if (!video) {
             log('No video element found.');
@@ -285,21 +353,21 @@
         const currentTime = video.currentTime;
         const duration = video.duration;
         const videoId = getVideoId();
-        
+
         if (!videoId) {
             log('No video ID found.');
             return;
         }
 
         log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
-        
+
         // Get video title from YouTube's page
-        const title = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim() || 
+        const title = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim() ||
                      document.querySelector('h1.title.style-scope.ytd-video-primary-info-renderer')?.textContent?.trim() ||
                      'Unknown Title';
-        
-        const record = { 
-            videoId: videoId, 
+
+        const record = {
+            videoId: videoId,
             time: currentTime,
             duration: duration,
             timestamp: Date.now(),
@@ -308,63 +376,33 @@
         };
 
         try {
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.put(record);
-
-            request.onsuccess = function() {
-                log(`Timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
-            };
-
-            request.onerror = function(event) {
-                log('Error saving record:', event.target.error);
-                // Try to reinitialize database and retry
-                openDBWithMigration().then(database => {
-                    db = database;
-                    setTimeout(saveTimestamp, 1000);
-                });
-            };
+            await ytStorage.setVideo(videoId, record);
+            log(`Timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
         } catch (error) {
-            log('Error during save transaction:', error);
-            // Try to reinitialize database and retry
-            openDBWithMigration().then(database => {
-                db = database;
-                setTimeout(saveTimestamp, 1000);
-            });
+            log('Error saving record:', error);
         }
     }
 
     // Clean up old records based on settings
-    function cleanupOldRecords() {
-        if (!db) {
-            log('Database not initialized, skipping cleanup');
-            return;
-        }
-
+    async function cleanupOldRecords() {
         const cutoffTime = Date.now() - (currentSettings.autoCleanPeriod * 24 * 60 * 60 * 1000);
         log(`Cleaning up records older than ${new Date(cutoffTime).toISOString()}`);
 
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.getAll();
-
-        request.onsuccess = function() {
-            const records = request.result;
+        try {
+            const allVideos = await ytStorage.getAllVideos();
             let deletedCount = 0;
 
-            records.forEach(record => {
+            for (const [videoId, record] of Object.entries(allVideos)) {
                 if (record.timestamp < cutoffTime) {
-                    store.delete(record.videoId);
+                    await ytStorage.removeVideo(videoId);
                     deletedCount++;
                 }
-            });
+            }
 
             log(`Cleaned up ${deletedCount} old records`);
-        };
-
-        request.onerror = function(event) {
-            log('Error during cleanup:', event.target.error);
-        };
+        } catch (error) {
+            log('Error during cleanup:', error);
+        }
     }
 
     // Start periodic saving
@@ -379,9 +417,9 @@
     // Set up video tracking
     function setupVideoTracking(video) {
         log('Setting up video tracking for video element:', video);
-        
+
         let timestampLoaded = false;
-        
+
         // Function to ensure video is ready before loading timestamp
         const ensureVideoReady = () => {
             if (timestampLoaded) {
@@ -466,12 +504,12 @@
                     const transaction = db.transaction([STORE_NAME], 'readonly');
                     const store = transaction.objectStore(STORE_NAME);
                     const request = store.getAll();
-                    
+
                     request.onsuccess = function() {
                         log('Sending history to popup:', request.result);
                         sendResponse({history: request.result});
                     };
-                    
+
                     request.onerror = function() {
                         log('Error getting history');
                         sendResponse({history: []});
@@ -502,7 +540,7 @@
     // Initialize database and set up event listeners
     function initializeIfNeeded() {
         if (isInitialized) {
-            return true; 
+            return true;
         }
 
         const video = document.querySelector('video');
@@ -524,9 +562,9 @@
             }).catch(error => {
                 log('Error initializing database during video setup:', error);
             });
-            return true; 
+            return true;
         }
-        return false; 
+        return false;
     }
 
     // Try to save playlist with retries
@@ -555,7 +593,7 @@
     initializeIfNeeded();
 
     // Add "Viewed" label and progress bar to thumbnails
-    function addViewedLabelToThumbnail(thumbnailElement, videoId) {
+    async function addViewedLabelToThumbnail(thumbnailElement, videoId) {
         if (!thumbnailElement || !videoId) return;
 
         // Only add overlays to ytd-thumbnail or its anchor child
@@ -572,44 +610,27 @@
         // Remove all existing overlays in this thumbnail
         thumbnailElement.querySelectorAll('.ytvht-viewed-label, .ytvht-progress-bar').forEach(el => el.remove());
 
-        openDBWithMigration().then(database => {
-            db = database;
-            const transaction = db.transaction([STORE_NAME], 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.get(videoId);
-            request.onsuccess = function() {
-                const record = request.result;
-                if (record) {
-                    const size = OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium;
-                    const label = document.createElement('div');
-                    label.className = 'ytvht-viewed-label';
-                    label.textContent = currentSettings.overlayTitle;
-                    label.style.position = 'absolute';
-                    label.style.top = '0';
-                    label.style.left = '0';
-                    label.style.padding = (size.fontSize / 2) + 'px 4px';
-                    label.style.backgroundColor = OVERLAY_COLORS[currentSettings.overlayColor];
-                    label.style.color = '#fff';
-                    label.style.fontSize = size.fontSize + 'px';
-                    label.style.fontWeight = 'bold';
-                    label.style.zIndex = '2';
-                    label.style.borderRadius = '0 0 4px 0';
-                    // Add progress bar
-                    const progress = document.createElement('div');
-                    progress.className = 'ytvht-progress-bar';
-                    progress.style.position = 'absolute';
-                    progress.style.bottom = '0';
-                    progress.style.left = '0';
-                    progress.style.height = size.bar + 'px';
-                    progress.style.backgroundColor = OVERLAY_COLORS[currentSettings.overlayColor];
-                    progress.style.width = `${(record.time / record.duration) * 100}%`;
-                    progress.style.zIndex = '2';
-                    thumbnailElement.style.position = 'relative';
-                    thumbnailElement.appendChild(label);
-                    thumbnailElement.appendChild(progress);
-                }
-            };
-        });
+        try {
+            const record = await ytStorage.getVideo(videoId);
+            if (record) {
+                const size = OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium;
+
+                const label = document.createElement('div');
+                label.className = 'ytvht-viewed-label';
+                label.textContent = currentSettings.overlayTitle;
+
+                // Add progress bar
+                const progress = document.createElement('div');
+                progress.className = 'ytvht-progress-bar';
+                progress.style.width = `${(record.time / record.duration) * 100}%`;
+
+                thumbnailElement.style.position = 'relative';
+                thumbnailElement.appendChild(label);
+                thumbnailElement.appendChild(progress);
+            }
+        } catch (error) {
+            log('Error checking video record:', error);
+        }
     }
 
     // Watch for new thumbnails being added to the page
@@ -650,23 +671,12 @@
     // Handle messages from popup
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
         if (message.type === 'getHistory') {
-            openDBWithMigration().then(database => {
-                db = database;
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.getAll();
-                
-                request.onsuccess = function() {
-                    log('Sending history to popup:', request.result);
-                    sendResponse({history: request.result});
-                };
-                
-                request.onerror = function() {
-                    log('Error getting history');
-                    sendResponse({history: []});
-                };
+            ytStorage.getAllVideos().then(allVideos => {
+                const history = Object.values(allVideos);
+                log('Sending history to popup:', history);
+                sendResponse({history: history});
             }).catch(error => {
-                log('Error opening database:', error);
+                log('Error getting history:', error);
                 sendResponse({history: []});
             });
             return true;
@@ -680,93 +690,51 @@
             return true;
         } else if (message.type === 'updateSettings') {
             currentSettings = message.settings;
+            injectCSS();
+            updateOverlayCSS(
+                OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium,
+                OVERLAY_COLORS[currentSettings.overlayColor] || OVERLAY_COLORS.blue
+            );
             // Reprocess thumbnails with new settings
             processExistingThumbnails();
             sendResponse({status: 'success'});
             return true;
         } else if (message.type === 'clearHistory') {
-            openDBWithMigration().then(database => {
-                db = database;
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.clear();
-                
-                request.onsuccess = function() {
-                    log('History cleared successfully');
-                    sendResponse({status: 'success'});
-                };
-                
-                request.onerror = function() {
-                    log('Error clearing history');
-                    sendResponse({status: 'error'});
-                };
+            ytStorage.clear().then(() => {
+                log('History cleared successfully');
+                sendResponse({status: 'success'});
             }).catch(error => {
-                log('Error opening database:', error);
+                log('Error clearing history:', error);
                 sendResponse({status: 'error'});
             });
             return true;
         } else if (message.type === 'deleteRecord') {
             const videoId = message.videoId;
-            openDBWithMigration().then(database => {
-                db = database;
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.delete(videoId);
-                
-                request.onsuccess = function() {
-                    log('Record deleted successfully:', videoId);
-                    sendResponse({status: 'success'});
-                };
-                
-                request.onerror = function() {
-                    log('Error deleting record:', videoId);
-                    sendResponse({status: 'error'});
-                };
+            ytStorage.removeVideo(videoId).then(() => {
+                log('Record deleted successfully:', videoId);
+                sendResponse({status: 'success'});
             }).catch(error => {
-                log('Error opening database:', error);
+                log('Error deleting record:', videoId);
                 sendResponse({status: 'error'});
             });
             return true;
         } else if (message.type === 'getPlaylists') {
-            openDBWithMigration().then(database => {
-                db = database;
-                const transaction = db.transaction(['playlistHistory'], 'readonly');
-                const store = transaction.objectStore('playlistHistory');
-                const request = store.getAll();
-                
-                request.onsuccess = function() {
-                    log('Sending playlists to popup:', request.result);
-                    sendResponse({playlists: request.result});
-                };
-                
-                request.onerror = function() {
-                    log('Error getting playlists');
-                    sendResponse({playlists: []});
-                };
+            ytStorage.getAllPlaylists().then(allPlaylists => {
+                const playlists = Object.values(allPlaylists);
+                log('Sending playlists to popup:', playlists);
+                sendResponse({playlists: playlists});
             }).catch(error => {
-                log('Error opening database:', error);
+                log('Error getting playlists:', error);
                 sendResponse({playlists: []});
             });
             return true;
         } else if (message.type === 'deletePlaylist') {
             const playlistId = message.playlistId;
-            openDBWithMigration().then(database => {
-                db = database;
-                const transaction = db.transaction(['playlistHistory'], 'readwrite');
-                const store = transaction.objectStore('playlistHistory');
-                const request = store.delete(playlistId);
-                
-                request.onsuccess = function() {
-                    log('Playlist deleted successfully:', playlistId);
-                    sendResponse({status: 'success'});
-                };
-                
-                request.onerror = function() {
-                    log('Error deleting playlist:', playlistId);
-                    sendResponse({status: 'error'});
-                };
+            ytStorage.removePlaylist(playlistId).then(() => {
+                log('Playlist deleted successfully:', playlistId);
+                sendResponse({status: 'success'});
             }).catch(error => {
-                log('Error opening database:', error);
+                log('Error deleting playlist:', playlistId);
                 sendResponse({status: 'error'});
             });
             return true;
@@ -853,12 +821,27 @@
         });
     }
 
-    // Initialize settings on startup
-    loadSettings().then(settings => {
-        currentSettings = settings;
-        log('Settings loaded:', settings);
-    }).catch(error => {
-        log('Error loading settings:', error);
-    });
+    // Initialize everything
+    async function initialize() {
+        injectCSS();
+
+        try {
+            const settings = await loadSettings() || DEFAULT_SETTINGS;
+            currentSettings = settings;
+
+            updateOverlayCSS(
+                OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium,
+                OVERLAY_COLORS[currentSettings.overlayColor] || OVERLAY_COLORS.blue
+            );
+
+            log('Settings loaded:', settings);
+        } catch (error) {
+            log('Error loading settings:', error);
+            currentSettings = DEFAULT_SETTINGS;
+        }
+    }
+
+    // Initialize on startup
+    initialize();
 })();
 
