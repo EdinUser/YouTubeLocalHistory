@@ -1,12 +1,13 @@
 {
     "manifest_version": 3,
     "name": "Local YouTube Video History Tracker",
-    "version": "2.1.1",
-    "description": "Store YouTube video timestamps using IndexedDB for larger storage capacity without expiry.",
+    "version": "2.2.0",
+    "description": "Store YouTube video timestamps using secure browser storage for larger storage capacity without expiry.",
     "author": "Edin User",
     "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
     "permissions": [
         "storage",
+        "unlimitedStorage",
         "activeTab",
         "scripting"
     ],
@@ -22,6 +23,7 @@
                 "*://*.youtube.com/*"
             ],
             "js": [
+                "storage.js",
                 "content.js"
             ],
             "run_at": "document_end"
