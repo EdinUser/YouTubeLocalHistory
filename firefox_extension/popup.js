@@ -515,6 +515,15 @@ function initSettingsTab() {
             showMessage('Settings saved successfully');
             pageSize = settings.paginationCount;
             displayHistoryPage();
+            
+            // Notify content script of settings changes
+            sendToContentScriptWithRetry({type: 'updateSettings', settings: settings}, function(response) {
+                if (response && response.status === 'success') {
+                    log('Settings updated in content script');
+                } else {
+                    console.warn('Failed to update settings in content script');
+                }
+            });
         }).catch(error => {
             console.error('Error saving settings:', error);
             showMessage('Error saving settings', 'error');

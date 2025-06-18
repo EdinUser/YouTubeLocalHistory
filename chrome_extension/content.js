@@ -130,6 +130,14 @@
         orange: '#ff9800'
     };
 
+    // Size mapping for overlay labels and progress bars
+    const OVERLAY_LABEL_SIZE_MAP = {
+        small: { fontSize: 12, bar: 2 },
+        medium: { fontSize: 16, bar: 3 },
+        large: { fontSize: 22, bar: 4 },
+        xlarge: { fontSize: 28, bar: 5 }
+    };
+
     let db;
     let saveIntervalId;
     let isInitialized = false;
@@ -290,11 +298,29 @@
     // Load settings from storage
     async function loadSettings() {
         try {
-            const settings = await ytStorage.getSettings();
+            const storedSettings = await ytStorage.getSettings();
+            let settings = storedSettings?.settings || {};
+            let updated = false;
+
+            // Ensure all default settings are present
+            for (const key in DEFAULT_SETTINGS) {
+                if (!(key in settings)) {
+                    settings[key] = DEFAULT_SETTINGS[key];
+                    updated = true;
+                }
+            }
+
+            // Save updated settings if needed
+            if (updated) {
+                await ytStorage.setSettings({id: 'userSettings', settings});
+            }
+
+            currentSettings = settings;
             return settings;
         } catch (error) {
-            log('Error loading settings:', error);
-            return null;
+            console.error('Error loading settings:', error);
+            currentSettings = DEFAULT_SETTINGS;
+            return DEFAULT_SETTINGS;
         }
     }
 
@@ -835,6 +861,14 @@
             );
 
             log('Settings loaded:', settings);
+            
+            // Start the thumbnail observer immediately
+            thumbnailObserver.observe(document.body, { childList: true, subtree: true });
+            
+            // Process existing thumbnails after settings are loaded
+            setTimeout(() => {
+                processExistingThumbnails();
+            }, 1000);
         } catch (error) {
             log('Error loading settings:', error);
             currentSettings = DEFAULT_SETTINGS;

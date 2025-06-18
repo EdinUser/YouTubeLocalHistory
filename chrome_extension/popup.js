@@ -431,7 +431,8 @@ function deletePlaylist(playlistId) {
 // Load settings from storage
 async function loadSettings() {
     try {
-        let settings = await popupStorage.getSettings() || {};
+        const storedSettings = await popupStorage.getSettings();
+        let settings = storedSettings?.settings || {};
         let updated = false;
         for (const key in DEFAULT_SETTINGS) {
             if (!(key in settings)) {
@@ -440,7 +441,7 @@ async function loadSettings() {
             }
         }
         if (updated) {
-            await popupStorage.setSettings(settings);
+            await popupStorage.setSettings({id: 'userSettings', settings});
         }
         return settings;
     } catch (error) {
@@ -452,7 +453,7 @@ async function loadSettings() {
 // Save settings to storage
 async function saveSettings(settings) {
     try {
-        await popupStorage.setSettings(settings);
+        await popupStorage.setSettings({id: 'userSettings', settings});
     } catch (error) {
         console.error('Error saving settings:', error);
         throw error;
@@ -523,6 +524,15 @@ function initSettingsTab() {
             showMessage('Settings saved successfully');
             pageSize = settings.paginationCount;
             displayHistoryPage();
+            
+            // Notify content script of settings changes
+            sendToContentScriptWithRetry({type: 'updateSettings', settings: settings}, function(response) {
+                if (response && response.status === 'success') {
+                    log('Settings updated in content script');
+                } else {
+                    console.warn('Failed to update settings in content script');
+                }
+            });
         }).catch(error => {
             console.error('Error saving settings:', error);
             showMessage('Error saving settings', 'error');
