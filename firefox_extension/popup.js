@@ -185,6 +185,8 @@ function loadHistory() {
             return;
         }
         allHistoryRecords = response.history || [];
+        // Sort by timestamp descending (most recent first)
+        allHistoryRecords.sort((a, b) => b.timestamp - a.timestamp);
         log('Received history:', allHistoryRecords);
         currentPage = 1;
         displayHistoryPage();
