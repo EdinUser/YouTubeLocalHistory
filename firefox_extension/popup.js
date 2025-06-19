@@ -185,6 +185,8 @@ function loadHistory() {
             return;
         }
         allHistoryRecords = response.history || [];
+        // Sort by timestamp descending (most recent first)
+        allHistoryRecords.sort((a, b) => b.timestamp - a.timestamp);
         log('Received history:', allHistoryRecords);
         currentPage = 1;
         displayHistoryPage();
@@ -237,10 +239,8 @@ function displayHistoryPage() {
         row.appendChild(actionCell);
         historyTable.appendChild(row);
     });
-    // Update pagination info
-    document.getElementById('ytvhtPageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
-    document.getElementById('ytvhtPrevPage').disabled = currentPage === 1;
-    document.getElementById('ytvhtNextPage').disabled = currentPage === totalPages;
+    // Update pagination info and controls
+    updatePaginationUI(currentPage, totalPages);
 }
 
 function deleteRecord(videoId) {
@@ -328,6 +328,125 @@ function goToNextPage() {
         currentPage++;
         displayHistoryPage();
     }
+}
+
+function goToFirstPage() {
+    if (currentPage !== 1) {
+        currentPage = 1;
+        displayHistoryPage();
+    }
+}
+
+function goToLastPage() {
+    const totalPages = Math.ceil(allHistoryRecords.length / pageSize);
+    if (currentPage !== totalPages) {
+        currentPage = totalPages;
+        displayHistoryPage();
+    }
+}
+
+function goToPage(page) {
+    const totalPages = Math.ceil(allHistoryRecords.length / pageSize);
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+        currentPage = page;
+        displayHistoryPage();
+    }
+}
+
+function updatePaginationUI(current, total) {
+    document.getElementById('ytvhtPageInfo').textContent = `Page ${current} of ${total}`;
+    
+    // Update button states
+    document.getElementById('ytvhtFirstPage').disabled = current === 1;
+    document.getElementById('ytvhtPrevPage').disabled = current === 1;
+    document.getElementById('ytvhtNextPage').disabled = current === total;
+    document.getElementById('ytvhtLastPage').disabled = current === total;
+    
+    // Update page input
+    const pageInput = document.getElementById('ytvhtPageInput');
+    pageInput.max = total;
+    
+    // Generate page numbers (smart pagination)
+    const pageNumbers = document.getElementById('ytvhtPageNumbers');
+    pageNumbers.innerHTML = '';
+    
+    if (total <= 10) {
+        // Show all pages if 10 or fewer
+        for (let i = 1; i <= total; i++) {
+            addPageButton(i, current);
+        }
+    } else {
+        // Smart pagination for many pages
+        addPageButton(1, current); // Always show first page
+        
+        if (current > 4) {
+            addEllipsis(); // Add ... if current is far from start
+        }
+        
+        // Show current page and neighbors
+        const start = Math.max(2, current - 2);
+        const end = Math.min(total - 1, current + 2);
+        
+        for (let i = start; i <= end; i++) {
+            addPageButton(i, current);
+        }
+        
+        if (current < total - 3) {
+            addEllipsis(); // Add ... if current is far from end
+        }
+        
+        if (total > 1) {
+            addPageButton(total, current); // Always show last page
+        }
+    }
+    
+    // Add "Go to page" input for very large sets
+    if (total > 10) {
+        const goToSpan = document.createElement('span');
+        goToSpan.textContent = ' Go to: ';
+        goToSpan.style.marginLeft = '10px';
+        pageNumbers.appendChild(goToSpan);
+        
+        const clonedInput = pageInput.cloneNode(true);
+        clonedInput.style.display = 'inline';
+        clonedInput.value = '';
+        clonedInput.placeholder = current;
+        clonedInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const page = parseInt(this.value);
+                if (page) {
+                    goToPage(page);
+                    this.value = '';
+                    this.placeholder = currentPage;
+                }
+            }
+        });
+        pageNumbers.appendChild(clonedInput);
+    }
+}
+
+function addPageButton(pageNum, currentPage) {
+    const button = document.createElement('button');
+    button.textContent = pageNum;
+    button.className = pageNum === currentPage ? 'active' : '';
+    button.style.cssText = `
+        min-width: 30px;
+        padding: 5px 8px;
+        border: 1px solid #ccc;
+        background: ${pageNum === currentPage ? '#007cba' : '#f9f9f9'};
+        color: ${pageNum === currentPage ? 'white' : '#333'};
+        cursor: pointer;
+        border-radius: 3px;
+    `;
+    button.addEventListener('click', () => goToPage(pageNum));
+    document.getElementById('ytvhtPageNumbers').appendChild(button);
+}
+
+function addEllipsis() {
+    const span = document.createElement('span');
+    span.textContent = '...';
+    span.style.padding = '5px';
+    document.getElementById('ytvhtPageNumbers').appendChild(span);
 }
 
 function loadPlaylists() {
@@ -503,8 +622,8 @@ function initSettingsTab() {
             showMessage('Auto-clean period must be between 1 and 180 days', 'error');
             return;
         }
-        if (settings.paginationCount < 5 || settings.paginationCount > 20) {
-            showMessage('Items per page must be between 5 and 20', 'error');
+        if (settings.paginationCount < 1 || settings.paginationCount > 100) {
+            showMessage('Items per page must be between 1 and 100', 'error');
             return;
         }
         if (settings.overlayTitle.length > 12) {
@@ -515,6 +634,15 @@ function initSettingsTab() {
             showMessage('Settings saved successfully');
             pageSize = settings.paginationCount;
             displayHistoryPage();
+            
+            // Notify content script of settings changes
+            sendToContentScriptWithRetry({type: 'updateSettings', settings: settings}, function(response) {
+                if (response && response.status === 'success') {
+                    log('Settings updated in content script');
+                } else {
+                    console.warn('Failed to update settings in content script');
+                }
+            });
         }).catch(error => {
             console.error('Error saving settings:', error);
             showMessage('Error saving settings', 'error');
@@ -564,16 +692,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const exportButton = document.getElementById('ytvhtExportHistory');
         const importButton = document.getElementById('ytvhtImportHistory');
         const closeButton = document.getElementById('ytvhtClosePopup');
+        const firstPageBtn = document.getElementById('ytvhtFirstPage');
         const prevPageBtn = document.getElementById('ytvhtPrevPage');
         const nextPageBtn = document.getElementById('ytvhtNextPage');
+        const lastPageBtn = document.getElementById('ytvhtLastPage');
         const videosTab = document.getElementById('ytvhtTabVideos');
         const playlistsTab = document.getElementById('ytvhtTabPlaylists');
         const prevPlaylistBtn = document.getElementById('ytvhtPrevPlaylistPage');
         const nextPlaylistBtn = document.getElementById('ytvhtNextPlaylistPage');
 
         if (!clearButton || !exportButton || !importButton || !closeButton || 
-            !prevPageBtn || !nextPageBtn || !videosTab || !playlistsTab || 
-            !prevPlaylistBtn || !nextPlaylistBtn) {
+            !firstPageBtn || !prevPageBtn || !nextPageBtn || !lastPageBtn ||
+            !videosTab || !playlistsTab || !prevPlaylistBtn || !nextPlaylistBtn) {
             throw new Error('Required buttons not found');
         }
 
@@ -634,8 +764,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         closeButton.addEventListener('click', () => window.close());
+        firstPageBtn.addEventListener('click', goToFirstPage);
         prevPageBtn.addEventListener('click', goToPrevPage);
         nextPageBtn.addEventListener('click', goToNextPage);
+        lastPageBtn.addEventListener('click', goToLastPage);
         videosTab.addEventListener('click', () => switchTab('videos'));
         playlistsTab.addEventListener('click', () => {
             switchTab('playlists');
@@ -647,7 +779,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Load initial data with a slight delay to ensure content script is ready
         setTimeout(() => {
             switchTab('videos');
-            loadHistory();
+            // Load settings first to set correct pageSize
+            loadSettings().then(settings => {
+                pageSize = settings.paginationCount;
+                loadHistory();
+            }).catch(() => {
+                loadHistory();
+            });
         }, 100);
         
         initSettingsTab();

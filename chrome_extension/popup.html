@@ -180,10 +180,16 @@
         <div id="ytvhtNoHistory" class="no-history" style="display: none;">
             No history found. Start watching some videos!
         </div>
-        <div id="ytvhtPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px;">
-            <button id="ytvhtPrevPage">Previous</button>
+        <div id="ytvhtPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;">
+            <button id="ytvhtFirstPage" title="First page">&laquo;</button>
+            <button id="ytvhtPrevPage" title="Previous page">&lt;</button>
+            <div id="ytvhtPageNumbers" style="display:flex; gap:5px; align-items:center;">
+                <!-- Page numbers will be inserted here -->
+            </div>
+            <input id="ytvhtPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
             <span id="ytvhtPageInfo">Page 1 of 1</span>
-            <button id="ytvhtNextPage">Next</button>
+            <button id="ytvhtNextPage" title="Next page">&gt;</button>
+            <button id="ytvhtLastPage" title="Last page">&raquo;</button>
         </div>
         <!-- Playlists Table -->
         <table class="history-table" id="ytvhtPlaylistsTable" style="display:none;">
@@ -220,8 +226,8 @@
 
             <div class="settings-group">
                 <label for="ytvhtPaginationCount">Items per Page</label>
-                <input type="number" id="ytvhtPaginationCount" min="5" max="20" value="10">
-                <div class="help-text">Number of items to show per page in history view (max 20)</div>
+                <input type="number" id="ytvhtPaginationCount" min="1" max="100" value="10">
+                <div class="help-text">Number of items to show per page in history view (1-100)</div>
             </div>
 
             <div class="settings-group">

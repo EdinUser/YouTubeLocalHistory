@@ -744,6 +744,17 @@
                 sendResponse({status: 'error'});
             });
             return true;
+        } else if (message.type === 'updateSettings') {
+            currentSettings = message.settings;
+            injectCSS();
+            updateOverlayCSS(
+                OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium,
+                OVERLAY_COLORS[currentSettings.overlayColor] || OVERLAY_COLORS.blue
+            );
+            // Reprocess thumbnails with new settings
+            processExistingThumbnails();
+            sendResponse({status: 'success'});
+            return true;
         }
         return false;
     });
@@ -810,9 +821,35 @@
         });
     }
 
-    // On startup, load settings
-    loadSettings().then(settings => {
-        currentSettings = settings;
-    });
+    // Initialize everything
+    async function initialize() {
+        injectCSS();
+
+        try {
+            const settings = await loadSettings() || DEFAULT_SETTINGS;
+            currentSettings = settings;
+
+            updateOverlayCSS(
+                OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium,
+                OVERLAY_COLORS[currentSettings.overlayColor] || OVERLAY_COLORS.blue
+            );
+
+            log('Settings loaded:', settings);
+            
+            // Start the thumbnail observer immediately
+            thumbnailObserver.observe(document.body, { childList: true, subtree: true });
+            
+            // Process existing thumbnails after settings are loaded
+            setTimeout(() => {
+                processExistingThumbnails();
+            }, 1000);
+        } catch (error) {
+            log('Error loading settings:', error);
+            currentSettings = DEFAULT_SETTINGS;
+        }
+    }
+
+    // Initialize on startup
+    initialize();
 })();
 
