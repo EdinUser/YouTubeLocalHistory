@@ -208,10 +208,16 @@
         <div id="ytvhtNoPlaylists" class="no-history" style="display: none;">
             No playlists saved yet. Visit a playlist to save it!
         </div>
-        <div id="ytvhtPlaylistsPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px;">
-            <button id="ytvhtPrevPlaylistPage">Previous</button>
+        <div id="ytvhtPlaylistsPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;">
+            <button id="ytvhtFirstPlaylistPage" title="First page">&laquo;</button>
+            <button id="ytvhtPrevPlaylistPage" title="Previous page">&lt;</button>
+            <div id="ytvhtPlaylistPageNumbers" style="display:flex; gap:5px; align-items:center;">
+                <!-- Page numbers will be inserted here -->
+            </div>
+            <input id="ytvhtPlaylistPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
             <span id="ytvhtPlaylistsPageInfo">Page 1 of 1</span>
-            <button id="ytvhtNextPlaylistPage">Next</button>
+            <button id="ytvhtNextPlaylistPage" title="Next page">&gt;</button>
+            <button id="ytvhtLastPlaylistPage" title="Last page">&raquo;</button>
         </div>
     </div>
 
