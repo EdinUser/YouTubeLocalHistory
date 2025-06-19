@@ -511,25 +511,127 @@ function displayPlaylistsPage() {
         row.appendChild(actionCell);
         body.appendChild(row);
     });
-    // Update pagination info
-    document.getElementById('ytvhtPlaylistsPageInfo').textContent = `Page ${currentPlaylistPage} of ${totalPages}`;
-    document.getElementById('ytvhtPrevPlaylistPage').disabled = currentPlaylistPage === 1;
-    document.getElementById('ytvhtNextPlaylistPage').disabled = currentPlaylistPage === totalPages;
+    // Update pagination info and controls
+    updatePlaylistPaginationUI(currentPlaylistPage, totalPages);
 }
 
-function goToPrevPlaylistPage() {
-    if (currentPlaylistPage > 1) {
-        currentPlaylistPage--;
+function goToFirstPlaylistPage() {
+    if (currentPlaylistPage !== 1) {
+        currentPlaylistPage = 1;
         displayPlaylistsPage();
     }
 }
 
-function goToNextPlaylistPage() {
+function goToLastPlaylistPage() {
     const totalPages = Math.ceil(allPlaylists.length / playlistPageSize);
-    if (currentPlaylistPage < totalPages) {
-        currentPlaylistPage++;
+    if (currentPlaylistPage !== totalPages) {
+        currentPlaylistPage = totalPages;
         displayPlaylistsPage();
     }
+}
+
+function goToPlaylistPage(page) {
+    const totalPages = Math.ceil(allPlaylists.length / playlistPageSize);
+    if (page >= 1 && page <= totalPages && page !== currentPlaylistPage) {
+        currentPlaylistPage = page;
+        displayPlaylistsPage();
+    }
+}
+
+function updatePlaylistPaginationUI(current, total) {
+    document.getElementById('ytvhtPlaylistsPageInfo').textContent = `Page ${current} of ${total}`;
+    
+    // Update button states
+    document.getElementById('ytvhtFirstPlaylistPage').disabled = current === 1;
+    document.getElementById('ytvhtPrevPlaylistPage').disabled = current === 1;
+    document.getElementById('ytvhtNextPlaylistPage').disabled = current === total;
+    document.getElementById('ytvhtLastPlaylistPage').disabled = current === total;
+    
+    // Update page input
+    const pageInput = document.getElementById('ytvhtPlaylistPageInput');
+    pageInput.max = total;
+    
+    // Generate page numbers
+    const pageNumbers = document.getElementById('ytvhtPlaylistPageNumbers');
+    pageNumbers.innerHTML = '';
+    
+    if (total <= 10) {
+        // Show all pages if 10 or fewer
+        for (let i = 1; i <= total; i++) {
+            addPlaylistPageButton(i, current);
+        }
+    } else {
+        // Smart pagination for many pages
+        addPlaylistPageButton(1, current); // Always show first page
+        
+        if (current > 4) {
+            addPlaylistEllipsis(); // Add ... if current is far from start
+        }
+        
+        // Show current page and neighbors
+        const start = Math.max(2, current - 2);
+        const end = Math.min(total - 1, current + 2);
+        
+        for (let i = start; i <= end; i++) {
+            addPlaylistPageButton(i, current);
+        }
+        
+        if (current < total - 3) {
+            addPlaylistEllipsis(); // Add ... if current is far from end
+        }
+        
+        if (total > 1) {
+            addPlaylistPageButton(total, current); // Always show last page
+        }
+    }
+    
+    // Add "Go to page" input for very large sets
+    if (total > 10) {
+        const goToSpan = document.createElement('span');
+        goToSpan.textContent = ' Go to: ';
+        goToSpan.style.marginLeft = '10px';
+        pageNumbers.appendChild(goToSpan);
+        
+        const clonedInput = pageInput.cloneNode(true);
+        clonedInput.style.display = 'inline';
+        clonedInput.value = '';
+        clonedInput.placeholder = current;
+        clonedInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const page = parseInt(this.value);
+                if (page) {
+                    goToPlaylistPage(page);
+                    this.value = '';
+                    this.placeholder = currentPlaylistPage;
+                }
+            }
+        });
+        pageNumbers.appendChild(clonedInput);
+    }
+}
+
+function addPlaylistPageButton(pageNum, currentPage) {
+    const button = document.createElement('button');
+    button.textContent = pageNum;
+    button.className = pageNum === currentPage ? 'active' : '';
+    button.style.cssText = `
+        min-width: 30px;
+        padding: 5px 8px;
+        border: 1px solid #ccc;
+        background: ${pageNum === currentPage ? '#007cba' : '#f9f9f9'};
+        color: ${pageNum === currentPage ? 'white' : '#333'};
+        cursor: pointer;
+        border-radius: 3px;
+    `;
+    button.addEventListener('click', () => goToPlaylistPage(pageNum));
+    document.getElementById('ytvhtPlaylistPageNumbers').appendChild(button);
+}
+
+function addPlaylistEllipsis() {
+    const span = document.createElement('span');
+    span.textContent = '...';
+    span.style.margin = '0 5px';
+    document.getElementById('ytvhtPlaylistPageNumbers').appendChild(span);
 }
 
 function deletePlaylist(playlistId) {
@@ -633,7 +735,12 @@ function initSettingsTab() {
         saveSettings(settings).then(() => {
             showMessage('Settings saved successfully');
             pageSize = settings.paginationCount;
+            playlistPageSize = settings.paginationCount;
             displayHistoryPage();
+            // Refresh playlist display if currently on playlists tab
+            if (document.getElementById('ytvhtTabPlaylists').classList.contains('active')) {
+                displayPlaylistsPage();
+            }
             
             // Notify content script of settings changes
             sendToContentScriptWithRetry({type: 'updateSettings', settings: settings}, function(response) {
@@ -660,25 +767,35 @@ function switchTab(tab) {
     const settingsTab = document.getElementById('ytvhtTabSettings');
     const historyContainer = document.getElementById('ytvhtHistoryContainer');
     const settingsContainer = document.getElementById('ytvhtSettingsContainer');
+    const videoPagination = document.getElementById('ytvhtPagination');
+    const playlistPagination = document.getElementById('ytvhtPlaylistsPagination');
+    
     videosTab.classList.remove('active');
     playlistsTab.classList.remove('active');
     settingsTab.classList.remove('active');
+    
     if (tab === 'videos') {
         videosTab.classList.add('active');
         historyContainer.style.display = 'block';
         settingsContainer.style.display = 'none';
         document.getElementById('ytvhtVideosTable').style.display = 'table';
         document.getElementById('ytvhtPlaylistsTable').style.display = 'none';
+        videoPagination.style.display = 'flex';
+        playlistPagination.style.display = 'none';
     } else if (tab === 'playlists') {
         playlistsTab.classList.add('active');
         historyContainer.style.display = 'block';
         settingsContainer.style.display = 'none';
         document.getElementById('ytvhtVideosTable').style.display = 'none';
         document.getElementById('ytvhtPlaylistsTable').style.display = 'table';
+        videoPagination.style.display = 'none';
+        playlistPagination.style.display = 'flex';
     } else if (tab === 'settings') {
         settingsTab.classList.add('active');
         historyContainer.style.display = 'none';
         settingsContainer.style.display = 'block';
+        videoPagination.style.display = 'none';
+        playlistPagination.style.display = 'none';
     }
 }
 
@@ -700,10 +817,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const playlistsTab = document.getElementById('ytvhtTabPlaylists');
         const prevPlaylistBtn = document.getElementById('ytvhtPrevPlaylistPage');
         const nextPlaylistBtn = document.getElementById('ytvhtNextPlaylistPage');
+        const firstPlaylistBtn = document.getElementById('ytvhtFirstPlaylistPage');
+        const lastPlaylistBtn = document.getElementById('ytvhtLastPlaylistPage');
 
         if (!clearButton || !exportButton || !importButton || !closeButton || 
             !firstPageBtn || !prevPageBtn || !nextPageBtn || !lastPageBtn ||
-            !videosTab || !playlistsTab || !prevPlaylistBtn || !nextPlaylistBtn) {
+            !videosTab || !playlistsTab || !prevPlaylistBtn || !nextPlaylistBtn ||
+            !firstPlaylistBtn || !lastPlaylistBtn) {
             throw new Error('Required buttons not found');
         }
 
@@ -775,6 +895,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         prevPlaylistBtn.addEventListener('click', goToPrevPlaylistPage);
         nextPlaylistBtn.addEventListener('click', goToNextPlaylistPage);
+        firstPlaylistBtn.addEventListener('click', goToFirstPlaylistPage);
+        lastPlaylistBtn.addEventListener('click', goToLastPlaylistPage);
 
         // Load initial data with a slight delay to ensure content script is ready
         setTimeout(() => {
@@ -782,6 +904,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Load settings first to set correct pageSize
             loadSettings().then(settings => {
                 pageSize = settings.paginationCount;
+                playlistPageSize = settings.paginationCount;
                 loadHistory();
             }).catch(() => {
                 loadHistory();
@@ -796,4 +919,19 @@ document.addEventListener('DOMContentLoaded', function() {
         showMessage('Failed to initialize extension', 'error');
     }
 });
+
+function goToPrevPlaylistPage() {
+    if (currentPlaylistPage > 1) {
+        currentPlaylistPage--;
+        displayPlaylistsPage();
+    }
+}
+
+function goToNextPlaylistPage() {
+    const totalPages = Math.ceil(allPlaylists.length / playlistPageSize);
+    if (currentPlaylistPage < totalPages) {
+        currentPlaylistPage++;
+        displayPlaylistsPage();
+    }
+}
 
