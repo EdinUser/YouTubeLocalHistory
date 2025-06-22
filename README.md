@@ -10,7 +10,10 @@ A browser extension that tracks your YouTube video watch history locally using s
 - **Playlist Tracking**: Saves playlist information for easy access
 - **Export/Import**: Backup and restore your watch history
 - **Customizable Settings**: Adjust overlay appearance and auto-cleanup settings
+- **Dark Theme Support**: Full dark/light theme system with system preference detection
+- **Progress Percentage**: View both watched time and percentage completion for each video
 - **Cross-Browser Support**: Works on Chrome and Firefox
+- **Firefox Sync**: Automatically syncs data across devices when Firefox Sync is enabled
 
 ## Installation
 
@@ -25,7 +28,7 @@ A browser extension that tracks your YouTube video watch history locally using s
 2. Open Firefox and go to `about:debugging#/runtime/this-firefox`
 3. Click "Load Temporary Add-on" and select the `manifest.json` file from the `dist/firefox` folder
 
-**Note**: Both extensions are now fully synced and use the same secure storage system with automatic migration from IndexedDB.
+**Note**: Both extensions are now fully synced and use the same secure storage system with automatic migration from IndexedDB. Firefox users can enable Firefox Sync to automatically sync their history across devices.
 
 ## Storage System
 
@@ -45,7 +48,7 @@ The extension stores three types of data:
 
 - **Video History**: Video IDs, timestamps, progress, titles, and URLs
 - **Playlist History**: Playlist IDs, titles, and URLs
-- **Settings**: User preferences for overlay appearance and cleanup
+- **Settings**: User preferences for overlay appearance, cleanup, and theme preferences
 
 ## Usage
 
@@ -53,15 +56,35 @@ The extension stores three types of data:
 2. **Visit YouTube** and start watching videos
 3. **Your progress is automatically saved** every 5 seconds
 4. **Click the extension icon** to view your watch history
-5. **Use the settings tab** to customize the overlay appearance
+5. **Use the settings tab** to customize the overlay appearance and theme
 
 ### Settings
 
+- **Theme**: Choose between System (follows your OS theme), Light, or Dark theme
 - **Auto-clean Period**: Automatically remove history entries older than specified days (1-180 days)
 - **Items per Page**: Number of items to show per page in history view (5-20)
 - **Overlay Title**: Text to show in the overlay (max 12 characters)
 - **Overlay Color**: Color of the progress bar overlay (blue, red, green, purple, orange)
 - **Overlay Label Size**: Size of the overlay label and progress bar (small, medium, large, extra large)
+
+### Theme System
+
+The extension supports a comprehensive theme system:
+
+- **System Theme**: Automatically follows your operating system's dark/light mode preference
+- **Manual Themes**: Choose Light or Dark theme regardless of system setting
+- **Dynamic Switching**: Theme changes are applied immediately without page refresh
+- **Browser Integration**: Detects and responds to browser theme changes
+- **Persistent Settings**: Your theme preference is saved and restored across sessions
+
+### Progress Display
+
+The history view now shows enhanced progress information:
+
+- **Watched Time**: Shows the actual time you've watched (e.g., "5:30")
+- **Percentage**: Shows the percentage of the video you've completed (e.g., "45%")
+- **Combined Display**: Shows both time and percentage (e.g., "5:30 (45%)")
+- **Accurate Tracking**: Only shows percentage when video duration is available
 
 ## Privacy
 
@@ -126,6 +149,15 @@ MIT License - see LICENSE file for details.
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
+
+### Version 2.3.0
+- **Dark Theme Support**: Added comprehensive dark/light theme system with system preference detection
+- **Theme Toggle Button**: Added dynamic theme toggle button that shows current theme selection
+- **Progress Percentage Display**: Enhanced progress column to show both watched time and percentage completion
+- **Browser Theme Integration**: Added support for browser theme detection and automatic theme switching
+- **Enhanced UI**: Improved theme switching with smooth transitions and consistent theming
+- **Firefox Sync**: Full compatibility with Firefox Sync for cross-device data synchronization
+- **Better User Experience**: Dynamic theme button, visual progress feedback, and seamless theme switching
 
 ### Version 2.2.0
 - **Major Security Update**: Migrated from IndexedDB to `chrome.storage.local`/`browser.storage.local`

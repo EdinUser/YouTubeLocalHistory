@@ -375,8 +375,8 @@
 
         const currentTime = video.currentTime;
         const duration = video.duration;
-        const videoId = getVideoId();
 
+        const videoId = getVideoId();
         if (!videoId) {
             log('No video ID found.');
             return;
@@ -396,7 +396,6 @@
             'ytd-reel-player-overlay-renderer h1',
             'ytd-reel-player-header-renderer yt-formatted-string',
             'ytd-reel-player-overlay-renderer yt-formatted-string',
-            // Additional Shorts selectors
             '.ytd-reel-player-header-renderer .title',
             '.ytd-reel-player-overlay-renderer .title',
             'ytd-reel-player-header-renderer .title yt-formatted-string',
