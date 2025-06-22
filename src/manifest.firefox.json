@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Local YouTube Video History Tracker",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Store YouTube video timestamps using secure browser storage for larger storage capacity without expiry.",
   "author": "Edin User",
   "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
@@ -14,7 +14,8 @@
     "storage",
     "unlimitedStorage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "theme"
   ],
   "host_permissions": [
     "*://*.youtube.com/*"

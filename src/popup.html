@@ -24,7 +24,9 @@
             --error-border: #d9534f;
         }
 
-        [data-theme="dark"] {
+        /* Dark theme */
+        [data-theme="dark"],
+        .dark-mode {
             --bg-color: #1e1e1e;
             --text-color: #e0e0e0;
             --border-color: #444444;
@@ -52,6 +54,12 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             transition: background-color 0.3s, color 0.3s;
+        }
+        
+        /* Ensure theme is applied to all elements */
+        * {
+            background-color: inherit;
+            color: inherit;
         }
         h1 {
             font-size: 16px;
