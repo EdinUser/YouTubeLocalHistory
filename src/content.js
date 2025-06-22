@@ -1,13 +1,38 @@
 (function() {
     'use strict';
 
+    // Browser detection and cross-browser storage wrapper
+    const isFirefox = typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
+    const isChrome = typeof chrome !== 'undefined' && (!isFirefox);
+
+    const storage = {
+        async get(keys) {
+            if (isFirefox) {
+                return await browser.storage.local.get(keys);
+            } else {
+                return new Promise((resolve) => {
+                    chrome.storage.local.get(keys, resolve);
+                });
+            }
+        },
+
+        async set(data) {
+            if (isFirefox) {
+                return await browser.storage.local.set(data);
+            } else {
+                return new Promise((resolve) => {
+                    chrome.storage.local.set(data, resolve);
+                });
+            }
+        }
+    };
+
     const DB_NAME = 'YouTubeHistoryDB';
     const DB_VERSION = 3;
     const STORE_NAME = 'videoHistory';
-    const DEBUG = false;
+    const DEBUG = true;
     const SAVE_INTERVAL = 5000; // Save every 5 seconds
-    const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // Clean up once a day
-    const RECORD_LIFETIME = 3 * 30 * 24 * 60 * 60 * 1000; // 3 months in milliseconds
+
     const DEFAULT_SETTINGS = {
         autoCleanPeriod: 90, // days
         paginationCount: 10,
@@ -267,46 +292,6 @@
         }
     }
 
-    // Migration-safe DB open/upgrade routine
-    function openDBWithMigration() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onupgradeneeded = function(event) {
-                const db = event.target.result;
-                log('Database upgrade needed. Creating stores...');
-
-                // Create video history store if it doesn't exist
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME, { keyPath: 'videoId' });
-                    log('Created video history store');
-                }
-
-                // Create playlist history store if it doesn't exist
-                if (!db.objectStoreNames.contains('playlistHistory')) {
-                    db.createObjectStore('playlistHistory', { keyPath: 'playlistId' });
-                    log('Created playlist history store');
-                }
-
-                // Create settings store if it doesn't exist
-                if (!db.objectStoreNames.contains('settings')) {
-                    db.createObjectStore('settings', { keyPath: 'id' });
-                    log('Created settings store');
-                }
-            };
-
-            request.onsuccess = function(event) {
-                const database = event.target.result;
-                log('Database opened successfully');
-                resolve(database);
-            };
-
-            request.onerror = function(event) {
-                log('Error opening database:', event.target.error);
-                reject(event.target.error);
-            };
-        });
-    }
-
     // Load settings from browser.storage.local
     async function loadSettings() {
         try {
@@ -399,10 +384,37 @@
 
         log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
 
-        // Get video title from YouTube's page
-        const title = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim() ||
-                     document.querySelector('h1.title.style-scope.ytd-video-primary-info-renderer')?.textContent?.trim() ||
-                     'Unknown Title';
+        // Get video title from YouTube's page - support both regular videos and Shorts
+        const titleSelectors = [
+            // Regular video page selectors
+            'h1.ytd-video-primary-info-renderer',
+            'h1.title.style-scope.ytd-video-primary-info-renderer',
+            // Shorts-specific selectors
+            'h1.ytd-reel-player-header-renderer',
+            'h1.ytd-reel-player-overlay-renderer',
+            'ytd-reel-player-header-renderer h1',
+            'ytd-reel-player-overlay-renderer h1',
+            'ytd-reel-player-header-renderer yt-formatted-string',
+            'ytd-reel-player-overlay-renderer yt-formatted-string',
+            // Additional Shorts selectors
+            '.ytd-reel-player-header-renderer .title',
+            '.ytd-reel-player-overlay-renderer .title',
+            'ytd-reel-player-header-renderer .title yt-formatted-string',
+            'ytd-reel-player-overlay-renderer .title yt-formatted-string'
+        ];
+
+        let title = 'Unknown Title';
+        for (const selector of titleSelectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+                const text = element.textContent?.trim();
+                if (text && text.length > 0 && text !== 'Unknown Title') {
+                    title = text;
+                    log(`Found title using selector "${selector}": "${title}"`);
+                    break;
+                }
+            }
+        }
 
         const record = {
             videoId: videoId,
@@ -659,14 +671,24 @@
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
                 if (node.nodeType === Node.ELEMENT_NODE) {
-                    // Look for thumbnails in all possible layouts
-                    const thumbnails = node.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-thumbnail, ytd-compact-video-renderer');
+                    // Look for thumbnails in all possible layouts (regular videos and Shorts)
+                    const thumbnails = node.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-thumbnail, ytd-compact-video-renderer, ytd-reel-item-renderer');
                     thumbnails.forEach((thumbnail) => {
-                        const anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
+                        // Check for regular video links
+                        let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
                         if (anchor) {
                             const videoId = anchor.href.match(/[?&]v=([^&]+)/)?.[1];
                             if (videoId) {
                                 addViewedLabelToThumbnail(thumbnail, videoId);
+                            }
+                        } else {
+                            // Check for Shorts links
+                            anchor = thumbnail.querySelector('a[href*="/shorts/"]');
+                            if (anchor) {
+                                const videoId = anchor.href.match(/\/shorts\/([^\/\?]+)/)?.[1];
+                                if (videoId) {
+                                    addViewedLabelToThumbnail(thumbnail, videoId);
+                                }
                             }
                         }
                     });
@@ -677,13 +699,23 @@
 
     // Process any existing thumbnails
     function processExistingThumbnails() {
-        const thumbnails = document.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-thumbnail, ytd-compact-video-renderer');
+        const thumbnails = document.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-thumbnail, ytd-compact-video-renderer, ytd-reel-item-renderer');
         thumbnails.forEach((thumbnail) => {
-            const anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
+            // Check for regular video links
+            let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
             if (anchor) {
                 const videoId = anchor.href.match(/[?&]v=([^&]+)/)?.[1];
                 if (videoId) {
                     addViewedLabelToThumbnail(thumbnail, videoId);
+                }
+            } else {
+                // Check for Shorts links
+                anchor = thumbnail.querySelector('a[href*="/shorts/"]');
+                if (anchor) {
+                    const videoId = anchor.href.match(/\/shorts\/([^\/\?]+)/)?.[1];
+                    if (videoId) {
+                        addViewedLabelToThumbnail(thumbnail, videoId);
+                    }
                 }
             }
         });
@@ -704,6 +736,117 @@
                 log('Error getting history:', error);
                 sendResponse({history: []});
             });
+            return true;
+        } else if (message.type === 'exportHistory') {
+            if (!isInitialized) {
+                log('Not initialized yet, initializing now');
+                initializeIfNeeded();
+            }
+            Promise.all([
+                ytStorage.getAllVideos(),
+                ytStorage.getAllPlaylists()
+            ]).then(([allVideos, allPlaylists]) => {
+                const history = Object.values(allVideos);
+                const playlists = Object.values(allPlaylists);
+                log('Sending export data to popup:', { history, playlists });
+                sendResponse({history: history, playlists: playlists});
+            }).catch(error => {
+                log('Error getting export data:', error);
+                sendResponse({history: [], playlists: []});
+            });
+            return true;
+        } else if (message.type === 'importHistory') {
+            const records = message.records || [];
+            const playlists = message.playlists || [];
+            const mergeMode = message.mergeMode || false;
+
+            log(`Importing ${records.length} videos and ${playlists.length} playlists (merge: ${mergeMode})`);
+
+            if (mergeMode) {
+                // Merge mode: combine with existing data
+                Promise.all([
+                    ytStorage.getAllVideos(),
+                    ytStorage.getAllPlaylists()
+                ]).then(([existingVideos, existingPlaylists]) => {
+                    let importedVideos = 0;
+                    let importedPlaylists = 0;
+
+                    // Merge videos (keep newest timestamp if duplicate)
+                    const mergedVideos = { ...existingVideos };
+                    records.forEach(record => {
+                        const existing = mergedVideos[record.videoId];
+                        if (!existing || record.timestamp > existing.timestamp) {
+                            mergedVideos[record.videoId] = record;
+                            importedVideos++;
+                        }
+                    });
+
+                    // Merge playlists (keep newest timestamp if duplicate)
+                    const mergedPlaylists = { ...existingPlaylists };
+                    playlists.forEach(playlist => {
+                        const existing = mergedPlaylists[playlist.playlistId];
+                        if (!existing || playlist.timestamp > existing.timestamp) {
+                            mergedPlaylists[playlist.playlistId] = playlist;
+                            importedPlaylists++;
+                        }
+                    });
+
+                    // Save merged data
+                    const savePromises = [];
+                    Object.values(mergedVideos).forEach(video => {
+                        savePromises.push(ytStorage.setVideo(video.videoId, video));
+                    });
+                    Object.values(mergedPlaylists).forEach(playlist => {
+                        savePromises.push(ytStorage.setPlaylist(playlist.playlistId, playlist));
+                    });
+
+                    Promise.all(savePromises).then(() => {
+                        log(`Merge completed: ${importedVideos} videos, ${importedPlaylists} playlists`);
+                        sendResponse({
+                            status: 'success',
+                            importedVideos: importedVideos,
+                            importedPlaylists: importedPlaylists
+                        });
+                    }).catch(error => {
+                        log('Error saving merged data:', error);
+                        sendResponse({status: 'error'});
+                    });
+                }).catch(error => {
+                    log('Error getting existing data for merge:', error);
+                    sendResponse({status: 'error'});
+                });
+            } else {
+                // Replace mode: clear existing and import new
+                ytStorage.clear().then(() => {
+                    let importedVideos = 0;
+                    let importedPlaylists = 0;
+
+                    const savePromises = [];
+                    records.forEach(record => {
+                        savePromises.push(ytStorage.setVideo(record.videoId, record));
+                        importedVideos++;
+                    });
+                    playlists.forEach(playlist => {
+                        savePromises.push(ytStorage.setPlaylist(playlist.playlistId, playlist));
+                        importedPlaylists++;
+                    });
+
+                    Promise.all(savePromises).then(() => {
+                        log(`Import completed: ${importedVideos} videos, ${importedPlaylists} playlists`);
+                        sendResponse({
+                            status: 'success',
+                            importedVideos: importedVideos,
+                            importedPlaylists: importedPlaylists
+                        });
+                    }).catch(error => {
+                        log('Error saving imported data:', error);
+                        sendResponse({status: 'error'});
+                    });
+                }).catch(error => {
+                    log('Error clearing existing data:', error);
+                    sendResponse({status: 'error'});
+                });
+            }
             return true;
         } else if (message.type === 'clearHistory') {
             ytStorage.clear().then(() => {
@@ -761,7 +904,7 @@
 
     function showExtensionInfo() {
         // Check if we've already shown the info
-        browser.storage.local.get(['infoShown']).then(result => {
+        storage.get(['infoShown']).then(result => {
             if (!result.infoShown) {
                 const topLevelButtons = document.querySelector('#top-level-buttons-computed');
                 if (!topLevelButtons) return;
@@ -800,7 +943,7 @@
                 closeButton.addEventListener('click', () => {
                     infoDiv.style.display = 'none';
                     // Remember that we've shown the info
-                    browser.storage.local.set({ infoShown: true });
+                    storage.set({ infoShown: true });
                 });
 
                 // Insert the info div
@@ -835,10 +978,10 @@
             );
 
             log('Settings loaded:', settings);
-            
+
             // Start the thumbnail observer immediately
             thumbnailObserver.observe(document.body, { childList: true, subtree: true });
-            
+
             // Process existing thumbnails after settings are loaded
             setTimeout(() => {
                 processExistingThumbnails();

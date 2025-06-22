@@ -1,8 +1,55 @@
-// Simple storage wrapper using chrome.storage.local instead of IndexedDB
+// Simple storage wrapper using cross-browser storage API
 // with automatic migration from IndexedDB if it exists
 
 (function() {
     'use strict';
+
+    // Browser detection
+    const isFirefox = typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
+    const isChrome = typeof chrome !== 'undefined' && (!isFirefox);
+
+    // Cross-browser storage wrapper
+    const storage = {
+        async get(keys) {
+            if (isFirefox) {
+                return await browser.storage.local.get(keys);
+            } else {
+                return new Promise((resolve) => {
+                    chrome.storage.local.get(keys, resolve);
+                });
+            }
+        },
+
+        async set(data) {
+            if (isFirefox) {
+                return await browser.storage.local.set(data);
+            } else {
+                return new Promise((resolve) => {
+                    chrome.storage.local.set(data, resolve);
+                });
+            }
+        },
+
+        async remove(keys) {
+            if (isFirefox) {
+                return await browser.storage.local.remove(keys);
+            } else {
+                return new Promise((resolve) => {
+                    chrome.storage.local.remove(keys, resolve);
+                });
+            }
+        },
+
+        async clear() {
+            if (isFirefox) {
+                return await browser.storage.local.clear();
+            } else {
+                return new Promise((resolve) => {
+                    chrome.storage.local.clear(resolve);
+                });
+            }
+        }
+    };
 
     // Storage wrapper class
     class SimpleStorage {
@@ -16,7 +63,7 @@
 
             try {
                 // Check if we already migrated
-                const result = await chrome.storage.local.get(['__migrated__']);
+                const result = await storage.get(['__migrated__']);
                 if (result.__migrated__) {
                     this.migrated = true;
                     return;
@@ -26,7 +73,7 @@
                 await this.migrateFromIndexedDB();
                 
                 // Mark as migrated
-                await chrome.storage.local.set({ '__migrated__': true });
+                await storage.set({ '__migrated__': true });
                 this.migrated = true;
                 console.log('[Storage] Migration completed successfully');
             } catch (error) {
@@ -35,7 +82,7 @@
             }
         }
 
-        // Migrate data from IndexedDB to chrome.storage.local
+        // Migrate data from IndexedDB to storage
         async migrateFromIndexedDB() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open('YouTubeHistoryDB', 3);
@@ -71,9 +118,9 @@
                             }
                         }
 
-                        // Save all migrated data to chrome.storage.local
+                        // Save all migrated data to storage
                         if (Object.keys(migrationData).length > 0) {
-                            await chrome.storage.local.set(migrationData);
+                            await storage.set(migrationData);
                             console.log(`[Storage] Migrated ${Object.keys(migrationData).length} items from IndexedDB`);
                         }
 
@@ -114,26 +161,26 @@
         // Get video record
         async getVideo(videoId) {
             await this.ensureMigrated();
-            const result = await chrome.storage.local.get([`video_${videoId}`]);
+            const result = await storage.get([`video_${videoId}`]);
             return result[`video_${videoId}`] || null;
         }
 
         // Save video record
         async setVideo(videoId, data) {
             await this.ensureMigrated();
-            await chrome.storage.local.set({ [`video_${videoId}`]: data });
+            await storage.set({ [`video_${videoId}`]: data });
         }
 
         // Remove video record
         async removeVideo(videoId) {
             await this.ensureMigrated();
-            await chrome.storage.local.remove([`video_${videoId}`]);
+            await storage.remove([`video_${videoId}`]);
         }
 
         // Get all video records
         async getAllVideos() {
             await this.ensureMigrated();
-            const allData = await chrome.storage.local.get(null);
+            const allData = await storage.get(null);
             const videos = {};
             
             Object.keys(allData).forEach(key => {
@@ -149,26 +196,26 @@
         // Get playlist record
         async getPlaylist(playlistId) {
             await this.ensureMigrated();
-            const result = await chrome.storage.local.get([`playlist_${playlistId}`]);
+            const result = await storage.get([`playlist_${playlistId}`]);
             return result[`playlist_${playlistId}`] || null;
         }
 
         // Save playlist record
         async setPlaylist(playlistId, data) {
             await this.ensureMigrated();
-            await chrome.storage.local.set({ [`playlist_${playlistId}`]: data });
+            await storage.set({ [`playlist_${playlistId}`]: data });
         }
 
         // Remove playlist record
         async removePlaylist(playlistId) {
             await this.ensureMigrated();
-            await chrome.storage.local.remove([`playlist_${playlistId}`]);
+            await storage.remove([`playlist_${playlistId}`]);
         }
 
         // Get all playlist records
         async getAllPlaylists() {
             await this.ensureMigrated();
-            const allData = await chrome.storage.local.get(null);
+            const allData = await storage.get(null);
             const playlists = {};
             
             Object.keys(allData).forEach(key => {
@@ -184,19 +231,19 @@
         // Get settings
         async getSettings() {
             await this.ensureMigrated();
-            const result = await chrome.storage.local.get(['settings']);
+            const result = await storage.get(['settings']);
             return result.settings || null;
         }
 
         // Save settings
         async setSettings(settings) {
             await this.ensureMigrated();
-            await chrome.storage.local.set({ 'settings': settings });
+            await storage.set({ 'settings': settings });
         }
 
         // Clear all data
         async clear() {
-            await chrome.storage.local.clear();
+            await storage.clear();
             this.migrated = false;
         }
     }

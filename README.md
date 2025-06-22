@@ -15,15 +15,15 @@ A browser extension that tracks your YouTube video watch history locally using s
 ## Installation
 
 ### Chrome
-1. Download the `chrome_extension` folder
+1. Run `./build.sh` to build the extension
 2. Open Chrome and go to `chrome://extensions/`
 3. Enable "Developer mode"
-4. Click "Load unpacked" and select the `chrome_extension` folder
+4. Click "Load unpacked" and select the `dist/chrome` folder
 
 ### Firefox
-1. Download the `firefox_extension` folder
+1. Run `./build.sh` to build the extension
 2. Open Firefox and go to `about:debugging#/runtime/this-firefox`
-3. Click "Load Temporary Add-on" and select the `manifest.json` file from the `firefox_extension` folder
+3. Click "Load Temporary Add-on" and select the `manifest.json` file from the `dist/firefox` folder
 
 **Note**: Both extensions are now fully synced and use the same secure storage system with automatic migration from IndexedDB.
 
@@ -99,29 +99,23 @@ If you experience issues with data migration:
 
 ### Project Structure
 ```
-├── chrome_extension/          # Chrome extension files
-│   ├── manifest.json         # Extension manifest
-│   ├── storage.js           # Storage management system (content scripts)
-│   ├── popup-storage.js     # Storage management system (popup)
-│   ├── content.js           # Content script for YouTube pages
-│   ├── popup.html           # Extension popup interface
-│   ├── popup.js             # Popup functionality
-│   └── background.js        # Background service worker
-├── firefox_extension/        # Firefox extension files
-│   ├── manifest.json        # Extension manifest
-│   ├── storage.js          # Storage management system (content scripts)
-│   ├── popup-storage.js     # Storage management system (popup)
-│   ├── content.js          # Content script for YouTube pages
-│   ├── popup.html          # Extension popup interface
-│   ├── popup.js            # Popup functionality
-│   └── background.js       # Background script
+├── src/                      # Source files
+│   ├── background/          # Background script
+│   ├── content/             # Content scripts
+│   ├── popup/               # Popup interface
+│   ├── shared/              # Shared utilities and components
+│   └── manifest/            # Manifest templates
+├── dist/                    # Distribution packages
+├── helpers/                 # Build helper scripts
+├── build.sh                 # Build script
 └── youtube-local-history.user.js  # Userscript version
 ```
 
 ### Building
-1. Make changes to the source files
-2. Test in your browser
-3. Package the extension for distribution
+1. Make changes to the source files in the `src/` directory
+2. Run `./build.sh` to build both Chrome and Firefox extensions
+3. Test the built extensions in your browser
+4. The built extensions will be available in the `dist/` directory
 
 ## License
 
