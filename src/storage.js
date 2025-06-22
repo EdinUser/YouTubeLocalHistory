@@ -4,8 +4,14 @@
 (function() {
     'use strict';
 
-    // Browser detection
-    const isFirefox = typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
+    // Browser detection - safer approach
+    const isFirefox = (function() {
+        try {
+            return typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
+        } catch (e) {
+            return false;
+        }
+    })();
     const isChrome = typeof chrome !== 'undefined' && (!isFirefox);
 
     // Cross-browser storage wrapper

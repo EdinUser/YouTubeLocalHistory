@@ -14,8 +14,7 @@
     "storage",
     "unlimitedStorage",
     "activeTab",
-    "scripting",
-    "theme"
+    "scripting"
   ],
   "host_permissions": [
     "*://*.youtube.com/*"
