@@ -1,5 +1,5 @@
 // --- Debugging and Logging ---
-const DEBUG = true; // Set to false for production
+const DEBUG = false; // Set to false for production
 
 function log(...args) {
     if (DEBUG) {
@@ -1246,7 +1246,7 @@ async function applyTheme(themePreference) {
         // Set up theme change listeners
         try {
             // Listen for browser theme changes
-            if (browser.theme && typeof browser.theme.onUpdated === 'object') {
+            if (typeof browser !== 'undefined' && browser.theme && browser.theme.onUpdated) {
                 browser.theme.onUpdated.addListener(async (updateInfo) => {
                     log('[Theme] Browser theme updated:', updateInfo);
                     if (settings.themePreference === 'system') {
@@ -1334,13 +1334,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         // Set up theme change listeners
-        if (browser.theme && browser.theme.onUpdated) {
+        if (typeof browser !== 'undefined' && browser.theme && browser.theme.onUpdated) {
             log('Setting up browser theme change listener');
             browser.theme.onUpdated.addListener(handleThemeChange);
             
             // Clean up event listener when popup is closed
             window.addEventListener('unload', () => {
-                browser.theme.onUpdated.removeListener(handleThemeChange);
+                if (typeof browser !== 'undefined' && browser.theme && browser.theme.onUpdated) {
+                    browser.theme.onUpdated.removeListener(handleThemeChange);
+                }
             });
         }
         
@@ -1381,7 +1383,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Clean up event listeners when popup is closed
         window.addEventListener('unload', () => {
-            if (browser.theme && browser.theme.onUpdated) {
+            if (typeof browser !== 'undefined' && browser.theme && browser.theme.onUpdated) {
                 browser.theme.onUpdated.removeListener(handleThemeChange);
             }
             colorSchemeQuery.removeEventListener('change', handleThemeChange);

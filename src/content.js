@@ -1,8 +1,14 @@
 (function() {
     'use strict';
 
-    // Browser detection and cross-browser storage wrapper
-    const isFirefox = typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
+    // Browser detection and cross-browser storage wrapper - safer approach
+    const isFirefox = (function() {
+        try {
+            return typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
+        } catch (e) {
+            return false;
+        }
+    })();
     const isChrome = typeof chrome !== 'undefined' && (!isFirefox);
 
     const storage = {
@@ -30,7 +36,7 @@
     const DB_NAME = 'YouTubeHistoryDB';
     const DB_VERSION = 3;
     const STORE_NAME = 'videoHistory';
-    const DEBUG = true;
+    const DEBUG = false;
     const SAVE_INTERVAL = 5000; // Save every 5 seconds
 
     const DEFAULT_SETTINGS = {
