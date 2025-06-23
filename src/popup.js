@@ -294,7 +294,7 @@ async function exportHistory() {
         const exportData = {
             _metadata: {
                 exportDate: new Date().toISOString(),
-                extensionVersion: "2.2.0",
+                extensionVersion: "2.4.0",
                 totalVideos: videos.length,
                 totalPlaylists: playlists.length,
                 exportFormat: "json",
