@@ -1,0 +1,57 @@
+{
+  "name": "youtube-local-history",
+  "version": "2.4.0",
+  "description": "Store YouTube video timestamps using secure browser storage for larger storage capacity without expiry.",
+  "main": "src/content.js",
+  "scripts": {
+    "test": "jest",
+    "test:unit": "jest --testPathPattern=unit",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:memory": "jest --testPathPattern=memory",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "build": "./build.sh",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
+  },
+  "keywords": [
+    "youtube",
+    "history",
+    "extension",
+    "browser",
+    "video",
+    "tracking"
+  ],
+  "author": "Edin User",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-env": "^7.24.0",
+    "@playwright/test": "^1.42.1",
+    "@types/jest": "^29.5.12",
+    "babel-jest": "^29.7.0",
+    "eslint": "^9.15.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
+    "testPathIgnorePatterns": [
+      "<rootDir>/tests/e2e/"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.test.js"
+    ]
+  },
+  "browserslist": [
+    "last 2 versions",
+    "not dead"
+  ]
+}

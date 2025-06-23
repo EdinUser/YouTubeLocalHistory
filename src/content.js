@@ -65,6 +65,16 @@
     let currentSettings = DEFAULT_SETTINGS;
     // Track already-initialized video elements to avoid duplicate listeners
     const trackedVideos = new WeakSet();
+    
+    // Track event listeners for cleanup
+    const videoEventListeners = new WeakMap();
+    
+    // Cleanup tracking
+    let thumbnailObserver = null;
+    let shortsVideoObserver = null;
+    let initChecker = null;
+    let playlistRetryTimeout = null;
+    let messageListener = null;
 
     function log(message, data) {
         if (DEBUG) {
@@ -73,6 +83,82 @@
     }
 
     log('YouTube Video History Tracker script is running.');
+
+    // Cleanup function to prevent memory leaks
+    function cleanup() {
+        log('Cleaning up resources...');
+        
+        try {
+            // Disconnect observers
+            if (thumbnailObserver) {
+                thumbnailObserver.disconnect();
+                thumbnailObserver = null;
+            }
+            
+            if (shortsVideoObserver) {
+                shortsVideoObserver.disconnect();
+                shortsVideoObserver = null;
+            }
+            
+            // Clear intervals
+            if (initChecker) {
+                clearInterval(initChecker);
+                initChecker = null;
+            }
+            
+            if (saveIntervalId) {
+                clearInterval(saveIntervalId);
+                saveIntervalId = null;
+            }
+            
+            // Clear timeouts
+            if (playlistRetryTimeout) {
+                clearTimeout(playlistRetryTimeout);
+                playlistRetryTimeout = null;
+            }
+            
+            // Remove message listener
+            if (messageListener) {
+                chrome.runtime.onMessage.removeListener(messageListener);
+                messageListener = null;
+            }
+            
+            // Clean up video event listeners
+            trackedVideos.clear();
+            videoEventListeners.clear();
+        } catch (error) {
+            log('Error during cleanup:', error);
+        }
+    }
+
+    // Function to clean up video event listeners
+    function cleanupVideoListeners(video) {
+        if (videoEventListeners.has(video)) {
+            const listeners = videoEventListeners.get(video);
+            listeners.forEach(({ event, handler }) => {
+                try {
+                    video.removeEventListener(event, handler);
+                } catch (error) {
+                    log('Error removing event listener:', error);
+                }
+            });
+            videoEventListeners.delete(video);
+            trackedVideos.delete(video);
+            log('Cleaned up event listeners for video:', video);
+        }
+    }
+
+    // Helper function to add tracked event listeners
+    function addTrackedEventListener(video, event, handler) {
+        if (!videoEventListeners.has(video)) {
+            videoEventListeners.set(video, []);
+        }
+        videoEventListeners.get(video).push({ event, handler });
+        video.addEventListener(event, handler);
+    }
+
+    // Setup cleanup on page unload only (not both beforeunload and pagehide)
+    window.addEventListener('beforeunload', cleanup);
 
     // Inject CSS to avoid CSP issues with inline styles
     function injectCSS() {
@@ -561,13 +647,14 @@
                 timestampLoaded = true;
             } else {
                 log('Video not ready, waiting for loadedmetadata event');
-                video.addEventListener('loadedmetadata', () => {
+                const metadataHandler = () => {
                     if (!timestampLoaded) {
                         log('Video metadata loaded, loading timestamp');
                         loadTimestamp();
                         timestampLoaded = true;
                     }
-                }, { once: true });
+                };
+                addTrackedEventListener(video, 'loadedmetadata', metadataHandler);
             }
         };
 
@@ -578,66 +665,57 @@
         setTimeout(ensureVideoReady, 1000);
 
         // Start saving timestamp periodically when the video starts playing
-        video.addEventListener('play', () => {
+        const playHandler = () => {
             log('Video started playing. Starting save interval.');
             startSaveInterval();
-        });
+        };
+        addTrackedEventListener(video, 'play', playHandler);
 
         // Stop saving timestamp when the video is paused
-        video.addEventListener('pause', () => {
+        const pauseHandler = () => {
             log('Video paused. Clearing save interval.');
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
             }
             saveTimestamp(); // Save timestamp when paused
-        });
+        };
+        addTrackedEventListener(video, 'pause', pauseHandler);
 
         // Save timestamp when video progress changes significantly
-        video.addEventListener('timeupdate', () => {
+        const timeupdateHandler = () => {
             const currentTime = Math.floor(video.currentTime);
             if (currentTime % 30 === 0) { // Save every 30 seconds
                 saveTimestamp();
             }
-        });
+        };
+        addTrackedEventListener(video, 'timeupdate', timeupdateHandler);
 
         // Handle seeking
-        video.addEventListener('seeking', () => {
+        const seekingHandler = () => {
             log('Video seeking');
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
             }
-        });
+        };
+        addTrackedEventListener(video, 'seeking', seekingHandler);
 
-        video.addEventListener('seeked', () => {
+        const seekedHandler = () => {
             log('Video seeked');
             saveTimestamp();
             if (!video.paused) {
                 startSaveInterval();
             }
-        });
+        };
+        addTrackedEventListener(video, 'seeked', seekedHandler);
 
         // Save on unload
-        window.addEventListener('beforeunload', () => {
+        const beforeunloadHandler = () => {
             log('Page unloading, saving final timestamp');
             saveTimestamp();
-        });
-
-        // Handle popup messages
-        chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-            if (message.type === 'getHistory') {
-                ytStorage.getAllVideos().then(allVideos => {
-                    const history = Object.values(allVideos);
-                    log('Sending history to popup:', history);
-                    sendResponse({history: history});
-                }).catch(error => {
-                    log('Error getting history:', error);
-                    sendResponse({history: []});
-                });
-                return true; // Keep the message channel open for async response
-            }
-        });
+        };
+        addTrackedEventListener(window, 'beforeunload', beforeunloadHandler);
     }
 
     // Initialize and set up event listeners
@@ -676,7 +754,7 @@
         // --- Shorts fix: observe for video elements dynamically ---
         if (window.location.pathname.startsWith('/shorts/')) {
             // Shorts pages may load video after script runs, so observe for it
-            const shortsVideoObserver = new MutationObserver(() => {
+            shortsVideoObserver = new MutationObserver(() => {
                 const shortsVideo = document.querySelector('video');
                 if (shortsVideo && !trackedVideos.has(shortsVideo)) {
                     log('Shorts video element detected by observer, initializing tracking...');
@@ -699,7 +777,7 @@
             savePlaylistInfo(playlistInfo);
         } else if (retries > 0) {
             log(`Playlist title not found, will retry in 1.5 seconds... (${retries} retries left)`);
-            setTimeout(() => {
+            playlistRetryTimeout = setTimeout(() => {
                 tryToSavePlaylist(retries - 1);
             }, 1500);
         } else {
@@ -708,11 +786,12 @@
     }
 
     // Start observing for video element and playlist changes
-    const initChecker = setInterval(() => {
+    initChecker = setInterval(() => {
         log('Checking for video element...');
         if (initializeIfNeeded()) {
             log('Initialization successful. Stopping checker.');
             clearInterval(initChecker);
+            initChecker = null;
         }
     }, 1000);
 
@@ -764,7 +843,7 @@
     }
 
     // Watch for new thumbnails being added to the page
-    const thumbnailObserver = new MutationObserver((mutations) => {
+    thumbnailObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
                 if (node.nodeType === Node.ELEMENT_NODE) {
@@ -788,6 +867,21 @@
                                 }
                             }
                         }
+                    });
+                }
+            });
+            
+            // Check for removed video elements and clean up their listeners
+            mutation.removedNodes.forEach((node) => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    // Check if the removed node is a video element
+                    if (node.tagName === 'VIDEO') {
+                        cleanupVideoListeners(node);
+                    }
+                    // Also check for video elements within the removed node
+                    const videos = node.querySelectorAll('video');
+                    videos.forEach(video => {
+                        cleanupVideoListeners(video);
                     });
                 }
             });
@@ -819,7 +913,7 @@
     }
 
     // Handle messages from popup
-    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+    messageListener = function(message, sender, sendResponse) {
         if (message.type === 'getHistory') {
             if (!isInitialized) {
                 log('Not initialized yet, initializing now');
@@ -997,7 +1091,9 @@
             return true;
         }
         return false;
-    });
+    };
+
+    chrome.runtime.onMessage.addListener(messageListener);
 
     function showExtensionInfo() {
         // Check if we've already shown the info
@@ -1075,9 +1171,6 @@
             );
 
             log('Settings loaded:', settings);
-
-            // Start the thumbnail observer immediately
-            thumbnailObserver.observe(document.body, { childList: true, subtree: true });
 
             // Process existing thumbnails after settings are loaded
             setTimeout(() => {
