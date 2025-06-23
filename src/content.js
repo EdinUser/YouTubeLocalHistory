@@ -63,6 +63,8 @@
     let saveIntervalId;
     let isInitialized = false;
     let currentSettings = DEFAULT_SETTINGS;
+    // Track already-initialized video elements to avoid duplicate listeners
+    const trackedVideos = new WeakSet();
 
     function log(message, data) {
         if (DEBUG) {
@@ -491,6 +493,12 @@
 
     // Set up video tracking
     function setupVideoTracking(video) {
+        if (trackedVideos.has(video)) {
+            log('Video already tracked, skipping setup.');
+            return;
+        }
+        trackedVideos.add(video);
+
         log('Setting up video tracking for video element:', video);
 
         let timestampLoaded = false;
@@ -619,6 +627,21 @@
             }
             return true;
         }
+
+        // --- Shorts fix: observe for video elements dynamically ---
+        if (window.location.pathname.startsWith('/shorts/')) {
+            // Shorts pages may load video after script runs, so observe for it
+            const shortsVideoObserver = new MutationObserver(() => {
+                const shortsVideo = document.querySelector('video');
+                if (shortsVideo && !trackedVideos.has(shortsVideo)) {
+                    log('Shorts video element detected by observer, initializing tracking...');
+                    setupVideoTracking(shortsVideo);
+                }
+            });
+            shortsVideoObserver.observe(document.body, { childList: true, subtree: true });
+        }
+        // ---------------------------------------------------------
+
         return false;
     }
 
@@ -1024,4 +1047,3 @@
     // Initialize on startup
     initialize();
 })();
-
