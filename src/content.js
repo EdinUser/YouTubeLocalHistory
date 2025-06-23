@@ -36,7 +36,7 @@
     const DB_NAME = 'YouTubeHistoryDB';
     const DB_VERSION = 3;
     const STORE_NAME = 'videoHistory';
-    const DEBUG = false;
+    const DEBUG = true;
     const SAVE_INTERVAL = 5000; // Save every 5 seconds
 
     const DEFAULT_SETTINGS = {
@@ -63,6 +63,8 @@
     let saveIntervalId;
     let isInitialized = false;
     let currentSettings = DEFAULT_SETTINGS;
+    // Track already-initialized video elements to avoid duplicate listeners
+    const trackedVideos = new WeakSet();
 
     function log(message, data) {
         if (DEBUG) {
@@ -371,8 +373,8 @@
         }
     }
 
-    // Save the current video timestamp
-    async function saveTimestamp() {
+    // Save the current video timestamp for Shorts
+    async function saveShortsTimestamp() {
         const video = document.querySelector('video');
         if (!video) {
             log('No video element found.');
@@ -381,21 +383,92 @@
 
         const currentTime = video.currentTime;
         const duration = video.duration;
-
         const videoId = getVideoId();
         if (!videoId) {
             log('No video ID found.');
             return;
         }
 
+        // Do not update record if timestamp is 0
+        if (!currentTime || currentTime === 0) {
+            log(`Detected Shorts timestamp 0 for video ID ${videoId}, skipping update.`);
+            return;
+        }
+
+        log(`Saving Shorts timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
+
+        let title = 'Unknown Title';
+        const shortsTitleEl = document.querySelector('yt-shorts-video-title-view-model h2 span');
+        if (shortsTitleEl && shortsTitleEl.textContent?.trim()) {
+            title = shortsTitleEl.textContent.trim();
+            log('Shorts title detected:', title);
+        } else {
+            // Fallback: use document title, but clean up " - YouTube Shorts"
+            let docTitle = document.title.replace(/ - YouTube Shorts$/, '').trim();
+            if (docTitle && docTitle.length > 0 && docTitle !== 'YouTube') {
+                title = docTitle;
+                log('Shorts title fallback from document.title:', title);
+            }
+        }
+
+        const record = {
+            videoId: videoId,
+            time: currentTime,
+            duration: duration,
+            timestamp: Date.now(),
+            title: title,
+            url: getCleanVideoUrl(),
+            isShorts: true // <--- Mark as Shorts for UI filtering
+        };
+
+        try {
+            await ytStorage.setVideo(videoId, record);
+            log(`Shorts timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
+        } catch (error) {
+            log('Error saving Shorts timestamp:', error);
+        }
+    }
+
+    // Save the current video timestamp (regular videos)
+    async function saveTimestamp() {
+        if (window.location.pathname.startsWith('/shorts/')) {
+            await saveShortsTimestamp();
+            return;
+        }
+
+        const video = document.querySelector('video');
+        if (!video) {
+            log('No video element found.');
+            return;
+        }
+
+        let currentTime = video.currentTime;
+        const duration = video.duration;
+        const videoId = getVideoId();
+        if (!videoId) {
+            log('No video ID found.');
+            return;
+        }
+
+        // Do not update record if timestamp is 0
+        if (!currentTime || currentTime === 0) {
+            log(`Detected timestamp 0 for video ID ${videoId}, skipping update.`);
+            return;
+        }
+
+        // If within last 10 seconds, save as duration - 10 (but not less than 0)
+        if (duration && currentTime > duration - 10) {
+            const adjustedTime = Math.max(0, duration - 10);
+            log(`Current time (${currentTime}) is within last 10s of duration (${duration}), saving as ${adjustedTime}`);
+            currentTime = adjustedTime;
+        }
+
         log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
 
-        // Get video title from YouTube's page - support both regular videos and Shorts
+        let title = 'Unknown Title';
         const titleSelectors = [
-            // Regular video page selectors
             'h1.ytd-video-primary-info-renderer',
             'h1.title.style-scope.ytd-video-primary-info-renderer',
-            // Shorts-specific selectors
             'h1.ytd-reel-player-header-renderer',
             'h1.ytd-reel-player-overlay-renderer',
             'ytd-reel-player-header-renderer h1',
@@ -407,8 +480,6 @@
             'ytd-reel-player-header-renderer .title yt-formatted-string',
             'ytd-reel-player-overlay-renderer .title yt-formatted-string'
         ];
-
-        let title = 'Unknown Title';
         for (const selector of titleSelectors) {
             const element = document.querySelector(selector);
             if (element) {
@@ -467,6 +538,12 @@
 
     // Set up video tracking
     function setupVideoTracking(video) {
+        if (trackedVideos.has(video)) {
+            log('Video already tracked, skipping setup.');
+            return;
+        }
+        trackedVideos.add(video);
+
         log('Setting up video tracking for video element:', video);
 
         let timestampLoaded = false;
@@ -595,6 +672,21 @@
             }
             return true;
         }
+
+        // --- Shorts fix: observe for video elements dynamically ---
+        if (window.location.pathname.startsWith('/shorts/')) {
+            // Shorts pages may load video after script runs, so observe for it
+            const shortsVideoObserver = new MutationObserver(() => {
+                const shortsVideo = document.querySelector('video');
+                if (shortsVideo && !trackedVideos.has(shortsVideo)) {
+                    log('Shorts video element detected by observer, initializing tracking...');
+                    setupVideoTracking(shortsVideo);
+                }
+            });
+            shortsVideoObserver.observe(document.body, { childList: true, subtree: true });
+        }
+        // ---------------------------------------------------------
+
         return false;
     }
 
@@ -1000,4 +1092,3 @@
     // Initialize on startup
     initialize();
 })();
-

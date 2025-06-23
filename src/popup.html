@@ -55,7 +55,7 @@
             color: var(--text-color);
             transition: background-color 0.3s, color 0.3s;
         }
-        
+
         /* Ensure theme is applied to all elements */
         * {
             background-color: inherit;
@@ -133,13 +133,13 @@
             margin-bottom: 10px;
             gap: 8px;
         }
-        
+
         .left-controls {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
         }
-        
+
         button {
             padding: 8px 12px;
             background-color: var(--button-bg);
@@ -149,12 +149,12 @@
             cursor: pointer;
             transition: background-color 0.2s, opacity 0.2s;
         }
-        
+
         button:hover {
             background-color: var(--button-hover);
             opacity: 0.9;
         }
-        
+
         #ytvhtToggleTheme {
             padding: 8px;
             min-width: 40px;
@@ -164,7 +164,7 @@
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
         }
-        
+
         #ytvhtToggleTheme:hover {
             background-color: var(--hover-bg);
         }
@@ -210,12 +210,12 @@
             gap: 20px;
             margin-bottom: 15px;
         }
-        
+
         .settings-column {
             flex: 1;
             min-width: 0;
         }
-        
+
         .settings-column h3 {
             margin-top: 0;
             margin-bottom: 15px;
@@ -223,20 +223,20 @@
             border-bottom: 1px solid var(--border-color);
             color: var(--button-bg);
         }
-        
+
         .settings-actions {
             margin-top: 15px;
             text-align: right;
             border-top: 1px solid var(--border-color);
             padding-top: 15px;
         }
-        
+
         .color-selector {
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        
+
         .settings-group {
             margin-bottom: 15px;
         }
@@ -285,11 +285,14 @@
     <div id="ytvhtMessage" class="message"></div>
 
     <div class="tab-bar">
-        <button id="ytvhtTabVideos" class="tab active">Videos</button>
+        <button id="ytvhtTabVideos" class="tab">Videos</button>
+        <button id="ytvhtTabShorts" class="tab">Shorts</button>
         <button id="ytvhtTabPlaylists" class="tab">Playlists</button>
         <button id="ytvhtTabSettings" class="tab">Settings</button>
     </div>
-    <div id="ytvhtHistoryContainer">
+
+    <!-- Videos Tab Container -->
+    <div id="ytvhtVideosContainer">
         <table class="history-table" id="ytvhtVideosTable">
             <thead>
                 <tr>
@@ -306,6 +309,7 @@
         <div id="ytvhtNoHistory" class="no-history" style="display: none;">
             No history found. Start watching some videos!
         </div>
+        <!-- Add Videos Pagination Controls -->
         <div id="ytvhtPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;">
             <button id="ytvhtFirstPage" title="First page">&laquo;</button>
             <button id="ytvhtPrevPage" title="Previous page">&lt;</button>
@@ -313,12 +317,46 @@
                 <!-- Page numbers will be inserted here -->
             </div>
             <input id="ytvhtPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
-            <span id="ytvhtPageInfo">Page 1 of 1</span>
+            <span id="ytvhtPageInfo">Video Page 1 of 1</span>
             <button id="ytvhtNextPage" title="Next page">&gt;</button>
             <button id="ytvhtLastPage" title="Last page">&raquo;</button>
         </div>
-        <!-- Playlists Table -->
-        <table class="history-table" id="ytvhtPlaylistsTable" style="display:none;">
+    </div>
+
+    <!-- Shorts Tab Container -->
+    <div id="ytvhtShortsContainer" style="display:none;">
+        <table class="history-table" id="ytvhtShortsTable">
+            <thead>
+                <tr>
+                    <th>Shorts Title</th>
+                    <th>Duration</th>
+                    <th>Last Watched</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="ytvhtShortsBody">
+                <!-- Shorts items will be inserted here -->
+            </tbody>
+        </table>
+        <div id="ytvhtNoShorts" class="no-history" style="display: none;">
+            No Shorts found. Watch some Shorts to see them here!
+        </div>
+        <div id="ytvhtShortsPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;">
+            <button id="ytvhtFirstShortsPage" title="First page">&laquo;</button>
+            <button id="ytvhtPrevShortsPage" title="Previous page">&lt;</button>
+            <div id="ytvhtShortsPageNumbers" style="display:flex; gap:5px; align-items:center;">
+                <!-- Shorts page numbers will be inserted here -->
+            </div>
+            <input id="ytvhtShortsPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
+            <span id="ytvhtShortsPageInfo">Short Page 1 of 1</span>
+            <button id="ytvhtNextShortsPage" title="Next page">&gt;</button>
+            <button id="ytvhtLastShortsPage" title="Last page">&raquo;</button>
+        </div>
+    </div>
+
+    <!-- Playlists Tab Container -->
+    <div id="ytvhtPlaylistsContainer" style="display:none;">
+        <table class="history-table" id="ytvhtPlaylistsTable">
             <thead>
                 <tr>
                     <th>Playlist Title</th>
@@ -341,11 +379,13 @@
                 <!-- Page numbers will be inserted here -->
             </div>
             <input id="ytvhtPlaylistPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
-            <span id="ytvhtPlaylistsPageInfo">Page 1 of 1</span>
+            <span id="ytvhtPlaylistsPageInfo">Playlist Page 1 of 1</span>
             <button id="ytvhtNextPlaylistPage" title="Next page">&gt;</button>
             <button id="ytvhtLastPlaylistPage" title="Last page">&raquo;</button>
         </div>
     </div>
+
+    <!-- Settings Tab Container -->
     <div id="ytvhtSettingsContainer" style="display:none;">
         <div class="settings-form">
             <div class="settings-columns">
@@ -424,4 +464,3 @@
     <script src="popup.js"></script>
 </body>
 </html>
-

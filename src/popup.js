@@ -16,15 +16,15 @@ console.log('[ythdb-popup] Script file loaded');
 
 log('Script starting initialization');
 
-const DB_NAME = 'YouTubeHistoryDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'videoHistory';
-let db;
-
 // Pagination state
 let allHistoryRecords = [];
+let allShortsRecords = [];
 let currentPage = 1;
 let pageSize = 20;
+
+// Shorts Pagination state
+let currentShortsPage = 1;
+let shortsPageSize = 20;
 
 // --- Playlists Tab State ---
 let allPlaylists = [];
@@ -172,15 +172,21 @@ async function loadHistory() {
         if (!history || Object.keys(history).length === 0) {
             showMessage('No history found.', 'info');
             allHistoryRecords = [];
+            allShortsRecords = [];
         } else {
-            // Convert the object of videos to an array and sort by timestamp descending (most recent first)
-            allHistoryRecords = Object.values(history);
+            // Use only regular (non-Shorts) videos for the Videos tab
+            allHistoryRecords = extractRegularVideoRecords(history);
             allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            // Extract Shorts records for the Shorts tab
+            allShortsRecords = extractShortsRecords(history);
+            allShortsRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             log('Loaded history:', allHistoryRecords);
+            log('Loaded shorts:', allShortsRecords);
         }
 
         currentPage = 1;
         displayHistoryPage();
+        displayShortsPage();
     } catch (error) {
         console.error('Error loading history:', error);
         showMessage('Error loading history: ' + (error.message || 'Unknown error'), 'error');
@@ -288,7 +294,7 @@ async function exportHistory() {
         const exportData = {
             _metadata: {
                 exportDate: new Date().toISOString(),
-                extensionVersion: "2.2.0",
+                extensionVersion: "2.4.0",
                 totalVideos: videos.length,
                 totalPlaylists: playlists.length,
                 exportFormat: "json",
@@ -406,6 +412,26 @@ async function importHistory() {
     };
 
     input.click();
+}
+
+// Extract all Shorts records from a history object (object of videoId -> record)
+// Fallback: treat as Shorts if isShorts === true, or if isShorts is missing and url contains '/shorts/'
+function extractShortsRecords(historyObj) {
+    if (!historyObj || typeof historyObj !== 'object') return [];
+    return Object.values(historyObj).filter(r =>
+        r.isShorts === true ||
+        (typeof r.isShorts === 'undefined' && r.url && r.url.includes('/shorts/'))
+    );
+}
+
+// Extract all non-Shorts (regular video) records from a history object
+// Fallback: treat as regular if isShorts === false, or if isShorts is missing and url does not contain '/shorts/'
+function extractRegularVideoRecords(historyObj) {
+    if (!historyObj || typeof historyObj !== 'object') return [];
+    return Object.values(historyObj).filter(r =>
+        r.isShorts === false ||
+        (typeof r.isShorts === 'undefined' && (!r.url || !r.url.includes('/shorts/')))
+    );
 }
 
 function goToPrevPage() {
@@ -897,41 +923,62 @@ async function initSettingsTab() {
 // Switch between different tabs in the popup
 function switchTab(tab) {
     const videosTab = document.getElementById('ytvhtTabVideos');
+    const shortsTab = document.getElementById('ytvhtTabShorts');
     const playlistsTab = document.getElementById('ytvhtTabPlaylists');
     const settingsTab = document.getElementById('ytvhtTabSettings');
-    const historyContainer = document.getElementById('ytvhtHistoryContainer');
+    const videosContainer = document.getElementById('ytvhtVideosContainer');
+    const shortsContainer = document.getElementById('ytvhtShortsContainer');
+    const playlistsContainer = document.getElementById('ytvhtPlaylistsContainer');
     const settingsContainer = document.getElementById('ytvhtSettingsContainer');
-    const videoPagination = document.getElementById('ytvhtPagination');
-    const playlistPagination = document.getElementById('ytvhtPlaylistsPagination');
 
     // Update tab active states
     videosTab.classList.remove('active');
+    shortsTab.classList.remove('active');
     playlistsTab.classList.remove('active');
     settingsTab.classList.remove('active');
 
+    // Hide all containers by default
+    videosContainer.style.display = 'none';
+    shortsContainer.style.display = 'none';
+    playlistsContainer.style.display = 'none';
+    settingsContainer.style.display = 'none';
+
+    saveCurrentExtensionTab(tab);
+
     if (tab === 'videos') {
         videosTab.classList.add('active');
-        historyContainer.style.display = 'block';
-        settingsContainer.style.display = 'none';
-        document.getElementById('ytvhtVideosTable').style.display = 'table';
-        document.getElementById('ytvhtPlaylistsTable').style.display = 'none';
-        videoPagination.style.display = 'flex';
-        playlistPagination.style.display = 'none';
+        videosContainer.style.display = 'block';
+        displayHistoryPage();
+    } else if (tab === 'shorts') {
+        shortsTab.classList.add('active');
+        shortsContainer.style.display = 'block';
+        displayShortsPage();
     } else if (tab === 'playlists') {
         playlistsTab.classList.add('active');
-        historyContainer.style.display = 'block';
-        settingsContainer.style.display = 'none';
-        document.getElementById('ytvhtVideosTable').style.display = 'none';
-        document.getElementById('ytvhtPlaylistsTable').style.display = 'table';
-        videoPagination.style.display = 'none';
-        playlistPagination.style.display = 'flex';
+        playlistsContainer.style.display = 'block';
+        displayPlaylistsPage();
     } else if (tab === 'settings') {
         settingsTab.classList.add('active');
-        historyContainer.style.display = 'none';
         settingsContainer.style.display = 'block';
-        videoPagination.style.display = 'none';
-        playlistPagination.style.display = 'none';
     }
+}
+
+/**
+ * Saves the currently opened extension tab (e.g., "videos", "shorts", "playlists", "settings") in localStorage.
+ * @param {string} tabName - The name of the tab to save.
+ */
+function saveCurrentExtensionTab(tabName) {
+    if (typeof tabName === 'string') {
+        localStorage.setItem('ythdb_currentTab', tabName);
+    }
+}
+
+/**
+ * Reads the currently saved extension tab from localStorage.
+ * @returns {string|null} The name of the saved tab, or null if not set.
+ */
+function getCurrentExtensionTab() {
+    return localStorage.getItem('ythdb_currentTab');
 }
 
 // Function to check system dark mode preference
@@ -1023,125 +1070,6 @@ async function getSystemColorScheme() {
     } catch (error) {
         log('[Theme Detection] Error in getSystemColorScheme:', error);
         return 'light'; // Default to light on error
-    }
-}
-
-// Helper function to determine if a color is dark
-function isColorDark(color) {
-    if (!color) {
-        log('No color provided to isColorDark');
-        return false;
-    }
-
-    try {
-        // Handle rgb/rgba colors
-        if (color.startsWith('rgb')) {
-            const rgb = color.match(/\d+/g);
-            if (rgb && rgb.length >= 3) {
-                const r = parseInt(rgb[0]);
-                const g = parseInt(rgb[1]);
-                const b = parseInt(rgb[2]);
-                // Calculate brightness using the WCAG formula
-                const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                return brightness < 128;
-            }
-        }
-        // Handle hex colors
-        else if (color.startsWith('#')) {
-            // Convert #RGB to #RRGGBB
-            const hex = color.length === 4 ?
-                '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3] :
-                color;
-
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
-            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            return brightness < 128;
-        }
-
-        // Handle color names (basic implementation)
-        const colorMap = {
-            'black': true,
-            'navy': true,
-            'darkblue': true,
-            'mediumblue': true,
-            'blue': false,
-            'darkgreen': true,
-            'green': false,
-            'teal': true,
-            'darkcyan': true,
-            'deepskyblue': false,
-            'darkturquoise': false,
-            'mediumspringgreen': false,
-            'lime': false,
-            'springgreen': false,
-            'cyan': false,
-            'midnightblue': true,
-            'dodgerblue': false,
-            'lightseagreen': true,
-            'forestgreen': true,
-            'seagreen': true,
-            'darkslategray': true,
-            'darkslategrey': true,
-            'limegreen': false,
-            'mediumseagreen': false,
-            'turquoise': false,
-            'royalblue': false,
-            'steelblue': false,
-            'darkslateblue': true,
-            'mediumturquoise': false,
-            'indigo': true,
-            'darkolivegreen': true,
-            'cadetblue': false,
-            'cornflowerblue': false,
-            'rebeccapurple': true,
-            'blueviolet': true,
-            'darkkhaki': false,
-            'mediumpurple': false,
-            'crimson': true,
-            'brown': true,
-            'firebrick': true,
-            'darkred': true,
-            'red': false,
-            'darkorange': false,
-            'orange': false,
-            'gold': false,
-            'yellow': false,
-            'khaki': false,
-            'violet': false,
-            'plum': false,
-            'magenta': false,
-            'orchid': false,
-            'pink': false,
-            'lightpink': false,
-            'white': false,
-            'snow': false,
-            'whitesmoke': false,
-            'gainsboro': false,
-            'lightgray': false,
-            'lightgrey': false,
-            'silver': false,
-            'darkgray': true,
-            'darkgrey': true,
-            'gray': true,
-            'grey': true,
-            'dimgray': true,
-            'dimgrey': true,
-            'black': true
-        };
-
-        const lowerColor = color.toLowerCase().trim();
-        if (colorMap.hasOwnProperty(lowerColor)) {
-            return colorMap[lowerColor];
-        }
-
-        // Default to light for unknown colors
-        return false;
-
-    } catch (e) {
-        log('Error in isColorDark:', e);
-        return false;
     }
 }
 
@@ -1327,12 +1255,39 @@ document.addEventListener('DOMContentLoaded', async function () {
         const nextPlaylistBtn = document.getElementById('ytvhtNextPlaylistPage');
         const firstPlaylistBtn = document.getElementById('ytvhtFirstPlaylistPage');
         const lastPlaylistBtn = document.getElementById('ytvhtLastPlaylistPage');
+        // Shorts tab and pagination
+        const shortsTab = document.getElementById('ytvhtTabShorts');
+        const firstShortsBtn = document.getElementById('ytvhtFirstShortsPage');
+        const prevShortsBtn = document.getElementById('ytvhtPrevShortsPage');
+        const nextShortsBtn = document.getElementById('ytvhtNextShortsPage');
+        const lastShortsBtn = document.getElementById('ytvhtLastShortsPage');
 
-        if (!clearButton || !exportButton || !importButton || !closeButton ||
-            !firstPageBtn || !prevPageBtn || !nextPageBtn || !lastPageBtn ||
-            !videosTab || !playlistsTab || !prevPlaylistBtn || !nextPlaylistBtn ||
-            !firstPlaylistBtn || !lastPlaylistBtn) {
-            throw new Error('Required buttons not found');
+        // Debug: Log missing buttons if any
+        const requiredButtons = [
+            ['ytvhtClearHistory', clearButton],
+            ['ytvhtExportHistory', exportButton],
+            ['ytvhtImportHistory', importButton],
+            ['ytvhtClosePopup', closeButton],
+            ['ytvhtFirstPage', firstPageBtn],
+            ['ytvhtPrevPage', prevPageBtn],
+            ['ytvhtNextPage', nextPageBtn],
+            ['ytvhtLastPage', lastPageBtn],
+            ['ytvhtTabVideos', videosTab],
+            ['ytvhtTabPlaylists', playlistsTab],
+            ['ytvhtPrevPlaylistBtn', prevPlaylistBtn],
+            ['ytvhtNextPlaylistBtn', nextPlaylistBtn],
+            ['ytvhtFirstPlaylistBtn', firstPlaylistBtn],
+            ['ytvhtLastPlaylistBtn', lastPlaylistBtn],
+            ['ytvhtTabShorts', shortsTab],
+            ['ytvhtFirstShortsPage', firstShortsBtn],
+            ['ytvhtPrevShortsPage', prevShortsBtn],
+            ['ytvhtNextShortsPage', nextShortsBtn],
+            ['ytvhtLastShortsPage', lastShortsBtn]
+        ];
+        const missing = requiredButtons.filter(([id, el]) => !el).map(([id]) => id);
+        if (missing.length) {
+            console.error('Missing required buttons:', missing);
+            throw new Error('Required buttons not found: ' + missing.join(', '));
         }
 
         // Set up event listeners
@@ -1380,8 +1335,18 @@ document.addEventListener('DOMContentLoaded', async function () {
         nextPageBtn.addEventListener('click', goToNextPage);
         lastPageBtn.addEventListener('click', goToLastPage);
 
+        let currentTab = getCurrentExtensionTab() || 'videos';
+        if (!['videos', 'shorts', 'playlists', 'settings'].includes(currentTab)) {
+            currentTab = 'videos'; // Default to videos if invalid
+        }
+        log('Current extension tab:', currentTab);
+        switchTab(currentTab);
         // Tabs
         videosTab.addEventListener('click', () => switchTab('videos'));
+        shortsTab.addEventListener('click', () => {
+            switchTab('shorts');
+            displayShortsPage();
+        });
         playlistsTab.addEventListener('click', () => {
             switchTab('playlists');
             loadPlaylists();
@@ -1392,6 +1357,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         nextPlaylistBtn.addEventListener('click', goToNextPlaylistPage);
         firstPlaylistBtn.addEventListener('click', goToFirstPlaylistPage);
         lastPlaylistBtn.addEventListener('click', goToLastPlaylistPage);
+
+        // Shorts pagination
+        firstShortsBtn.addEventListener('click', goToFirstShortsPage);
+        prevShortsBtn.addEventListener('click', goToPrevShortsPage);
+        nextShortsBtn.addEventListener('click', goToNextShortsPage);
+        lastShortsBtn.addEventListener('click', goToLastShortsPage);
 
         // Listen for system theme changes
         if (window.matchMedia) {
@@ -1416,9 +1387,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Load initial data
         await loadHistory();
 
-        // Show default tab
-        switchTab('videos');
-
         log('Initialization complete');
     } catch (error) {
         console.error('Error during initialization:', error);
@@ -1439,4 +1407,200 @@ function goToNextPlaylistPage() {
         currentPlaylistPage++;
         displayPlaylistsPage();
     }
+}
+
+// Shorts pagination controls
+function goToPrevShortsPage() {
+    if (currentShortsPage > 1) {
+        currentShortsPage--;
+        displayShortsPage();
+    }
+}
+
+function goToNextShortsPage() {
+    const totalPages = Math.ceil(allShortsRecords.length / shortsPageSize);
+    if (currentShortsPage < totalPages) {
+        currentShortsPage++;
+        displayShortsPage();
+    }
+}
+
+function goToFirstShortsPage() {
+    if (currentShortsPage !== 1) {
+        currentShortsPage = 1;
+        displayShortsPage();
+    }
+}
+
+function goToLastShortsPage() {
+    const totalPages = Math.ceil(allShortsRecords.length / shortsPageSize);
+    if (currentShortsPage !== totalPages) {
+        currentShortsPage = totalPages;
+        displayShortsPage();
+    }
+}
+
+function goToShortsPage(page) {
+    const totalPages = Math.ceil(allShortsRecords.length / shortsPageSize);
+    if (page >= 1 && page <= totalPages && page !== currentShortsPage) {
+        currentShortsPage = page;
+        displayShortsPage();
+    }
+}
+
+function updateShortsPaginationUI(current, total) {
+    // Defensive: Only update if all required elements exist
+    const pageInfo = document.getElementById('ytvhtShortsPageInfo');
+    const firstBtn = document.getElementById('ytvhtFirstShortsPage');
+    const prevBtn = document.getElementById('ytvhtPrevShortsPage');
+    const nextBtn = document.getElementById('ytvhtNextShortsPage');
+    const lastBtn = document.getElementById('ytvhtLastShortsPage');
+    const pageInput = document.getElementById('ytvhtShortsPageInput');
+    const pageNumbers = document.getElementById('ytvhtShortsPageNumbers');
+
+    if (!pageInfo || !firstBtn || !prevBtn || !nextBtn || !lastBtn || !pageInput || !pageNumbers) {
+        // One or more elements are missing, do not proceed
+        return;
+    }
+
+    pageInfo.textContent = `Page ${current} of ${total}`;
+
+    // Update button states
+    firstBtn.disabled = current === 1;
+    prevBtn.disabled = current === 1;
+    nextBtn.disabled = current === total;
+    lastBtn.disabled = current === total;
+
+    // Update page input
+    pageInput.max = total;
+
+    // Generate page numbers (smart pagination)
+    pageNumbers.innerHTML = '';
+
+    if (total <= 10) {
+        for (let i = 1; i <= total; i++) {
+            addShortsPageButton(i, current);
+        }
+    } else {
+        addShortsPageButton(1, current);
+        if (current > 4) addShortsEllipsis();
+        const start = Math.max(2, current - 2);
+        const end = Math.min(total - 1, current + 2);
+        for (let i = start; i <= end; i++) {
+            addShortsPageButton(i, current);
+        }
+        if (current < total - 3) addShortsEllipsis();
+        if (total > 1) addShortsPageButton(total, current);
+    }
+
+    // Add "Go to page" input for very large sets
+    if (total > 10) {
+        const goToSpan = document.createElement('span');
+        goToSpan.textContent = ' Go to: ';
+        goToSpan.style.marginLeft = '10px';
+        pageNumbers.appendChild(goToSpan);
+
+        const clonedInput = pageInput.cloneNode(true);
+        clonedInput.style.display = 'inline';
+        clonedInput.value = '';
+        clonedInput.placeholder = current;
+        clonedInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                const page = parseInt(this.value);
+                if (page) {
+                    goToShortsPage(page);
+                    this.value = '';
+                    this.placeholder = currentShortsPage;
+                }
+            }
+        });
+        pageNumbers.appendChild(clonedInput);
+    }
+}
+
+function addShortsPageButton(pageNum, currentPage) {
+    const button = document.createElement('button');
+    button.textContent = pageNum;
+    button.className = pageNum === currentPage ? 'active' : '';
+    button.style.cssText = `
+        min-width: 30px;
+        padding: 5px 8px;
+        border: 1px solid #ccc;
+        background: ${pageNum === currentPage ? '#007cba' : '#f9f9f9'};
+        color: ${pageNum === currentPage ? 'white' : '#333'};
+        cursor: pointer;
+        border-radius: 3px;
+    `;
+    button.addEventListener('click', () => goToShortsPage(pageNum));
+    document.getElementById('ytvhtShortsPageNumbers').appendChild(button);
+}
+
+function addShortsEllipsis() {
+    const span = document.createElement('span');
+    span.textContent = '...';
+    span.style.padding = '5px';
+    document.getElementById('ytvhtShortsPageNumbers').appendChild(span);
+}
+
+// Update displayShortsPage to use pagination
+function displayShortsPage() {
+    const shortsTable = document.getElementById('ytvhtShortsTable');
+    const noShorts = document.getElementById('ytvhtNoShorts');
+    const paginationDiv = document.getElementById('ytvhtShortsPagination');
+    const tbody = document.getElementById('ytvhtShortsBody');
+    tbody.innerHTML = '';
+
+    if (!allShortsRecords.length) {
+        noShorts.style.display = 'block';
+        shortsTable.style.display = 'none';
+        if (paginationDiv) paginationDiv.style.display = 'none';
+        return;
+    }
+    noShorts.style.display = 'none';
+    shortsTable.style.display = '';
+    if (paginationDiv) paginationDiv.style.display = 'flex';
+
+    const totalPages = Math.ceil(allShortsRecords.length / shortsPageSize);
+    if (currentShortsPage > totalPages) currentShortsPage = totalPages;
+    if (currentShortsPage < 1) currentShortsPage = 1;
+    const startIdx = (currentShortsPage - 1) * shortsPageSize;
+    const endIdx = Math.min(startIdx + shortsPageSize, allShortsRecords.length);
+    const pageRecords = allShortsRecords.slice(startIdx, endIdx);
+
+    pageRecords.forEach(record => {
+        const row = document.createElement('tr');
+        // Shorts title and link
+        const titleCell = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = record.url || `https://www.youtube.com/shorts/${record.videoId}`;
+        link.className = 'video-link';
+        link.textContent = record.title || record.videoId;
+        link.target = '_blank';
+        titleCell.appendChild(link);
+
+        // Duration
+        const durationCell = document.createElement('td');
+        durationCell.textContent = formatDuration(record.duration);
+
+        // Last watched
+        const dateCell = document.createElement('td');
+        dateCell.textContent = formatDate(record.timestamp);
+
+        // Action buttons
+        const actionCell = document.createElement('td');
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.onclick = () => deleteRecord(record.videoId);
+        actionCell.appendChild(deleteButton);
+
+        row.appendChild(titleCell);
+        row.appendChild(durationCell);
+        row.appendChild(dateCell);
+        row.appendChild(actionCell);
+
+        tbody.appendChild(row);
+    });
+
+
+    updateShortsPaginationUI(currentShortsPage, totalPages);
 }

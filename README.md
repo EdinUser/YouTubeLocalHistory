@@ -150,6 +150,17 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
+### Version 2.4.0
+- **YouTube Shorts Support**: Added comprehensive tracking and display for YouTube Shorts
+- **Separate Shorts Tab**: New dedicated tab interface for viewing Shorts history with pagination
+- **Enhanced UI Structure**: Refactored popup interface with separate containers for Videos, Shorts, and Playlists
+- **Tab State Persistence**: Extension remembers which tab was last active across sessions
+- **Theme Handling Improvements**: Refactored theme handling logic for better clarity and efficiency
+- **Simplified Theme Toggle**: Theme toggle button now only switches between light and dark themes
+- **Enhanced Theme Persistence**: Fixed issues with theme preference saving and application
+- **Code Optimization**: Streamlined theme application logic and removed redundant code
+- **Better Performance**: Improved theme switching performance and reduced code complexity
+
 ### Version 2.3.0
 - **Dark Theme Support**: Added comprehensive dark/light theme system with system preference detection
 - **Theme Toggle Button**: Added dynamic theme toggle button that shows current theme selection
