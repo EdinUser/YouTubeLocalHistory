@@ -926,11 +926,10 @@ function switchTab(tab) {
     const shortsTab = document.getElementById('ytvhtTabShorts');
     const playlistsTab = document.getElementById('ytvhtTabPlaylists');
     const settingsTab = document.getElementById('ytvhtTabSettings');
-    const historyContainer = document.getElementById('ytvhtHistoryContainer');
+    const videosContainer = document.getElementById('ytvhtVideosContainer');
+    const shortsContainer = document.getElementById('ytvhtShortsContainer');
+    const playlistsContainer = document.getElementById('ytvhtPlaylistsContainer');
     const settingsContainer = document.getElementById('ytvhtSettingsContainer');
-    const videoPagination = document.getElementById('ytvhtPagination');
-    const playlistPagination = document.getElementById('ytvhtPlaylistsPagination');
-    const shortsPagination = document.getElementById('ytvhtShortsPagination');
 
     // Update tab active states
     videosTab.classList.remove('active');
@@ -938,37 +937,28 @@ function switchTab(tab) {
     playlistsTab.classList.remove('active');
     settingsTab.classList.remove('active');
 
-    // Hide all tables and paginations by default
-    document.getElementById('ytvhtVideosTable').style.display = 'none';
-    document.getElementById('ytvhtShortsTable').style.display = 'none';
-    document.getElementById('ytvhtPlaylistsTable').style.display = 'none';
-    videoPagination.style.display = 'none';
-    playlistPagination.style.display = 'none';
-    shortsPagination.style.display = 'none';
+    // Hide all containers by default
+    videosContainer.style.display = 'none';
+    shortsContainer.style.display = 'none';
+    playlistsContainer.style.display = 'none';
+    settingsContainer.style.display = 'none';
 
     saveCurrentExtensionTab(tab);
 
     if (tab === 'videos') {
         videosTab.classList.add('active');
-        historyContainer.style.display = 'block';
-        settingsContainer.style.display = 'none';
-        document.getElementById('ytvhtVideosTable').style.display = 'table';
-        videoPagination.style.display = 'flex';
+        videosContainer.style.display = 'block';
+        displayHistoryPage();
     } else if (tab === 'shorts') {
         shortsTab.classList.add('active');
-        historyContainer.style.display = 'block';
-        settingsContainer.style.display = 'none';
-        document.getElementById('ytvhtShortsTable').style.display = 'table';
-        shortsPagination.style.display = 'flex';
+        shortsContainer.style.display = 'block';
+        displayShortsPage();
     } else if (tab === 'playlists') {
         playlistsTab.classList.add('active');
-        historyContainer.style.display = 'block';
-        settingsContainer.style.display = 'none';
-        document.getElementById('ytvhtPlaylistsTable').style.display = 'table';
-        playlistPagination.style.display = 'flex';
+        playlistsContainer.style.display = 'block';
+        displayPlaylistsPage();
     } else if (tab === 'settings') {
         settingsTab.classList.add('active');
-        historyContainer.style.display = 'none';
         settingsContainer.style.display = 'block';
     }
 }

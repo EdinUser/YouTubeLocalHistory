@@ -290,7 +290,9 @@
         <button id="ytvhtTabPlaylists" class="tab">Playlists</button>
         <button id="ytvhtTabSettings" class="tab">Settings</button>
     </div>
-    <div id="ytvhtHistoryContainer">
+
+    <!-- Videos Tab Container -->
+    <div id="ytvhtVideosContainer">
         <table class="history-table" id="ytvhtVideosTable">
             <thead>
                 <tr>
@@ -315,12 +317,15 @@
                 <!-- Page numbers will be inserted here -->
             </div>
             <input id="ytvhtPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
-            <span id="ytvhtPageInfo">Page 1 of 1</span>
+            <span id="ytvhtPageInfo">Video Page 1 of 1</span>
             <button id="ytvhtNextPage" title="Next page">&gt;</button>
             <button id="ytvhtLastPage" title="Last page">&raquo;</button>
         </div>
-        <!-- Shorts Table -->
-        <table class="history-table" id="ytvhtShortsTable" style="display:none;">
+    </div>
+
+    <!-- Shorts Tab Container -->
+    <div id="ytvhtShortsContainer" style="display:none;">
+        <table class="history-table" id="ytvhtShortsTable">
             <thead>
                 <tr>
                     <th>Shorts Title</th>
@@ -343,12 +348,15 @@
                 <!-- Shorts page numbers will be inserted here -->
             </div>
             <input id="ytvhtShortsPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
-            <span id="ytvhtShortsPageInfo">Page 1 of 1</span>
+            <span id="ytvhtShortsPageInfo">Short Page 1 of 1</span>
             <button id="ytvhtNextShortsPage" title="Next page">&gt;</button>
             <button id="ytvhtLastShortsPage" title="Last page">&raquo;</button>
         </div>
-        <!-- Playlists Table -->
-        <table class="history-table" id="ytvhtPlaylistsTable" style="display:none;">
+    </div>
+
+    <!-- Playlists Tab Container -->
+    <div id="ytvhtPlaylistsContainer" style="display:none;">
+        <table class="history-table" id="ytvhtPlaylistsTable">
             <thead>
                 <tr>
                     <th>Playlist Title</th>
@@ -371,11 +379,13 @@
                 <!-- Page numbers will be inserted here -->
             </div>
             <input id="ytvhtPlaylistPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
-            <span id="ytvhtPlaylistsPageInfo">Page 1 of 1</span>
+            <span id="ytvhtPlaylistsPageInfo">Playlist Page 1 of 1</span>
             <button id="ytvhtNextPlaylistPage" title="Next page">&gt;</button>
             <button id="ytvhtLastPlaylistPage" title="Last page">&raquo;</button>
         </div>
     </div>
+
+    <!-- Settings Tab Container -->
     <div id="ytvhtSettingsContainer" style="display:none;">
         <div class="settings-form">
             <div class="settings-columns">
