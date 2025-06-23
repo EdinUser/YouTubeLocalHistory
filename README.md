@@ -1,5 +1,9 @@
 # YouTube Local History Tracker
 
+![Tests](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/EdinUser/YouTubeLocalHistory)
+![License](https://img.shields.io/github/license/EdinUser/YouTubeLocalHistory)
+
 A browser extension that tracks your YouTube video watch history locally using secure browser storage. This extension automatically saves your progress in videos and shows visual indicators for videos you've already watched.
 
 ## Features
