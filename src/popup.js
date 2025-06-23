@@ -938,13 +938,13 @@ function switchTab(tab) {
 async function getSystemColorScheme() {
     try {
         log('=== Starting theme detection ===');
-        
+
         // 1. First check prefers-color-scheme media query
         const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const lightMediaQuery = window.matchMedia('(prefers-color-scheme: light)');
-        
+
         log(`[Theme Detection] Media query - prefers-color-scheme: ${darkMediaQuery.matches ? 'dark' : lightMediaQuery.matches ? 'light' : 'not set'}`);
-        
+
         if (darkMediaQuery.matches) {
             log('[Theme Detection] Using dark theme from media query');
             return 'dark';
@@ -953,33 +953,33 @@ async function getSystemColorScheme() {
             log('[Theme Detection] Using light theme from media query');
             return 'light';
         }
-        
+
         // 2. Try to get the browser's theme info
         if (typeof browser !== 'undefined' && browser.theme && typeof browser.theme.getCurrent === 'function') {
             try {
                 log('[Theme Detection] Attempting to get browser theme info...');
                 const themeInfo = await browser.theme.getCurrent();
                 log('[Theme Detection] Browser theme info:', JSON.stringify(themeInfo, null, 2));
-                
+
                 if (themeInfo && themeInfo.colors) {
                     // Log all color values for debugging
                     log('[Theme Detection] Theme colors:', Object.entries(themeInfo.colors)
                         .map(([key, value]) => `${key}: ${value}`)
                         .join('\n  '));
-                    
+
                     // Check for explicit dark theme indicators
-                    if (themeInfo.colors.color_scheme === 'dark' || 
-                        (themeInfo.colors.theme_collection && 
-                         themeInfo.colors.theme_collection.private_browsing === 'dark')) {
+                    if (themeInfo.colors.color_scheme === 'dark' ||
+                        (themeInfo.colors.theme_collection &&
+                            themeInfo.colors.theme_collection.private_browsing === 'dark')) {
                         log('[Theme Detection] Detected dark theme from explicit indicators');
                         return 'dark';
                     }
-                    
+
                     // Check for common dark theme properties
                     const themeColors = JSON.stringify(themeInfo.colors).toLowerCase();
-                    const hasDarkIndicator = ['dark', 'night', 'black'].some(key => 
+                    const hasDarkIndicator = ['dark', 'night', 'black'].some(key =>
                         themeColors.includes(key));
-                        
+
                     if (hasDarkIndicator) {
                         log('[Theme Detection] Detected dark theme from color analysis');
                         return 'dark';
@@ -991,7 +991,7 @@ async function getSystemColorScheme() {
         } else {
             log('[Theme Detection] Browser theme API not available');
         }
-        
+
         // 3. Check for high contrast mode
         if (window.matchMedia('(forced-colors: active)').matches) {
             log('[Theme Detection] High contrast mode detected');
@@ -999,27 +999,27 @@ async function getSystemColorScheme() {
                 return 'dark';
             }
         }
-        
+
         // 4. Check the document's background color as a last resort
         const bgColor = window.getComputedStyle(document.documentElement).backgroundColor;
         log(`[Theme Detection] Document background color: ${bgColor}`);
-        
+
         // Simple check for dark background
         if (bgColor) {
             const rgb = bgColor.match(/\d+/g);
             if (rgb && rgb.length >= 3) {
-                const brightness = (parseInt(rgb[0]) * 299 + 
-                                 parseInt(rgb[1]) * 587 + 
-                                 parseInt(rgb[2]) * 114) / 1000;
+                const brightness = (parseInt(rgb[0]) * 299 +
+                    parseInt(rgb[1]) * 587 +
+                    parseInt(rgb[2]) * 114) / 1000;
                 const isDark = brightness < 128;
                 log(`[Theme Detection] Background brightness: ${brightness}, isDark: ${isDark}`);
                 return isDark ? 'dark' : 'light';
             }
         }
-        
+
         log('[Theme Detection] No dark theme detected, defaulting to light');
         return 'light';
-        
+
     } catch (error) {
         log('[Theme Detection] Error in getSystemColorScheme:', error);
         return 'light'; // Default to light on error
@@ -1032,7 +1032,7 @@ function isColorDark(color) {
         log('No color provided to isColorDark');
         return false;
     }
-    
+
     try {
         // Handle rgb/rgba colors
         if (color.startsWith('rgb')) {
@@ -1049,17 +1049,17 @@ function isColorDark(color) {
         // Handle hex colors
         else if (color.startsWith('#')) {
             // Convert #RGB to #RRGGBB
-            const hex = color.length === 4 ? 
-                '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3] : 
+            const hex = color.length === 4 ?
+                '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3] :
                 color;
-            
+
             const r = parseInt(hex.slice(1, 3), 16);
             const g = parseInt(hex.slice(3, 5), 16);
             const b = parseInt(hex.slice(5, 7), 16);
             const brightness = (r * 299 + g * 587 + b * 114) / 1000;
             return brightness < 128;
         }
-        
+
         // Handle color names (basic implementation)
         const colorMap = {
             'black': true,
@@ -1130,15 +1130,15 @@ function isColorDark(color) {
             'dimgrey': true,
             'black': true
         };
-        
+
         const lowerColor = color.toLowerCase().trim();
         if (colorMap.hasOwnProperty(lowerColor)) {
             return colorMap[lowerColor];
         }
-        
+
         // Default to light for unknown colors
         return false;
-        
+
     } catch (e) {
         log('Error in isColorDark:', e);
         return false;
@@ -1147,32 +1147,32 @@ function isColorDark(color) {
 
 function toggleDarkMode(enable) {
     log('=== toggleDarkMode called with:', enable);
-    
+
     try {
         const theme = enable ? 'dark' : 'light';
         log(`Setting theme to: ${theme}`);
-        
+
         // Set data-theme attribute on html and body
         document.documentElement.setAttribute('data-theme', theme);
         document.body.setAttribute('data-theme', theme);
-        
+
         // Toggle dark-mode class on body
         if (enable) {
             document.body.classList.add('dark-mode');
         } else {
             document.body.classList.remove('dark-mode');
         }
-        
+
         // Force a reflow to ensure styles are applied
         document.body.offsetHeight;
-        
+
         // Log the current state after applying theme
         const htmlTheme = document.documentElement.getAttribute('data-theme');
         const bodyTheme = document.body.getAttribute('data-theme');
         const bodyClasses = document.body.className;
         const computedBg = window.getComputedStyle(document.body).backgroundColor;
         const computedColor = window.getComputedStyle(document.body).color;
-        
+
         log('Theme applied:', {
             'html data-theme': htmlTheme,
             'body data-theme': bodyTheme,
@@ -1180,7 +1180,7 @@ function toggleDarkMode(enable) {
             'computed bg': computedBg,
             'computed color': computedColor
         });
-        
+
     } catch (error) {
         console.error('Error in toggleDarkMode:', error);
     }
@@ -1192,15 +1192,13 @@ function updateThemeToggleText(themePreference) {
     if (themeText) {
         let text = 'Theme: ';
         switch (themePreference) {
-            case 'system':
-                text += 'System';
-                break;
             case 'light':
                 text += 'Light';
                 break;
             case 'dark':
                 text += 'Dark';
                 break;
+            case 'system':
             default:
                 text += 'System';
         }
@@ -1208,109 +1206,31 @@ function updateThemeToggleText(themePreference) {
     }
 }
 
-// Apply theme based on settings
+// Apply theme based on settings or override
 async function applyTheme(themePreference) {
-    log('=== Starting applyTheme ===');
-    const settings = await loadSettings();
-    log('Loaded settings:', settings);
-
-    const effectivePreference = themePreference || settings.themePreference || 'system';
-    log('Effective theme preference:', effectivePreference);
-
-    if (effectivePreference === 'system') {
-        log('System theme preference detected, checking system theme...');
-        
-        // Function to apply system theme
-        const applySystemTheme = async () => {
-            try {
-                log('[Theme] Detecting system theme...');
-                const systemColorScheme = await getSystemColorScheme();
-                const isDark = systemColorScheme === 'dark';
-                
-                log(`[Theme] System color scheme resolved to: ${systemColorScheme}`);
-                await toggleDarkMode(isDark);
-                
-                // Update UI to reflect current theme
-                updateThemeToggleText('system');
-                
-            } catch (error) {
-                log('[Theme] Error applying system theme:', error);
-                // Fallback to light theme on error
-                await toggleDarkMode(false);
-            }
-        };
-        
-        // Apply theme immediately
-        applySystemTheme();
-        
-        // Set up theme change listeners
-        try {
-            // Listen for browser theme changes
-            if (typeof browser !== 'undefined' && browser.theme && browser.theme.onUpdated) {
-                browser.theme.onUpdated.addListener(async (updateInfo) => {
-                    log('[Theme] Browser theme updated:', updateInfo);
-                    if (settings.themePreference === 'system') {
-                        await applySystemTheme();
-                    }
-                });
-            }
-            
-            // Listen for system color scheme changes
-            const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            const handleSystemThemeChange = async () => {
-                log('[Theme] System color scheme changed');
-                if (settings.themePreference === 'system') {
-                    await applySystemTheme();
-                }
-            };
-            
-            darkModeMediaQuery.addEventListener('change', handleSystemThemeChange);
-            
-            // Clean up event listener when popup is closed
-            window.addEventListener('unload', () => {
-                darkModeMediaQuery.removeEventListener('change', handleSystemThemeChange);
-            });
-            
-        } catch (error) {
-            log('[Theme] Error setting up theme change listeners:', error);
-        }
-    } else if (effectivePreference === 'dark') {
-        log('Forcing dark theme');
-        await toggleDarkMode(true);
-        updateThemeToggleText('dark');
-    } else {
-        log('Using light theme');
-        await toggleDarkMode(false);
-        updateThemeToggleText('light');
+    let effectiveTheme = themePreference;
+    if (!effectiveTheme || effectiveTheme === 'system') {
+        effectiveTheme = await getSystemColorScheme();
     }
+    toggleDarkMode(effectiveTheme === 'dark');
+    updateThemeToggleText(themePreference || 'system');
 }
 
-// Toggle theme between system, light, and dark
+// Toggle theme between light and dark (never "system" from the button)
 async function toggleTheme() {
     try {
         const settings = await loadSettings();
         let newTheme;
-
-        switch (settings.themePreference) {
-            case 'system':
-                newTheme = 'light';
-                break;
-            case 'light':
-                newTheme = 'dark';
-                break;
-            case 'dark':
-                newTheme = 'system';
-                break;
-            default:
-                newTheme = 'system';
+        // Only toggle between light and dark
+        if (settings.themePreference === 'dark') {
+            newTheme = 'light';
+        } else {
+            newTheme = 'dark';
         }
-
-        log('Toggling theme from', settings.themePreference, 'to', newTheme);
+        // Override the saved preference (even if it was "system")
         settings.themePreference = newTheme;
         await saveSettings(settings);
         updateThemeToggleText(newTheme);
-
-        // Apply the new theme
         await applyTheme(newTheme);
     } catch (error) {
         console.error('Error in toggleTheme:', error);
@@ -1321,11 +1241,11 @@ async function toggleTheme() {
 document.addEventListener('DOMContentLoaded', async function () {
     try {
         log('Starting initialization...');
-        
+
         // Load settings first
         const settings = await loadSettings();
         log('Initial settings:', settings);
-        
+
         // Function to handle theme changes
         async function handleThemeChange() {
             log('Theme change detected, re-applying theme...');
@@ -1337,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (typeof browser !== 'undefined' && browser.theme && browser.theme.onUpdated) {
             log('Setting up browser theme change listener');
             browser.theme.onUpdated.addListener(handleThemeChange);
-            
+
             // Clean up event listener when popup is closed
             window.addEventListener('unload', () => {
                 if (typeof browser !== 'undefined' && browser.theme && browser.theme.onUpdated) {
@@ -1345,16 +1265,16 @@ document.addEventListener('DOMContentLoaded', async function () {
                 }
             });
         }
-        
+
         // Set up system theme change listener
         const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         darkModeMediaQuery.addEventListener('change', handleThemeChange);
-        
+
         // Clean up event listener when popup is closed
         window.addEventListener('unload', () => {
             darkModeMediaQuery.removeEventListener('change', handleThemeChange);
         });
-        
+
         // Initialize storage
         const storageReady = await initStorage();
         if (!storageReady) {
@@ -1364,7 +1284,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Update UI with current settings
         currentSettings = settings;
         updateSettingsUI(settings);
-        
+
+        // Apply theme immediately on popup open
+        await applyTheme(settings.themePreference);
+
         // Set up theme toggle button
         const themeToggle = document.getElementById('ytvhtToggleTheme');
         if (themeToggle) {
@@ -1517,4 +1440,3 @@ function goToNextPlaylistPage() {
         displayPlaylistsPage();
     }
 }
-
