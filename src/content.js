@@ -36,7 +36,7 @@
     const DB_NAME = 'YouTubeHistoryDB';
     const DB_VERSION = 3;
     const STORE_NAME = 'videoHistory';
-    const DEBUG = false;
+    const DEBUG = true;
     const SAVE_INTERVAL = 5000; // Save every 5 seconds
 
     const DEFAULT_SETTINGS = {
@@ -390,33 +390,57 @@
 
         log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
 
-        // Get video title from YouTube's page - support both regular videos and Shorts
-        const titleSelectors = [
-            // Regular video page selectors
-            'h1.ytd-video-primary-info-renderer',
-            'h1.title.style-scope.ytd-video-primary-info-renderer',
-            // Shorts-specific selectors
-            'h1.ytd-reel-player-header-renderer',
-            'h1.ytd-reel-player-overlay-renderer',
-            'ytd-reel-player-header-renderer h1',
-            'ytd-reel-player-overlay-renderer h1',
-            'ytd-reel-player-header-renderer yt-formatted-string',
-            'ytd-reel-player-overlay-renderer yt-formatted-string',
-            '.ytd-reel-player-header-renderer .title',
-            '.ytd-reel-player-overlay-renderer .title',
-            'ytd-reel-player-header-renderer .title yt-formatted-string',
-            'ytd-reel-player-overlay-renderer .title yt-formatted-string'
-        ];
-
+        // Improved Shorts title detection (2024+)
         let title = 'Unknown Title';
-        for (const selector of titleSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-                const text = element.textContent?.trim();
-                if (text && text.length > 0 && text !== 'Unknown Title') {
-                    title = text;
-                    log(`Found title using selector "${selector}": "${title}"`);
-                    break;
+        if (window.location.pathname.startsWith('/shorts/')) {
+            // New Shorts title selector (2024)
+            let shortsTitleEl =
+                document.querySelector('yt-shorts-video-title-view-model h2 span') ||
+                document.querySelector('.ytd-reel-video-renderer h2.title yt-formatted-string') ||
+                document.querySelector('h2.title.ytd-reel-video-renderer yt-formatted-string') ||
+                document.querySelector('h1.title.ytd-reel-player-header-renderer') ||
+                document.querySelector('ytd-reel-player-header-renderer h1') ||
+                document.querySelector('ytd-reel-player-header-renderer yt-formatted-string') ||
+                document.querySelector('ytd-reel-player-overlay-renderer yt-formatted-string');
+            if (shortsTitleEl && shortsTitleEl.textContent?.trim()) {
+                title = shortsTitleEl.textContent.trim();
+                log('Shorts title detected:', title);
+            } else {
+                // Fallback: use document title, but clean up " - YouTube Shorts"
+                let docTitle = document.title.replace(/ - YouTube Shorts$/, '').trim();
+                if (docTitle && docTitle.length > 0 && docTitle !== 'YouTube') {
+                    title = docTitle;
+                    log('Shorts title fallback from document.title:', title);
+                }
+            }
+        }
+        if (title === 'Unknown Title') {
+            // Fallback to previous selectors for regular videos and Shorts overlays
+            const titleSelectors = [
+                // Regular video page selectors
+                'h1.ytd-video-primary-info-renderer',
+                'h1.title.style-scope.ytd-video-primary-info-renderer',
+                // Shorts-specific selectors (header/overlay)
+                'h1.ytd-reel-player-header-renderer',
+                'h1.ytd-reel-player-overlay-renderer',
+                'ytd-reel-player-header-renderer h1',
+                'ytd-reel-player-overlay-renderer h1',
+                'ytd-reel-player-header-renderer yt-formatted-string',
+                'ytd-reel-player-overlay-renderer yt-formatted-string',
+                '.ytd-reel-player-header-renderer .title',
+                '.ytd-reel-player-overlay-renderer .title',
+                'ytd-reel-player-header-renderer .title yt-formatted-string',
+                'ytd-reel-player-overlay-renderer .title yt-formatted-string'
+            ];
+            for (const selector of titleSelectors) {
+                const element = document.querySelector(selector);
+                if (element) {
+                    const text = element.textContent?.trim();
+                    if (text && text.length > 0 && text !== 'Unknown Title') {
+                        title = text;
+                        log(`Found title using selector "${selector}": "${title}"`);
+                        break;
+                    }
                 }
             }
         }
