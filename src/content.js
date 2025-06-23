@@ -373,8 +373,8 @@
         }
     }
 
-    // Save the current video timestamp
-    async function saveTimestamp() {
+    // Save the current video timestamp for Shorts
+    async function saveShortsTimestamp() {
         const video = document.querySelector('video');
         if (!video) {
             log('No video element found.');
@@ -383,66 +383,111 @@
 
         const currentTime = video.currentTime;
         const duration = video.duration;
-
         const videoId = getVideoId();
         if (!videoId) {
             log('No video ID found.');
             return;
         }
 
-        log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
+        // Do not update record if timestamp is 0
+        if (!currentTime || currentTime === 0) {
+            log(`Detected Shorts timestamp 0 for video ID ${videoId}, skipping update.`);
+            return;
+        }
 
-        // Improved Shorts title detection (2024+)
+        log(`Saving Shorts timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
+
         let title = 'Unknown Title';
-        if (window.location.pathname.startsWith('/shorts/')) {
-            // New Shorts title selector (2024)
-            let shortsTitleEl =
-                document.querySelector('yt-shorts-video-title-view-model h2 span') ||
-                document.querySelector('.ytd-reel-video-renderer h2.title yt-formatted-string') ||
-                document.querySelector('h2.title.ytd-reel-video-renderer yt-formatted-string') ||
-                document.querySelector('h1.title.ytd-reel-player-header-renderer') ||
-                document.querySelector('ytd-reel-player-header-renderer h1') ||
-                document.querySelector('ytd-reel-player-header-renderer yt-formatted-string') ||
-                document.querySelector('ytd-reel-player-overlay-renderer yt-formatted-string');
-            if (shortsTitleEl && shortsTitleEl.textContent?.trim()) {
-                title = shortsTitleEl.textContent.trim();
-                log('Shorts title detected:', title);
-            } else {
-                // Fallback: use document title, but clean up " - YouTube Shorts"
-                let docTitle = document.title.replace(/ - YouTube Shorts$/, '').trim();
-                if (docTitle && docTitle.length > 0 && docTitle !== 'YouTube') {
-                    title = docTitle;
-                    log('Shorts title fallback from document.title:', title);
-                }
+        const shortsTitleEl = document.querySelector('yt-shorts-video-title-view-model h2 span');
+        if (shortsTitleEl && shortsTitleEl.textContent?.trim()) {
+            title = shortsTitleEl.textContent.trim();
+            log('Shorts title detected:', title);
+        } else {
+            // Fallback: use document title, but clean up " - YouTube Shorts"
+            let docTitle = document.title.replace(/ - YouTube Shorts$/, '').trim();
+            if (docTitle && docTitle.length > 0 && docTitle !== 'YouTube') {
+                title = docTitle;
+                log('Shorts title fallback from document.title:', title);
             }
         }
-        if (title === 'Unknown Title') {
-            // Fallback to previous selectors for regular videos and Shorts overlays
-            const titleSelectors = [
-                // Regular video page selectors
-                'h1.ytd-video-primary-info-renderer',
-                'h1.title.style-scope.ytd-video-primary-info-renderer',
-                // Shorts-specific selectors (header/overlay)
-                'h1.ytd-reel-player-header-renderer',
-                'h1.ytd-reel-player-overlay-renderer',
-                'ytd-reel-player-header-renderer h1',
-                'ytd-reel-player-overlay-renderer h1',
-                'ytd-reel-player-header-renderer yt-formatted-string',
-                'ytd-reel-player-overlay-renderer yt-formatted-string',
-                '.ytd-reel-player-header-renderer .title',
-                '.ytd-reel-player-overlay-renderer .title',
-                'ytd-reel-player-header-renderer .title yt-formatted-string',
-                'ytd-reel-player-overlay-renderer .title yt-formatted-string'
-            ];
-            for (const selector of titleSelectors) {
-                const element = document.querySelector(selector);
-                if (element) {
-                    const text = element.textContent?.trim();
-                    if (text && text.length > 0 && text !== 'Unknown Title') {
-                        title = text;
-                        log(`Found title using selector "${selector}": "${title}"`);
-                        break;
-                    }
+
+        const record = {
+            videoId: videoId,
+            time: currentTime,
+            duration: duration,
+            timestamp: Date.now(),
+            title: title,
+            url: getCleanVideoUrl(),
+            isShorts: true // <--- Mark as Shorts for UI filtering
+        };
+
+        try {
+            await ytStorage.setVideo(videoId, record);
+            log(`Shorts timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
+        } catch (error) {
+            log('Error saving Shorts timestamp:', error);
+        }
+    }
+
+    // Save the current video timestamp (regular videos)
+    async function saveTimestamp() {
+        if (window.location.pathname.startsWith('/shorts/')) {
+            await saveShortsTimestamp();
+            return;
+        }
+
+        const video = document.querySelector('video');
+        if (!video) {
+            log('No video element found.');
+            return;
+        }
+
+        let currentTime = video.currentTime;
+        const duration = video.duration;
+        const videoId = getVideoId();
+        if (!videoId) {
+            log('No video ID found.');
+            return;
+        }
+
+        // Do not update record if timestamp is 0
+        if (!currentTime || currentTime === 0) {
+            log(`Detected timestamp 0 for video ID ${videoId}, skipping update.`);
+            return;
+        }
+
+        // If within last 10 seconds, save as duration - 10 (but not less than 0)
+        if (duration && currentTime > duration - 10) {
+            const adjustedTime = Math.max(0, duration - 10);
+            log(`Current time (${currentTime}) is within last 10s of duration (${duration}), saving as ${adjustedTime}`);
+            currentTime = adjustedTime;
+        }
+
+        log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
+
+        let title = 'Unknown Title';
+        const titleSelectors = [
+            'h1.ytd-video-primary-info-renderer',
+            'h1.title.style-scope.ytd-video-primary-info-renderer',
+            'h1.ytd-reel-player-header-renderer',
+            'h1.ytd-reel-player-overlay-renderer',
+            'ytd-reel-player-header-renderer h1',
+            'ytd-reel-player-overlay-renderer h1',
+            'ytd-reel-player-header-renderer yt-formatted-string',
+            'ytd-reel-player-overlay-renderer yt-formatted-string',
+            '.ytd-reel-player-header-renderer .title',
+            '.ytd-reel-player-overlay-renderer .title',
+            'ytd-reel-player-header-renderer .title yt-formatted-string',
+            'ytd-reel-player-overlay-renderer .title yt-formatted-string'
+        ];
+        for (const selector of titleSelectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+                const text = element.textContent?.trim();
+                if (text && text.length > 0 && text !== 'Unknown Title') {
+                    title = text;
+                    log(`Found title using selector "${selector}": "${title}"`);
+                    break;
                 }
             }
         }
