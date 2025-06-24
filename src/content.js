@@ -389,8 +389,7 @@
     // Load settings from browser.storage.local
     async function loadSettings() {
         try {
-            const storedSettings = await ytStorage.getSettings();
-            let settings = storedSettings?.settings || {};
+            const settings = await ytStorage.getSettings() || {};
             let updated = false;
 
             // Ensure all default settings are present
@@ -403,7 +402,7 @@
 
             // Save updated settings if needed
             if (updated) {
-                await ytStorage.setSettings({id: 'userSettings', settings});
+                await ytStorage.setSettings(settings);
             }
 
             currentSettings = settings;

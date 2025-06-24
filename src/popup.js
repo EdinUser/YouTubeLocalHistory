@@ -778,8 +778,7 @@ async function deletePlaylist(playlistId) {
 // Load settings from storage
 async function loadSettings() {
     try {
-        const storedSettings = await ytStorage.getSettings() || {};
-        let settings = {...storedSettings};
+        const settings = await ytStorage.getSettings() || {};
         let updated = false;
 
         // Ensure all default settings exist
@@ -805,6 +804,10 @@ async function loadSettings() {
 // Save settings to storage
 async function saveSettings(settings) {
     try {
+        // Remove parasite sub-object if present
+        if ('settings' in settings) {
+            delete settings.settings;
+        }
         await ytStorage.setSettings(settings);
         return true;
     } catch (error) {
