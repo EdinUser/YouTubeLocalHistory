@@ -1183,4 +1183,23 @@
 
     // Initialize on startup
     initialize();
+
+    // Listen for storage changes and update overlays in real time
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area === 'local') {
+                if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
+                    processExistingThumbnails();
+                }
+            }
+        });
+    } else if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
+        browser.storage.onChanged.addListener((changes, area) => {
+            if (area === 'local') {
+                if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
+                    processExistingThumbnails();
+                }
+            }
+        });
+    }
 })();

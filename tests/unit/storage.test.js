@@ -107,6 +107,20 @@ class MockSimpleStorage {
     await this.ensureMigrated();
     await this.storage.clear();
   }
+
+  async clearHistoryOnly() {
+    await this.ensureMigrated();
+    const allData = await this.storage.get(null);
+    const keysToRemove = [];
+
+    Object.keys(allData).forEach(key => {
+      if (key.startsWith('video_') || key.startsWith('playlist_')) {
+        keysToRemove.push(key);
+      }
+    });
+
+    await this.storage.remove(keysToRemove);
+  }
 }
 
 describe('Storage Operations', () => {
@@ -277,10 +291,69 @@ describe('Storage Operations', () => {
   describe('Clear Operations', () => {
     test('should clear all data', async () => {
       mockStorage.clear.mockResolvedValue();
+      await ytStorage.clear();
+      expect(mockStorage.clear).toHaveBeenCalled();
+    });
 
+    test('should clear all data types including videos, playlists, shorts, and settings', async () => {
+      // Mock storage with various data types
+      const mockData = {
+        'video_video1': { videoId: 'video1', title: 'Video 1' },
+        'video_video2': { videoId: 'video2', title: 'Video 2' },
+        'playlist_playlist1': { playlistId: 'playlist1', title: 'Playlist 1' },
+        'playlist_playlist2': { playlistId: 'playlist2', title: 'Playlist 2' },
+        'settings': { overlayColor: 'blue', overlayLabelSize: 'medium' },
+        '__migrated__': true
+      };
+
+      mockStorage.get.mockResolvedValue(mockData);
+      mockStorage.clear.mockResolvedValue();
+
+      // Verify data exists before clearing
+      const videosBefore = await ytStorage.getAllVideos();
+      const playlistsBefore = await ytStorage.getAllPlaylists();
+      const settingsBefore = await ytStorage.getSettings();
+
+      expect(Object.keys(videosBefore)).toHaveLength(2);
+      expect(Object.keys(playlistsBefore)).toHaveLength(2);
+      expect(settingsBefore).toBeTruthy();
+
+      // Clear all data
       await ytStorage.clear();
 
       expect(mockStorage.clear).toHaveBeenCalled();
+
+      // Verify storage is cleared
+      mockStorage.get.mockResolvedValue({});
+      
+      const videosAfter = await ytStorage.getAllVideos();
+      const playlistsAfter = await ytStorage.getAllPlaylists();
+      const settingsAfter = await ytStorage.getSettings();
+
+      expect(Object.keys(videosAfter)).toHaveLength(0);
+      expect(Object.keys(playlistsAfter)).toHaveLength(0);
+      expect(settingsAfter).toBeNull();
+    });
+
+    test('should clear only videos and playlists with clearHistoryOnly', async () => {
+      const mockData = {
+        'video_video1': { videoId: 'video1', title: 'Video 1' },
+        'video_video2': { videoId: 'video2', title: 'Video 2' },
+        'playlist_playlist1': { playlistId: 'playlist1', title: 'Playlist 1' },
+        'settings': { overlayColor: 'blue', overlayLabelSize: 'medium' },
+        '__migrated__': true
+      };
+      mockStorage.get.mockResolvedValue(mockData);
+      mockStorage.remove.mockResolvedValue();
+
+      await ytStorage.clearHistoryOnly();
+
+      expect(mockStorage.remove).toHaveBeenCalledWith([
+        'video_video1',
+        'video_video2',
+        'playlist_playlist1'
+      ]);
+      // settings and __migrated__ should remain
     });
   });
 

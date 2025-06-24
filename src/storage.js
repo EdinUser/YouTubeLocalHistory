@@ -252,6 +252,16 @@
             await storage.clear();
             this.migrated = false;
         }
+
+        // Clear only videos and playlists (not settings or migration flags)
+        async clearHistoryOnly() {
+            await this.ensureMigrated();
+            const allData = await storage.get(null);
+            const keysToRemove = Object.keys(allData).filter(key => key.startsWith('video_') || key.startsWith('playlist_'));
+            if (keysToRemove.length > 0) {
+                await storage.remove(keysToRemove);
+            }
+        }
     }
 
     // Create global storage instance

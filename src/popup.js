@@ -1295,14 +1295,28 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Set up event listeners
         clearButton.addEventListener('click', async () => {
+            // Show confirmation dialog
+            const confirmed = confirm('WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?');
+            
+            if (!confirmed) {
+                return;
+            }
+            
             try {
-                await ytStorage.clear();
+                await ytStorage.clearHistoryOnly();
                 allHistoryRecords = [];
                 allPlaylists = [];
+                allShortsRecords = [];
                 currentPage = 1;
                 currentPlaylistPage = 1;
+                currentShortsPage = 1;
+                
+                // Update all displays
                 displayHistoryPage();
-                showMessage('History cleared successfully');
+                displayShortsPage();
+                displayPlaylistsPage();
+                
+                showMessage('All video and playlist history has been cleared successfully');
             } catch (error) {
                 console.error('Error clearing history:', error);
                 showMessage('Error clearing history: ' + (error.message || 'Unknown error'), 'error');
@@ -1389,6 +1403,25 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Load initial data
         await loadHistory();
+
+        // Listen for storage changes and update popup in real time
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+            chrome.storage.onChanged.addListener((changes, area) => {
+                if (area === 'local') {
+                    if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
+                        loadHistory();
+                    }
+                }
+            });
+        } else if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
+            browser.storage.onChanged.addListener((changes, area) => {
+                if (area === 'local') {
+                    if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
+                        loadHistory();
+                    }
+                }
+            });
+        }
 
         log('Initialization complete');
     } catch (error) {
