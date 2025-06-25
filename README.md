@@ -24,12 +24,24 @@ A browser extension that tracks your YouTube video watch history locally using s
 ## Installation
 
 ### Chrome
+#### Option 1: Install from Chrome Web Store
+[![Get it on Chrome Web Store](https://img.shields.io/badge/Get_it_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
+[![Chrome Users](https://img.shields.io/chrome-web-store/users/pebiokefjgdbfnkolmblaaladkmpilba?logo=googlechrome&color=green)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
+[![Chrome Rating](https://img.shields.io/chrome-web-store/rating/pebiokefjgdbfnkolmblaaladkmpilba?logo=googlechrome)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
+
+#### Option 2: Manual Installation
 1. Run `./build.sh` to build the extension
 2. Open Chrome and go to `chrome://extensions/`
 3. Enable "Developer mode"
 4. Click "Load unpacked" and select the `dist/chrome` folder
 
 ### Firefox
+#### Option 1: Install from Firefox Add-ons
+[![Get it on Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/local-youtube-video-history/)
+[![Firefox Users](https://img.shields.io/amo/users/local-youtube-video-history?logo=firefox&color=blue)](https://addons.mozilla.org/firefox/addon/local-youtube-video-history/)
+[![Firefox Rating](https://img.shields.io/amo/rating/local-youtube-video-history?logo=firefox)](https://addons.mozilla.org/firefox/addon/local-youtube-video-history/)
+
+#### Option 2: Manual Installation
 1. Run `./build.sh` to build the extension
 2. Open Firefox and go to `about:debugging#/runtime/this-firefox`
 3. Click "Load Temporary Add-on" and select the `manifest.json` file from the `dist/firefox` folder
