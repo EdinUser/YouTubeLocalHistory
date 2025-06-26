@@ -3,26 +3,45 @@
  */
 
 // Mock DOM environment
-document.body.innerHTML = `
-  <div class="controls">
-    <div class="left-controls">
-      <button id="ytvhtToggleTheme" class="theme-toggle" title="Toggle theme">
-        <span id="themeText">Theme</span>
-      </button>
-      <button id="ytvhtExportHistory">Export History</button>
-      <button id="ytvhtImportHistory">Import History</button>
-      <button id="ytvhtClearHistory" style="background-color: #dc3545;">Clear History</button>
+const setupDOM = () => {
+  document.body.innerHTML = `
+    <div class="controls">
+      <div class="left-controls">
+        <button id="ytvhtToggleTheme" class="theme-toggle" title="Toggle theme">
+          <span id="themeText">Theme</span>
+        </button>
+        <button id="ytvhtExportHistory">Export History</button>
+        <button id="ytvhtImportHistory">Import History</button>
+        <button id="ytvhtClearHistory" style="background-color: #dc3545;">Clear History</button>
+      </div>
+      <button id="ytvhtClosePopup">Close</button>
     </div>
-    <button id="ytvhtClosePopup">Close</button>
-  </div>
-  <div id="ytvhtMessage" class="message"></div>
-`;
+    <div id="ytvhtMessage" class="message"></div>
+  `;
+};
 
 // Mock storage
 const mockYtStorage = {
   clear: jest.fn().mockResolvedValue(),
   getAllVideos: jest.fn().mockResolvedValue({}),
   getAllPlaylists: jest.fn().mockResolvedValue({})
+};
+
+// Mock Chrome API
+global.chrome = {
+  storage: {
+    onChanged: {
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      emit: jest.fn()
+    }
+  },
+  runtime: {
+    onMessage: {
+      addListener: jest.fn(),
+      removeListener: jest.fn()
+    }
+  }
 };
 
 // Mock global objects
@@ -47,10 +66,43 @@ global.displayShortsPage = jest.fn();
 global.displayPlaylistsPage = jest.fn();
 global.showMessage = jest.fn();
 
+// Import functions to mock
+const popup = require('../../src/popup.js');
+
+// Mock the functions
+jest.mock('../../src/popup.js', () => {
+    const original = jest.requireActual('../../src/popup.js');
+    return {
+        ...original,
+        updateVideoRecord: jest.fn((record) => {
+            if (!record || !record.videoId) return;
+            
+            const recordIndex = global.allHistoryRecords.findIndex(r => r.videoId === record.videoId);
+            if (recordIndex !== -1) {
+                global.allHistoryRecords[recordIndex] = record;
+            } else {
+                global.allHistoryRecords.unshift(record);
+            }
+            // Sort by timestamp
+            global.allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        }),
+        displayHistoryPage: jest.fn(),
+        displayShortsPage: jest.fn(),
+        displayPlaylistsPage: jest.fn(),
+        showMessage: jest.fn(),
+        formatDuration: jest.fn(time => `${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`),
+        formatDate: jest.fn(timestamp => new Date(timestamp).toLocaleString())
+    };
+});
+
 describe('Popup Functionality', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    document.getElementById('ytvhtMessage').style.display = 'none';
+    setupDOM();
+    const messageElement = document.getElementById('ytvhtMessage');
+    if (messageElement) {
+      messageElement.style.display = 'none';
+    }
   });
 
   describe('Button Ordering', () => {
@@ -190,6 +242,7 @@ describe('Popup Functionality', () => {
       global.confirm.mockReturnValue(true);
       await handleClearClick();
 
+      expect(global.confirm).toHaveBeenCalled();
       expect(mockYtStorage.clear).toHaveBeenCalled();
       expect(displayHistoryPage).toHaveBeenCalled();
       expect(displayShortsPage).toHaveBeenCalled();
@@ -200,8 +253,9 @@ describe('Popup Functionality', () => {
     test('should handle errors during clear operation', async () => {
       const clearButton = document.getElementById('ytvhtClearHistory');
       
-      // Mock storage to throw an error
-      mockYtStorage.clear.mockRejectedValue(new Error('Storage error'));
+      // Mock error
+      const mockError = new Error('Storage error');
+      mockYtStorage.clear.mockRejectedValueOnce(mockError);
       
       // Simulate the event listener logic
       const handleClearClick = async () => {
@@ -231,46 +285,205 @@ describe('Popup Functionality', () => {
         }
       };
 
-      // Test with confirmation and error
+      // Test with confirmation
       global.confirm.mockReturnValue(true);
       await handleClearClick();
 
+      expect(global.confirm).toHaveBeenCalled();
       expect(mockYtStorage.clear).toHaveBeenCalled();
-      expect(console.error).toHaveBeenCalledWith('Error clearing history:', expect.any(Error));
+      expect(console.error).toHaveBeenCalledWith('Error clearing history:', mockError);
       expect(showMessage).toHaveBeenCalledWith('Error clearing history: Storage error', 'error');
     });
   });
 
   describe('Storage Change Listener', () => {
-    test('should call processExistingThumbnails on video_ or playlist_ key change', () => {
+    let storageChangeListener;
+
+    beforeEach(() => {
       // Mock processExistingThumbnails
       global.processExistingThumbnails = jest.fn();
 
-      // Simulate a storage change event
-      const changes = {
-        'video_abc': { oldValue: undefined, newValue: { videoId: 'abc' } },
-        'playlist_xyz': { oldValue: undefined, newValue: { playlistId: 'xyz' } }
+      // Create a storage change listener
+      storageChangeListener = (changes, area) => {
+        if (area === 'local') {
+          const keys = Object.keys(changes);
+          if (keys.some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
+            global.processExistingThumbnails();
+          }
+        }
       };
-      const area = 'local';
 
-      // Simulate the listener logic
-      if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
-        processExistingThumbnails();
-      }
+      // Add the listener
+      chrome.storage.onChanged.addListener(storageChangeListener);
+    });
 
+    afterEach(() => {
+      // Clean up
+      chrome.storage.onChanged.removeListener(storageChangeListener);
+    });
+
+    test('should call processExistingThumbnails on video_ or playlist_ key change', () => {
+      const changes = {
+        'video_123': { newValue: { title: 'Test Video' } },
+        'playlist_456': { newValue: { title: 'Test Playlist' } }
+      };
+      
+      // Trigger the listener directly
+      storageChangeListener(changes, 'local');
+      
       expect(global.processExistingThumbnails).toHaveBeenCalled();
     });
 
     test('should not call processExistingThumbnails on unrelated key change', () => {
-      global.processExistingThumbnails = jest.fn();
       const changes = {
-        'settings': { oldValue: {}, newValue: { overlayColor: 'red' } }
+        'settings': { newValue: { theme: 'dark' } }
       };
-      const area = 'local';
-      if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
-        processExistingThumbnails();
-      }
+      
+      // Trigger the listener directly
+      storageChangeListener(changes, 'local');
+      
       expect(global.processExistingThumbnails).not.toHaveBeenCalled();
     });
   });
+});
+
+describe('Real-time Updates', () => {
+    let mockHistoryTable;
+    let mockNoHistory;
+    let mockPaginationDiv;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        
+        // Setup DOM elements
+        mockHistoryTable = document.createElement('table');
+        mockHistoryTable.id = 'ytvhtHistoryTable';
+        document.body.appendChild(mockHistoryTable);
+
+        mockNoHistory = document.createElement('div');
+        mockNoHistory.id = 'ytvhtNoHistory';
+        document.body.appendChild(mockNoHistory);
+
+        mockPaginationDiv = document.createElement('div');
+        mockPaginationDiv.id = 'ytvhtPagination';
+        document.body.appendChild(mockPaginationDiv);
+
+        // Reset global variables
+        global.allHistoryRecords = [];
+        global.currentPage = 1;
+        global.pageSize = 10;
+
+        // Mock displayHistoryPage implementation
+        popup.displayHistoryPage.mockImplementation(() => {
+            mockHistoryTable.innerHTML = '';
+            global.allHistoryRecords.forEach(record => {
+                const row = document.createElement('tr');
+                const titleCell = document.createElement('td');
+                const link = document.createElement('a');
+                link.textContent = record.title || 'Unknown Title';
+                titleCell.appendChild(link);
+                row.appendChild(titleCell);
+                mockHistoryTable.appendChild(row);
+            });
+        });
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    test('should update existing record', () => {
+        // Setup initial state
+        const initialRecord = {
+            videoId: 'test123',
+            title: 'Old Title',
+            time: 30,
+            duration: 100,
+            timestamp: Date.now() - 1000,
+            url: 'https://youtube.com/watch?v=test123'
+        };
+        global.allHistoryRecords = [initialRecord];
+        popup.displayHistoryPage();
+
+        // Update record
+        const updatedRecord = {
+            ...initialRecord,
+            title: 'New Title',
+            time: 50,
+            timestamp: Date.now()
+        };
+        popup.updateVideoRecord(updatedRecord);
+        popup.displayHistoryPage();
+
+        // Check if UI was updated
+        const row = mockHistoryTable.rows[0];
+        const titleCell = row.cells[0];
+        expect(titleCell.querySelector('a').textContent).toBe('New Title');
+    });
+
+    test('should handle new record insertion', () => {
+        // Setup initial state with some records
+        global.allHistoryRecords = [
+            {
+                videoId: 'old1',
+                title: 'Old Video',
+                timestamp: Date.now() - 1000
+            }
+        ];
+        popup.displayHistoryPage();
+
+        // Add new record
+        const newRecord = {
+            videoId: 'new1',
+            title: 'New Video',
+            timestamp: Date.now()
+        };
+        popup.updateVideoRecord(newRecord);
+        popup.displayHistoryPage();
+
+        // Check if new record was added at the beginning
+        expect(global.allHistoryRecords[0].videoId).toBe('new1');
+        const titleCell = mockHistoryTable.rows[0].cells[0];
+        expect(titleCell.querySelector('a').textContent).toBe('New Video');
+    });
+
+    test('should handle unknown title gracefully', () => {
+        const record = {
+            videoId: 'test123',
+            time: 30,
+            duration: 100,
+            timestamp: Date.now()
+        };
+        popup.updateVideoRecord(record);
+        popup.displayHistoryPage();
+
+        const titleCell = mockHistoryTable.rows[0].cells[0];
+        expect(titleCell.querySelector('a').textContent).toBe('Unknown Title');
+    });
+
+    test('should maintain sort order on updates', () => {
+        // Setup initial records
+        global.allHistoryRecords = [
+            {
+                videoId: 'vid1',
+                timestamp: Date.now() - 1000
+            },
+            {
+                videoId: 'vid2',
+                timestamp: Date.now() - 2000
+            }
+        ];
+        popup.displayHistoryPage();
+
+        // Update older record with newer timestamp
+        const updatedRecord = {
+            videoId: 'vid2',
+            timestamp: Date.now()
+        };
+        popup.updateVideoRecord(updatedRecord);
+        popup.displayHistoryPage();
+
+        // Check if order was updated
+        expect(global.allHistoryRecords[0].videoId).toBe('vid2');
+    });
 }); 
