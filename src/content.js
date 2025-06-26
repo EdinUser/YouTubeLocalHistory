@@ -36,7 +36,7 @@
     const DB_NAME = 'YouTubeHistoryDB';
     const DB_VERSION = 3;
     const STORE_NAME = 'videoHistory';
-    const DEBUG = true;
+    const DEBUG = false;
     const SAVE_INTERVAL = 5000; // Save every 5 seconds
 
     const DEFAULT_SETTINGS = {
@@ -65,10 +65,10 @@
     let currentSettings = DEFAULT_SETTINGS;
     // Track already-initialized video elements to avoid duplicate listeners
     const trackedVideos = new WeakSet();
-    
+
     // Track event listeners for cleanup
     const videoEventListeners = new WeakMap();
-    
+
     // Cleanup tracking
     let thumbnailObserver = null;
     let shortsVideoObserver = null;
@@ -87,42 +87,42 @@
     // Cleanup function to prevent memory leaks
     function cleanup() {
         log('Cleaning up resources...');
-        
+
         try {
             // Disconnect observers
             if (thumbnailObserver) {
                 thumbnailObserver.disconnect();
                 thumbnailObserver = null;
             }
-            
+
             if (shortsVideoObserver) {
                 shortsVideoObserver.disconnect();
                 shortsVideoObserver = null;
             }
-            
+
             // Clear intervals
             if (initChecker) {
                 clearInterval(initChecker);
                 initChecker = null;
             }
-            
+
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
             }
-            
+
             // Clear timeouts
             if (playlistRetryTimeout) {
                 clearTimeout(playlistRetryTimeout);
                 playlistRetryTimeout = null;
             }
-            
+
             // Remove message listener
             if (messageListener) {
                 chrome.runtime.onMessage.removeListener(messageListener);
                 messageListener = null;
             }
-            
+
             // Clean up video event listeners
             trackedVideos.clear();
             videoEventListeners.clear();
@@ -514,6 +514,14 @@
         }
     }
 
+    // Broadcast update to popup
+    function broadcastVideoUpdate(videoData) {
+        chrome.runtime.sendMessage({
+            type: 'videoUpdate',
+            data: videoData
+        });
+    }
+
     // Save the current video timestamp (regular videos)
     async function saveTimestamp() {
         if (window.location.pathname.startsWith('/shorts/')) {
@@ -550,31 +558,38 @@
 
         log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
 
-        let title = 'Unknown Title';
-        const titleSelectors = [
-            'h1.ytd-video-primary-info-renderer',
-            'h1.title.style-scope.ytd-video-primary-info-renderer',
-            'h1.ytd-reel-player-header-renderer',
-            'h1.ytd-reel-player-overlay-renderer',
-            'ytd-reel-player-header-renderer h1',
-            'ytd-reel-player-overlay-renderer h1',
-            'ytd-reel-player-header-renderer yt-formatted-string',
-            'ytd-reel-player-overlay-renderer yt-formatted-string',
-            '.ytd-reel-player-header-renderer .title',
-            '.ytd-reel-player-overlay-renderer .title',
-            'ytd-reel-player-header-renderer .title yt-formatted-string',
-            'ytd-reel-player-overlay-renderer .title yt-formatted-string'
-        ];
-        for (const selector of titleSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-                const text = element.textContent?.trim();
-                if (text && text.length > 0 && text !== 'Unknown Title') {
-                    title = text;
-                    log(`Found title using selector "${selector}": "${title}"`);
-                    break;
+        // Get existing record first to preserve title if it exists
+        let existingRecord = await ytStorage.getVideo(videoId);
+        let title = existingRecord?.title;
+
+        // Only update title if we don't have one or if it's "Unknown Title"
+        if (!title || title === 'Unknown Title') {
+            // Try multiple selectors to get the title
+            const selectors = [
+                'h1.ytd-video-primary-info-renderer',      // Main video title
+                'yt-formatted-string.ytd-video-primary-info-renderer', // Alternative title element
+                '#above-the-fold #title h1',               // Another possible title location
+                'meta[property="og:title"]',               // OpenGraph title
+                'title'                                    // Document title
+            ];
+
+            for (const selector of selectors) {
+                const element = document.querySelector(selector);
+                if (element) {
+                    let newTitle = element.tagName === 'META' ? element.content : element.textContent?.trim();
+                    if (newTitle && newTitle !== 'YouTube') {
+                        // Clean up title if it's from document.title
+                        if (selector === 'title') {
+                            newTitle = newTitle.replace(/ - YouTube$/, '').trim();
+                        }
+                        title = newTitle;
+                        break;
+                    }
                 }
             }
+
+            // If still no title, keep existing or use "Unknown Title"
+            title = title || 'Unknown Title';
         }
 
         const record = {
@@ -588,6 +603,8 @@
 
         try {
             await ytStorage.setVideo(videoId, record);
+            // Broadcast update after successful save
+            broadcastVideoUpdate(record);
             log(`Timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
         } catch (error) {
             log('Error saving timestamp:', error);
@@ -621,6 +638,19 @@
         saveIntervalId = setInterval(saveTimestamp, SAVE_INTERVAL);
     }
 
+    // Debounce helper function
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
     // Set up video tracking
     function setupVideoTracking(video) {
         if (trackedVideos.has(video)) {
@@ -632,6 +662,18 @@
         log('Setting up video tracking for video element:', video);
 
         let timestampLoaded = false;
+        let lastSaveTime = 0;
+        const MIN_SAVE_INTERVAL = 2000; // Minimum time between saves in milliseconds
+
+        // Debounced save function
+        const debouncedSave = debounce(async () => {
+            const now = Date.now();
+            if (now - lastSaveTime < MIN_SAVE_INTERVAL) {
+                return;
+            }
+            lastSaveTime = now;
+            await saveTimestamp();
+        }, 1000);
 
         // Function to ensure video is ready before loading timestamp
         const ensureVideoReady = () => {
@@ -677,7 +719,7 @@
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
             }
-            saveTimestamp(); // Save timestamp when paused
+            debouncedSave(); // Save timestamp when paused
         };
         addTrackedEventListener(video, 'pause', pauseHandler);
 
@@ -685,7 +727,7 @@
         const timeupdateHandler = () => {
             const currentTime = Math.floor(video.currentTime);
             if (currentTime % 30 === 0) { // Save every 30 seconds
-                saveTimestamp();
+                debouncedSave();
             }
         };
         addTrackedEventListener(video, 'timeupdate', timeupdateHandler);
@@ -702,7 +744,7 @@
 
         const seekedHandler = () => {
             log('Video seeked');
-            saveTimestamp();
+            debouncedSave();
             if (!video.paused) {
                 startSaveInterval();
             }
@@ -712,6 +754,7 @@
         // Save on unload
         const beforeunloadHandler = () => {
             log('Page unloading, saving final timestamp');
+            // Use non-debounced save for unload to ensure it happens
             saveTimestamp();
         };
         addTrackedEventListener(window, 'beforeunload', beforeunloadHandler);
@@ -812,8 +855,9 @@
             }
         }
 
-        // Remove all existing overlays in this thumbnail
-        thumbnailElement.querySelectorAll('.ytvht-viewed-label, .ytvht-progress-bar').forEach(el => el.remove());
+        // Check if we already have overlays
+        let label = thumbnailElement.querySelector('.ytvht-viewed-label');
+        let progress = thumbnailElement.querySelector('.ytvht-progress-bar');
 
         ytStorage.getVideo(videoId).then(record => {
             if (record) {
@@ -823,21 +867,42 @@
                 // Create custom CSS for this specific overlay with current settings
                 updateOverlayCSS(size, color);
 
-                const label = document.createElement('div');
-                label.className = 'ytvht-viewed-label';
-                label.textContent = currentSettings.overlayTitle;
+                // Update or create label
+                if (!label) {
+                    label = document.createElement('div');
+                    label.className = 'ytvht-viewed-label';
+                    thumbnailElement.appendChild(label);
+                }
 
-                // Add progress bar
-                const progress = document.createElement('div');
-                progress.className = 'ytvht-progress-bar';
-                progress.style.width = `${(record.time / record.duration) * 100}%`;
+                // Only update text if it changed
+                if (label.textContent !== currentSettings.overlayTitle) {
+                    label.textContent = currentSettings.overlayTitle;
+                }
+
+                // Update or create progress bar
+                if (!progress) {
+                    progress = document.createElement('div');
+                    progress.className = 'ytvht-progress-bar';
+                    thumbnailElement.appendChild(progress);
+                }
+
+                // Only update width if it changed
+                const newWidth = `${(record.time / record.duration) * 100}%`;
+                if (progress.style.width !== newWidth) {
+                    progress.style.width = newWidth;
+                }
 
                 thumbnailElement.style.position = 'relative';
-                thumbnailElement.appendChild(label);
-                thumbnailElement.appendChild(progress);
+            } else {
+                // If no record exists, remove overlays if they exist
+                label?.remove();
+                progress?.remove();
             }
         }).catch(error => {
             log('Error getting video record for thumbnail:', error);
+            // On error, remove overlays to prevent stale data
+            label?.remove();
+            progress?.remove();
         });
     }
 
@@ -869,7 +934,7 @@
                     });
                 }
             });
-            
+
             // Check for removed video elements and clean up their listeners
             mutation.removedNodes.forEach((node) => {
                 if (node.nodeType === Node.ELEMENT_NODE) {

@@ -1,5 +1,5 @@
 // --- Debugging and Logging ---
-const DEBUG = false; // Set to false for production
+const DEBUG = true; // Set to false for production
 
 function log(...args) {
     if (DEBUG) {
@@ -151,15 +151,111 @@ function sendToContentScriptWithRetry(message, callback, retries = 3, delay = 50
     });
 }
 
-// Initialize storage
+// Initialize storage and set up listeners
 async function initStorage() {
     try {
         // Ensure migration is complete
         await ytStorage.ensureMigrated();
+
+        // Set up message listener for updates
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            if (message.type === 'videoUpdateFromBackground') {
+                log('Received video update from background:', message.data);
+                updateVideoRecord(message.data);
+            } else if (message.type === 'storageUpdate') {
+                log('Received storage update:', message.changes);
+                handleStorageUpdates(message.changes);
+            }
+        });
+
+        // Get any updates that happened while popup was closed
+        chrome.runtime.sendMessage({ type: 'getLatestUpdate' }, (response) => {
+            if (response?.lastUpdate) {
+                log('Received latest update from background:', response.lastUpdate);
+                updateVideoRecord(response.lastUpdate);
+            }
+        });
+
         return true;
     } catch (error) {
         console.error('Storage initialization failed:', error);
         return false;
+    }
+}
+
+// Handle storage updates
+function handleStorageUpdates(changes) {
+    let needsRefresh = false;
+    
+    changes.forEach(([key, change]) => {
+        if (key.startsWith('video_')) {
+            const videoId = key.replace('video_', '');
+            if (change.newValue) {
+                // Update or add record
+                updateVideoRecord(change.newValue);
+            } else {
+                // Record was deleted
+                const index = allHistoryRecords.findIndex(r => r.videoId === videoId);
+                if (index !== -1) {
+                    allHistoryRecords.splice(index, 1);
+                    needsRefresh = true;
+                }
+            }
+        }
+    });
+
+    if (needsRefresh) {
+        displayHistoryPage();
+    }
+}
+
+// Update a single video record in the table
+function updateVideoRecord(record) {
+    if (!record || !record.videoId) return;
+
+    // Update the record in our local array
+    const recordIndex = allHistoryRecords.findIndex(r => r.videoId === record.videoId);
+    if (recordIndex !== -1) {
+        allHistoryRecords[recordIndex] = record;
+    } else {
+        // New record, add it to the beginning and sort
+        allHistoryRecords.unshift(record);
+        allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    }
+
+    // Find if the record is currently displayed
+    const historyTable = document.getElementById('ytvhtHistoryTable');
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = Math.min(startIdx + pageSize, allHistoryRecords.length);
+    const recordPageIndex = recordIndex - startIdx;
+
+    // Only update DOM if the record is on the current page
+    if (recordIndex >= startIdx && recordIndex < endIdx) {
+        const row = historyTable.rows[recordPageIndex];
+        if (row) {
+            const [titleCell, progressCell, dateCell] = row.cells;
+            
+            // Update title if needed
+            const link = titleCell.querySelector('a');
+            if (link) {
+                link.textContent = record.title || 'Unknown Title';
+                link.href = record.url;
+            }
+
+            // Update progress
+            if (record.duration && record.duration > 0) {
+                const percentage = Math.round((record.time / record.duration) * 100);
+                progressCell.textContent = `${formatDuration(record.time)} (${percentage}%)`;
+            } else {
+                progressCell.textContent = formatDuration(record.time);
+            }
+
+            // Update timestamp
+            dateCell.textContent = formatDate(record.timestamp);
+        }
+    } else if (recordIndex === -1 && currentPage === 1) {
+        // If it's a new record and we're on the first page, refresh the display
+        displayHistoryPage();
     }
 }
 
@@ -197,53 +293,79 @@ function displayHistoryPage() {
     const historyTable = document.getElementById('ytvhtHistoryTable');
     const noHistory = document.getElementById('ytvhtNoHistory');
     const paginationDiv = document.getElementById('ytvhtPagination');
-    historyTable.innerHTML = '';
+    
+    // Clear only if we have new content to show
     if (!allHistoryRecords.length) {
+        historyTable.innerHTML = '';
         noHistory.style.display = 'block';
         paginationDiv.style.display = 'none';
         return;
     }
+    
     noHistory.style.display = 'none';
     paginationDiv.style.display = 'flex';
+    
     const totalPages = Math.ceil(allHistoryRecords.length / pageSize);
     if (currentPage > totalPages) currentPage = totalPages;
     if (currentPage < 1) currentPage = 1;
+    
     const startIdx = (currentPage - 1) * pageSize;
     const endIdx = Math.min(startIdx + pageSize, allHistoryRecords.length);
     const pageRecords = allHistoryRecords.slice(startIdx, endIdx);
-    pageRecords.forEach(record => {
-        const row = document.createElement('tr');
-        // Video title and link
-        const titleCell = document.createElement('td');
-        const link = document.createElement('a');
+    
+    // Reuse existing rows when possible
+    while (historyTable.rows.length > pageRecords.length) {
+        historyTable.deleteRow(-1);
+    }
+    
+    pageRecords.forEach((record, index) => {
+        let row = historyTable.rows[index];
+        const isNewRow = !row;
+        
+        if (isNewRow) {
+            row = document.createElement('tr');
+            // Create cells
+            ['title', 'progress', 'date', 'action'].forEach(() => {
+                row.appendChild(document.createElement('td'));
+            });
+            historyTable.appendChild(row);
+        }
+        
+        // Update cells
+        const [titleCell, progressCell, dateCell, actionCell] = row.cells;
+        
+        // Update title cell
+        let link = titleCell.querySelector('a');
+        if (!link) {
+            link = document.createElement('a');
+            link.className = 'video-link';
+            link.target = '_blank';
+            titleCell.appendChild(link);
+        }
         link.href = record.url;
-        link.className = 'video-link';
-        link.textContent = record.title;
-        link.target = '_blank';
-        titleCell.appendChild(link);
-        // Progress
-        const progressCell = document.createElement('td');
+        link.textContent = record.title || 'Unknown Title';
+        
+        // Update progress cell
         if (record.duration && record.duration > 0) {
             const percentage = Math.round((record.time / record.duration) * 100);
             progressCell.textContent = `${formatDuration(record.time)} (${percentage}%)`;
         } else {
             progressCell.textContent = formatDuration(record.time);
         }
-        // Last watched
-        const dateCell = document.createElement('td');
+        
+        // Update date cell
         dateCell.textContent = formatDate(record.timestamp);
-        // Action buttons
-        const actionCell = document.createElement('td');
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete';
+        
+        // Update action cell
+        if (!actionCell.hasChildNodes()) {
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            actionCell.appendChild(deleteButton);
+        }
+        const deleteButton = actionCell.firstChild;
         deleteButton.onclick = () => deleteRecord(record.videoId);
-        actionCell.appendChild(deleteButton);
-        row.appendChild(titleCell);
-        row.appendChild(progressCell);
-        row.appendChild(dateCell);
-        row.appendChild(actionCell);
-        historyTable.appendChild(row);
     });
+    
     // Update pagination info and controls
     updatePaginationUI(currentPage, totalPages);
 }
