@@ -84,7 +84,7 @@
     let processingTimeout = null;
 
     // Track video changes in YouTube's SPA
-    const videoObserver = new MutationObserver((mutations) => {
+    let videoObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
                 if (node.nodeType === Node.ELEMENT_NODE) {
@@ -529,70 +529,6 @@
         }
     }
 
-    // Save the current video timestamp for Shorts
-    async function saveShortsTimestamp() {
-        const video = document.querySelector('video');
-        if (!video) {
-            log('No video element found.');
-            return;
-        }
-
-        const currentTime = video.currentTime;
-        const duration = video.duration;
-        const videoId = getVideoId();
-        if (!videoId) {
-            log('No video ID found.');
-            return;
-        }
-
-        // Do not update record if timestamp is 0
-        if (!currentTime || currentTime === 0) {
-            log(`Detected Shorts timestamp 0 for video ID ${videoId}, skipping update.`);
-            return;
-        }
-
-        log(`Saving Shorts timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
-
-        let title = 'Unknown Title';
-        const shortsTitleEl = document.querySelector('yt-shorts-video-title-view-model h2 span');
-        if (shortsTitleEl && shortsTitleEl.textContent?.trim()) {
-            title = shortsTitleEl.textContent.trim();
-            log('Shorts title detected:', title);
-        } else {
-            // Fallback: use document title, but clean up " - YouTube Shorts"
-            let docTitle = document.title.replace(/ - YouTube Shorts$/, '').trim();
-            if (docTitle && docTitle.length > 0 && docTitle !== 'YouTube') {
-                title = docTitle;
-                log('Shorts title fallback from document.title:', title);
-            }
-        }
-
-        const record = {
-            videoId: videoId,
-            time: currentTime,
-            duration: duration,
-            timestamp: Date.now(),
-            title: title,
-            url: getCleanVideoUrl(),
-            isShorts: true // <--- Mark as Shorts for UI filtering
-        };
-
-        try {
-            await ytStorage.setVideo(videoId, record);
-            log(`Shorts timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
-        } catch (error) {
-            log('Error saving Shorts timestamp:', error);
-        }
-    }
-
-    // Broadcast update to popup
-    function broadcastVideoUpdate(videoData) {
-        chrome.runtime.sendMessage({
-            type: 'videoUpdate',
-            data: videoData
-        });
-    }
-
     // Save the current video timestamp (regular videos)
     async function saveTimestamp() {
         if (window.location.pathname.startsWith('/shorts/')) {
@@ -614,14 +550,14 @@
             return;
         }
 
-        // Do not update record if timestamp is 0
-        if (!currentTime || currentTime === 0) {
-            log(`Detected timestamp 0 for video ID ${videoId}, skipping update.`);
+        // Do not update record if timestamp is 0 or duration is not available
+        if (!currentTime || currentTime === 0 || !duration || duration === 0) {
+            log(`Invalid timestamp (${currentTime}) or duration (${duration}) for video ID ${videoId}, skipping update.`);
             return;
         }
 
         // If within last 10 seconds, save as duration - 10 (but not less than 0)
-        if (duration && currentTime > duration - 10) {
+        if (currentTime > duration - 10) {
             const adjustedTime = Math.max(0, duration - 10);
             log(`Current time (${currentTime}) is within last 10s of duration (${duration}), saving as ${adjustedTime}`);
             currentTime = adjustedTime;
@@ -649,9 +585,8 @@
             title = existingRecord?.title || 'Unknown Title';
         }
 
-            // If still no title, keep existing or use "Unknown Title"
-            title = title || 'Unknown Title';
-        }
+        // If still no title, use "Unknown Title"
+        title = title || 'Unknown Title';
 
         const record = {
             videoId,
@@ -670,6 +605,73 @@
         } catch (error) {
             log('Error saving timestamp:', error);
         }
+    }
+
+    // Save Shorts timestamp
+    async function saveShortsTimestamp() {
+        const videoId = getVideoId();
+        if (!videoId) {
+            log('No video ID found for Shorts.');
+            return;
+        }
+
+        const video = document.querySelector('video');
+        if (!video) {
+            log('No video element found for Shorts.');
+            return;
+        }
+
+        let currentTime = video.currentTime;
+        const duration = video.duration;
+
+        // Do not update record if timestamp is 0 or duration is not available
+        if (!currentTime || currentTime === 0 || !duration || duration === 0) {
+            log(`Invalid timestamp (${currentTime}) or duration (${duration}) for Shorts ID ${videoId}, skipping update.`);
+            return;
+        }
+
+        log(`Saving Shorts timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
+
+        let title = 'Unknown Title';
+        const shortsTitleEl = document.querySelector('yt-shorts-video-title-view-model h2 span');
+        if (shortsTitleEl && shortsTitleEl.textContent?.trim()) {
+            title = shortsTitleEl.textContent.trim();
+            log('Shorts title detected:', title);
+        } else {
+            // Fallback: use document title, but clean up " - YouTube Shorts"
+            let docTitle = document.title.replace(/ - YouTube Shorts$/, '').trim();
+            if (docTitle && docTitle.length > 0 && docTitle !== 'YouTube') {
+                title = docTitle;
+                log('Shorts title fallback from document.title:', title);
+            }
+        }
+
+        const record = {
+            videoId: videoId,
+            time: currentTime,
+            duration: duration,
+            timestamp: Date.now(),
+            title: title,
+            url: getCleanVideoUrl(),
+            isShorts: true
+        };
+
+        try {
+            await ytStorage.setVideo(videoId, record);
+            // Broadcast update after successful save
+            broadcastVideoUpdate(record);
+            log(`Shorts timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
+        } catch (error) {
+            log('Error saving Shorts timestamp:', error);
+        }
+    }
+
+    // Broadcast update to popup
+    function broadcastVideoUpdate(videoData) {
+        chrome.runtime.sendMessage({
+            type: 'videoUpdate',
+            data: videoData
+        });
     }
 
     // Update cleanupOldRecords to use currentSettings.autoCleanPeriod
@@ -697,19 +699,6 @@
         }
         saveTimestamp(); // Save immediately
         saveIntervalId = setInterval(saveTimestamp, 5000); // Changed from SAVE_INTERVAL to fixed 5000ms
-    }
-
-    // Debounce helper function
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
     }
 
     // Debounce helper function
@@ -892,12 +881,12 @@
         return false;
     }
 
-    // Try to save playlist with retries
+    // Try to save playlist with optimized retry mechanism
     function tryToSavePlaylist(retries = 3) {
         // First check if we're even on a page that could have a playlist
         const urlParams = new URLSearchParams(window.location.search);
         const playlistId = urlParams.get('list');
-
+        
         if (!playlistId) {
             // No playlist ID in URL, no need to retry
             log('No playlist ID in URL, skipping playlist save');
@@ -906,18 +895,27 @@
 
         log(`Trying to save playlist (${retries} retries left)...`);
         const playlistInfo = getPlaylistInfo();
-
+        
         if (playlistInfo) {
             log('Playlist info found, saving...');
             savePlaylistInfo(playlistInfo);
         } else if (retries > 0) {
             // Only retry if we have a playlist ID but couldn't get the title
             // This means the UI probably hasn't loaded yet
-            log(`Playlist title not found for ID ${playlistId}, will retry in 2 seconds... (${retries} retries left)`);
+            log(`Playlist title not found for ID ${playlistId}, will retry in 3 seconds... (${retries} retries left)`);
             clearTimeout(playlistRetryTimeout);
+            
+            // Exponential backoff: wait longer between retries
+            const delay = Math.min(3000 * (4 - retries), 5000);
             playlistRetryTimeout = setTimeout(() => {
-                tryToSavePlaylist(retries - 1);
-            }, 2000); // Increased from 1.5s to 2s to give more time for UI to load
+                // Check if we're still on the same playlist before retrying
+                const currentPlaylistId = new URLSearchParams(window.location.search).get('list');
+                if (currentPlaylistId === playlistId) {
+                    tryToSavePlaylist(retries - 1);
+                } else {
+                    log('Playlist ID changed, stopping retry attempts');
+                }
+            }, delay);
         } else {
             // If we've run out of retries but have a playlist ID, save with a default title
             if (playlistId) {
