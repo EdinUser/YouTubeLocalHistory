@@ -183,6 +183,20 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
+### Version 2.5.1
+- **Console Logging Optimization**: Reduced verbose logging in thumbnail observer
+- **Improved Video ID Extraction**: Streamlined video ID extraction from thumbnails
+- **Debug Mode Enhancement**: Added debug mode toggle in settings with proper persistence
+- **Version Display**: Added version number display in settings tab
+- **Error Handling**: Enhanced error messages for missing UI elements
+- **Settings Tab**: Fixed settings tab not showing/working properly
+- **Theme Handling**: Added proper theme preference handling
+- **Success Messages**: Added success messages for settings updates
+- **Code Cleanup**: Fixed duplicate settingsTab declaration
+- **Performance**: Maintained critical debugging logs while reducing noise
+- **Thumbnail Processing**: Improved thumbnail observer efficiency
+- **Overlay System**: Enhanced overlay functionality with better error handling
+
 ### Version 2.5.0
 - **Live Updates Fixed**: Popup now receives live updates instantly while open
 - **Instant History Updates**: Videos appear in history immediately after being watched
