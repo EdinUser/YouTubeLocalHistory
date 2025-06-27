@@ -62,6 +62,8 @@
     let db;
     let saveIntervalId;
     let isInitialized = false;
+    let initRetryCount = 0;
+    const MAX_INIT_RETRIES = 3;
     let currentSettings = DEFAULT_SETTINGS;
     // Track already-initialized video elements to avoid duplicate listeners
     const trackedVideos = new WeakSet();
@@ -76,6 +78,50 @@
     let playlistRetryTimeout = null;
     let messageListener = null;
 
+    // Track thumbnail processing state
+    let isProcessingThumbnails = false;
+    let thumbnailProcessingQueue = new Set();
+    let processingTimeout = null;
+
+    // Track video changes in YouTube's SPA
+    let videoObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    // Check if this node is a video or contains a video
+                    const videos = [
+                        ...(node.tagName === 'VIDEO' ? [node] : []),
+                        ...node.querySelectorAll('video')
+                    ];
+
+                    videos.forEach(video => {
+                        if (!trackedVideos.has(video)) {
+                            log('New video element detected in SPA navigation');
+                            setupVideoTracking(video);
+                        }
+                    });
+                }
+            });
+
+            // Handle removed videos
+            mutation.removedNodes.forEach((node) => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const videos = [
+                        ...(node.tagName === 'VIDEO' ? [node] : []),
+                        ...node.querySelectorAll('video')
+                    ];
+
+                    videos.forEach(video => {
+                        if (trackedVideos.has(video)) {
+                            log('Video element removed, cleaning up');
+                            cleanupVideoListeners(video);
+                        }
+                    });
+                }
+            });
+        });
+    });
+
     function log(message, data) {
         if (DEBUG) {
             console.log('[ythdb]', message, data || '');
@@ -88,47 +134,39 @@
     function cleanup() {
         log('Cleaning up resources...');
 
-        try {
-            // Disconnect observers
-            if (thumbnailObserver) {
-                thumbnailObserver.disconnect();
-                thumbnailObserver = null;
-            }
-
-            if (shortsVideoObserver) {
-                shortsVideoObserver.disconnect();
-                shortsVideoObserver = null;
-            }
-
-            // Clear intervals
-            if (initChecker) {
-                clearInterval(initChecker);
-                initChecker = null;
-            }
-
-            if (saveIntervalId) {
-                clearInterval(saveIntervalId);
-                saveIntervalId = null;
-            }
-
-            // Clear timeouts
-            if (playlistRetryTimeout) {
-                clearTimeout(playlistRetryTimeout);
-                playlistRetryTimeout = null;
-            }
-
-            // Remove message listener
-            if (messageListener) {
-                chrome.runtime.onMessage.removeListener(messageListener);
-                messageListener = null;
-            }
-
-            // Clean up video event listeners
-            trackedVideos.clear();
-            videoEventListeners.clear();
-        } catch (error) {
-            log('Error during cleanup:', error);
+        // Stop all observers
+        if (thumbnailObserver) {
+            thumbnailObserver.disconnect();
+            thumbnailObserver = null;
         }
+        if (shortsVideoObserver) {
+            shortsVideoObserver.disconnect();
+            shortsVideoObserver = null;
+        }
+        if (videoObserver) {
+            videoObserver.disconnect();
+            videoObserver = null;
+        }
+        if (initChecker) {
+            clearInterval(initChecker);
+            initChecker = null;
+        }
+        if (playlistRetryTimeout) {
+            clearTimeout(playlistRetryTimeout);
+            playlistRetryTimeout = null;
+        }
+        if (saveIntervalId) {
+            clearInterval(saveIntervalId);
+            saveIntervalId = null;
+        }
+        if (messageListener) {
+            chrome.runtime.onMessage.removeListener(messageListener);
+            messageListener = null;
+        }
+
+        // Clear all tracked videos and their listeners
+        trackedVideos.clear();
+        videoEventListeners.clear();
     }
 
     // Function to clean up video event listeners
@@ -414,7 +452,7 @@
         }
     }
 
-    // Load and set the saved timestamp
+    // Load and set the saved timestamp with retries
     async function loadTimestamp() {
         const videoId = getVideoId();
         if (!videoId) {
@@ -431,21 +469,54 @@
                 if (video) {
                     log(`Found record for video ID ${videoId}:`, record);
 
-                    // Wait for video to be ready
-                    const setTime = () => {
-                        if (record.time > 0 && record.time < video.duration) {
-                            video.currentTime = record.time;
-                            log(`Timestamp set for video ID ${videoId}: ${record.time} (duration: ${video.duration})`);
+                    // Wait for video to be ready with retries
+                    const setTime = async (retryCount = 0) => {
+                        const maxRetries = 10;
+                        const retryDelay = 500;
+
+                        if (retryCount >= maxRetries) {
+                            log(`Failed to set timestamp after ${maxRetries} retries`);
+                            return;
+                        }
+
+                        // Check if video duration is available and valid
+                        if (video.duration && !isNaN(video.duration) && video.duration > 0) {
+                            if (record.time > 0 && record.time < video.duration) {
+                                // Ensure we're not too close to the end
+                                const timeToSet = Math.min(record.time, video.duration - 1);
+                                video.currentTime = timeToSet;
+                                log(`Timestamp set for video ID ${videoId}: ${timeToSet} (duration: ${video.duration})`);
+
+                                // Verify the time was actually set
+                                setTimeout(() => {
+                                    if (Math.abs(video.currentTime - timeToSet) > 1) {
+                                        log('Time was not set correctly, retrying...');
+                                        setTime(retryCount + 1);
+                                    }
+                                }, 100);
+                            } else {
+                                log(`Invalid timestamp ${record.time} for video duration ${video.duration}, skipping`);
+                            }
                         } else {
-                            log(`Invalid timestamp ${record.time} for video duration ${video.duration}, skipping`);
+                            log(`Video duration not ready (${video.duration}), retrying in ${retryDelay}ms...`);
+                            setTimeout(() => setTime(retryCount + 1), retryDelay);
                         }
                     };
 
+                    // Try to set time immediately if video is ready
                     if (video.readyState >= 1) {
                         setTime();
                     } else {
+                        // Wait for metadata and then try
                         log('Video not ready, waiting for loadedmetadata event');
-                        video.addEventListener('loadedmetadata', setTime, {once: true});
+                        video.addEventListener('loadedmetadata', () => setTime(), { once: true });
+
+                        // Also set up a backup timeout in case the event doesn't fire
+                        setTimeout(() => {
+                            if (video.readyState >= 1) {
+                                setTime();
+                            }
+                        }, 1000);
                     }
                 } else {
                     log('No video element found.');
@@ -458,15 +529,20 @@
         }
     }
 
-    // Save the current video timestamp for Shorts
-    async function saveShortsTimestamp() {
+    // Save the current video timestamp (regular videos)
+    async function saveTimestamp() {
+        if (window.location.pathname.startsWith('/shorts/')) {
+            await saveShortsTimestamp();
+            return;
+        }
+
         const video = document.querySelector('video');
         if (!video) {
             log('No video element found.');
             return;
         }
 
-        const currentTime = video.currentTime;
+        let currentTime = video.currentTime;
         const duration = video.duration;
         const videoId = getVideoId();
         if (!videoId) {
@@ -474,9 +550,83 @@
             return;
         }
 
-        // Do not update record if timestamp is 0
-        if (!currentTime || currentTime === 0) {
-            log(`Detected Shorts timestamp 0 for video ID ${videoId}, skipping update.`);
+        // Do not update record if timestamp is 0 or duration is not available
+        if (!currentTime || currentTime === 0 || !duration || duration === 0) {
+            log(`Invalid timestamp (${currentTime}) or duration (${duration}) for video ID ${videoId}, skipping update.`);
+            return;
+        }
+
+        // If within last 10 seconds, save as duration - 10 (but not less than 0)
+        if (currentTime > duration - 10) {
+            const adjustedTime = Math.max(0, duration - 10);
+            log(`Current time (${currentTime}) is within last 10s of duration (${duration}), saving as ${adjustedTime}`);
+            currentTime = adjustedTime;
+        }
+
+        log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
+
+        // Get video title with fallbacks
+        let title = '';
+
+        // Try primary title element first
+        const primaryTitle = document.querySelector('h1.ytd-video-primary-info-renderer yt-formatted-string');
+        if (primaryTitle?.textContent) {
+            title = primaryTitle.textContent.trim();
+        }
+
+        // Fallback to document title
+        if (!title) {
+            title = document.title.replace(/ - YouTube$/, '').trim();
+        }
+
+        // Fallback to existing record title
+        if (!title) {
+            const existingRecord = await ytStorage.getVideo(videoId);
+            title = existingRecord?.title || 'Unknown Title';
+        }
+
+        // If still no title, use "Unknown Title"
+        title = title || 'Unknown Title';
+
+        const record = {
+            videoId,
+            title,
+            time: currentTime,
+            duration,
+            timestamp: Date.now(),
+            url: getCleanVideoUrl()
+        };
+
+        try {
+            await ytStorage.setVideo(videoId, record);
+            // Broadcast update after successful save
+            broadcastVideoUpdate(record);
+            log(`Timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
+        } catch (error) {
+            log('Error saving timestamp:', error);
+        }
+    }
+
+    // Save Shorts timestamp
+    async function saveShortsTimestamp() {
+        const videoId = getVideoId();
+        if (!videoId) {
+            log('No video ID found for Shorts.');
+            return;
+        }
+
+        const video = document.querySelector('video');
+        if (!video) {
+            log('No video element found for Shorts.');
+            return;
+        }
+
+        let currentTime = video.currentTime;
+        const duration = video.duration;
+
+        // Do not update record if timestamp is 0 or duration is not available
+        if (!currentTime || currentTime === 0 || !duration || duration === 0) {
+            log(`Invalid timestamp (${currentTime}) or duration (${duration}) for Shorts ID ${videoId}, skipping update.`);
             return;
         }
 
@@ -503,11 +653,13 @@
             timestamp: Date.now(),
             title: title,
             url: getCleanVideoUrl(),
-            isShorts: true // <--- Mark as Shorts for UI filtering
+            isShorts: true
         };
 
         try {
             await ytStorage.setVideo(videoId, record);
+            // Broadcast update after successful save
+            broadcastVideoUpdate(record);
             log(`Shorts timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
         } catch (error) {
             log('Error saving Shorts timestamp:', error);
@@ -520,95 +672,6 @@
             type: 'videoUpdate',
             data: videoData
         });
-    }
-
-    // Save the current video timestamp (regular videos)
-    async function saveTimestamp() {
-        if (window.location.pathname.startsWith('/shorts/')) {
-            await saveShortsTimestamp();
-            return;
-        }
-
-        const video = document.querySelector('video');
-        if (!video) {
-            log('No video element found.');
-            return;
-        }
-
-        let currentTime = video.currentTime;
-        const duration = video.duration;
-        const videoId = getVideoId();
-        if (!videoId) {
-            log('No video ID found.');
-            return;
-        }
-
-        // Do not update record if timestamp is 0
-        if (!currentTime || currentTime === 0) {
-            log(`Detected timestamp 0 for video ID ${videoId}, skipping update.`);
-            return;
-        }
-
-        // If within last 10 seconds, save as duration - 10 (but not less than 0)
-        if (duration && currentTime > duration - 10) {
-            const adjustedTime = Math.max(0, duration - 10);
-            log(`Current time (${currentTime}) is within last 10s of duration (${duration}), saving as ${adjustedTime}`);
-            currentTime = adjustedTime;
-        }
-
-        log(`Saving timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
-
-        // Get existing record first to preserve title if it exists
-        let existingRecord = await ytStorage.getVideo(videoId);
-        let title = existingRecord?.title;
-
-        // Only update title if we don't have one or if it's "Unknown Title"
-        if (!title || title === 'Unknown Title') {
-            // Try multiple selectors to get the title
-            const selectors = [
-                'h1.ytd-video-primary-info-renderer',      // Main video title
-                'yt-formatted-string.ytd-video-primary-info-renderer', // Alternative title element
-                '#above-the-fold #title h1',               // Another possible title location
-                'meta[property="og:title"]',               // OpenGraph title
-                'title'                                    // Document title
-            ];
-
-            for (const selector of selectors) {
-                const element = document.querySelector(selector);
-                if (element) {
-                    let newTitle = element.tagName === 'META' ? element.content : element.textContent?.trim();
-                    if (newTitle && newTitle !== 'YouTube') {
-                        // Clean up title if it's from document.title
-                        if (selector === 'title') {
-                            newTitle = newTitle.replace(/ - YouTube$/, '').trim();
-                        }
-                        title = newTitle;
-                        break;
-                    }
-                }
-            }
-
-            // If still no title, keep existing or use "Unknown Title"
-            title = title || 'Unknown Title';
-        }
-
-        const record = {
-            videoId: videoId,
-            time: currentTime,
-            duration: duration,
-            timestamp: Date.now(),
-            title: title,
-            url: getCleanVideoUrl()
-        };
-
-        try {
-            await ytStorage.setVideo(videoId, record);
-            // Broadcast update after successful save
-            broadcastVideoUpdate(record);
-            log(`Timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
-        } catch (error) {
-            log('Error saving timestamp:', error);
-        }
     }
 
     // Update cleanupOldRecords to use currentSettings.autoCleanPeriod
@@ -629,13 +692,13 @@
         }
     }
 
-    // Start periodic saving
+    // Start periodic saving with shorter interval
     function startSaveInterval() {
         if (saveIntervalId) {
             clearInterval(saveIntervalId);
         }
         saveTimestamp(); // Save immediately
-        saveIntervalId = setInterval(saveTimestamp, SAVE_INTERVAL);
+        saveIntervalId = setInterval(saveTimestamp, 5000); // Changed from SAVE_INTERVAL to fixed 5000ms
     }
 
     // Debounce helper function
@@ -663,9 +726,9 @@
 
         let timestampLoaded = false;
         let lastSaveTime = 0;
-        const MIN_SAVE_INTERVAL = 2000; // Minimum time between saves in milliseconds
+        const MIN_SAVE_INTERVAL = 1000; // Minimum time between saves in milliseconds
 
-        // Debounced save function
+        // Debounced save function with shorter delay
         const debouncedSave = debounce(async () => {
             const now = Date.now();
             if (now - lastSaveTime < MIN_SAVE_INTERVAL) {
@@ -673,37 +736,39 @@
             }
             lastSaveTime = now;
             await saveTimestamp();
-        }, 1000);
+        }, 500);
 
-        // Function to ensure video is ready before loading timestamp
-        const ensureVideoReady = () => {
+        // Function to ensure video is ready and load saved timestamp
+        const ensureVideoReady = async () => {
             if (timestampLoaded) {
                 log('Timestamp already loaded, skipping');
                 return;
             }
 
-            if (video.readyState >= 1) {
-                log('Video is ready, loading timestamp');
-                loadTimestamp();
-                timestampLoaded = true;
-            } else {
-                log('Video not ready, waiting for loadedmetadata event');
-                const metadataHandler = () => {
-                    if (!timestampLoaded) {
-                        log('Video metadata loaded, loading timestamp');
-                        loadTimestamp();
-                        timestampLoaded = true;
-                    }
-                };
-                addTrackedEventListener(video, 'loadedmetadata', metadataHandler);
+            // Wait for video metadata to be loaded
+            if (video.readyState < 1) {
+                log('Video metadata not ready, waiting for loadedmetadata event');
+                await new Promise(resolve => {
+                    video.addEventListener('loadedmetadata', resolve, { once: true });
+                });
+            }
+
+            log('Video metadata loaded, duration:', video.duration);
+
+            // Load saved timestamp
+            await loadTimestamp();
+            timestampLoaded = true;
+
+            // Start periodic saving only after timestamp is loaded
+            if (!video.paused) {
+                startSaveInterval();
             }
         };
 
-        // Try to load timestamp immediately
-        ensureVideoReady();
-
-        // Also try again after a short delay to handle late initialization
-        setTimeout(ensureVideoReady, 1000);
+        // Try to load timestamp immediately or wait for metadata
+        ensureVideoReady().catch(error => {
+            log('Error during video initialization:', error);
+        });
 
         // Start saving timestamp periodically when the video starts playing
         const playHandler = () => {
@@ -726,7 +791,7 @@
         // Save timestamp when video progress changes significantly
         const timeupdateHandler = () => {
             const currentTime = Math.floor(video.currentTime);
-            if (currentTime % 30 === 0) { // Save every 30 seconds
+            if (currentTime % 15 === 0) { // Every 15 seconds
                 debouncedSave();
             }
         };
@@ -781,6 +846,12 @@
                 tryToSavePlaylist();
                 showExtensionInfo();
 
+                // Start observing for video changes
+                videoObserver.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+
                 // Start observing for thumbnails and process existing ones
                 log('Starting thumbnail observer and processing existing thumbnails.');
                 thumbnailObserver.observe(document.body, { childList: true, subtree: true });
@@ -810,20 +881,55 @@
         return false;
     }
 
-    // Try to save playlist with retries
-    function tryToSavePlaylist(retries = 10) {
+    // Try to save playlist with optimized retry mechanism
+    function tryToSavePlaylist(retries = 3) {
+        // First check if we're even on a page that could have a playlist
+        const urlParams = new URLSearchParams(window.location.search);
+        const playlistId = urlParams.get('list');
+        
+        if (!playlistId) {
+            // No playlist ID in URL, no need to retry
+            log('No playlist ID in URL, skipping playlist save');
+            return;
+        }
+
         log(`Trying to save playlist (${retries} retries left)...`);
         const playlistInfo = getPlaylistInfo();
+        
         if (playlistInfo) {
             log('Playlist info found, saving...');
             savePlaylistInfo(playlistInfo);
         } else if (retries > 0) {
-            log(`Playlist title not found, will retry in 1.5 seconds... (${retries} retries left)`);
+            // Only retry if we have a playlist ID but couldn't get the title
+            // This means the UI probably hasn't loaded yet
+            log(`Playlist title not found for ID ${playlistId}, will retry in 3 seconds... (${retries} retries left)`);
+            clearTimeout(playlistRetryTimeout);
+            
+            // Exponential backoff: wait longer between retries
+            const delay = Math.min(3000 * (4 - retries), 5000);
             playlistRetryTimeout = setTimeout(() => {
-                tryToSavePlaylist(retries - 1);
-            }, 1500);
+                // Check if we're still on the same playlist before retrying
+                const currentPlaylistId = new URLSearchParams(window.location.search).get('list');
+                if (currentPlaylistId === playlistId) {
+                    tryToSavePlaylist(retries - 1);
+                } else {
+                    log('Playlist ID changed, stopping retry attempts');
+                }
+            }, delay);
         } else {
-            log('Failed to save playlist after all retries');
+            // If we've run out of retries but have a playlist ID, save with a default title
+            if (playlistId) {
+                log('Failed to get playlist title after retries, saving with default title');
+                const defaultInfo = {
+                    playlistId,
+                    title: 'Untitled Playlist',
+                    url: `https://www.youtube.com/playlist?list=${playlistId}`,
+                    timestamp: Date.now()
+                };
+                savePlaylistInfo(defaultInfo);
+            } else {
+                log('Failed to save playlist after all retries');
+            }
         }
     }
 
@@ -952,28 +1058,51 @@
         });
     });
 
-    // Process any existing thumbnails
-    function processExistingThumbnails() {
-        const thumbnails = document.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-thumbnail, ytd-compact-video-renderer, ytd-reel-item-renderer');
-        thumbnails.forEach((thumbnail) => {
-            // Check for regular video links
-            let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
-            if (anchor) {
-                const videoId = anchor.href.match(/[?&]v=([^&]+)/)?.[1];
+    // Process thumbnails with debouncing and queuing
+    async function processExistingThumbnails() {
+        if (!isInitialized) {
+            log('Not initialized yet, queuing thumbnail processing');
+            if (initRetryCount < MAX_INIT_RETRIES) {
+                initRetryCount++;
+                await initialize();
+            }
+            return;
+        }
+
+        // Add to queue if already processing
+        if (isProcessingThumbnails) {
+            thumbnailProcessingQueue.add(Date.now());
+            return;
+        }
+
+        isProcessingThumbnails = true;
+        try {
+            const thumbnails = document.querySelectorAll('ytd-thumbnail, a#thumbnail');
+            log(`Processing ${thumbnails.length} thumbnails`);
+
+            for (const thumbnail of thumbnails) {
+                const videoId = getVideoIdFromThumbnail(thumbnail);
                 if (videoId) {
                     addViewedLabelToThumbnail(thumbnail, videoId);
                 }
-            } else {
-                // Check for Shorts links
-                anchor = thumbnail.querySelector('a[href*="/shorts/"]');
-                if (anchor) {
-                    const videoId = anchor.href.match(/\/shorts\/([^\/\?]+)/)?.[1];
-                    if (videoId) {
-                        addViewedLabelToThumbnail(thumbnail, videoId);
-                    }
-                }
             }
-        });
+
+            // Process any queued requests
+            if (thumbnailProcessingQueue.size > 0) {
+                thumbnailProcessingQueue.clear();
+                // Delay next processing to avoid overwhelming
+                clearTimeout(processingTimeout);
+                processingTimeout = setTimeout(() => {
+                    isProcessingThumbnails = false;
+                    processExistingThumbnails();
+                }, 100);
+            } else {
+                isProcessingThumbnails = false;
+            }
+        } catch (error) {
+            log('Error processing thumbnails:', error);
+            isProcessingThumbnails = false;
+        }
     }
 
     // Handle messages from popup
@@ -1221,11 +1350,14 @@
         });
     }
 
-    // Initialize everything
+    // Initialize everything with retry mechanism
     async function initialize() {
-        injectCSS();
+        if (isInitialized) {
+            return true;
+        }
 
         try {
+            injectCSS();
             const settings = await loadSettings() || DEFAULT_SETTINGS;
             currentSettings = settings;
 
@@ -1236,24 +1368,32 @@
 
             log('Settings loaded:', settings);
 
-            // Process existing thumbnails after settings are loaded
+            // Process existing thumbnails after a short delay
             setTimeout(() => {
                 processExistingThumbnails();
-            }, 1000);
+            }, 500);
+
+            isInitialized = true;
+            return true;
         } catch (error) {
-            log('Error loading settings:', error);
+            log('Error during initialization:', error);
             currentSettings = DEFAULT_SETTINGS;
+            return false;
         }
     }
 
     // Initialize on startup
     initialize();
 
-    // Listen for storage changes and update overlays in real time
+    // Update the storage change listener to use the improved thumbnail processing
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area === 'local') {
-                if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
+                const hasVideoChanges = Object.keys(changes).some(key =>
+                    key.startsWith('video_') || key.startsWith('playlist_')
+                );
+                if (hasVideoChanges) {
+                    // Use the improved processing function
                     processExistingThumbnails();
                 }
             }
@@ -1261,10 +1401,42 @@
     } else if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
         browser.storage.onChanged.addListener((changes, area) => {
             if (area === 'local') {
-                if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
+                const hasVideoChanges = Object.keys(changes).some(key =>
+                    key.startsWith('video_') || key.startsWith('playlist_')
+                );
+                if (hasVideoChanges) {
+                    // Use the improved processing function
                     processExistingThumbnails();
                 }
             }
         });
+    }
+
+    // Helper function to extract video ID from thumbnail element
+    function getVideoIdFromThumbnail(thumbnail) {
+        // Check for regular video links
+        let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
+        if (anchor) {
+            return anchor.href.match(/[?&]v=([^&]+)/)?.[1];
+        }
+
+        // Check if the thumbnail itself is the anchor
+        if (thumbnail.tagName === 'A' && thumbnail.id === 'thumbnail') {
+            if (thumbnail.href.includes('watch?v=')) {
+                return thumbnail.href.match(/[?&]v=([^&]+)/)?.[1];
+            }
+            // Check for Shorts
+            if (thumbnail.href.includes('/shorts/')) {
+                return thumbnail.href.match(/\/shorts\/([^\/\?]+)/)?.[1];
+            }
+        }
+
+        // Check for Shorts links in nested elements
+        anchor = thumbnail.querySelector('a[href*="/shorts/"]');
+        if (anchor) {
+            return anchor.href.match(/\/shorts\/([^\/\?]+)/)?.[1];
+        }
+
+        return null;
     }
 })();

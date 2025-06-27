@@ -59,6 +59,8 @@ const OVERLAY_COLORS = {
 
 // Format time duration
 function formatDuration(seconds) {
+    if (!seconds || isNaN(seconds)) return '0:00';
+
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const remainingSeconds = Math.floor(seconds % 60);
@@ -69,26 +71,58 @@ function formatDuration(seconds) {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-// Format date
-function getYouTubeLocale() {
-    // 1. Check for 'hl' param in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('hl')) {
-        return urlParams.get('hl');
+// Format date in a more readable way
+function formatDate(timestamp) {
+    if (!timestamp) return 'Unknown';
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+
+    const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    if (isToday) {
+        return `Today ${timeStr}`;
     }
-    // 2. Check <html lang="...">
-    const htmlLang = document.documentElement.lang;
-    if (htmlLang) {
-        return htmlLang;
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+        return `Yesterday ${timeStr}`;
     }
-    // 3. Fallback to browser
-    return navigator.language || 'en-US';
+
+    return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+    }) + ' ' + timeStr;
 }
 
-function formatDate(timestamp) {
-    const date = new Date(timestamp);
-    const locale = getYouTubeLocale();
-    return date.toLocaleDateString(locale) + ' ' + date.toLocaleTimeString(locale);
+// Calculate progress percentage with validation
+function calculateProgress(time, duration) {
+    if (!time || !duration || isNaN(time) || isNaN(duration) || duration <= 0) {
+        return 0;
+    }
+
+    // Ensure values are within reasonable bounds
+    time = Math.max(0, Math.min(time, duration));
+    const percentage = Math.round((time / duration) * 100);
+    return Math.min(100, Math.max(0, percentage)); // Ensure between 0-100
+}
+
+// Format progress text
+function formatProgress(time, duration) {
+    const timeStr = formatDuration(time);
+    if (!duration || duration <= 0) {
+        return timeStr;
+    }
+
+    const percentage = calculateProgress(time, duration);
+    return `${timeStr} (${percentage}%)`;
 }
 
 // Show message
@@ -157,6 +191,9 @@ async function initStorage() {
         // Ensure migration is complete
         await ytStorage.ensureMigrated();
 
+        // Load initial data
+        await loadHistory(true);
+
         // Set up message listener for updates
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (message.type === 'videoUpdateFromBackground') {
@@ -176,6 +213,33 @@ async function initStorage() {
             }
         });
 
+        // Set up storage change listener
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area === 'local') {
+                const videoChanges = Object.entries(changes).filter(([key]) =>
+                    key.startsWith('video_') || key.startsWith('playlist_')
+                );
+
+                if (videoChanges.length > 0) {
+                    // Process each change individually
+                    videoChanges.forEach(([key, change]) => {
+                        if (key.startsWith('video_')) {
+                            const videoId = key.replace('video_', '');
+                            if (change.newValue) {
+                                updateVideoRecord(change.newValue);
+                            } else {
+                                // Record was deleted
+                                allHistoryRecords = allHistoryRecords.filter(r => r.videoId !== videoId);
+                                allShortsRecords = allShortsRecords.filter(r => r.videoId !== videoId);
+                                displayHistoryPage();
+                                displayShortsPage();
+                            }
+                        }
+                    });
+                }
+            }
+        });
+
         return true;
     } catch (error) {
         console.error('Storage initialization failed:', error);
@@ -186,7 +250,7 @@ async function initStorage() {
 // Handle storage updates
 function handleStorageUpdates(changes) {
     let needsRefresh = false;
-    
+
     changes.forEach(([key, change]) => {
         if (key.startsWith('video_')) {
             const videoId = key.replace('video_', '');
@@ -213,6 +277,8 @@ function handleStorageUpdates(changes) {
 function updateVideoRecord(record) {
     if (!record || !record.videoId) return;
 
+    log('Updating video record:', record);
+
     // Update the record in our local array
     const recordIndex = allHistoryRecords.findIndex(r => r.videoId === record.videoId);
     if (recordIndex !== -1) {
@@ -234,7 +300,7 @@ function updateVideoRecord(record) {
         const row = historyTable.rows[recordPageIndex];
         if (row) {
             const [titleCell, progressCell, dateCell] = row.cells;
-            
+
             // Update title if needed
             const link = titleCell.querySelector('a');
             if (link) {
@@ -242,13 +308,8 @@ function updateVideoRecord(record) {
                 link.href = record.url;
             }
 
-            // Update progress
-            if (record.duration && record.duration > 0) {
-                const percentage = Math.round((record.time / record.duration) * 100);
-                progressCell.textContent = `${formatDuration(record.time)} (${percentage}%)`;
-            } else {
-                progressCell.textContent = formatDuration(record.time);
-            }
+            // Update progress using new format function
+            progressCell.textContent = formatProgress(record.time, record.duration);
 
             // Update timestamp
             dateCell.textContent = formatDate(record.timestamp);
@@ -260,114 +321,445 @@ function updateVideoRecord(record) {
 }
 
 // Load history records
-async function loadHistory() {
+async function loadHistory(isInitialLoad = false) {
     try {
         log('Loading history from storage...');
         const history = await ytStorage.getAllVideos();
 
         if (!history || Object.keys(history).length === 0) {
-            showMessage('No history found.', 'info');
+            if (isInitialLoad) {
+                showMessage('No history found.', 'info');
+            }
             allHistoryRecords = [];
             allShortsRecords = [];
         } else {
-            // Use only regular (non-Shorts) videos for the Videos tab
-            allHistoryRecords = extractRegularVideoRecords(history);
-            allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            // Extract Shorts records for the Shorts tab
-            allShortsRecords = extractShortsRecords(history);
-            allShortsRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            log('Loaded history:', allHistoryRecords);
-            log('Loaded shorts:', allShortsRecords);
+            const newRegularVideos = extractRegularVideoRecords(history);
+            const newShortsRecords = extractShortsRecords(history);
+
+            // Only sort and update if there are actual changes
+            if (JSON.stringify(newRegularVideos) !== JSON.stringify(allHistoryRecords)) {
+                allHistoryRecords = newRegularVideos;
+                allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                log('Updated regular videos history:', allHistoryRecords);
+            }
+
+            if (JSON.stringify(newShortsRecords) !== JSON.stringify(allShortsRecords)) {
+                allShortsRecords = newShortsRecords;
+                allShortsRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                log('Updated shorts history:', allShortsRecords);
+            }
         }
 
-        currentPage = 1;
+        // Only reset to first page on initial load
+        if (isInitialLoad) {
+            currentPage = 1;
+        }
+
         displayHistoryPage();
         displayShortsPage();
     } catch (error) {
         console.error('Error loading history:', error);
-        showMessage('Error loading history: ' + (error.message || 'Unknown error'), 'error');
+        if (isInitialLoad) {
+            showMessage('Error loading history: ' + (error.message || 'Unknown error'), 'error');
+        }
     }
 }
 
+// Search functionality
+let searchQuery = '';
+const searchInput = document.getElementById('ytvhtSearchInput');
+
+searchInput?.addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase();
+    currentPage = 1; // Reset to first page when searching
+    displayHistoryPage();
+});
+
+// Filter records based on search query
+function filterRecords(records) {
+    if (!searchQuery) return records;
+    return records.filter(record =>
+        record.title?.toLowerCase().includes(searchQuery)
+    );
+}
+
+// Format duration for analytics
+function formatAnalyticsDuration(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+}
+
+// Calculate analytics data
+function calculateAnalytics(records) {
+    const totalSeconds = records.reduce((sum, record) => sum + (record.time || 0), 0);
+    const totalDuration = records.reduce((sum, record) => sum + (record.duration || 0), 0);
+    const completedVideos = records.filter(record =>
+        record.time && record.duration && (record.time / record.duration) >= 0.9
+    ).length;
+
+    return {
+        totalWatchTime: formatAnalyticsDuration(totalSeconds),
+        videosWatched: records.length,
+        shortsWatched: allShortsRecords.length,
+        avgDuration: formatAnalyticsDuration(totalDuration / records.length || 0),
+        completionRate: Math.round((completedVideos / records.length) * 100) || 0,
+        playlistsSaved: allPlaylists.length
+    };
+}
+
+// Update analytics display
+function updateAnalytics() {
+    const stats = calculateAnalytics(allHistoryRecords);
+
+    document.getElementById('totalWatchTime').textContent = stats.totalWatchTime;
+    document.getElementById('videosWatched').textContent = stats.videosWatched;
+    document.getElementById('shortsWatched').textContent = stats.shortsWatched;
+    document.getElementById('avgDuration').textContent = stats.avgDuration;
+    document.getElementById('completionRate').textContent = `${stats.completionRate}%`;
+    document.getElementById('playlistsSaved').textContent = stats.playlistsSaved;
+
+    // Update all charts
+    updateActivityChart();
+    updateContentTypeChart();
+    updateWatchTimeByHourChart();
+}
+
+// Create activity chart
+function updateActivityChart() {
+    const canvas = document.getElementById('ytvhtActivityChart');
+    if (!canvas) return;
+
+    // Set canvas size based on container
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = parseInt(canvas.style.height) || 200;
+
+    const ctx = canvas.getContext('2d');
+
+    // Clear previous chart
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Get last 7 days of activity
+    const now = new Date();
+    const days = Array.from({length: 7}, (_, i) => {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        return date.toISOString().split('T')[0];
+    }).reverse();
+
+    const activity = days.map(day => {
+        return allHistoryRecords.filter(record => {
+            const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+            return recordDate === day;
+        }).length;
+    });
+
+    // Draw chart
+    const maxActivity = Math.max(...activity, 1);
+    const barWidth = Math.floor((canvas.width - 40) / 7); // Leave space for margins
+    const barSpacing = Math.floor(barWidth * 0.2);
+    const maxHeight = canvas.height - 40; // Leave space for labels
+
+    // Draw background grid
+    ctx.strokeStyle = getComputedStyle(document.documentElement)
+        .getPropertyValue('--border-color')
+        .trim();
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 5; i++) {
+        const y = 20 + (maxHeight * i / 5);
+        ctx.moveTo(20, y);
+        ctx.lineTo(canvas.width - 20, y);
+    }
+    ctx.stroke();
+
+    // Draw bars
+    activity.forEach((count, i) => {
+        const height = Math.max(1, (count / maxActivity) * maxHeight);
+        const x = 20 + (barWidth + barSpacing) * i;
+        const y = canvas.height - height - 20;
+
+        // Draw bar
+        ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--button-bg')
+            .trim();
+        ctx.fillRect(x, y, barWidth - barSpacing, height);
+
+        // Draw date label
+        ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--text-color')
+            .trim();
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        const dateLabel = days[i].slice(5).replace('-', '/');
+        ctx.fillText(dateLabel, x + (barWidth - barSpacing)/2, canvas.height - 5);
+
+        // Draw count label
+        ctx.fillText(count.toString(), x + (barWidth - barSpacing)/2, y - 5);
+    });
+}
+
+// Create content type distribution chart
+function updateContentTypeChart() {
+    const canvas = document.getElementById('ytvhtContentTypeChart');
+    if (!canvas) return;
+
+    // Set canvas size based on container
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = parseInt(canvas.style.height) || 200;
+
+    const ctx = canvas.getContext('2d');
+
+    // Clear previous chart
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Calculate data
+    const regularVideos = allHistoryRecords.length;
+    const shorts = allShortsRecords.length;
+    const total = regularVideos + shorts;
+
+    if (total === 0) {
+        // Draw "No data" message
+        ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--text-color')
+            .trim();
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('No watch history data available', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Calculate pie chart dimensions
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(centerX, centerY) - 40;
+
+    // Draw pie chart
+    let startAngle = 0;
+    const data = [
+        { label: 'Regular Videos', value: regularVideos, color: '#4285f4' },
+        { label: 'Shorts', value: shorts, color: '#ea4335' }
+    ];
+
+    data.forEach(segment => {
+        const angle = (segment.value / total) * 2 * Math.PI;
+
+        // Draw segment
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, startAngle + angle);
+        ctx.closePath();
+        ctx.fillStyle = segment.color;
+        ctx.fill();
+
+        // Draw label
+        const labelAngle = startAngle + angle / 2;
+        const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
+        const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+
+        ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--text-color')
+            .trim();
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${segment.label}: ${segment.value}`, labelX, labelY);
+
+        startAngle += angle;
+    });
+}
+
+// Create watch time by hour chart
+function updateWatchTimeByHourChart() {
+    const canvas = document.getElementById('ytvhtWatchTimeByHourChart');
+    if (!canvas) return;
+
+    // Set canvas size based on container
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = parseInt(canvas.style.height) || 200;
+
+    const ctx = canvas.getContext('2d');
+
+    // Clear previous chart
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Calculate watch time by hour
+    const hourlyData = new Array(24).fill(0);
+
+    // Combine regular videos and shorts
+    const allVideos = [...allHistoryRecords, ...allShortsRecords];
+
+    allVideos.forEach(record => {
+        if (record.timestamp) {
+            const hour = new Date(record.timestamp).getHours();
+            hourlyData[hour] += record.time || 0;
+        }
+    });
+
+    // Convert seconds to minutes for better readability
+    const hourlyMinutes = hourlyData.map(seconds => Math.round(seconds / 60));
+
+    // Draw chart
+    const maxMinutes = Math.max(...hourlyMinutes, 1);
+    const barWidth = Math.floor((canvas.width - 60) / 24); // Leave space for labels
+    const barSpacing = Math.floor(barWidth * 0.2);
+    const maxHeight = canvas.height - 60; // Leave space for labels
+
+    // Draw background grid
+    ctx.strokeStyle = getComputedStyle(document.documentElement)
+        .getPropertyValue('--border-color')
+        .trim();
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 5; i++) {
+        const y = 20 + (maxHeight * i / 5);
+        ctx.moveTo(30, y);
+        ctx.lineTo(canvas.width - 30, y);
+    }
+    ctx.stroke();
+
+    // Draw bars
+    hourlyMinutes.forEach((minutes, hour) => {
+        const height = Math.max(1, (minutes / maxMinutes) * maxHeight);
+        const x = 30 + (barWidth + barSpacing) * hour;
+        const y = canvas.height - height - 40;
+
+        // Draw bar
+        ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--button-bg')
+            .trim();
+        ctx.fillRect(x, y, barWidth - barSpacing, height);
+
+        // Draw hour label
+        ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--text-color')
+            .trim();
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+            hour.toString().padStart(2, '0'),
+            x + (barWidth - barSpacing)/2,
+            canvas.height - 20
+        );
+
+        // Draw minutes label if non-zero
+        if (minutes > 0) {
+            ctx.fillText(
+                `${minutes}m`,
+                x + (barWidth - barSpacing)/2,
+                y - 5
+            );
+        }
+    });
+
+    // Draw axis labels
+    ctx.fillStyle = getComputedStyle(document.documentElement)
+        .getPropertyValue('--text-color')
+        .trim();
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText('Minutes', 25, 35);
+    ctx.textAlign = 'center';
+    ctx.fillText('Hour of Day', canvas.width / 2, canvas.height - 5);
+}
+
+// Update displayHistoryPage to use new layout
 function displayHistoryPage() {
     const historyTable = document.getElementById('ytvhtHistoryTable');
     const noHistory = document.getElementById('ytvhtNoHistory');
     const paginationDiv = document.getElementById('ytvhtPagination');
-    
+
+    // Filter records based on search
+    const filteredRecords = filterRecords(allHistoryRecords);
+
     // Clear only if we have new content to show
-    if (!allHistoryRecords.length) {
+    if (!filteredRecords.length) {
         historyTable.innerHTML = '';
         noHistory.style.display = 'block';
+        noHistory.textContent = searchQuery
+            ? 'No videos found matching your search.'
+            : 'No history found. Start watching some videos!';
         paginationDiv.style.display = 'none';
         return;
     }
-    
+
     noHistory.style.display = 'none';
     paginationDiv.style.display = 'flex';
-    
-    const totalPages = Math.ceil(allHistoryRecords.length / pageSize);
+
+    const totalPages = Math.ceil(filteredRecords.length / pageSize);
     if (currentPage > totalPages) currentPage = totalPages;
     if (currentPage < 1) currentPage = 1;
-    
+
     const startIdx = (currentPage - 1) * pageSize;
-    const endIdx = Math.min(startIdx + pageSize, allHistoryRecords.length);
-    const pageRecords = allHistoryRecords.slice(startIdx, endIdx);
-    
+    const endIdx = Math.min(startIdx + pageSize, filteredRecords.length);
+    const pageRecords = filteredRecords.slice(startIdx, endIdx);
+
     // Reuse existing rows when possible
     while (historyTable.rows.length > pageRecords.length) {
         historyTable.deleteRow(-1);
     }
-    
+
     pageRecords.forEach((record, index) => {
         let row = historyTable.rows[index];
         const isNewRow = !row;
-        
+
         if (isNewRow) {
             row = document.createElement('tr');
-            // Create cells
-            ['title', 'progress', 'date', 'action'].forEach(() => {
-                row.appendChild(document.createElement('td'));
-            });
+            // We only need one cell now
+            const cell = document.createElement('td');
+            row.appendChild(cell);
             historyTable.appendChild(row);
         }
-        
-        // Update cells
-        const [titleCell, progressCell, dateCell, actionCell] = row.cells;
-        
-        // Update title cell
-        let link = titleCell.querySelector('a');
-        if (!link) {
-            link = document.createElement('a');
-            link.className = 'video-link';
-            link.target = '_blank';
-            titleCell.appendChild(link);
+
+        // Get the cell (we only have one now)
+        const cell = row.cells[0];
+        cell.className = 'video-cell';
+
+        // Create or update content
+        if (!cell.querySelector('.video-thumbnail')) {
+            cell.innerHTML = `
+                <img class="video-thumbnail" alt="Video thumbnail">
+                <div class="video-content">
+                    <div class="video-title">
+                        <a class="video-link" target="_blank"></a>
+                    </div>
+                    <div class="video-details">
+                        <span class="video-progress"></span>
+                        <span class="video-date"></span>
+                        <button class="delete-button">Delete</button>
+                    </div>
+                </div>
+            `;
         }
+
+        // Update content
+        const thumbnail = cell.querySelector('.video-thumbnail');
+        const link = cell.querySelector('.video-link');
+        const progress = cell.querySelector('.video-progress');
+        const date = cell.querySelector('.video-date');
+        const deleteButton = cell.querySelector('.delete-button');
+
+        thumbnail.src = `https://i.ytimg.com/vi/${record.videoId}/mqdefault.jpg`;
+        thumbnail.alt = record.title || 'Video thumbnail';
+
         link.href = record.url;
         link.textContent = record.title || 'Unknown Title';
-        
-        // Update progress cell
-        if (record.duration && record.duration > 0) {
-            const percentage = Math.round((record.time / record.duration) * 100);
-            progressCell.textContent = `${formatDuration(record.time)} (${percentage}%)`;
-        } else {
-            progressCell.textContent = formatDuration(record.time);
-        }
-        
-        // Update date cell
-        dateCell.textContent = formatDate(record.timestamp);
-        
-        // Update action cell
-        if (!actionCell.hasChildNodes()) {
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Delete';
-            actionCell.appendChild(deleteButton);
-        }
-        const deleteButton = actionCell.firstChild;
+
+        progress.textContent = formatProgress(record.time, record.duration);
+        date.textContent = formatDate(record.timestamp);
+
         deleteButton.onclick = () => deleteRecord(record.videoId);
     });
-    
+
     // Update pagination info and controls
     updatePaginationUI(currentPage, totalPages);
+
+    // Update analytics if we're showing them
+    if (document.getElementById('ytvhtAnalyticsContainer').style.display !== 'none') {
+        updateAnalytics();
+    }
 }
 
 async function deleteRecord(videoId) {
@@ -1047,44 +1439,31 @@ async function initSettingsTab() {
 
 // Switch between different tabs in the popup
 function switchTab(tab) {
-    const videosTab = document.getElementById('ytvhtTabVideos');
-    const shortsTab = document.getElementById('ytvhtTabShorts');
-    const playlistsTab = document.getElementById('ytvhtTabPlaylists');
-    const settingsTab = document.getElementById('ytvhtTabSettings');
-    const videosContainer = document.getElementById('ytvhtVideosContainer');
-    const shortsContainer = document.getElementById('ytvhtShortsContainer');
-    const playlistsContainer = document.getElementById('ytvhtPlaylistsContainer');
-    const settingsContainer = document.getElementById('ytvhtSettingsContainer');
+    // Remove active class from all tabs
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
-    // Update tab active states
-    videosTab.classList.remove('active');
-    shortsTab.classList.remove('active');
-    playlistsTab.classList.remove('active');
-    settingsTab.classList.remove('active');
+    // Add active class to selected tab
+    document.getElementById(`ytvhtTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
 
-    // Hide all containers by default
-    videosContainer.style.display = 'none';
-    shortsContainer.style.display = 'none';
-    playlistsContainer.style.display = 'none';
-    settingsContainer.style.display = 'none';
+    // Hide all containers
+    document.getElementById('ytvhtVideosContainer').style.display = 'none';
+    document.getElementById('ytvhtShortsContainer').style.display = 'none';
+    document.getElementById('ytvhtPlaylistsContainer').style.display = 'none';
+    document.getElementById('ytvhtSettingsContainer').style.display = 'none';
+    document.getElementById('ytvhtAnalyticsContainer').style.display = 'none';
 
-    saveCurrentExtensionTab(tab);
+    // Show selected container
+    const container = document.getElementById(`ytvht${tab.charAt(0).toUpperCase() + tab.slice(1)}Container`);
+    if (container) {
+        container.style.display = 'block';
 
-    if (tab === 'videos') {
-        videosTab.classList.add('active');
-        videosContainer.style.display = 'block';
-        displayHistoryPage();
-    } else if (tab === 'shorts') {
-        shortsTab.classList.add('active');
-        shortsContainer.style.display = 'block';
-        displayShortsPage();
-    } else if (tab === 'playlists') {
-        playlistsTab.classList.add('active');
-        playlistsContainer.style.display = 'block';
-        displayPlaylistsPage();
-    } else if (tab === 'settings') {
-        settingsTab.classList.add('active');
-        settingsContainer.style.display = 'block';
+        // If switching to analytics, update the display
+        if (tab === 'analytics') {
+            // Small delay to ensure container is visible and sized
+            setTimeout(() => {
+                updateAnalytics();
+            }, 0);
+        }
     }
 }
 
@@ -1376,6 +1755,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const lastPageBtn = document.getElementById('ytvhtLastPage');
         const videosTab = document.getElementById('ytvhtTabVideos');
         const playlistsTab = document.getElementById('ytvhtTabPlaylists');
+        const analyticsTab = document.getElementById('ytvhtTabAnalytics');
         const prevPlaylistBtn = document.getElementById('ytvhtPrevPlaylistPage');
         const nextPlaylistBtn = document.getElementById('ytvhtNextPlaylistPage');
         const firstPlaylistBtn = document.getElementById('ytvhtFirstPlaylistPage');
@@ -1399,6 +1779,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             ['ytvhtLastPage', lastPageBtn],
             ['ytvhtTabVideos', videosTab],
             ['ytvhtTabPlaylists', playlistsTab],
+            ['ytvhtTabAnalytics', analyticsTab],
             ['ytvhtPrevPlaylistBtn', prevPlaylistBtn],
             ['ytvhtNextPlaylistBtn', nextPlaylistBtn],
             ['ytvhtFirstPlaylistBtn', firstPlaylistBtn],
@@ -1419,11 +1800,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         clearButton.addEventListener('click', async () => {
             // Show confirmation dialog
             const confirmed = confirm('WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?');
-            
+
             if (!confirmed) {
                 return;
             }
-            
+
             try {
                 await ytStorage.clearHistoryOnly();
                 allHistoryRecords = [];
@@ -1432,12 +1813,12 @@ document.addEventListener('DOMContentLoaded', async function () {
                 currentPage = 1;
                 currentPlaylistPage = 1;
                 currentShortsPage = 1;
-                
+
                 // Update all displays
                 displayHistoryPage();
                 displayShortsPage();
                 displayPlaylistsPage();
-                
+
                 showMessage('All video and playlist history has been cleared successfully');
             } catch (error) {
                 console.error('Error clearing history:', error);
@@ -1475,7 +1856,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         lastPageBtn.addEventListener('click', goToLastPage);
 
         let currentTab = getCurrentExtensionTab() || 'videos';
-        if (!['videos', 'shorts', 'playlists', 'settings'].includes(currentTab)) {
+        if (!['videos', 'shorts', 'playlists', 'analytics', 'settings'].includes(currentTab)) {
             currentTab = 'videos'; // Default to videos if invalid
         }
         log('Current extension tab:', currentTab);
@@ -1489,6 +1870,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         playlistsTab.addEventListener('click', () => {
             switchTab('playlists');
             loadPlaylists();
+        });
+        analyticsTab.addEventListener('click', () => {
+            switchTab('analytics');
+            updateAnalytics();
         });
 
         // Playlist pagination
@@ -1524,26 +1909,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         // Load initial data
-        await loadHistory();
-
-        // Listen for storage changes and update popup in real time
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
-            chrome.storage.onChanged.addListener((changes, area) => {
-                if (area === 'local') {
-                    if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
-                        loadHistory();
-                    }
-                }
-            });
-        } else if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
-            browser.storage.onChanged.addListener((changes, area) => {
-                if (area === 'local') {
-                    if (Object.keys(changes).some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
-                        loadHistory();
-                    }
-                }
-            });
-        }
+        await loadHistory(true);
 
         log('Initialization complete');
     } catch (error) {

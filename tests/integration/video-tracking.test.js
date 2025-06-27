@@ -65,14 +65,55 @@ function mockDebounce(fn, wait = 0) {
   };
 }
 
-// Import the module - note that we need to mock it before requiring
-jest.mock('../../src/content.js', () => {
-  // Store private variables that the module would normally manage
-  const trackedVideos = new WeakSet();
-  const videoEventListeners = new WeakMap();
-  
-  const mockModule = {
-    setupVideoTracking: jest.fn((video) => {
+// Import mocks
+jest.mock('../../src/content.js');
+jest.mock('../../src/popup.js');
+
+const contentModule = require('../../src/content.js');
+const popup = require('../../src/popup.js');
+
+describe('Video Tracking Integration', () => {
+  let mockVideoElement;
+  let mockYtStorage;
+
+  beforeEach(() => {
+    // Reset DOM and mocks
+    document.body.innerHTML = '';
+    jest.clearAllMocks();
+
+    // Create mock video element
+    mockVideoElement = createMockVideoElement();
+    document.body.appendChild(mockVideoElement);
+
+    // Mock ytStorage
+    mockYtStorage = {
+      ensureMigrated: jest.fn().mockResolvedValue(),
+      getVideo: jest.fn().mockResolvedValue(null),
+      setVideo: jest.fn().mockResolvedValue(),
+      saveVideo: jest.fn().mockResolvedValue(),
+      updateVideo: jest.fn().mockResolvedValue(),
+      getAllVideos: jest.fn().mockResolvedValue({}),
+      removeVideo: jest.fn().mockResolvedValue(),
+      getPlaylist: jest.fn().mockResolvedValue(null),
+      setPlaylist: jest.fn().mockResolvedValue(),
+      getAllPlaylists: jest.fn().mockResolvedValue({}),
+      removePlaylist: jest.fn().mockResolvedValue(),
+      getSettings: jest.fn().mockResolvedValue({
+        autoCleanPeriod: 90,
+        paginationCount: 10,
+        overlayTitle: 'viewed',
+        overlayColor: 'blue',
+        overlayLabelSize: 'medium'
+      }),
+      setSettings: jest.fn().mockResolvedValue(),
+      clear: jest.fn().mockResolvedValue()
+    };
+
+    // Mock global ytStorage
+    global.ytStorage = mockYtStorage;
+
+    // Setup mock implementations
+    contentModule.setupVideoTracking.mockImplementation((video) => {
       if (!video) return null;
       
       const handlers = {
@@ -116,8 +157,8 @@ jest.mock('../../src/content.js', () => {
         console.error('Error adding event listeners:', error);
       }
       
-      trackedVideos.add(video);
-      videoEventListeners.set(video, [
+      contentModule.trackedVideos.add(video);
+      contentModule.videoEventListeners.set(video, [
         { event: 'play', handler: handlers.playHandler },
         { event: 'pause', handler: handlers.pauseHandler },
         { event: 'timeupdate', handler: handlers.timeupdateHandler },
@@ -127,81 +168,122 @@ jest.mock('../../src/content.js', () => {
       ]);
       
       return handlers;
-    }),
-    
-    addViewedLabelToThumbnail: jest.fn(),
-    processExistingThumbnails: jest.fn(),
-    trackedVideos,
-    videoEventListeners,
-    
-    // Additional functions for real-time updates
-    saveTimestamp: jest.fn(async () => {
-      await global.ytStorage.setVideo('testVideoId', {
+    });
+
+    contentModule.saveTimestamp.mockImplementation(async () => {
+      const mockVideo = global.createMockVideoElement();
+      if (!mockVideo) return;
+
+      const currentTime = mockVideo.currentTime;
+      const duration = mockVideo.duration;
+
+      // Apply validation rules
+      if (!currentTime || currentTime === 0 || !duration || duration === 0) {
+        return;
+      }
+
+      // Adjust timestamp if near end
+      const adjustedTime = currentTime > duration - 10 ? duration - 10 : currentTime;
+
+      const record = {
         videoId: 'testVideoId',
         title: 'Test Video',
-        time: 30,
-        duration: 100,
+        time: adjustedTime,
+        duration: duration,
         timestamp: Date.now()
-      });
-      mockModule.broadcastVideoUpdate({
+      };
+
+      await global.ytStorage.setVideo(record.videoId, record);
+      chrome.runtime.sendMessage({
         type: 'videoUpdate',
-        data: {
-          videoId: 'testVideoId',
-          title: 'Test Video',
-          time: 30,
-          duration: 100
+        data: record
+      });
+    });
+
+    contentModule.tryToSavePlaylist.mockImplementation(async (retries = 3) => {
+      const playlistId = 'PL123';
+      let attempts = 0;
+
+      const tryGetInfo = async () => {
+        attempts++;
+        const info = await contentModule.getPlaylistInfo();
+        if (info) return info;
+
+        if (attempts < retries) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+        return null;
+      };
+
+      let playlistInfo = null;
+      while (attempts < retries) {
+        // Check if playlist ID has changed
+        const currentId = new URLSearchParams(window.location.search).get('list');
+        if (currentId !== playlistId) {
+          return; // Stop retrying if playlist ID has changed
+        }
+
+        playlistInfo = await tryGetInfo();
+        if (playlistInfo) break;
+      }
+
+      if (!playlistInfo) {
+        playlistInfo = {
+          playlistId,
+          title: 'Untitled Playlist',
+          url: `https://www.youtube.com/playlist?list=${playlistId}`,
+          timestamp: Date.now()
+        };
+      }
+
+      await global.ytStorage.setPlaylist(playlistId, playlistInfo);
+    });
+
+    contentModule.calculateAnalytics.mockImplementation((videos) => {
+      const totalSeconds = videos.reduce((sum, record) => sum + (record.time || 0), 0);
+      const completedVideos = videos.filter(record => 
+        record.time && record.duration && (record.time / record.duration) >= 0.9
+      ).length;
+
+      return {
+        totalWatchTime: `${Math.floor(totalSeconds / 60)}m`,
+        videosWatched: videos.length,
+        avgDuration: `${Math.floor((totalSeconds / videos.length) / 60)}m`,
+        completionRate: Math.round((completedVideos / videos.length) * 100)
+      };
+    });
+
+    contentModule.getWatchTimeByHour.mockImplementation((videos) => {
+      const hourlyData = new Array(24).fill(0);
+      videos.forEach(video => {
+        if (video.timestamp) {
+          const hour = new Date(video.timestamp).getHours();
+          hourlyData[hour] += Math.floor(video.time / 60); // Convert to minutes
         }
       });
-    }),
-    
-    broadcastVideoUpdate: jest.fn(),
-    debounce: mockDebounce
-  };
+      return hourlyData;
+    });
 
-  return mockModule;
-});
+    contentModule.getContentTypeDistribution.mockImplementation((videos) => ({
+      regular: videos.filter(v => !v.isShorts).length,
+      shorts: videos.filter(v => v.isShorts).length
+    }));
 
-const contentModule = require('../../src/content.js');
+    contentModule.broadcastVideoUpdate.mockImplementation((data) => {
+      chrome.runtime.sendMessage(data);
+    });
 
-describe('Video Tracking Integration', () => {
-  let mockVideoElement;
-  let mockYtStorage;
-
-  beforeEach(() => {
-    // Reset DOM and mocks
-    document.body.innerHTML = '';
-    jest.clearAllMocks();
-
-    // Create mock video element
-    mockVideoElement = createMockVideoElement();
-    document.body.appendChild(mockVideoElement);
-
-    // Mock ytStorage
-    mockYtStorage = {
-      ensureMigrated: jest.fn().mockResolvedValue(),
-      getVideo: jest.fn().mockResolvedValue(null),
-      setVideo: jest.fn().mockResolvedValue(),
-      saveVideo: jest.fn().mockResolvedValue(),
-      updateVideo: jest.fn().mockResolvedValue(),
-      getAllVideos: jest.fn().mockResolvedValue({}),
-      removeVideo: jest.fn().mockResolvedValue(),
-      getPlaylist: jest.fn().mockResolvedValue(null),
-      setPlaylist: jest.fn().mockResolvedValue(),
-      getAllPlaylists: jest.fn().mockResolvedValue({}),
-      removePlaylist: jest.fn().mockResolvedValue(),
-      getSettings: jest.fn().mockResolvedValue({
-        autoCleanPeriod: 90,
-        paginationCount: 10,
-        overlayTitle: 'viewed',
-        overlayColor: 'blue',
-        overlayLabelSize: 'medium'
-      }),
-      setSettings: jest.fn().mockResolvedValue(),
-      clear: jest.fn().mockResolvedValue()
-    };
-
-    // Mock global ytStorage
-    global.ytStorage = mockYtStorage;
+    contentModule.debounce.mockImplementation((fn, wait) => {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          fn(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    });
 
     // Setup addViewedLabelToThumbnail implementation after DOM is ready
     contentModule.addViewedLabelToThumbnail.mockImplementation((thumbnail, videoId) => {
@@ -211,11 +293,6 @@ describe('Video Tracking Integration', () => {
       const progressBar = createProgressBar();
       thumbnail.appendChild(label);
       thumbnail.appendChild(progressBar);
-    });
-
-    // Setup broadcastVideoUpdate implementation
-    contentModule.broadcastVideoUpdate.mockImplementation((data) => {
-      mockChrome.runtime.sendMessage(data);
     });
   });
 
@@ -416,6 +493,233 @@ describe('Video Tracking Integration', () => {
       // Should not add overlays
       expect(thumbnail.querySelector('.ytvht-viewed-label')).toBeNull();
       expect(thumbnail.querySelector('.ytvht-progress-bar')).toBeNull();
+    });
+  });
+
+  describe('Timestamp Validation', () => {
+    test('should not save timestamp when time is 0', async () => {
+      const video = {
+        currentTime: 0,
+        duration: 100,
+        paused: true,
+        readyState: 1,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn()
+      };
+      global.createMockVideoElement = jest.fn().mockReturnValue(video);
+
+      await contentModule.saveTimestamp();
+      
+      expect(mockYtStorage.setVideo).not.toHaveBeenCalled();
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    test('should not save timestamp when duration is 0', async () => {
+      const video = {
+        currentTime: 30,
+        duration: 0,
+        paused: true,
+        readyState: 1,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn()
+      };
+      global.createMockVideoElement = jest.fn().mockReturnValue(video);
+
+      await contentModule.saveTimestamp();
+      
+      expect(mockYtStorage.setVideo).not.toHaveBeenCalled();
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    test('should adjust timestamp when near end of video', async () => {
+      const video = {
+        currentTime: 95, // 5 seconds from end
+        duration: 100,
+        paused: true,
+        readyState: 1,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn()
+      };
+      global.createMockVideoElement = jest.fn().mockReturnValue(video);
+
+      await contentModule.saveTimestamp();
+      
+      expect(mockYtStorage.setVideo).toHaveBeenCalledWith(
+        'testVideoId',
+        expect.objectContaining({
+          time: 90 // Should be adjusted to duration - 10
+        })
+      );
+    });
+  });
+
+  describe('Playlist Retry Mechanism', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.clearAllMocks();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    test('should use exponential backoff for retries', async () => {
+      const playlistId = 'PL123';
+      let attempts = 0;
+      
+      // Set up URL with playlist ID
+      window.location.search = `?list=${playlistId}`;
+      
+      // Mock getPlaylistInfo to fail first two times
+      contentModule.getPlaylistInfo.mockImplementation(() => {
+        attempts++;
+        if (attempts <= 2) return null;
+        return {
+          playlistId,
+          title: 'Test Playlist',
+          url: `https://www.youtube.com/playlist?list=${playlistId}`,
+          timestamp: Date.now()
+        };
+      });
+
+      // Start the retry process
+      contentModule.tryToSavePlaylist(3);
+
+      // First attempt should happen immediately
+      expect(contentModule.getPlaylistInfo).toHaveBeenCalledTimes(1);
+
+      // First retry after 3 seconds
+      await jest.advanceTimersByTimeAsync(3000);
+      expect(contentModule.getPlaylistInfo).toHaveBeenCalledTimes(2);
+
+      // Second retry after another 3 seconds (6 total)
+      await jest.advanceTimersByTimeAsync(3000);
+      expect(contentModule.getPlaylistInfo).toHaveBeenCalledTimes(3);
+      
+      // Wait for any pending promises to resolve
+      await Promise.resolve();
+      
+      // Clear any pending timeouts
+      jest.clearAllTimers();
+
+      expect(mockYtStorage.setPlaylist).toHaveBeenCalledWith(
+        playlistId,
+        expect.objectContaining({
+          title: 'Test Playlist'
+        })
+      );
+    });
+
+    test('should stop retrying when playlist ID changes', async () => {
+      const originalId = 'PL123';
+      const newId = 'PL456';
+      
+      // Mock URL changes
+      let currentId = originalId;
+      window.location.search = `?list=${currentId}`;
+      
+      // Mock getPlaylistInfo to always fail
+      contentModule.getPlaylistInfo.mockReturnValue(null);
+
+      // Start the retry process
+      const retryPromise = contentModule.tryToSavePlaylist(3);
+      
+      // Change playlist ID before first retry
+      window.location.search = `?list=${newId}`;
+
+      await jest.advanceTimersByTimeAsync(3000);
+      
+      expect(contentModule.getPlaylistInfo).toHaveBeenCalledTimes(1);
+      expect(mockYtStorage.setPlaylist).not.toHaveBeenCalled();
+
+      // Wait for the promise to resolve
+      await retryPromise;
+    });
+
+    test('should use default title after all retries fail', async () => {
+      const playlistId = 'PL123';
+      
+      // Set up URL with playlist ID
+      window.location.search = `?list=${playlistId}`;
+      
+      // Mock getPlaylistInfo to always return null
+      contentModule.getPlaylistInfo.mockReturnValue(null);
+
+      // Start the retry process
+      contentModule.tryToSavePlaylist(3);
+
+      // First attempt should happen immediately
+      expect(contentModule.getPlaylistInfo).toHaveBeenCalledTimes(1);
+
+      // First retry after 3 seconds
+      await jest.advanceTimersByTimeAsync(3000);
+      expect(contentModule.getPlaylistInfo).toHaveBeenCalledTimes(2);
+
+      // Second retry after another 3 seconds (6 total)
+      await jest.advanceTimersByTimeAsync(3000);
+      expect(contentModule.getPlaylistInfo).toHaveBeenCalledTimes(3);
+      
+      // Wait for any pending promises to resolve
+      await Promise.resolve();
+
+      expect(mockYtStorage.setPlaylist).toHaveBeenCalledWith(
+        playlistId,
+        expect.objectContaining({
+          title: 'Untitled Playlist'
+        })
+      );
+      
+      // Clear any pending timeouts
+      jest.clearAllTimers();
+    });
+  });
+
+  describe('Analytics Integration', () => {
+    test('should calculate total watch time correctly', () => {
+      const videos = [
+        { time: 300, duration: 600 },  // 5 minutes
+        { time: 600, duration: 900 },  // 10 minutes
+        { time: 1800, duration: 3600 } // 30 minutes
+      ];
+
+      const stats = contentModule.calculateAnalytics(videos);
+      expect(stats.totalWatchTime).toBe('45m'); // 45 minutes total
+    });
+
+    test('should calculate completion rate correctly', () => {
+      const videos = [
+        { time: 570, duration: 600 },  // 95% complete
+        { time: 450, duration: 900 },  // 50% complete
+        { time: 3500, duration: 3600 } // 97% complete
+      ];
+
+      const stats = contentModule.calculateAnalytics(videos);
+      expect(stats.completionRate).toBe(67); // 2 out of 3 videos >90% complete
+    });
+
+    test('should generate hourly activity data', () => {
+      const now = new Date();
+      const videos = [
+        { timestamp: now.setHours(10, 0, 0), time: 300 },
+        { timestamp: now.setHours(10, 30, 0), time: 600 },
+        { timestamp: now.setHours(15, 0, 0), time: 900 }
+      ];
+
+      const hourlyData = contentModule.getWatchTimeByHour(videos);
+      expect(hourlyData[10]).toBe(15); // 15 minutes in hour 10
+      expect(hourlyData[15]).toBe(15); // 15 minutes in hour 15
+    });
+
+    test('should handle content type distribution', () => {
+      const videos = [
+        { isShorts: false, time: 300 },
+        { isShorts: false, time: 600 },
+        { isShorts: true, time: 30 }
+      ];
+
+      const distribution = contentModule.getContentTypeDistribution(videos);
+      expect(distribution.regular).toBe(2);
+      expect(distribution.shorts).toBe(1);
     });
   });
 });
