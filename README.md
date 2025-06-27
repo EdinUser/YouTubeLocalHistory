@@ -183,7 +183,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
-### Version 2.5.0
+### Version 2.5.1
 - **Console Logging Optimization**: Reduced verbose logging in thumbnail observer
 - **Improved Video ID Extraction**: Streamlined video ID extraction from thumbnails
 - **Debug Mode Enhancement**: Added debug mode toggle in settings with proper persistence
