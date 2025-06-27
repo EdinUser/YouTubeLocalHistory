@@ -10,16 +10,18 @@ A browser extension that tracks your YouTube video watch history locally using s
 
 ## Features
 
-- **Automatic Progress Tracking**: Saves your current position in videos automatically
-- **Visual Indicators**: Shows "viewed" labels and progress bars on video thumbnails
+- **Automatic Progress Tracking**: Saves your current position in videos automatically, with improved timestamp accuracy and instant updates
+- **Visual Indicators**: Shows "viewed" labels and progress bars on video thumbnails, now with modern card-based layout and progress indicators
 - **Local Storage**: All data is stored locally on your device using secure browser storage
-- **Playlist Tracking**: Saves playlist information for easy access
+- **Playlist Tracking**: Saves playlist information for easy access, now with enhanced playlist metrics
+- **Analytics Dashboard**: Full analytics dashboard with interactive charts, watch time distribution by hour, content type comparison (Videos vs Shorts), weekly activity tracking, and completion rate statistics
 - **Export/Import**: Backup and restore your watch history
 - **Customizable Settings**: Adjust overlay appearance and auto-cleanup settings
-- **Dark Theme Support**: Full dark/light theme system with system preference detection
+- **Dark Theme Support**: Full dark/light theme system with system preference detection and theme-aware visualizations
 - **Progress Percentage**: View both watched time and percentage completion for each video
 - **Cross-Browser Support**: Works on Chrome and Firefox
 - **Firefox Sync**: Automatically syncs data across devices when Firefox Sync is enabled
+- **Modern UI/UX**: Card-based layout, thumbnails, and improved error messages and loading states
 
 ## Installation
 
@@ -72,9 +74,10 @@ The extension stores three types of data:
 
 1. **Install the extension** following the instructions above
 2. **Visit YouTube** and start watching videos
-3. **Your progress is automatically saved** every 5 seconds
+3. **Your progress is automatically saved** every 5 seconds, and videos now appear in your history immediately after being watched
 4. **Click the extension icon** to view your watch history
-5. **Use the settings tab** to customize the overlay appearance and theme
+5. **Use the Analytics tab** to explore interactive charts, watch time by hour, content type comparison, weekly activity, completion rate, and playlist tracking metrics
+6. **Use the settings tab** to customize the overlay appearance and theme
 
 ### Settings
 
@@ -103,6 +106,17 @@ The history view now shows enhanced progress information:
 - **Percentage**: Shows the percentage of the video you've completed (e.g., "45%")
 - **Combined Display**: Shows both time and percentage (e.g., "5:30 (45%)")
 - **Accurate Tracking**: Only shows percentage when video duration is available
+- **Progress Indicators**: Modern progress bars and visual indicators for each video and playlist
+
+## Analytics Dashboard
+
+The Analytics tab provides:
+- **Watch Time Distribution by Hour**: See when you watch the most
+- **Content Type Comparison**: Compare time spent on regular videos vs Shorts
+- **Weekly Activity Tracking**: Visualize your weekly YouTube activity
+- **Completion Rate Statistics**: Track how often you finish videos
+- **Playlist Tracking Metrics**: Analyze your playlist viewing habits
+- **Interactive Charts**: All analytics are presented with interactive, theme-aware charts
 
 ## Privacy
 
@@ -129,6 +143,7 @@ The extension uses the browser's built-in storage API (`chrome.storage.local`/`b
 1. Close and reopen the popup
 2. Refresh the YouTube page
 3. Check the browser console for error messages
+4. Benefit from improved error messages and loading states for easier troubleshooting
 
 ### Migration Issues
 If you experience issues with data migration:
@@ -167,6 +182,24 @@ MIT License - see LICENSE file for details.
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
+
+### Version 2.5.0
+- **Live Updates Fixed**: Popup now receives live updates instantly while open
+- **Instant History Updates**: Videos appear in history immediately after being watched
+- **Improved Timestamp Tracking**: More accurate and reliable video progress saving
+- **Optimized Playlist Saving**: Playlist saving is now less aggressive and more efficient
+- **Modern Visual Layout**: Updated card-based layout with thumbnails and progress indicators
+- **Full Analytics Dashboard**: Added analytics tab with interactive charts and theme-aware visualizations
+- **Watch Time Distribution**: View your watch time by hour in the analytics dashboard
+- **Content Type Comparison**: Compare time spent on regular videos vs Shorts
+- **Weekly Activity Tracking**: Visualize your weekly YouTube activity
+- **Completion Rate Statistics**: Track how often you finish videos
+- **Playlist Tracking Metrics**: Analyze your playlist viewing habits
+- **Improved Error Handling**: Enhanced error messages and loading states throughout the extension
+- **Optimized Storage Handling**: More efficient and reliable storage updates
+- **Better State Management**: Improved state management for live updates and analytics
+- **Theme Integration**: Better theme integration and visual consistency across all components
+- **Efficient Data Processing**: Analytics and history processing are now faster and more efficient
 
 ### Version 2.4.0
 - **YouTube Shorts Support**: Added comprehensive tracking and display for YouTube Shorts
