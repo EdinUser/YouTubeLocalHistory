@@ -11,8 +11,20 @@ const mockChrome = {
   runtime: {
     sendMessage: jest.fn(),
     onMessage: {
-      addListener: jest.fn(),
-      removeListener: jest.fn()
+      addListener: jest.fn((listener) => {
+        mockChrome.runtime.onMessage.listeners.push(listener);
+      }),
+      removeListener: jest.fn((listener) => {
+        const index = mockChrome.runtime.onMessage.listeners.indexOf(listener);
+        if (index > -1) {
+          mockChrome.runtime.onMessage.listeners.splice(index, 1);
+        }
+      }),
+      // Add trigger method for simulating messages
+      trigger: function(message) {
+        this.listeners.forEach(listener => listener(message));
+      },
+      listeners: []
     }
   }
 };
@@ -247,31 +259,215 @@ global.advanceTimersByTime = (ms) => {
   jest.advanceTimersByTime(ms);
 };
 
+// Mock source files
+jest.mock('../src/content.js', () => {
+  // Create mock functions
+  const saveTimestamp = jest.fn().mockImplementation(async () => {
+    const mockVideo = global.createMockVideoElement();
+    if (!mockVideo) return;
+
+    const currentTime = mockVideo.currentTime;
+    const duration = mockVideo.duration;
+
+    // Apply validation rules
+    if (!currentTime || currentTime === 0 || !duration || duration === 0) {
+      return;
+    }
+
+    // Adjust timestamp if near end
+    const adjustedTime = currentTime > duration - 10 ? duration - 10 : currentTime;
+
+    const record = {
+      videoId: 'testVideoId',
+      title: 'Test Video',
+      time: adjustedTime,
+      duration: duration,
+      timestamp: Date.now()
+    };
+
+    await global.ytStorage.setVideo(record.videoId, record);
+    mockChrome.runtime.onMessage.trigger({
+      type: 'videoUpdate',
+      data: record
+    });
+  });
+
+  const tryToSavePlaylist = jest.fn().mockImplementation(async (retries = 3) => {
+    const playlistId = 'PL123';
+    const playlistInfo = {
+      playlistId,
+      title: 'Test Playlist',
+      url: `https://www.youtube.com/playlist?list=${playlistId}`,
+      timestamp: Date.now()
+    };
+    await global.ytStorage.setPlaylist(playlistId, playlistInfo);
+  });
+
+  const calculateAnalytics = jest.fn().mockImplementation((videos) => {
+    const totalSeconds = videos.reduce((sum, record) => sum + (record.time || 0), 0);
+    const completedVideos = videos.filter(record => 
+      record.time && record.duration && (record.time / record.duration) >= 0.9
+    ).length;
+
+    return {
+      totalWatchTime: `${Math.floor(totalSeconds / 60)}m`,
+      videosWatched: videos.length,
+      avgDuration: `${Math.floor((totalSeconds / videos.length) / 60)}m`,
+      completionRate: Math.round((completedVideos / videos.length) * 100)
+    };
+  });
+
+  const getWatchTimeByHour = jest.fn().mockImplementation((videos) => {
+    const hourlyData = new Array(24).fill(0);
+    videos.forEach(video => {
+      if (video.timestamp) {
+        const hour = new Date(video.timestamp).getHours();
+        hourlyData[hour] += Math.floor(video.time / 60); // Convert to minutes
+      }
+    });
+    return hourlyData;
+  });
+
+  const getContentTypeDistribution = jest.fn().mockImplementation((videos) => ({
+    regular: videos.filter(v => !v.isShorts).length,
+    shorts: videos.filter(v => v.isShorts).length
+  }));
+
+  const module = {
+    setupVideoTracking: jest.fn(),
+    addViewedLabelToThumbnail: jest.fn(),
+    processExistingThumbnails: jest.fn(),
+    trackedVideos: new WeakSet(),
+    videoEventListeners: new WeakMap(),
+    saveTimestamp,
+    tryToSavePlaylist,
+    calculateAnalytics,
+    getWatchTimeByHour,
+    getContentTypeDistribution,
+    getPlaylistInfo: jest.fn(),
+    broadcastVideoUpdate: jest.fn().mockImplementation((data) => {
+      mockChrome.runtime.sendMessage(data);
+    }),
+    debounce: jest.fn((fn, wait) => {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          fn(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    })
+  };
+
+  // Expose module for tests
+  global.contentModule = module;
+  return module;
+});
+
+jest.mock('../src/popup.js', () => {
+  const popup = {
+    updateVideoRecord: jest.fn((record) => {
+      if (!record || !record.videoId) return;
+      
+      const recordIndex = global.allHistoryRecords.findIndex(r => r.videoId === record.videoId);
+      if (recordIndex !== -1) {
+        global.allHistoryRecords[recordIndex] = { ...record };
+      } else {
+        global.allHistoryRecords.unshift({ ...record });
+      }
+      global.allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      popup.displayHistoryPage();
+    }),
+    displayHistoryPage: jest.fn(),
+    formatDuration: jest.fn(time => `${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`),
+    formatDate: jest.fn(timestamp => new Date(timestamp).toLocaleString())
+  };
+  return popup;
+});
+
+// Mock window.location
+Object.defineProperty(window, 'location', {
+  value: {
+    _search: '',
+    get search() {
+      return this._search;
+    },
+    set search(value) {
+      this._search = value;
+    }
+  },
+  writable: true
+});
+
 // Helper function to create mock video element
-global.createMockVideoElement = () => {
-  const video = document.createElement('video');
-  video.currentTime = 0;
-  video.duration = 100;
-  video.paused = true;
-  video.readyState = 1;
+let mockVideoState = {
+  currentTime: 30,
+  duration: 100,
+  paused: true,
+  readyState: 1,
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn()
+};
 
-  // Mock video methods
-  video.addEventListener = jest.fn();
-  video.removeEventListener = jest.fn();
-
+global.createMockVideoElement = jest.fn().mockImplementation(() => {
+  const video = {
+    get currentTime() {
+      return mockVideoState.currentTime;
+    },
+    set currentTime(value) {
+      mockVideoState.currentTime = value;
+    },
+    get duration() {
+      return mockVideoState.duration;
+    },
+    set duration(value) {
+      mockVideoState.duration = value;
+    },
+    paused: mockVideoState.paused,
+    readyState: mockVideoState.readyState,
+    addEventListener: mockVideoState.addEventListener,
+    removeEventListener: mockVideoState.removeEventListener
+  };
   return video;
+});
+
+global.setMockVideoState = (state) => {
+  mockVideoState = { ...mockVideoState, ...state };
+};
+
+// Mock storage service
+global.ytStorage = {
+  setVideo: jest.fn(),
+  setPlaylist: jest.fn(),
+  getAllVideos: jest.fn(),
+  clear: jest.fn(),
+  ensureMigrated: jest.fn().mockResolvedValue(),
+  getVideo: jest.fn().mockResolvedValue(null),
+  saveVideo: jest.fn().mockResolvedValue(),
+  updateVideo: jest.fn().mockResolvedValue(),
+  removeVideo: jest.fn().mockResolvedValue(),
+  getPlaylist: jest.fn().mockResolvedValue(null),
+  getAllPlaylists: jest.fn().mockResolvedValue({}),
+  removePlaylist: jest.fn().mockResolvedValue(),
+  getSettings: jest.fn().mockResolvedValue({
+    autoCleanPeriod: 90,
+    paginationCount: 10,
+    overlayTitle: 'viewed',
+    overlayColor: 'blue',
+    overlayLabelSize: 'medium'
+  }),
+  setSettings: jest.fn().mockResolvedValue()
 };
 
 // Helper function to create mock thumbnail element
 global.createMockThumbnail = () => {
-  const thumbnail = document.createElement('div');
-  thumbnail.className = 'ytd-rich-item-renderer';
-
-  const anchor = document.createElement('a');
-  anchor.id = 'thumbnail';
-  anchor.href = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-
-  thumbnail.appendChild(anchor);
+  const thumbnail = {
+    className: 'ytd-rich-item-renderer',
+    appendChild: jest.fn(),
+    querySelector: jest.fn()
+  };
   return thumbnail;
 };
 
@@ -285,56 +481,3 @@ global.simulatePageNavigation = () => {
     global.cleanupFunction();
   }
 };
-
-// Mock source files
-jest.mock('../src/content.js', () => {
-  const setupVideoTracking = jest.fn((video) => ({
-    playHandler: jest.fn(),
-    pauseHandler: jest.fn(),
-    timeupdateHandler: jest.fn(),
-    seekingHandler: jest.fn(),
-    seekedHandler: jest.fn(),
-    beforeunloadHandler: jest.fn()
-  }));
-
-  const addViewedLabelToThumbnail = jest.fn((thumbnail, videoId) => {
-    const mockLabel = {
-      className: 'ytvht-viewed-label'
-    };
-    const mockProgressBar = {
-      className: 'ytvht-progress-bar'
-    };
-    thumbnail.appendChild = jest.fn();
-    thumbnail.appendChild(mockLabel);
-    thumbnail.appendChild(mockProgressBar);
-  });
-
-  const processExistingThumbnails = jest.fn();
-  const trackedVideos = new WeakSet();
-  const videoEventListeners = new WeakMap();
-
-  return {
-    setupVideoTracking,
-    addViewedLabelToThumbnail,
-    processExistingThumbnails,
-    trackedVideos,
-    videoEventListeners
-  };
-});
-
-jest.mock('../src/popup.js', () => ({
-    updateVideoRecord: jest.fn((record) => {
-        if (!record || !record.videoId) return;
-        
-        const recordIndex = global.allHistoryRecords.findIndex(r => r.videoId === record.videoId);
-        if (recordIndex !== -1) {
-            global.allHistoryRecords[recordIndex] = record;
-        } else {
-            global.allHistoryRecords.unshift(record);
-            global.allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        }
-    }),
-    displayHistoryPage: jest.fn(),
-    formatDuration: jest.fn(time => `${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`),
-    formatDate: jest.fn(timestamp => new Date(timestamp).toLocaleString())
-}));

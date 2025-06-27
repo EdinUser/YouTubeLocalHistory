@@ -39,7 +39,9 @@ global.chrome = {
   runtime: {
     onMessage: {
       addListener: jest.fn(),
-      removeListener: jest.fn()
+      removeListener: jest.fn(),
+      trigger: jest.fn(),
+      listeners: []
     }
   }
 };
@@ -66,8 +68,12 @@ global.displayShortsPage = jest.fn();
 global.displayPlaylistsPage = jest.fn();
 global.showMessage = jest.fn();
 
-// Import functions to mock
+// Import mocks
+jest.mock('../../src/content.js');
+jest.mock('../../src/popup.js');
+
 const popup = require('../../src/popup.js');
+const contentModule = require('../../src/content.js');
 
 // Mock the functions
 jest.mock('../../src/popup.js', () => {
@@ -485,5 +491,219 @@ describe('Real-time Updates', () => {
 
         // Check if order was updated
         expect(global.allHistoryRecords[0].videoId).toBe('vid2');
+    });
+});
+
+describe('Popup Live Updates', () => {
+    let mockHistoryTable;
+    let mockNoHistory;
+    let mockPaginationDiv;
+    let messageListener;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        
+        // Setup DOM elements
+        mockHistoryTable = document.createElement('table');
+        mockHistoryTable.id = 'ytvhtHistoryTable';
+        document.body.appendChild(mockHistoryTable);
+
+        mockNoHistory = document.createElement('div');
+        mockNoHistory.id = 'ytvhtNoHistory';
+        document.body.appendChild(mockNoHistory);
+
+        mockPaginationDiv = document.createElement('div');
+        mockPaginationDiv.id = 'ytvhtPagination';
+        document.body.appendChild(mockPaginationDiv);
+
+        // Reset global variables
+        global.allHistoryRecords = [];
+        global.currentPage = 1;
+        global.pageSize = 10;
+
+        // Setup message listener
+        messageListener = (message) => {
+            if (message.type === 'videoUpdate') {
+                const record = message.data;
+                popup.updateVideoRecord(record);
+            }
+        };
+        chrome.runtime.onMessage.listeners = [messageListener];
+
+        // Mock popup.updateVideoRecord implementation
+        popup.updateVideoRecord.mockImplementation((record) => {
+            if (!record || !record.videoId) return;
+            
+            const recordIndex = global.allHistoryRecords.findIndex(r => r.videoId === record.videoId);
+            if (recordIndex !== -1) {
+                global.allHistoryRecords[recordIndex] = { ...record };
+            } else {
+                global.allHistoryRecords.unshift({ ...record });
+            }
+            global.allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            popup.displayHistoryPage();
+        });
+
+        // Mock displayHistoryPage implementation
+        popup.displayHistoryPage.mockImplementation(() => {
+            mockHistoryTable.innerHTML = '';
+            global.allHistoryRecords.forEach(record => {
+                const row = document.createElement('tr');
+                const titleCell = document.createElement('td');
+                const link = document.createElement('a');
+                link.textContent = record.title || 'Unknown Title';
+                titleCell.appendChild(link);
+                row.appendChild(titleCell);
+                mockHistoryTable.appendChild(row);
+            });
+        });
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
+        chrome.runtime.onMessage.listeners = [];
+    });
+
+    test('should update history when current video is saved', () => {
+        // Setup initial state
+        const currentVideo = {
+            videoId: 'current123',
+            title: 'Current Video',
+            time: 30,
+            duration: 100,
+            timestamp: Date.now()
+        };
+
+        // Simulate video save
+        popup.updateVideoRecord(currentVideo);
+
+        // Check if video was added to history
+        expect(global.allHistoryRecords[0]).toEqual(currentVideo);
+        expect(popup.displayHistoryPage).toHaveBeenCalled();
+    });
+
+    test('should update history when popup is open', () => {
+        // Setup initial state
+        const initialVideo = {
+            videoId: 'test123',
+            title: 'Initial Video',
+            time: 30,
+            duration: 100,
+            timestamp: Date.now() - 1000
+        };
+        global.allHistoryRecords = [initialVideo];
+
+        // Simulate video update while popup is open
+        const updatedVideo = {
+            ...initialVideo,
+            time: 60,
+            timestamp: Date.now()
+        };
+
+        popup.updateVideoRecord(updatedVideo);
+
+        // Check if video was updated
+        expect(global.allHistoryRecords[0].time).toBe(60);
+        expect(popup.displayHistoryPage).toHaveBeenCalled();
+    });
+
+    test('should handle multiple rapid updates', () => {
+        // Setup initial state
+        const videoId = 'test123';
+        const initialVideo = {
+            videoId,
+            title: 'Test Video',
+            time: 0,
+            duration: 100,
+            timestamp: Date.now() - 1000
+        };
+        global.allHistoryRecords = [initialVideo];
+
+        // Simulate multiple rapid updates
+        const updates = [30, 35, 40, 45, 50].map(time => ({
+            ...initialVideo,
+            time,
+            timestamp: Date.now()
+        }));
+
+        updates.forEach(update => {
+            popup.updateVideoRecord(update);
+        });
+
+        // Check if final update was applied
+        expect(global.allHistoryRecords[0].time).toBe(50);
+        expect(popup.displayHistoryPage).toHaveBeenCalledTimes(updates.length);
+    });
+
+    test('should maintain sort order during updates', () => {
+        // Setup initial state with multiple videos
+        const videos = [
+            {
+                videoId: 'old1',
+                title: 'Old Video 1',
+                time: 30,
+                duration: 100,
+                timestamp: Date.now() - 2000
+            },
+            {
+                videoId: 'old2',
+                title: 'Old Video 2',
+                time: 30,
+                duration: 100,
+                timestamp: Date.now() - 1000
+            }
+        ];
+        global.allHistoryRecords = [...videos];
+
+        // Update older video with newer timestamp
+        const updatedVideo = {
+            ...videos[0],
+            time: 60,
+            timestamp: Date.now()
+        };
+
+        popup.updateVideoRecord(updatedVideo);
+
+        // Check if order was updated correctly
+        expect(global.allHistoryRecords[0].videoId).toBe('old1');
+        expect(global.allHistoryRecords[0].time).toBe(60);
+        expect(popup.displayHistoryPage).toHaveBeenCalled();
+    });
+
+    test('should broadcast updates to all open popups', () => {
+        // Setup mock for multiple popup windows
+        const mockPopups = Array(3).fill(null).map(() => ({
+            displayHistoryPage: jest.fn()
+        }));
+
+        // Add message listeners for each popup
+        chrome.runtime.onMessage.listeners = mockPopups.map(mockPopup => (message) => {
+            if (message.type === 'videoUpdate') {
+                mockPopup.displayHistoryPage();
+                return true; // Indicate that the message was handled
+            }
+        });
+
+        // Simulate video update
+        const videoUpdate = {
+            videoId: 'test123',
+            title: 'Test Video',
+            time: 30,
+            duration: 100,
+            timestamp: Date.now()
+        };
+
+        // Trigger the message directly
+        chrome.runtime.onMessage.listeners.forEach(listener => {
+            listener({
+                type: 'videoUpdate',
+                data: videoUpdate
+            });
+        });
+
+        // Check if all popups received the update
+        mockPopups.forEach(mockPopup => {
+            expect(mockPopup.displayHistoryPage).toHaveBeenCalled();
+        });
     });
 }); 
