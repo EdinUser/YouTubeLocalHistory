@@ -37,6 +37,7 @@ global.chrome = {
     }
   },
   runtime: {
+    getManifest: jest.fn().mockReturnValue({ version: '1.0.0' }),
     onMessage: {
       addListener: jest.fn(),
       removeListener: jest.fn(),

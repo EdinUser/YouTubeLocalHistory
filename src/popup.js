@@ -38,8 +38,12 @@ const DEFAULT_SETTINGS = {
     themePreference: 'system', // 'system', 'light', or 'dark'
     overlayTitle: 'viewed',
     overlayColor: 'blue',
-    overlayLabelSize: 'medium'
+    overlayLabelSize: 'medium',
+    debug: false
 };
+
+// Get version from manifest
+const EXTENSION_VERSION = chrome.runtime.getManifest().version;
 
 const OVERLAY_LABEL_SIZE_MAP = {
     small: {fontSize: 12, bar: 2},
@@ -299,20 +303,25 @@ function updateVideoRecord(record) {
     if (recordIndex >= startIdx && recordIndex < endIdx) {
         const row = historyTable.rows[recordPageIndex];
         if (row) {
-            const [titleCell, progressCell, dateCell] = row.cells;
+            const cell = row.cells[0];
+            if (cell) {
+                const link = cell.querySelector('.video-link');
+                const progress = cell.querySelector('.video-progress');
+                const date = cell.querySelector('.video-date');
 
-            // Update title if needed
-            const link = titleCell.querySelector('a');
-            if (link) {
-                link.textContent = record.title || 'Unknown Title';
-                link.href = record.url;
+                if (link) {
+                    link.textContent = record.title || 'Unknown Title';
+                    link.href = record.url;
+                }
+
+                if (progress) {
+                    progress.textContent = formatProgress(record.time, record.duration);
+                }
+
+                if (date) {
+                    date.textContent = formatDate(record.timestamp);
+                }
             }
-
-            // Update progress using new format function
-            progressCell.textContent = formatProgress(record.time, record.duration);
-
-            // Update timestamp
-            dateCell.textContent = formatDate(record.timestamp);
         }
     } else if (recordIndex === -1 && currentPage === 1) {
         // If it's a new record and we're on the first page, refresh the display
@@ -808,7 +817,7 @@ async function exportHistory() {
         const exportData = {
             _metadata: {
                 exportDate: new Date().toISOString(),
-                extensionVersion: "2.4.0",
+                extensionVersion: EXTENSION_VERSION,
                 totalVideos: videos.length,
                 totalPlaylists: playlists.length,
                 exportFormat: "json",
@@ -1336,8 +1345,9 @@ function updateSettingsUI(settings) {
     document.getElementById('ytvhtPaginationCount').value = settings.paginationCount;
     document.getElementById('ytvhtOverlayTitle').value = settings.overlayTitle;
     document.getElementById('ytvhtOverlayColor').value = settings.overlayColor;
-    document.getElementById('ytvhtOverlayLabelSize').value = settings.overlayLabelSize || 'medium';
-    document.getElementById('ytvhtThemePreference').value = settings.themePreference || 'system';
+    document.getElementById('ytvhtOverlayLabelSize').value = settings.overlayLabelSize;
+    document.getElementById('ytvhtDebugMode').checked = settings.debug;
+    document.getElementById('ytvhtVersion').textContent = EXTENSION_VERSION;
     updateColorPreview(settings.overlayColor);
 }
 
@@ -1349,96 +1359,124 @@ function updateColorPreview(color) {
 
 // Handle settings tab
 async function initSettingsTab() {
-    const settingsTab = document.getElementById('ytvhtTabSettings');
-    const settingsContainer = document.getElementById('ytvhtSettingsContainer');
-    const saveButton = document.getElementById('ytvhtSaveSettings');
-    const colorSelect = document.getElementById('ytvhtOverlayColor');
+    log('Initializing settings tab...');
+    const settings = await loadSettings();
+    log('Loaded settings:', settings);
 
-    try {
-        const settings = await loadSettings();
-        updateSettingsUI(settings);
+    // Update UI with current values
+    updateSettingsUI(settings);
 
-        // Set up color preview
-        colorSelect.addEventListener('change', function () {
-            updateColorPreview(this.value);
+    // Auto-clean period
+    const autoCleanPeriod = document.getElementById('ytvhtAutoCleanPeriod');
+    if (autoCleanPeriod) {
+        autoCleanPeriod.addEventListener('change', async function() {
+            const settings = await loadSettings();
+            settings.autoCleanPeriod = parseInt(this.value);
+            await saveSettings(settings);
+            showMessage('Auto-clean period updated');
         });
-
-        // Set up save button
-        saveButton.addEventListener('click', async () => {
-            try {
-                const themePreference = document.getElementById('ytvhtThemePreference').value || 'system';
-                const newSettings = {
-                    ...settings, // Keep existing settings
-                    autoCleanPeriod: parseInt(document.getElementById('ytvhtAutoCleanPeriod').value, 10) || 90,
-                    paginationCount: parseInt(document.getElementById('ytvhtPaginationCount').value, 10) || 10,
-                    overlayTitle: document.getElementById('ytvhtOverlayTitle').value || 'viewed',
-                    overlayColor: document.getElementById('ytvhtOverlayColor').value || 'blue',
-                    overlayLabelSize: document.getElementById('ytvhtOverlayLabelSize').value || 'medium',
-                    themePreference: themePreference,
-                    darkMode: themePreference === 'system'
-                        ? getSystemColorScheme() === 'dark'
-                        : themePreference === 'dark'
-                };
-
-                // Validate settings
-                if (newSettings.autoCleanPeriod < 1 || newSettings.autoCleanPeriod > 365) {
-                    throw new Error('Auto-clean period must be between 1 and 365 days');
-                }
-
-                if (newSettings.paginationCount < 1 || newSettings.paginationCount > 100) {
-                    throw new Error('Items per page must be between 1 and 100');
-                }
-
-                if (newSettings.overlayTitle.length > 20) {
-                    throw new Error('Overlay title must be 20 characters or less');
-                }
-
-                const success = await saveSettings(newSettings);
-                if (!success) {
-                    throw new Error('Failed to save settings');
-                }
-
-                showMessage('Settings saved successfully');
-
-                // Update current settings and UI
-                Object.assign(settings, newSettings);
-                pageSize = settings.paginationCount;
-                playlistPageSize = settings.paginationCount;
-
-                // Update display
-                displayHistoryPage();
-                if (document.getElementById('ytvhtTabPlaylists').classList.contains('active')) {
-                    displayPlaylistsPage();
-                }
-
-                // Notify content script of settings changes
-                chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-                    if (tabs[0]?.id) {
-                        chrome.tabs.sendMessage(tabs[0].id, {
-                            type: 'updateSettings',
-                            settings: newSettings
-                        }).catch(err => console.warn('Could not send settings to tab:', err));
-                    }
-                });
-
-            } catch (error) {
-                console.error('Error saving settings:', error);
-                showMessage(error.message || 'Error saving settings', 'error');
-            }
-        });
-
-        settingsTab.addEventListener('click', function () {
-            switchTab('settings');
-        });
-
-    } catch (error) {
-        console.error('Error initializing settings tab:', error);
-        showMessage('Error initializing settings tab', 'error');
+    } else {
+        log('Error: Auto-clean period element not found');
     }
+
+    // Pagination count
+    const paginationCount = document.getElementById('ytvhtPaginationCount');
+    if (paginationCount) {
+        paginationCount.addEventListener('change', async function() {
+            const settings = await loadSettings();
+            settings.paginationCount = parseInt(this.value);
+            await saveSettings(settings);
+            showMessage('Pagination count updated');
+        });
+    } else {
+        log('Error: Pagination count element not found');
+    }
+
+    // Overlay title
+    const overlayTitle = document.getElementById('ytvhtOverlayTitle');
+    if (overlayTitle) {
+        overlayTitle.addEventListener('change', async function() {
+            const settings = await loadSettings();
+            settings.overlayTitle = this.value;
+            await saveSettings(settings);
+            showMessage('Overlay title updated');
+        });
+    } else {
+        log('Error: Overlay title element not found');
+    }
+
+    // Overlay color
+    const overlayColor = document.getElementById('ytvhtOverlayColor');
+    if (overlayColor) {
+        overlayColor.addEventListener('change', async function() {
+            const settings = await loadSettings();
+            settings.overlayColor = this.value;
+            updateColorPreview(this.value);
+            await saveSettings(settings);
+            showMessage('Overlay color updated');
+        });
+    } else {
+        log('Error: Overlay color element not found');
+    }
+
+    // Overlay label size
+    const overlayLabelSize = document.getElementById('ytvhtOverlayLabelSize');
+    if (overlayLabelSize) {
+        overlayLabelSize.addEventListener('change', async function() {
+            const settings = await loadSettings();
+            settings.overlayLabelSize = this.value;
+            await saveSettings(settings);
+            showMessage('Overlay size updated');
+        });
+    } else {
+        log('Error: Overlay label size element not found');
+    }
+
+    // Theme preference
+    const themePreference = document.getElementById('ytvhtThemePreference');
+    if (themePreference) {
+        themePreference.value = settings.themePreference || 'system';
+        themePreference.addEventListener('change', async function() {
+            const settings = await loadSettings();
+            settings.themePreference = this.value;
+            await saveSettings(settings);
+            await applyTheme(this.value);
+            showMessage('Theme preference updated');
+        });
+    } else {
+        log('Error: Theme preference element not found');
+    }
+
+    // Debug mode
+    const debugMode = document.getElementById('ytvhtDebugMode');
+    if (debugMode) {
+        debugMode.checked = settings.debug || false;
+        debugMode.addEventListener('change', async function() {
+            const settings = await loadSettings();
+            settings.debug = this.checked;
+            await saveSettings(settings);
+            showMessage(this.checked ? 'Debug mode enabled' : 'Debug mode disabled');
+        });
+    } else {
+        log('Error: Debug mode element not found');
+    }
+
+    // Version display
+    const versionElement = document.getElementById('ytvhtVersion');
+    if (versionElement) {
+        versionElement.textContent = EXTENSION_VERSION;
+    } else {
+        log('Error: Version element not found');
+    }
+
+    log('Settings tab initialization complete');
 }
 
 // Switch between different tabs in the popup
 function switchTab(tab) {
+    // Save the current tab
+    saveCurrentExtensionTab(tab);
+
     // Remove active class from all tabs
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
@@ -1457,12 +1495,15 @@ function switchTab(tab) {
     if (container) {
         container.style.display = 'block';
 
-        // If switching to analytics, update the display
+        // Handle special tab initializations
         if (tab === 'analytics') {
             // Small delay to ensure container is visible and sized
             setTimeout(() => {
                 updateAnalytics();
             }, 0);
+        } else if (tab === 'settings') {
+            // Initialize settings tab
+            initSettingsTab();
         }
     }
 }
@@ -1754,14 +1795,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         const nextPageBtn = document.getElementById('ytvhtNextPage');
         const lastPageBtn = document.getElementById('ytvhtLastPage');
         const videosTab = document.getElementById('ytvhtTabVideos');
+        const shortsTab = document.getElementById('ytvhtTabShorts');
         const playlistsTab = document.getElementById('ytvhtTabPlaylists');
         const analyticsTab = document.getElementById('ytvhtTabAnalytics');
+        const settingsTab = document.getElementById('ytvhtTabSettings');
         const prevPlaylistBtn = document.getElementById('ytvhtPrevPlaylistPage');
         const nextPlaylistBtn = document.getElementById('ytvhtNextPlaylistPage');
         const firstPlaylistBtn = document.getElementById('ytvhtFirstPlaylistPage');
         const lastPlaylistBtn = document.getElementById('ytvhtLastPlaylistPage');
         // Shorts tab and pagination
-        const shortsTab = document.getElementById('ytvhtTabShorts');
         const firstShortsBtn = document.getElementById('ytvhtFirstShortsPage');
         const prevShortsBtn = document.getElementById('ytvhtPrevShortsPage');
         const nextShortsBtn = document.getElementById('ytvhtNextShortsPage');
@@ -1780,6 +1822,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             ['ytvhtTabVideos', videosTab],
             ['ytvhtTabPlaylists', playlistsTab],
             ['ytvhtTabAnalytics', analyticsTab],
+            ['ytvhtTabSettings', settingsTab],
             ['ytvhtPrevPlaylistBtn', prevPlaylistBtn],
             ['ytvhtNextPlaylistBtn', nextPlaylistBtn],
             ['ytvhtFirstPlaylistBtn', firstPlaylistBtn],
@@ -1875,6 +1918,14 @@ document.addEventListener('DOMContentLoaded', async function () {
             switchTab('analytics');
             updateAnalytics();
         });
+        if (settingsTab) {
+            settingsTab.addEventListener('click', () => {
+                switchTab('settings');
+                initSettingsTab();
+            });
+        } else {
+            console.error('Settings tab button not found');
+        }
 
         // Playlist pagination
         prevPlaylistBtn.addEventListener('click', goToPrevPlaylistPage);

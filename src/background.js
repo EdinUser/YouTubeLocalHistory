@@ -28,9 +28,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.runtime.sendMessage({
             type: 'videoUpdateFromBackground',
             data: message.data
-        }).catch(error => {
-            // This error is expected when no listeners are available (popup closed)
-            console.log('Could not broadcast video update:', error);
+        }).catch(() => {
+            // Expected when popup is closed - no need to log
         });
     }
 
@@ -50,9 +49,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
             chrome.runtime.sendMessage({
                 type: 'storageUpdate',
                 changes: videoChanges
-            }).catch(error => {
-                // This error is expected when no listeners are available
-                console.log('Could not broadcast storage update:', error);
+            }).catch(() => {
+                // Expected when popup is closed - no need to log
             });
         }
     }

@@ -519,6 +519,48 @@
             font-size: 12px;
             color: var(--text-color);
         }
+
+        .settings-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .settings-section h3 {
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            color: var(--text-color);
+        }
+        .setting-group {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .setting-group label {
+            min-width: 150px;
+            color: var(--text-color);
+        }
+        .setting-group input[type="text"],
+        .setting-group input[type="number"],
+        .setting-group select {
+            padding: 5px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--input-bg);
+            color: var(--text-color);
+        }
+        .setting-description {
+            font-size: 12px;
+            color: var(--text-color);
+            opacity: 0.8;
+        }
+        .version-text {
+            color: var(--text-color);
+            opacity: 0.8;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -699,6 +741,15 @@
                             <option value="dark">Dark</option>
                         </select>
                         <div class="help-text">Choose your preferred theme</div>
+                    </div>
+                    <div class="settings-group">
+                        <label for="ytvhtDebugMode">Debug Mode</label>
+                        <input type="checkbox" id="ytvhtDebugMode">
+                        <div class="help-text">Enable debug logging (for troubleshooting)</div>
+                    </div>
+                    <div class="settings-group">
+                        <label>Extension Version</label>
+                        <div id="ytvhtVersion" class="version-text"></div>
                     </div>
                 </div>
                 <div class="settings-column">
