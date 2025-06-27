@@ -905,12 +905,37 @@
 
     // Update overlays to use currentSettings.overlayTitle and overlayColor
     function getVideoIdFromThumbnail(thumbnail) {
-        // Check for compact video renderer (right column) first
-        if (thumbnail.tagName === 'YTD-COMPACT-VIDEO-RENDERER') {
+        // Check for playlist panel video renderers first (most specific)
+        if (thumbnail.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' || thumbnail.closest('ytd-playlist-panel-video-renderer')) {
+            // Try to get from the video ID from the href attribute
+            const videoLink = thumbnail.querySelector('a#wc-endpoint[href*="watch?v="]');
+            if (videoLink) {
+                return videoLink.href.match(/[?&]v=([^&]+)/)?.[1];
+            }
+
+            // Try to get from the thumbnail link
+            const thumbnailLink = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
+            if (thumbnailLink) {
+                return thumbnailLink.href.match(/[?&]v=([^&]+)/)?.[1];
+            }
+        }
+
+        // Check for regular playlist video renderers
+        if (thumbnail.tagName === 'YTD-PLAYLIST-VIDEO-RENDERER' || thumbnail.closest('ytd-playlist-video-renderer')) {
+            const videoId = thumbnail.getAttribute('data-video-id') || thumbnail.getAttribute('video-id');
+            if (videoId) return videoId;
+
+            const playlistLink = thumbnail.querySelector('a#video-title[href*="watch?v="], a#thumbnail[href*="watch?v="]');
+            if (playlistLink) {
+                return playlistLink.href.match(/[?&]v=([^&]+)/)?.[1];
+            }
+        }
+
+        // Check for compact video renderer (right column)
+        if (thumbnail.tagName === 'YTD-COMPACT-VIDEO-RENDERER' || thumbnail.closest('ytd-compact-video-renderer')) {
             const videoId = thumbnail.getAttribute('video-id');
             if (videoId) return videoId;
             
-            // Try to get from the thumbnail link
             const compactLink = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
             if (compactLink) {
                 return compactLink.href.match(/[?&]v=([^&]+)/)?.[1];
@@ -918,13 +943,13 @@
         }
 
         // Check for regular video links
-        let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
+        let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="], a#video-title[href*="watch?v="]');
         if (anchor) {
             return anchor.href.match(/[?&]v=([^&]+)/)?.[1];
         }
 
         // Check if the thumbnail itself is the anchor
-        if (thumbnail.tagName === 'A' && thumbnail.id === 'thumbnail') {
+        if (thumbnail.tagName === 'A' && (thumbnail.id === 'thumbnail' || thumbnail.id === 'video-title')) {
             if (thumbnail.href.includes('watch?v=')) {
                 return thumbnail.href.match(/[?&]v=([^&]+)/)?.[1];
             }
@@ -946,18 +971,45 @@
     function addViewedLabelToThumbnail(thumbnailElement, videoId) {
         if (!thumbnailElement || !videoId) return;
 
-        // Only add overlays to ytd-thumbnail or its anchor child
-        if (thumbnailElement.tagName !== 'YTD-THUMBNAIL' && !(thumbnailElement.tagName === 'A' && thumbnailElement.id === 'thumbnail')) {
+        // For playlist items, we need to target the thumbnail container
+        let targetElement = thumbnailElement;
+        
+        // If we're in a playlist panel video renderer, find the thumbnail container
+        if (thumbnailElement.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' || thumbnailElement.closest('ytd-playlist-panel-video-renderer')) {
+            const thumbnailContainer = thumbnailElement.querySelector('#thumbnail-container ytd-thumbnail') || 
+                                    thumbnailElement.querySelector('ytd-thumbnail') ||
+                                    thumbnailElement.querySelector('#thumbnail-container');
+            if (thumbnailContainer) {
+                targetElement = thumbnailContainer;
+            } else {
+                return; // Can't find a suitable container
+            }
+        }
+        // For regular playlist items
+        else if (thumbnailElement.tagName === 'YTD-PLAYLIST-VIDEO-RENDERER' || thumbnailElement.closest('ytd-playlist-video-renderer')) {
+            const thumbnailContainer = thumbnailElement.querySelector('ytd-thumbnail') || 
+                                    thumbnailElement.querySelector('a#thumbnail');
+            if (thumbnailContainer) {
+                targetElement = thumbnailContainer;
+            } else {
+                return;
+            }
+        }
+        // For other video types, keep existing logic
+        else if (thumbnailElement.tagName !== 'YTD-THUMBNAIL' && !(thumbnailElement.tagName === 'A' && thumbnailElement.id === 'thumbnail')) {
             const inner = thumbnailElement.querySelector('ytd-thumbnail, a#thumbnail');
             if (inner) {
-                thumbnailElement = inner;
+                targetElement = inner;
             } else {
                 return;
             }
         }
 
-        let label = thumbnailElement.querySelector('.ytvht-viewed-label');
-        let progress = thumbnailElement.querySelector('.ytvht-progress-bar');
+        // Ensure the target element has relative positioning
+        targetElement.style.position = 'relative';
+
+        let label = targetElement.querySelector('.ytvht-viewed-label');
+        let progress = targetElement.querySelector('.ytvht-progress-bar');
 
         ytStorage.getVideo(videoId).then(record => {
             if (record) {
@@ -969,7 +1021,7 @@
                 if (!label) {
                     label = document.createElement('div');
                     label.className = 'ytvht-viewed-label';
-                    thumbnailElement.appendChild(label);
+                    targetElement.appendChild(label);
                 }
 
                 if (label.textContent !== currentSettings.overlayTitle) {
@@ -979,15 +1031,13 @@
                 if (!progress) {
                     progress = document.createElement('div');
                     progress.className = 'ytvht-progress-bar';
-                    thumbnailElement.appendChild(progress);
+                    targetElement.appendChild(progress);
                 }
 
                 const newWidth = `${(record.time / record.duration) * 100}%`;
                 if (progress.style.width !== newWidth) {
                     progress.style.width = newWidth;
                 }
-
-                thumbnailElement.style.position = 'relative';
             } else {
                 label?.remove();
                 progress?.remove();
@@ -999,14 +1049,14 @@
         });
     }
 
-    // Update the thumbnail observer to be more reliable
+    // Update the mutation observer to include playlist panel items
     thumbnailObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             // Handle attribute changes that might indicate content loading
             if (mutation.type === 'attributes') {
                 const target = mutation.target;
                 if (target.tagName === 'IMG' && target.id === 'img') {
-                    const videoElement = target.closest('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer');
+                    const videoElement = target.closest('ytd-playlist-panel-video-renderer, ytd-playlist-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer');
                     if (videoElement) {
                         processVideoElement(videoElement);
                     }
@@ -1019,6 +1069,8 @@
                 if (node.nodeType === Node.ELEMENT_NODE) {
                     // Process the node itself if it's a video element
                     if (node.tagName && (
+                        node.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' ||
+                        node.tagName === 'YTD-PLAYLIST-VIDEO-RENDERER' ||
                         node.tagName === 'YTD-RICH-ITEM-RENDERER' ||
                         node.tagName === 'YTD-GRID-VIDEO-RENDERER' ||
                         node.tagName === 'YTD-VIDEO-RENDERER' ||
@@ -1029,38 +1081,33 @@
                     }
 
                     // Also check for video elements inside the added node
-                    const videoElements = node.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer');
+                    const videoElements = node.querySelectorAll('ytd-playlist-panel-video-renderer, ytd-playlist-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer');
                     if (videoElements.length > 0) {
                         videoElements.forEach(element => processVideoElement(element));
                     }
                 }
             });
-
-            // Handle removed nodes cleanup
-            mutation.removedNodes.forEach((node) => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    // Clean up any pending operations for removed elements
-                    if (pendingOperations.has(node)) {
-                        const ops = pendingOperations.get(node);
-                        if (ops.timeout) clearTimeout(ops.timeout);
-                        if (ops.rafId) cancelAnimationFrame(ops.rafId);
-                        pendingOperations.delete(node);
-                    }
-
-                    // Also check children of removed nodes
-                    const elements = node.querySelectorAll('*');
-                    elements.forEach(element => {
-                        if (pendingOperations.has(element)) {
-                            const ops = pendingOperations.get(element);
-                            if (ops.timeout) clearTimeout(ops.timeout);
-                            if (ops.rafId) cancelAnimationFrame(ops.rafId);
-                            pendingOperations.delete(element);
-                        }
-                    });
-                }
-            });
         });
     });
+
+    // Add processing for playlist panel items
+    function processExistingThumbnails() {
+        // Process playlist panel videos first (most specific)
+        const playlistPanelVideos = document.querySelectorAll('ytd-playlist-panel-video-renderer');
+        playlistPanelVideos.forEach(element => processVideoElement(element));
+
+        // Process regular playlist videos
+        const playlistVideos = document.querySelectorAll('ytd-playlist-video-renderer');
+        playlistVideos.forEach(element => processVideoElement(element));
+
+        // Process main feed thumbnails
+        const mainThumbnails = document.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer');
+        mainThumbnails.forEach(element => processVideoElement(element));
+
+        // Process right column recommendations
+        const rightColumnThumbnails = document.querySelectorAll('ytd-compact-video-renderer, ytd-compact-radio-renderer');
+        rightColumnThumbnails.forEach(element => processVideoElement(element));
+    }
 
     // Enhanced processVideoElement with cleanup tracking
     function processVideoElement(element) {
@@ -1433,16 +1480,5 @@
                 }
             }
         });
-    }
-
-    // Add processing for right column recommendations
-    function processExistingThumbnails() {
-        // Process main feed thumbnails
-        const mainThumbnails = document.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer');
-        mainThumbnails.forEach(element => processVideoElement(element));
-
-        // Process right column recommendations
-        const rightColumnThumbnails = document.querySelectorAll('ytd-compact-video-renderer, ytd-compact-radio-renderer');
-        rightColumnThumbnails.forEach(element => processVideoElement(element));
     }
 })();

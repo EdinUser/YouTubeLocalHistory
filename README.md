@@ -183,7 +183,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
-### Version 2.5.1
+### Version 2.5.0
 - **Console Logging Optimization**: Reduced verbose logging in thumbnail observer
 - **Improved Video ID Extraction**: Streamlined video ID extraction from thumbnails
 - **Debug Mode Enhancement**: Added debug mode toggle in settings with proper persistence
@@ -195,25 +195,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - **Code Cleanup**: Fixed duplicate settingsTab declaration
 - **Performance**: Maintained critical debugging logs while reducing noise
 - **Thumbnail Processing**: Improved thumbnail observer efficiency
-- **Overlay System**: Enhanced overlay functionality with better error handling
-
-### Version 2.5.0
-- **Live Updates Fixed**: Popup now receives live updates instantly while open
-- **Instant History Updates**: Videos appear in history immediately after being watched
-- **Improved Timestamp Tracking**: More accurate and reliable video progress saving
-- **Optimized Playlist Saving**: Playlist saving is now less aggressive and more efficient
-- **Modern Visual Layout**: Updated card-based layout with thumbnails and progress indicators
-- **Full Analytics Dashboard**: Added analytics tab with interactive charts and theme-aware visualizations
-- **Watch Time Distribution**: View your watch time by hour in the analytics dashboard
-- **Content Type Comparison**: Compare time spent on regular videos vs Shorts
-- **Weekly Activity Tracking**: Visualize your weekly YouTube activity
-- **Completion Rate Statistics**: Track how often you finish videos
-- **Playlist Tracking Metrics**: Analyze your playlist viewing habits
-- **Improved Error Handling**: Enhanced error messages and loading states throughout the extension
-- **Optimized Storage Handling**: More efficient and reliable storage updates
-- **Better State Management**: Improved state management for live updates and analytics
-- **Theme Integration**: Better theme integration and visual consistency across all components
-- **Efficient Data Processing**: Analytics and history processing are now faster and more efficient
+- **Overlay System**: Enhanced overlay handling for all video types
+- **Playlist Support**: Added proper overlay support for playlist panel videos
+- **Version Management**: Implemented fetching version from manifest.json instead of hardcoding
 
 ### Version 2.4.0
 - **YouTube Shorts Support**: Added comprehensive tracking and display for YouTube Shorts
