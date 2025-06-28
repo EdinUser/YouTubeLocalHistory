@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Local YouTube Video History Tracker",
-  "version": "2.5.1",
-  "description": "Store YouTube video timestamps using secure browser storage for larger storage capacity without expiry.",
+  "name": "YT re:Watch",
+  "version": "2.6.0",
+  "description": "Track and resume your YouTube watch history with YT re:Watch - Your personal video timekeeper.",
   "author": "Edin User",
   "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
   "browser_specific_settings": {
