@@ -1,5 +1,5 @@
 /**
- * End-to-End tests for YouTube Local History Extension
+ * End-to-End tests for YT re:Watch Extension
  *
  * Note: These tests require the extension to be built and loaded
  * Run with: npm run test:e2e
@@ -8,7 +8,7 @@
 const { test, expect } = require('@playwright/test');
 
 // Test configuration
-test.describe('YouTube Local History Extension E2E', () => {
+test.describe('YT re:Watch Extension E2E', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to YouTube
     await page.goto('https://www.youtube.com');

@@ -1,6 +1,6 @@
 # Testing Guide
 
-This directory contains comprehensive tests for the YouTube Local History extension.
+This directory contains comprehensive tests for the YT re:Watch extension.
 
 ## Test Structure
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# YouTube Local History Extension Test Runner
+# YT re:Watch Extension Test Runner
 # Usage: ./run-tests.sh [test-type]
 
 set -e
@@ -77,7 +77,7 @@ run_tests() {
 }
 
 # Main execution
-print_status "YouTube Local History Extension Test Runner"
+print_status "YT re:Watch Extension Test Runner"
 echo "=================================================="
 
 # Check if Jest is available

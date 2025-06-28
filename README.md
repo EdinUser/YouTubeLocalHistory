@@ -1,12 +1,16 @@
-# YouTube Local History Tracker
+<div align="center">
 
-![Tests](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/github/v/release/EdinUser/YouTubeLocalHistory)
-![Privacy First](https://img.shields.io/badge/Privacy-First-blueviolet?logo=privateinternetaccess)
-[![Browser Support](https://img.shields.io/badge/Browser_Compatibility-Chrome_&_Firefox-brightgreen?logo=googlechrome&logoColor=white)](https://github.com/EdinUser/YouTubeLocalHistory#installation)
-![Local Storage](https://img.shields.io/badge/Data%20Storage-Local_Only-orange?logo=databricks)
+# <img src="./src/icon128.png" alt="YT re:Watch" width="48" height="48" style="vertical-align: middle; margin-right: 10px;"> YT re:Watch
 
-A browser extension that tracks your YouTube video watch history locally using secure browser storage. This extension automatically saves your progress in videos and shows visual indicators for videos you've already watched.
+[![Tests](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml/badge.svg)](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/EdinUser/YouTubeLocalHistory)](https://github.com/EdinUser/YouTubeLocalHistory/releases)
+[![Privacy First](https://img.shields.io/badge/Privacy-First-blueviolet?logo=privateinternetaccess)](https://github.com/EdinUser/YouTubeLocalHistory#privacy)
+[![Browser Support](https://img.shields.io/badge/Browser-Chrome_|_Firefox-FF7139?logo=googlechrome&logoColor=white)](https://github.com/EdinUser/YouTubeLocalHistory#installation)
+[![Local Storage](https://img.shields.io/badge/Data-Local_Only-important)](https://github.com/EdinUser/YouTubeLocalHistory#data-storage)
+
+</div>
+
+**YT re:Watch** is your personal YouTube companion that keeps track of your video journey. Never lose your place in a video again! This lightweight browser extension automatically saves your progress and helps you pick up right where you left off, all while keeping your data private and secure on your device.
 
 ## Features
 
@@ -27,7 +31,7 @@ A browser extension that tracks your YouTube video watch history locally using s
 
 ### Chrome
 #### Option 1: Install from Chrome Web Store
-[![Get it on Chrome Web Store](https://img.shields.io/badge/Get_it_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
+[![Get YT re:Watch on Chrome Web Store](https://img.shields.io/badge/Get_YT_re:Watch_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
 [![Chrome Users](https://img.shields.io/chrome-web-store/users/pebiokefjgdbfnkolmblaaladkmpilba?logo=googlechrome&color=green)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
 [![Chrome Rating](https://img.shields.io/chrome-web-store/rating/pebiokefjgdbfnkolmblaaladkmpilba?logo=googlechrome)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
 
