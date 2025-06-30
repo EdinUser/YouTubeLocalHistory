@@ -747,7 +747,17 @@
                 });
             }
 
-            await loadTimestamp();
+            // A short delay to allow YouTube's scripts to restore video state first
+            await new Promise(resolve => setTimeout(resolve, 250));
+
+            // If currentTime is already set, we are likely in a mode-change
+            // and YouTube has already restored the time. Don't interfere.
+            if (video.currentTime > 1) {
+                log('Video already in progress, skipping timestamp load to avoid interruption.');
+            } else {
+                await loadTimestamp();
+            }
+
             timestampLoaded = true;
 
             if (!video.paused) {
