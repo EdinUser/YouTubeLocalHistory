@@ -92,6 +92,9 @@
     // Track pending operations
     const pendingOperations = new Map(); // Map<Element, {timeout: number, rafId: number}>
 
+    // Track the last processed video ID to handle SPA navigation
+    let lastProcessedVideoId = null;
+
     // Track video changes in YouTube's SPA
     let videoObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
@@ -782,6 +785,39 @@
         addTrackedEventListener(window, 'beforeunload', () => saveTimestamp());
     }
 
+    // This function is called when YouTube's SPA navigation is complete.
+    function handleSpaNavigation() {
+        const videoId = getVideoId();
+
+        // If we're not on a video page, or it's the same video, do nothing.
+        if (!videoId || videoId === lastProcessedVideoId) {
+            return;
+        }
+        log(`[SPA] Navigation to new video detected: ${videoId}`);
+        lastProcessedVideoId = videoId;
+
+        // Reset the main initialization flag to allow re-initialization for the new page.
+        isInitialized = false;
+
+        // Stop any existing initialization interval, as we are starting a new one.
+        if (initChecker) {
+            clearInterval(initChecker);
+            initChecker = null;
+        }
+
+        // Re-run the initialization logic, which will find the video and set up tracking.
+        // The logic includes retries in case the video element is not immediately available.
+        initializeIfNeeded();
+        initChecker = setInterval(() => {
+            log('Checking for video element after SPA navigation...');
+            if (initializeIfNeeded()) {
+                log('Initialization successful after SPA navigation. Stopping checker.');
+                clearInterval(initChecker);
+                initChecker = null;
+            }
+        }, 1000);
+    }
+
     // Initialize and set up event listeners
     async function initializeIfNeeded() {
         if (isInitialized) {
@@ -792,6 +828,12 @@
         if (video) {
             log('Found video element, initializing...');
             try {
+                // If the video element is being reused from a previous page, clean up old listeners first.
+                if (trackedVideos.has(video)) {
+                    log('[SPA] Reused video element detected. Cleaning up listeners before re-initializing.');
+                    cleanupVideoListeners(video);
+                }
+
                 // Ensure storage is ready
                 await ytStorage.ensureMigrated();
                 log('Storage initialized successfully');
@@ -1454,6 +1496,9 @@
 
     // Initialize on startup
     initialize();
+
+    // Listen for YouTube's own navigation events to handle SPA changes.
+    window.addEventListener('yt-navigate-finish', handleSpaNavigation);
 
     // Update the storage change listener to use the improved thumbnail processing
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
