@@ -72,8 +72,8 @@
 ### Firefox
 #### Option 1: Install from Firefox Add-ons
 [![Get it on Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
-[![Firefox Users](https://img.shields.io/amo/users/local-youtube-video-history?logo=firefox&color=blue)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
-[![Firefox Rating](https://img.shields.io/amo/rating/local-youtube-video-history?logo=firefox)](https://addons.mozilla.org/firefox/addon/local-youtube-video-history/)
+[![Firefox Users](https://img.shields.io/amo/users/yt-rewatch?logo=firefox&color=blue)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
+[![Firefox Rating](https://img.shields.io/amo/rating/yt-rewatch?logo=firefox)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
 
 #### Option 2: Manual Installation
 1. Run `./build.sh` to build the extension
