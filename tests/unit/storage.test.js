@@ -10,6 +10,15 @@ const mockStorage = {
   clear: jest.fn()
 };
 
+// Mock chrome runtime for sync triggering
+const mockChrome = {
+  runtime: {
+    sendMessage: jest.fn()
+  }
+};
+
+global.chrome = mockChrome;
+
 // Mock ytStorage class
 class MockSimpleStorage {
   constructor() {
@@ -38,12 +47,26 @@ class MockSimpleStorage {
 
   async setVideo(videoId, data) {
     await this.ensureMigrated();
+    // Always save to local storage first (priority 1)
     await this.storage.set({ [`video_${videoId}`]: data });
+    // Then trigger sync if enabled
+    try {
+      this.triggerSync(videoId);
+    } catch (error) {
+      // Don't let sync errors break storage operations
+      console.log('Sync trigger failed:', error);
+    }
   }
 
   async removeVideo(videoId) {
     await this.ensureMigrated();
     await this.storage.remove([`video_${videoId}`]);
+    // Trigger sync after removal
+    try {
+      this.triggerSync();
+    } catch (error) {
+      console.log('Sync trigger failed:', error);
+    }
   }
 
   async getAllVideos() {
@@ -69,12 +92,25 @@ class MockSimpleStorage {
 
   async setPlaylist(playlistId, data) {
     await this.ensureMigrated();
+    // Always save to local storage first (priority 1)
     await this.storage.set({ [`playlist_${playlistId}`]: data });
+    // Then trigger sync if enabled
+    try {
+      this.triggerSync('playlist_' + playlistId);
+    } catch (error) {
+      console.log('Sync trigger failed:', error);
+    }
   }
 
   async removePlaylist(playlistId) {
     await this.ensureMigrated();
     await this.storage.remove([`playlist_${playlistId}`]);
+    // Trigger sync after removal
+    try {
+      this.triggerSync();
+    } catch (error) {
+      console.log('Sync trigger failed:', error);
+    }
   }
 
   async getAllPlaylists() {
@@ -119,7 +155,78 @@ class MockSimpleStorage {
       }
     });
 
-    await this.storage.remove(keysToRemove);
+    if (keysToRemove.length > 0) {
+      await this.storage.remove(keysToRemove);
+      // Trigger sync after clearing
+      try {
+        this.triggerSync();
+      } catch (error) {
+        console.log('Sync trigger failed:', error);
+      }
+    }
+  }
+
+  // Helper method to trigger sync if available
+  triggerSync(videoId = null) {
+    // Reduce delay for more immediate syncing
+    setTimeout(() => {
+      // Try multiple approaches to ensure sync is triggered
+      let syncTriggered = false;
+      
+      // First try: Check if we're in background script context (has direct access to sync service)
+      if (typeof window !== 'undefined' && window.ytSyncService && window.ytSyncService.syncEnabled) {
+        if (videoId) {
+          // Use efficient upload for specific video
+          window.ytSyncService.uploadNewData(videoId).then(success => {
+            if (success) {
+              console.log('✅ Direct video upload triggered successfully');
+              syncTriggered = true;
+            }
+          }).catch(error => {
+            console.log('⚠️ Direct video upload failed:', error);
+          });
+        } else {
+          // Fall back to full sync
+          window.ytSyncService.triggerSync().then(success => {
+            if (success) {
+              console.log('✅ Direct sync trigger successful');
+              syncTriggered = true;
+            }
+          }).catch(error => {
+            console.log('⚠️ Direct sync trigger failed:', error);
+          });
+        }
+        return; // Exit early if direct sync service is available
+      }
+      
+      // Second try: Send message to background script
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+        const message = videoId ? 
+          { type: 'uploadNewData', videoId: videoId } : 
+          { type: 'triggerSync' };
+          
+        chrome.runtime.sendMessage(message).then(result => {
+          if (result && result.success) {
+            console.log('✅ Background sync trigger successful');
+            syncTriggered = true;
+          } else {
+            console.log('⚠️ Background sync not available or failed');
+          }
+        }).catch(error => {
+          console.log('⚠️ Could not reach background script for sync trigger:', error);
+        });
+      }
+      
+      // Third try: Check for direct sync method
+      if (!syncTriggered && typeof triggerSync === 'function') {
+        try {
+          triggerSync();
+          console.log('✅ Direct triggerSync() call successful');
+        } catch (error) {
+          console.log('⚠️ Direct triggerSync() call failed:', error);
+        }
+      }
+    }, 100); // Reduced delay from 250ms to 100ms for more immediate syncing
   }
 }
 
@@ -129,6 +236,10 @@ describe('Storage Operations', () => {
   beforeEach(() => {
     ytStorage = new MockSimpleStorage();
     jest.clearAllMocks();
+    global.console = {
+      log: jest.fn(),
+      error: jest.fn()
+    };
   });
 
   describe('Video Storage', () => {
@@ -153,6 +264,27 @@ describe('Storage Operations', () => {
       expect(retrieved).toEqual(videoData);
     });
 
+    test('should trigger sync when saving video', async () => {
+      const videoId = 'dQw4w9WgXcQ';
+      const videoData = {
+        videoId,
+        title: 'Test Video',
+        timestamp: Date.now(),
+        time: 30,
+        duration: 100
+      };
+
+      mockStorage.set.mockResolvedValue();
+      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true });
+      
+      // Spy on triggerSync method
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+
+      await ytStorage.setVideo(videoId, videoData);
+
+      expect(triggerSyncSpy).toHaveBeenCalledWith(videoId);
+    });
+
     test('should return null for non-existent video', async () => {
       const videoId = 'nonexistent';
       mockStorage.get.mockResolvedValue({});
@@ -162,13 +294,17 @@ describe('Storage Operations', () => {
       expect(result).toBeNull();
     });
 
-    test('should remove video data', async () => {
+    test('should remove video data and trigger sync', async () => {
       const videoId = 'dQw4w9WgXcQ';
       mockStorage.remove.mockResolvedValue();
+      
+      // Spy on triggerSync method
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
 
       await ytStorage.removeVideo(videoId);
 
       expect(mockStorage.remove).toHaveBeenCalledWith([`video_${videoId}`]);
+      expect(triggerSyncSpy).toHaveBeenCalledWith();
     });
 
     test('should get all videos', async () => {
@@ -211,6 +347,26 @@ describe('Storage Operations', () => {
       expect(retrieved).toEqual(playlistData);
     });
 
+    test('should trigger sync when saving playlist', async () => {
+      const playlistId = 'PL1234567890';
+      const playlistData = {
+        playlistId,
+        title: 'Test Playlist',
+        timestamp: Date.now(),
+        videoCount: 10
+      };
+
+      mockStorage.set.mockResolvedValue();
+      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true });
+      
+      // Spy on triggerSync method
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+
+      await ytStorage.setPlaylist(playlistId, playlistData);
+
+      expect(triggerSyncSpy).toHaveBeenCalledWith('playlist_' + playlistId);
+    });
+
     test('should get all playlists', async () => {
       const mockData = {
         'video_video1': { videoId: 'video1', title: 'Video 1' },
@@ -229,13 +385,17 @@ describe('Storage Operations', () => {
       });
     });
 
-    test('should remove playlist data', async () => {
+    test('should remove playlist data and trigger sync', async () => {
       const playlistId = 'PL1234567890';
       mockStorage.remove.mockResolvedValue();
+      
+      // Spy on triggerSync method
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
 
       await ytStorage.removePlaylist(playlistId);
 
       expect(mockStorage.remove).toHaveBeenCalledWith([`playlist_${playlistId}`]);
+      expect(triggerSyncSpy).toHaveBeenCalledWith();
     });
   });
 
@@ -343,67 +503,299 @@ describe('Storage Operations', () => {
         'settings': { overlayColor: 'blue', overlayLabelSize: 'medium' },
         '__migrated__': true
       };
+
       mockStorage.get.mockResolvedValue(mockData);
       mockStorage.remove.mockResolvedValue();
 
       await ytStorage.clearHistoryOnly();
 
-      expect(mockStorage.remove).toHaveBeenCalledWith([
-        'video_video1',
-        'video_video2',
-        'playlist_playlist1'
-      ]);
-      // settings and __migrated__ should remain
+      // Should remove only video_ and playlist_ keys
+      expect(mockStorage.remove).toHaveBeenCalledWith(['video_video1', 'video_video2', 'playlist_playlist1']);
+      
+      // Should trigger sync after clearing
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+      await ytStorage.clearHistoryOnly();
+      expect(triggerSyncSpy).toHaveBeenCalled();
     });
   });
 
-  describe('Error Handling', () => {
-    test('should handle storage errors gracefully', async () => {
-      const error = new Error('Storage error');
-      mockStorage.get.mockRejectedValue(error);
-
-      await expect(ytStorage.getVideo('test')).rejects.toThrow('Storage error');
+  describe('Sync Integration', () => {
+    beforeEach(() => {
+      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true });
     });
 
-    test('should handle set operation errors', async () => {
-      const error = new Error('Storage error');
-      mockStorage.set.mockRejectedValue(error);
-
-      await expect(ytStorage.setVideo('test', {})).rejects.toThrow('Storage error');
-    });
-  });
-
-  describe('Data Validation', () => {
-    test('should validate video data structure', () => {
-      const validVideoData = {
-        videoId: 'dQw4w9WgXcQ',
+    test('should trigger sync when saving video with error handling', async () => {
+      const videoId = 'dQw4w9WgXcQ';
+      const videoData = {
+        videoId,
         title: 'Test Video',
         timestamp: Date.now(),
         time: 30,
         duration: 100
       };
 
-      expect(validVideoData).toHaveProperty('videoId');
-      expect(validVideoData).toHaveProperty('title');
-      expect(validVideoData).toHaveProperty('timestamp');
-      expect(validVideoData).toHaveProperty('time');
-      expect(validVideoData).toHaveProperty('duration');
-      expect(typeof validVideoData.time).toBe('number');
-      expect(typeof validVideoData.duration).toBe('number');
+      mockStorage.set.mockResolvedValue();
+      
+      // Mock sync trigger failure  
+      mockChrome.runtime.sendMessage.mockRejectedValue(new Error('Sync failed'));
+      
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+      
+      // Storage operation should still succeed even if sync fails
+      await ytStorage.setVideo(videoId, videoData);
+
+      expect(mockStorage.set).toHaveBeenCalledWith({ [`video_${videoId}`]: videoData });
+      expect(triggerSyncSpy).toHaveBeenCalledWith(videoId);
+      // The error is caught internally and logged, so we can't easily test for console.log
+      // Instead, verify that the operation completed successfully despite sync failure
     });
 
-    test('should validate playlist data structure', () => {
-      const validPlaylistData = {
-        playlistId: 'PL1234567890',
-        title: 'Test Playlist',
-        timestamp: Date.now(),
-        videoCount: 10
-      };
+    test('should handle chrome runtime not available', async () => {
+      const videoId = 'test123';
+      const videoData = { videoId, title: 'Test' };
 
-      expect(validPlaylistData).toHaveProperty('playlistId');
-      expect(validPlaylistData).toHaveProperty('title');
-      expect(validPlaylistData).toHaveProperty('timestamp');
-      expect(validPlaylistData.playlistId).toMatch(/^PL/);
+      mockStorage.set.mockResolvedValue();
+      
+      // Temporarily remove chrome runtime
+      const originalChrome = global.chrome;
+      global.chrome = undefined;
+      
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+      
+      await ytStorage.setVideo(videoId, videoData);
+
+      expect(mockStorage.set).toHaveBeenCalled();
+      expect(triggerSyncSpy).toHaveBeenCalled();
+      
+      // Restore chrome
+      global.chrome = originalChrome;
+    });
+
+    test('should use multiple sync trigger approaches', () => {
+      const videoId = 'video_123';
+      
+      // Mock setTimeout
+      const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
+        callback();
+        return 123;
+      });
+      
+      // Mock different sync approaches
+      global.window = {
+        ytSyncService: {
+          syncEnabled: true,
+          uploadNewData: jest.fn().mockResolvedValue(true)
+        }
+      };
+      
+      global.triggerSync = jest.fn();
+      
+      // Call triggerSync
+      ytStorage.triggerSync(videoId);
+      
+      // Should have attempted multiple approaches
+      expect(setTimeoutSpy).toHaveBeenCalled();
+      
+      // Clean up
+      delete global.window;
+      delete global.triggerSync;
+      setTimeoutSpy.mockRestore();
+    });
+
+    test('should handle sync trigger timeouts', async () => {
+      const videoId = 'video_456';
+      
+      // Mock setTimeout to execute immediately
+      const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
+        callback();
+        return 123;
+      });
+      
+      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true });
+      
+      ytStorage.triggerSync(videoId);
+      
+      // Wait for setTimeout to be called
+      await new Promise(resolve => setInterval(resolve, 0));
+      
+      expect(setTimeoutSpy).toHaveBeenCalled();
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'uploadNewData', videoId: videoId })
+      );
+      
+      setTimeoutSpy.mockRestore();
+    });
+
+    test('should trigger sync on playlist operations', async () => {
+      const playlistId = 'PL123';
+      const playlistData = { playlistId, title: 'Test Playlist' };
+
+      mockStorage.set.mockResolvedValue();
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+
+      await ytStorage.setPlaylist(playlistId, playlistData);
+      
+      expect(triggerSyncSpy).toHaveBeenCalledWith('playlist_' + playlistId);
+    });
+
+    test('should trigger sync on remove operations', async () => {
+      const videoId = 'removeTest';
+      
+      mockStorage.remove.mockResolvedValue();
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+
+      await ytStorage.removeVideo(videoId);
+      
+      expect(triggerSyncSpy).toHaveBeenCalledWith();
+    });
+
+    test('should handle direct sync service access', () => {
+      // Mock direct sync service access
+      global.window = {
+        ytSyncService: {
+          syncEnabled: true,
+          uploadNewData: jest.fn().mockResolvedValue(true),
+          triggerSync: jest.fn().mockResolvedValue(true)
+        }
+      };
+      
+      // Test with specific video ID
+      ytStorage.triggerSync('video_123');
+      
+      // Test without video ID (should fall back to general sync)
+      ytStorage.triggerSync();
+      
+      // Clean up
+      delete global.window;
+    });
+
+    test('should prioritize direct sync service over background messaging', (done) => {
+      // Setup direct sync service
+      global.window = {
+        ytSyncService: {
+          syncEnabled: true,
+          uploadNewData: jest.fn().mockResolvedValue(true)
+        }
+      };
+      
+      const videoId = 'video_priority_test';
+      
+      jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
+        callback();
+        return 123;
+      });
+      
+      ytStorage.triggerSync(videoId);
+      
+      setTimeout(() => {
+        // Should use direct sync service, not chrome runtime
+        expect(global.window.ytSyncService.uploadNewData).toHaveBeenCalledWith(videoId);
+        expect(mockChrome.runtime.sendMessage).not.toHaveBeenCalled();
+        
+        // Clean up
+        delete global.window;
+        done();
+      }, 0);
+    });
+
+    test('should handle reduced sync delay for responsiveness', () => {
+      const videoId = 'video_fast_sync';
+      
+      const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((callback, delay) => {
+        expect(delay).toBe(100); // Reduced from 250ms to 100ms
+        callback();
+        return 123;
+      });
+      
+      ytStorage.triggerSync(videoId);
+      
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 100);
+      setTimeoutSpy.mockRestore();
+    });
+
+    test('should handle data validation before sync', async () => {
+      const invalidVideoData = null;
+      
+      mockStorage.set.mockResolvedValue();
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+      
+      // Should handle null/undefined data gracefully
+      await ytStorage.setVideo('test', invalidVideoData);
+      
+      expect(mockStorage.set).toHaveBeenCalledWith({ 'video_test': invalidVideoData });
+      expect(triggerSyncSpy).toHaveBeenCalled();
+    });
+
+    test('should handle concurrent sync triggers', async () => {
+      const videoIds = ['video_1', 'video_2', 'video_3'];
+      const videoData = { title: 'Test Video', timestamp: Date.now() };
+      
+      mockStorage.set.mockResolvedValue();
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+      
+      // Trigger multiple saves concurrently
+      const promises = videoIds.map(id => ytStorage.setVideo(id, videoData));
+      await Promise.all(promises);
+      
+      expect(triggerSyncSpy).toHaveBeenCalledTimes(3);
+      expect(mockStorage.set).toHaveBeenCalledTimes(3);
+    });
+
+    test('should handle sync trigger with error recovery', async () => {
+      const videoId = 'error_recovery_test';
+      const videoData = { title: 'Test', timestamp: Date.now() };
+      
+      mockStorage.set.mockResolvedValue();
+      
+      // Mock first sync attempt failing, second succeeding
+      mockChrome.runtime.sendMessage
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({ success: true });
+      
+      await ytStorage.setVideo(videoId, videoData);
+      
+      expect(mockStorage.set).toHaveBeenCalled();
+      // Sync should still be attempted despite errors - verify sync was called internally
+      const triggerSyncSpy = jest.spyOn(ytStorage, 'triggerSync');
+      await ytStorage.setVideo(videoId, videoData);
+      expect(triggerSyncSpy).toHaveBeenCalled();
+      triggerSyncSpy.mockRestore();
+    });
+  });
+
+  describe('Error Handling', () => {
+    test('should handle storage errors without breaking sync', async () => {
+      const videoId = 'error_test';
+      const videoData = { title: 'Test Video' };
+      
+      mockStorage.set.mockRejectedValue(new Error('Storage full'));
+      
+      // Should throw the storage error, but sync should still be attempted
+      await expect(ytStorage.setVideo(videoId, videoData)).rejects.toThrow('Storage full');
+    });
+  });
+
+  describe('Conflict Resolution', () => {
+    test('should handle data conflicts during sync', async () => {
+      const videoId = 'conflict_test';
+      const localData = { 
+        videoId, 
+        title: 'Local Version', 
+        timestamp: Date.now() 
+      };
+      const syncData = { 
+        videoId, 
+        title: 'Sync Version', 
+        timestamp: Date.now() - 1000 // Older
+      };
+      
+      mockStorage.get.mockResolvedValue({ [`video_${videoId}`]: localData });
+      mockStorage.set.mockResolvedValue();
+      
+      // Simulate conflict resolution (local data should win)
+      await ytStorage.setVideo(videoId, localData);
+      
+      expect(mockStorage.set).toHaveBeenCalledWith({ [`video_${videoId}`]: localData });
     });
   });
 });

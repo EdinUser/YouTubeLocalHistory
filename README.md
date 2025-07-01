@@ -7,6 +7,7 @@
 [![Privacy First](https://img.shields.io/badge/Privacy-First-blueviolet?logo=privateinternetaccess)](https://github.com/EdinUser/YouTubeLocalHistory#privacy)
 [![Browser Support](https://img.shields.io/badge/Browser-Chrome_|_Firefox-FF7139?logo=googlechrome&logoColor=white)](https://github.com/EdinUser/YouTubeLocalHistory#installation)
 [![Local Storage](https://img.shields.io/badge/Data-Local_Only-important)](https://github.com/EdinUser/YouTubeLocalHistory#data-storage)
+[![Telegram Channel](https://img.shields.io/badge/Community-Telegram-2AABEE?logo=telegram&logoColor=white)](https://t.me/+eFftKWGVvSpiZjZk)
 
 </div>
 
@@ -14,18 +15,45 @@
 
 ## Features
 
-- **Automatic Progress Tracking**: Saves your current position in videos automatically, with improved timestamp accuracy and instant updates
-- **Visual Indicators**: Shows "viewed" labels and progress bars on video thumbnails, now with modern card-based layout and progress indicators
-- **Local Storage**: All data is stored locally on your device using secure browser storage
-- **Playlist Tracking**: Saves playlist information for easy access, now with enhanced playlist metrics
-- **Analytics Dashboard**: Full analytics dashboard with interactive charts, watch time distribution by hour, content type comparison (Videos vs Shorts), weekly activity tracking, and completion rate statistics
-- **Export/Import**: Backup and restore your watch history
-- **Customizable Settings**: Adjust overlay appearance and auto-cleanup settings
-- **Dark Theme Support**: Full dark/light theme system with system preference detection and theme-aware visualizations
+### 🎬 Video Tracking
+- **Automatic Progress Tracking**: Saves your current position in videos automatically with improved timestamp accuracy and instant updates
+- **YouTube Shorts Support**: Full tracking and display for YouTube Shorts with dedicated interface
+- **Smart Timestamp Loading**: 250ms delay to prevent video interruption with respect for YouTube's state restoration
 - **Progress Percentage**: View both watched time and percentage completion for each video
-- **Cross-Browser Support**: Works on Chrome and Firefox
-- **Firefox Sync**: Automatically syncs data across devices when Firefox Sync is enabled
-- **Modern UI/UX**: Card-based layout, thumbnails, and improved error messages and loading states
+- **Visual Indicators**: Shows "viewed" labels and progress bars on video thumbnails with modern card-based layout
+
+### 🗂️ Data Management
+- **Local Storage**: All data is stored locally on your device using secure browser storage (`chrome.storage.local`)
+- **Playlist Tracking**: Saves playlist information for easy access with enhanced metrics
+- **Export/Import**: Backup and restore your watch history with support for both legacy and new formats
+- **Automatic Migration**: Seamless migration from IndexedDB to secure browser storage
+
+### 🔄 Sync & Cross-Device
+- **Firefox Sync Integration**: Automatically syncs data across devices when Firefox Sync is enabled
+- **Cross-Device Synchronization**: Real-time sync of video history and playlists with conflict resolution
+- **Sync Status Indicator**: Visual sync progress with manual sync controls
+- **Local Priority**: Local storage takes precedence during sync conflicts to ensure data integrity
+
+### 📊 Analytics & Insights
+- **Analytics Dashboard**: Full analytics dashboard with interactive charts
+- **Watch Time Distribution**: See your viewing patterns by hour of day
+- **Content Type Analysis**: Compare time spent on regular videos vs Shorts
+- **Weekly Activity Tracking**: Visualize your weekly YouTube activity
+- **Completion Rate Statistics**: Track how often you finish videos
+- **Playlist Metrics**: Analyze your playlist viewing habits
+
+### 🎨 User Experience
+- **Modern UI/UX**: Card-based layout with thumbnails and improved error messages
+- **Dark Theme Support**: Full dark/light theme system with system preference detection
+- **Responsive Design**: Theme-aware visualizations and smooth transitions
+- **Tab State Persistence**: Extension remembers which tab (Videos, Shorts, Playlists) was last active
+- **Customizable Settings**: Adjust overlay appearance, auto-cleanup settings, and theme preferences
+
+### 🔧 Technical Features
+- **Cross-Browser Support**: Works on Chrome and Firefox with identical functionality
+- **SPA Navigation Handling**: Improved single-page application navigation without video interruption
+- **Enhanced Security**: Encrypted data storage that cannot be accessed through browser developer tools
+- **Comprehensive Testing**: Full test suite covering sync, storage, and UI functionality
 
 ## Installation
 
@@ -52,7 +80,11 @@
 2. Open Firefox and go to `about:debugging#/runtime/this-firefox`
 3. Click "Load Temporary Add-on" and select the `manifest.json` file from the `dist/firefox` folder
 
-**Note**: Both extensions are now fully synced and use the same secure storage system with automatic migration from IndexedDB. Firefox users can enable Firefox Sync to automatically sync their history across devices.
+**Note**: Both extensions use the same secure storage system with automatic migration from IndexedDB. Firefox users can enable Firefox Sync to automatically sync their history across devices with real-time sync status indicators.
+
+## Community
+
+Join our [Telegram channel](https://t.me/+eFftKWGVvSpiZjZk) for updates, support, and discussions about YT re:Watch! 💬
 
 ## Storage System
 
@@ -78,19 +110,33 @@ The extension stores three types of data:
 
 1. **Install the extension** following the instructions above
 2. **Visit YouTube** and start watching videos
-3. **Your progress is automatically saved** every 5 seconds, and videos now appear in your history immediately after being watched
-4. **Click the extension icon** to view your watch history
-5. **Use the Analytics tab** to explore interactive charts, watch time by hour, content type comparison, weekly activity, completion rate, and playlist tracking metrics
-6. **Use the settings tab** to customize the overlay appearance and theme
+3. **Your progress is automatically saved** every 5 seconds with smart timestamp loading to prevent video interruption
+4. **Click the extension icon** to view your watch history across multiple tabs:
+   - **Videos**: Regular YouTube videos with progress tracking
+   - **Shorts**: Dedicated interface for YouTube Shorts
+   - **Playlists**: Saved playlists with metadata
+   - **Analytics**: Interactive charts and viewing statistics
+   - **Settings**: Customize appearance, sync, and preferences
+5. **Enable Firefox Sync** (Firefox users) for cross-device synchronization with real-time status updates
 
 ### Settings
 
-- **Theme**: Choose between System (follows your OS theme), Light, or Dark theme
-- **Auto-clean Period**: Automatically remove history entries older than specified days (1-180 days)
-- **Items per Page**: Number of items to show per page in history view (5-20)
+#### 🎨 Appearance
+- **Theme**: Choose between System (follows your OS theme), Light, or Dark theme with instant switching
 - **Overlay Title**: Text to show in the overlay (max 12 characters)
 - **Overlay Color**: Color of the progress bar overlay (blue, red, green, purple, orange)
 - **Overlay Label Size**: Size of the overlay label and progress bar (small, medium, large, extra large)
+
+#### 🗂️ Data Management  
+- **Auto-clean Period**: Automatically remove history entries older than specified days (1-180 days)
+- **Items per Page**: Number of items to show per page in history view (5-20)
+- **Debug Mode**: Enable debug logging for troubleshooting
+
+#### 🔄 Sync Settings (Firefox)
+- **Enable/Disable Sync**: Toggle Firefox Sync integration
+- **Sync Status**: Real-time sync status with last sync time
+- **Manual Sync**: Trigger immediate sync or full sync with cleanup
+- **Sync Indicator**: Visual status indicator in popup interface
 
 ### Theme System
 
@@ -114,13 +160,22 @@ The history view now shows enhanced progress information:
 
 ## Analytics Dashboard
 
-The Analytics tab provides:
-- **Watch Time Distribution by Hour**: See when you watch the most
-- **Content Type Comparison**: Compare time spent on regular videos vs Shorts
-- **Weekly Activity Tracking**: Visualize your weekly YouTube activity
-- **Completion Rate Statistics**: Track how often you finish videos
-- **Playlist Tracking Metrics**: Analyze your playlist viewing habits
-- **Interactive Charts**: All analytics are presented with interactive, theme-aware charts
+The Analytics tab provides comprehensive insights into your YouTube viewing habits:
+
+#### 📈 Viewing Patterns
+- **Watch Time Distribution by Hour**: Interactive charts showing when you watch the most content
+- **Weekly Activity Tracking**: Visualize your daily YouTube activity over the past 7 days
+- **Content Type Comparison**: Pie charts comparing time spent on regular videos vs Shorts
+
+#### 📊 Performance Metrics  
+- **Completion Rate Statistics**: Track how often you finish videos you start watching
+- **Total Watch Time**: Cumulative time spent watching videos and shorts
+- **Video Count Statistics**: Track total videos watched and completion rates
+
+#### 🎨 Visual Features
+- **Interactive Charts**: All analytics presented with interactive, theme-aware visualizations
+- **Real-time Updates**: Charts update automatically as you watch more content  
+- **Dark Theme Support**: Analytics adapt to your chosen theme preference
 
 ## Privacy
 
@@ -139,21 +194,31 @@ The extension uses the browser's built-in storage API (`chrome.storage.local`/`b
 ## Troubleshooting
 
 ### Extension Not Working
-1. Make sure you're on a YouTube page
-2. Refresh the page and try again
-3. Check if the extension is enabled in your browser
+1. **Check YouTube Page**: Make sure you're on a YouTube page (youtube.com)
+2. **Refresh and Retry**: Refresh the page and try again
+3. **Extension Status**: Verify the extension is enabled in your browser
+4. **Debug Mode**: Enable debug mode in settings for detailed logging
 
-### History Not Loading
-1. Close and reopen the popup
-2. Refresh the YouTube page
-3. Check the browser console for error messages
-4. Benefit from improved error messages and loading states for easier troubleshooting
+### History Not Loading  
+1. **Popup Refresh**: Close and reopen the popup interface
+2. **Page Refresh**: Refresh the YouTube page completely  
+3. **Console Logs**: Check browser console for error messages (F12 → Console)
+4. **Storage Check**: Verify extension has storage permissions
+5. **Improved Diagnostics**: Benefit from enhanced error messages and loading states
+
+### Sync Issues (Firefox)
+1. **Firefox Sync Status**: Check if Firefox Sync is enabled in your browser
+2. **Sync Indicator**: Look at the sync status indicator in the popup
+3. **Manual Sync**: Try triggering a manual sync from the settings tab
+4. **Full Sync**: Use "Full Sync" option to clean up and re-sync all data
+5. **Network Check**: Ensure stable internet connection for sync operations
 
 ### Migration Issues
-If you experience issues with data migration:
-1. The extension will automatically retry migration on next startup
-2. If problems persist, you can clear the extension data and start fresh
-3. Export your data before clearing if you want to preserve it
+If you experience issues with data migration from older versions:
+1. **Automatic Retry**: The extension will automatically retry migration on next startup
+2. **Export First**: Export your data before troubleshooting to preserve it
+3. **Clear and Restart**: If problems persist, clear extension data and start fresh
+4. **Import Backup**: Use the import feature to restore previously exported data
 
 ## Development
 
@@ -185,60 +250,6 @@ MIT License - see LICENSE file for details.
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Changelog
+## Release Notes
 
-### Version 2.5.1
-- **Console Logging Optimization**: Reduced verbose logging in thumbnail observer
-- **Improved Video ID Extraction**: Streamlined video ID extraction from thumbnails
-- **Debug Mode Enhancement**: Added debug mode toggle in settings with proper persistence
-- **Version Display**: Added version number display in settings tab
-- **Error Handling**: Enhanced error messages for missing UI elements
-- **Settings Tab**: Fixed settings tab not showing/working properly
-- **Theme Handling**: Added proper theme preference handling
-- **Success Messages**: Added success messages for settings updates
-- **Code Cleanup**: Fixed duplicate settingsTab declaration
-- **Performance**: Maintained critical debugging logs while reducing noise
-- **Thumbnail Processing**: Improved thumbnail observer efficiency
-- **Overlay System**: Enhanced overlay handling for all video types
-- **Playlist Support**: Added proper overlay support for playlist panel videos
-- **Version Management**: Implemented fetching version from manifest.json instead of hardcoding
-
-### Version 2.4.0
-- **YouTube Shorts Support**: Added comprehensive tracking and display for YouTube Shorts
-- **Separate Shorts Tab**: New dedicated tab interface for viewing Shorts history with pagination
-- **Enhanced UI Structure**: Refactored popup interface with separate containers for Videos, Shorts, and Playlists
-- **Tab State Persistence**: Extension remembers which tab was last active across sessions
-- **Theme Handling Improvements**: Refactored theme handling logic for better clarity and efficiency
-- **Simplified Theme Toggle**: Theme toggle button now only switches between light and dark themes
-- **Enhanced Theme Persistence**: Fixed issues with theme preference saving and application
-- **Code Optimization**: Streamlined theme application logic and removed redundant code
-- **Better Performance**: Improved theme switching performance and reduced code complexity
-
-### Version 2.3.0
-- **Dark Theme Support**: Added comprehensive dark/light theme system with system preference detection
-- **Theme Toggle Button**: Added dynamic theme toggle button that shows current theme selection
-- **Progress Percentage Display**: Enhanced progress column to show both watched time and percentage completion
-- **Browser Theme Integration**: Added support for browser theme detection and automatic theme switching
-- **Enhanced UI**: Improved theme switching with smooth transitions and consistent theming
-- **Firefox Sync**: Full compatibility with Firefox Sync for cross-device data synchronization
-- **Better User Experience**: Dynamic theme button, visual progress feedback, and seamless theme switching
-
-### Version 2.2.0
-- **Major Security Update**: Migrated from IndexedDB to `chrome.storage.local`/`browser.storage.local`
-- **Automatic Migration**: Existing IndexedDB data is automatically migrated to the new storage system
-- **Enhanced Security**: Data is now stored in encrypted format and cannot be easily accessed through browser developer tools
-- **Improved Reliability**: Better error handling and storage management
-- **Cross-Browser Sync**: Chrome and Firefox extensions are now fully synchronized with identical functionality
-- **CSP Compliance**: Removed inline styles to comply with Content Security Policy
-- **Updated Descriptions**: Reflects the new secure storage system
-
-### Version 2.1.x
-- Added playlist tracking
-- Improved thumbnail overlay system
-- Enhanced settings management
-- Better error handling
-
-### Version 1.x
-- Initial release with IndexedDB storage
-- Basic video progress tracking
-- Simple overlay system
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes and version history.
