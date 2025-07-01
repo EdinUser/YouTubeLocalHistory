@@ -8,15 +8,15 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send message to Telegram
+      - name: Send Telegram Notification
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          RELEASE_URL: ${{ github.event.release.html_url }}
           RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
         run: |
-          curl -s -X POST https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-          -d chat_id="${TELEGRAM_CHAT_ID}" \
-          -d text="🆕 New release: *${RELEASE_NAME}* (${RELEASE_TAG})\n👉 [View on GitHub](${RELEASE_URL})" \
-          -d parse_mode=Markdown
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d text="📦 *New Release:* ${RELEASE_NAME} (${RELEASE_TAG})%0A🔗 [View on GitHub](${RELEASE_URL})" \
+            -d parse_mode="Markdown"
