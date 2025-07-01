@@ -2303,7 +2303,17 @@ function updateSyncIndicator(status, lastSyncTime) {
     
     // Update text and tooltip
     const textElement = indicator.querySelector('.sync-text');
-    const statusElement = indicator.querySelector('.sync-status') || createSyncStatusElement(indicator);
+    
+    // Get or create a single status element (remove any duplicates first)
+    const existingElements = indicator.parentNode.querySelectorAll('.sync-status');
+    existingElements.forEach((el, index) => {
+        if (index > 0) el.remove(); // Remove duplicates, keep only first
+    });
+    
+    let statusElement = existingElements[0];
+    if (!statusElement) {
+        statusElement = createSyncStatusElement(indicator);
+    }
     
     const tooltips = {
         'disabled': 'Sync disabled - Click to enable',
@@ -2343,7 +2353,8 @@ function updateSyncIndicator(status, lastSyncTime) {
             statusElement.textContent = 'Synced';
             statusElement.style.color = '#34a853';
             syncStatusTimeout = setTimeout(() => {
-                if (statusElement) { // Check if element still exists
+                // Clear the specific element we set the text on
+                if (statusElement && statusElement.parentNode && syncStatusTimeout) {
                     statusElement.textContent = '';
                 }
                 syncStatusTimeout = null;
