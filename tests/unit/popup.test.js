@@ -10,6 +10,9 @@ const setupDOM = () => {
         <button id="ytvhtToggleTheme" class="theme-toggle" title="Toggle theme">
           <span id="themeText">Theme</span>
         </button>
+        <div id="ytvhtSyncIndicator" class="sync-indicator sync-disabled">
+          <span class="sync-text">Off</span>
+        </div>
         <button id="ytvhtExportHistory">Export History</button>
         <button id="ytvhtImportHistory">Import History</button>
         <button id="ytvhtClearHistory" style="background-color: #dc3545;">Clear History</button>
@@ -17,14 +20,29 @@ const setupDOM = () => {
       <button id="ytvhtClosePopup">Close</button>
     </div>
     <div id="ytvhtMessage" class="message"></div>
+    <div id="ytvhtSettingsContainer" style="display: none;">
+      <div class="settings-section">
+        <h3>Sync Settings</h3>
+        <label>
+          <input type="checkbox" id="ytvhtSyncEnabled"> Enable Sync
+        </label>
+        <div class="sync-controls">
+          <button id="ytvhtTriggerSync">Sync Now</button>
+          <button id="ytvhtTriggerFullSync">Full Sync</button>
+          <div id="ytvhtLastSyncTime">Never</div>
+        </div>
+      </div>
+    </div>
   `;
 };
 
 // Mock storage
 const mockYtStorage = {
   clear: jest.fn().mockResolvedValue(),
+  clearHistoryOnly: jest.fn().mockResolvedValue(),
   getAllVideos: jest.fn().mockResolvedValue({}),
-  getAllPlaylists: jest.fn().mockResolvedValue({})
+  getAllPlaylists: jest.fn().mockResolvedValue({}),
+  triggerSync: jest.fn()
 };
 
 // Mock Chrome API
@@ -37,13 +55,14 @@ global.chrome = {
     }
   },
   runtime: {
-    getManifest: jest.fn().mockReturnValue({ version: '1.0.0' }),
+    getManifest: jest.fn().mockReturnValue({ version: '2.6.1' }),
     onMessage: {
       addListener: jest.fn(),
       removeListener: jest.fn(),
       trigger: jest.fn(),
       listeners: []
-    }
+    },
+    sendMessage: jest.fn()
   }
 };
 
@@ -62,12 +81,15 @@ global.allShortsRecords = [];
 global.currentPage = 1;
 global.currentPlaylistPage = 1;
 global.currentShortsPage = 1;
+global.syncInProgress = false;
 
 // Mock functions that would be defined in popup.js
 global.displayHistoryPage = jest.fn();
 global.displayShortsPage = jest.fn();
 global.displayPlaylistsPage = jest.fn();
 global.showMessage = jest.fn();
+global.updateSyncIndicator = jest.fn();
+global.updateSyncSettingsUI = jest.fn();
 
 // Import mocks
 jest.mock('../../src/content.js');
@@ -98,7 +120,13 @@ jest.mock('../../src/popup.js', () => {
         displayPlaylistsPage: jest.fn(),
         showMessage: jest.fn(),
         formatDuration: jest.fn(time => `${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`),
-        formatDate: jest.fn(timestamp => new Date(timestamp).toLocaleString())
+        formatDate: jest.fn(timestamp => new Date(timestamp).toLocaleString()),
+        updateSyncIndicator: jest.fn(),
+        updateSyncSettingsUI: jest.fn(),
+        handleSyncIndicatorClick: jest.fn(),
+        handleSyncToggle: jest.fn(),
+        handleManualSync: jest.fn(),
+        handleManualFullSync: jest.fn()
     };
 });
 
@@ -110,40 +138,50 @@ describe('Popup Functionality', () => {
     if (messageElement) {
       messageElement.style.display = 'none';
     }
+    global.syncInProgress = false;
   });
 
   describe('Button Ordering', () => {
     test('should have correct button order in left-controls', () => {
       const leftControls = document.querySelector('.left-controls');
       const buttons = leftControls.querySelectorAll('button');
+      const syncIndicator = leftControls.querySelector('#ytvhtSyncIndicator');
       
       expect(buttons).toHaveLength(4);
       expect(buttons[0].id).toBe('ytvhtToggleTheme');
       expect(buttons[1].id).toBe('ytvhtExportHistory');
       expect(buttons[2].id).toBe('ytvhtImportHistory');
       expect(buttons[3].id).toBe('ytvhtClearHistory');
+      expect(syncIndicator).toBeTruthy();
     });
 
     test('should have Clear History button styled as destructive', () => {
       const clearButton = document.getElementById('ytvhtClearHistory');
       expect(clearButton.style.backgroundColor).toBe('rgb(220, 53, 69)'); // #dc3545
     });
+
+    test('should have sync indicator with initial state', () => {
+      const syncIndicator = document.getElementById('ytvhtSyncIndicator');
+      expect(syncIndicator).toBeTruthy();
+      expect(syncIndicator.classList).toContain('sync-disabled');
+      expect(syncIndicator.querySelector('.sync-text').textContent).toBe('Off');
+    });
   });
 
   describe('Clear History Functionality', () => {
-    test('should show confirmation dialog when clear history is clicked', () => {
+    test('should show updated confirmation dialog when clear history is clicked', () => {
       const clearButton = document.getElementById('ytvhtClearHistory');
       
-      // Simulate the event listener logic
+      // Simulate the updated event listener logic
       const handleClearClick = async () => {
-        const confirmed = confirm('⚠️ WARNING: This will permanently delete ALL your YouTube viewing history, playlists, and settings.\n\nThis action cannot be undone. Are you sure you want to continue?');
+        const confirmed = confirm('WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?');
         
         if (!confirmed) {
           return;
         }
         
         try {
-          await ytStorage.clear();
+          await ytStorage.clearHistoryOnly();
           allHistoryRecords = [];
           allPlaylists = [];
           allShortsRecords = [];
@@ -155,7 +193,7 @@ describe('Popup Functionality', () => {
           displayShortsPage();
           displayPlaylistsPage();
           
-          showMessage('All history, playlists, and settings have been cleared successfully');
+          showMessage('All video and playlist history has been cleared successfully');
         } catch (error) {
           console.error('Error clearing history:', error);
           showMessage('Error clearing history: ' + (error.message || 'Unknown error'), 'error');
@@ -167,23 +205,23 @@ describe('Popup Functionality', () => {
       handleClearClick();
 
       expect(global.confirm).toHaveBeenCalledWith(
-        '⚠️ WARNING: This will permanently delete ALL your YouTube viewing history, playlists, and settings.\n\nThis action cannot be undone. Are you sure you want to continue?'
+        'WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?'
       );
     });
 
-    test('should not clear history when user cancels confirmation', async () => {
+    test('should use clearHistoryOnly instead of clear', async () => {
       const clearButton = document.getElementById('ytvhtClearHistory');
       
-      // Simulate the event listener logic
+      // Simulate the updated event listener logic with clearHistoryOnly
       const handleClearClick = async () => {
-        const confirmed = confirm('⚠️ WARNING: This will permanently delete ALL your YouTube viewing history, playlists, and settings.\n\nThis action cannot be undone. Are you sure you want to continue?');
+        const confirmed = confirm('WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?');
         
         if (!confirmed) {
           return;
         }
         
         try {
-          await ytStorage.clear();
+          await ytStorage.clearHistoryOnly(); // Uses clearHistoryOnly instead of clear
           allHistoryRecords = [];
           allPlaylists = [];
           allShortsRecords = [];
@@ -195,7 +233,51 @@ describe('Popup Functionality', () => {
           displayShortsPage();
           displayPlaylistsPage();
           
-          showMessage('All history, playlists, and settings have been cleared successfully');
+          showMessage('All video and playlist history has been cleared successfully');
+        } catch (error) {
+          console.error('Error clearing history:', error);
+          showMessage('Error clearing history: ' + (error.message || 'Unknown error'), 'error');
+        }
+      };
+
+      // Test with confirmation
+      global.confirm.mockReturnValue(true);
+      await handleClearClick();
+
+      expect(global.confirm).toHaveBeenCalled();
+      expect(mockYtStorage.clearHistoryOnly).toHaveBeenCalled();
+      expect(mockYtStorage.clear).not.toHaveBeenCalled(); // Ensure clear is not called
+      expect(displayHistoryPage).toHaveBeenCalled();
+      expect(displayShortsPage).toHaveBeenCalled();
+      expect(displayPlaylistsPage).toHaveBeenCalled();
+      expect(showMessage).toHaveBeenCalledWith('All video and playlist history has been cleared successfully');
+    });
+
+    test('should not clear history when user cancels confirmation', async () => {
+      const clearButton = document.getElementById('ytvhtClearHistory');
+      
+      // Simulate the updated event listener logic
+      const handleClearClick = async () => {
+        const confirmed = confirm('WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?');
+        
+        if (!confirmed) {
+          return;
+        }
+        
+        try {
+          await ytStorage.clearHistoryOnly();
+          allHistoryRecords = [];
+          allPlaylists = [];
+          allShortsRecords = [];
+          currentPage = 1;
+          currentPlaylistPage = 1;
+          currentShortsPage = 1;
+          
+          displayHistoryPage();
+          displayShortsPage();
+          displayPlaylistsPage();
+          
+          showMessage('All video and playlist history has been cleared successfully');
         } catch (error) {
           console.error('Error clearing history:', error);
           showMessage('Error clearing history: ' + (error.message || 'Unknown error'), 'error');
@@ -207,54 +289,11 @@ describe('Popup Functionality', () => {
       await handleClearClick();
 
       expect(global.confirm).toHaveBeenCalled();
-      expect(mockYtStorage.clear).not.toHaveBeenCalled();
+      expect(mockYtStorage.clearHistoryOnly).not.toHaveBeenCalled();
       expect(displayHistoryPage).not.toHaveBeenCalled();
       expect(displayShortsPage).not.toHaveBeenCalled();
       expect(displayPlaylistsPage).not.toHaveBeenCalled();
       expect(showMessage).not.toHaveBeenCalled();
-    });
-
-    test('should clear all data and update displays when confirmed', async () => {
-      const clearButton = document.getElementById('ytvhtClearHistory');
-      
-      // Simulate the event listener logic
-      const handleClearClick = async () => {
-        const confirmed = confirm('⚠️ WARNING: This will permanently delete ALL your YouTube viewing history, playlists, and settings.\n\nThis action cannot be undone. Are you sure you want to continue?');
-        
-        if (!confirmed) {
-          return;
-        }
-        
-        try {
-          await ytStorage.clear();
-          allHistoryRecords = [];
-          allPlaylists = [];
-          allShortsRecords = [];
-          currentPage = 1;
-          currentPlaylistPage = 1;
-          currentShortsPage = 1;
-          
-          displayHistoryPage();
-          displayShortsPage();
-          displayPlaylistsPage();
-          
-          showMessage('All history, playlists, and settings have been cleared successfully');
-        } catch (error) {
-          console.error('Error clearing history:', error);
-          showMessage('Error clearing history: ' + (error.message || 'Unknown error'), 'error');
-        }
-      };
-
-      // Test with confirmation
-      global.confirm.mockReturnValue(true);
-      await handleClearClick();
-
-      expect(global.confirm).toHaveBeenCalled();
-      expect(mockYtStorage.clear).toHaveBeenCalled();
-      expect(displayHistoryPage).toHaveBeenCalled();
-      expect(displayShortsPage).toHaveBeenCalled();
-      expect(displayPlaylistsPage).toHaveBeenCalled();
-      expect(showMessage).toHaveBeenCalledWith('All history, playlists, and settings have been cleared successfully');
     });
 
     test('should handle errors during clear operation', async () => {
@@ -262,18 +301,18 @@ describe('Popup Functionality', () => {
       
       // Mock error
       const mockError = new Error('Storage error');
-      mockYtStorage.clear.mockRejectedValueOnce(mockError);
+      mockYtStorage.clearHistoryOnly.mockRejectedValueOnce(mockError);
       
-      // Simulate the event listener logic
+      // Simulate the updated event listener logic
       const handleClearClick = async () => {
-        const confirmed = confirm('⚠️ WARNING: This will permanently delete ALL your YouTube viewing history, playlists, and settings.\n\nThis action cannot be undone. Are you sure you want to continue?');
+        const confirmed = confirm('WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?');
         
         if (!confirmed) {
           return;
         }
         
         try {
-          await ytStorage.clear();
+          await ytStorage.clearHistoryOnly();
           allHistoryRecords = [];
           allPlaylists = [];
           allShortsRecords = [];
@@ -285,7 +324,7 @@ describe('Popup Functionality', () => {
           displayShortsPage();
           displayPlaylistsPage();
           
-          showMessage('All history, playlists, and settings have been cleared successfully');
+          showMessage('All video and playlist history has been cleared successfully');
         } catch (error) {
           console.error('Error clearing history:', error);
           showMessage('Error clearing history: ' + (error.message || 'Unknown error'), 'error');
@@ -297,9 +336,255 @@ describe('Popup Functionality', () => {
       await handleClearClick();
 
       expect(global.confirm).toHaveBeenCalled();
-      expect(mockYtStorage.clear).toHaveBeenCalled();
+      expect(mockYtStorage.clearHistoryOnly).toHaveBeenCalled();
       expect(console.error).toHaveBeenCalledWith('Error clearing history:', mockError);
       expect(showMessage).toHaveBeenCalledWith('Error clearing history: Storage error', 'error');
+    });
+  });
+
+  describe('Sync Functionality', () => {
+    test('should initialize sync integration', () => {
+      // Mock the sync integration initialization
+      const initSyncIntegration = jest.fn(() => {
+        // Mock getting initial sync status
+        chrome.runtime.sendMessage({ type: 'getSyncStatus' }, (response) => {
+          if (response) {
+            updateSyncIndicator(response.status, response.lastSyncTime);
+            updateSyncSettingsUI(response);
+          }
+        });
+      });
+
+      initSyncIntegration();
+      expect(initSyncIntegration).toHaveBeenCalled();
+    });
+
+    test('should update sync indicator based on status', () => {
+      const syncIndicator = document.getElementById('ytvhtSyncIndicator');
+      const syncText = syncIndicator.querySelector('.sync-text');
+
+      // Test different sync states
+      popup.updateSyncIndicator('disabled', null);
+      popup.updateSyncIndicator('syncing', null);
+      popup.updateSyncIndicator('success', Date.now());
+      popup.updateSyncIndicator('error', null);
+
+      expect(popup.updateSyncIndicator).toHaveBeenCalledTimes(4);
+    });
+
+    test('should handle sync indicator click', async () => {
+      const syncIndicator = document.getElementById('ytvhtSyncIndicator');
+      
+      // Mock click handler
+      const handleClick = async () => {
+        chrome.runtime.sendMessage({ type: 'getSyncStatus' }, (response) => {
+          if (response && response.status === 'disabled') {
+            chrome.runtime.sendMessage({ type: 'enableSync' });
+          } else if (response && response.enabled) {
+            chrome.runtime.sendMessage({ type: 'triggerSync' });
+          }
+        });
+      };
+
+      await handleClick();
+      expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    });
+
+    test('should handle sync toggle in settings', () => {
+      const syncToggle = document.getElementById('ytvhtSyncEnabled');
+      
+      // Mock toggle handler
+      const handleToggle = (enabled) => {
+        if (enabled) {
+          chrome.runtime.sendMessage({ type: 'enableSync' });
+        } else {
+          chrome.runtime.sendMessage({ type: 'disableSync' });
+        }
+      };
+
+      handleToggle(true);
+      handleToggle(false);
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'enableSync' });
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'disableSync' });
+    });
+
+    test('should handle manual sync trigger', () => {
+      const syncButton = document.getElementById('ytvhtTriggerSync');
+      
+      // Mock manual sync handler
+      const handleManualSync = () => {
+        chrome.runtime.sendMessage({ type: 'triggerSync' });
+      };
+
+      handleManualSync();
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'triggerSync' });
+    });
+
+    test('should handle full sync trigger with confirmation', () => {
+      const fullSyncButton = document.getElementById('ytvhtTriggerFullSync');
+      global.confirm.mockReturnValue(true);
+      
+      // Mock full sync handler
+      const handleFullSync = () => {
+        const confirmed = confirm('Full Sync will clean up old data and re-sync everything. This may take a moment. Continue?');
+        if (confirmed) {
+          chrome.runtime.sendMessage({ type: 'triggerFullSync' });
+        }
+      };
+
+      handleFullSync();
+      expect(global.confirm).toHaveBeenCalledWith('Full Sync will clean up old data and re-sync everything. This may take a moment. Continue?');
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'triggerFullSync' });
+    });
+
+    test('should prevent actions during sync', () => {
+      global.syncInProgress = true;
+      
+      // Mock sync-aware storage change listener
+      const storageChangeListener = (changes, area) => {
+        if (area === 'local' && !syncInProgress) {
+          const videoChanges = Object.entries(changes).filter(([key]) =>
+            key.startsWith('video_') || key.startsWith('playlist_')
+          );
+          if (videoChanges.length > 0) {
+            // Process changes
+          }
+        }
+      };
+
+      const changes = { 'video_123': { newValue: { title: 'Test' } } };
+      storageChangeListener(changes, 'local');
+
+      // Should not process changes during sync
+      expect(global.syncInProgress).toBe(true);
+    });
+
+    test('should update sync status message handling', () => {
+      const syncIndicator = document.getElementById('ytvhtSyncIndicator');
+      
+      // Test sync status messages
+      const testStatuses = [
+        { status: 'disabled', expectedText: 'Off', expectedClass: 'sync-disabled' },
+        { status: 'initializing', expectedText: 'Init', expectedClass: 'sync-initializing' },
+        { status: 'syncing', expectedText: 'Sync', expectedClass: 'sync-syncing' },
+        { status: 'success', expectedText: 'OK', expectedClass: 'sync-success' },
+        { status: 'error', expectedText: 'Error', expectedClass: 'sync-error' },
+        { status: 'not_available', expectedText: 'N/A', expectedClass: 'sync-not_available' }
+      ];
+
+      testStatuses.forEach(({ status, expectedText, expectedClass }) => {
+        popup.updateSyncIndicator(status, Date.now());
+        expect(popup.updateSyncIndicator).toHaveBeenCalledWith(status, expect.any(Number));
+      });
+    });
+
+    test('should handle sync status updates correctly', () => {
+      const syncIndicator = document.getElementById('ytvhtSyncIndicator');
+      const syncText = syncIndicator.querySelector('.sync-text');
+
+      // Mock updateSyncIndicator function
+      const updateSyncIndicator = (status, lastSyncTime) => {
+        const statusMessages = {
+          'disabled': 'Off',
+          'initializing': 'Init', 
+          'syncing': 'Sync',
+          'success': 'OK',
+          'error': 'Error',
+          'not_available': 'N/A'
+        };
+
+        // Update classes
+        syncIndicator.className = `sync-indicator sync-${status}`;
+        syncText.textContent = statusMessages[status] || 'Unknown';
+
+        // Add timestamp for successful syncs
+        if (status === 'success' && lastSyncTime) {
+          const timeElement = syncIndicator.querySelector('.sync-time') || document.createElement('div');
+          timeElement.className = 'sync-time';
+          timeElement.textContent = new Date(lastSyncTime).toLocaleTimeString();
+          if (!syncIndicator.querySelector('.sync-time')) {
+            syncIndicator.appendChild(timeElement);
+          }
+        }
+      };
+
+      // Test each status
+      updateSyncIndicator('disabled', null);
+      expect(syncIndicator.classList.contains('sync-disabled')).toBe(true);
+      expect(syncText.textContent).toBe('Off');
+
+      updateSyncIndicator('syncing', null);
+      expect(syncIndicator.classList.contains('sync-syncing')).toBe(true);
+      expect(syncText.textContent).toBe('Sync');
+
+      updateSyncIndicator('success', Date.now());
+      expect(syncIndicator.classList.contains('sync-success')).toBe(true);
+      expect(syncText.textContent).toBe('OK');
+      expect(syncIndicator.querySelector('.sync-time')).toBeTruthy();
+    });
+
+    test('should handle sync settings UI updates', () => {
+      const syncToggle = document.getElementById('ytvhtSyncEnabled');
+      const lastSyncTime = document.getElementById('ytvhtLastSyncTime');
+      
+      // Mock sync settings UI update
+      const updateSyncSettingsUI = (syncStatus) => {
+        if (syncToggle) {
+          syncToggle.checked = syncStatus.enabled || false;
+        }
+        
+        if (lastSyncTime) {
+          if (syncStatus.lastSyncTime) {
+            lastSyncTime.textContent = new Date(syncStatus.lastSyncTime).toLocaleString();
+          } else {
+            lastSyncTime.textContent = 'Never';
+          }
+        }
+      };
+
+      // Test enabled state
+      updateSyncSettingsUI({ enabled: true, lastSyncTime: Date.now() });
+      expect(syncToggle.checked).toBe(true);
+      expect(lastSyncTime.textContent).not.toBe('Never');
+
+      // Test disabled state
+      updateSyncSettingsUI({ enabled: false, lastSyncTime: null });
+      expect(syncToggle.checked).toBe(false);
+      expect(lastSyncTime.textContent).toBe('Never');
+    });
+
+    test('should prevent race conditions during sync', () => {
+      // Mock storage change listener that's sync-aware
+      let processedChanges = [];
+      
+      const syncAwareStorageListener = (changes, area) => {
+        if (area === 'local' && !global.syncInProgress) {
+          const videoChanges = Object.entries(changes).filter(([key]) =>
+            key.startsWith('video_') || key.startsWith('playlist_')
+          );
+          
+          if (videoChanges.length > 0) {
+            processedChanges.push(...videoChanges);
+          }
+        } else if (global.syncInProgress) {
+          console.log('Ignoring storage changes during sync (will refresh after sync completes)');
+        }
+      };
+
+      // Test normal operation (not syncing)
+      global.syncInProgress = false;
+      processedChanges = [];
+      const changes1 = { 'video_123': { newValue: { title: 'Test Video' } } };
+      syncAwareStorageListener(changes1, 'local');
+      expect(processedChanges).toHaveLength(1);
+
+      // Test during sync (should ignore changes)
+      global.syncInProgress = true;
+      processedChanges = [];
+      const changes2 = { 'video_456': { newValue: { title: 'Another Video' } } };
+      syncAwareStorageListener(changes2, 'local');
+      expect(processedChanges).toHaveLength(0);
     });
   });
 
@@ -310,9 +595,9 @@ describe('Popup Functionality', () => {
       // Mock processExistingThumbnails
       global.processExistingThumbnails = jest.fn();
 
-      // Create a storage change listener
+      // Create a sync-aware storage change listener
       storageChangeListener = (changes, area) => {
-        if (area === 'local') {
+        if (area === 'local' && !global.syncInProgress) {
           const keys = Object.keys(changes);
           if (keys.some(key => key.startsWith('video_') || key.startsWith('playlist_'))) {
             global.processExistingThumbnails();
@@ -329,7 +614,8 @@ describe('Popup Functionality', () => {
       chrome.storage.onChanged.removeListener(storageChangeListener);
     });
 
-    test('should call processExistingThumbnails on video_ or playlist_ key change', () => {
+    test('should call processExistingThumbnails on video_ or playlist_ key change when not syncing', () => {
+      global.syncInProgress = false;
       const changes = {
         'video_123': { newValue: { title: 'Test Video' } },
         'playlist_456': { newValue: { title: 'Test Playlist' } }
@@ -341,7 +627,21 @@ describe('Popup Functionality', () => {
       expect(global.processExistingThumbnails).toHaveBeenCalled();
     });
 
+    test('should not call processExistingThumbnails during sync', () => {
+      global.syncInProgress = true;
+      const changes = {
+        'video_123': { newValue: { title: 'Test Video' } },
+        'playlist_456': { newValue: { title: 'Test Playlist' } }
+      };
+      
+      // Trigger the listener directly
+      storageChangeListener(changes, 'local');
+      
+      expect(global.processExistingThumbnails).not.toHaveBeenCalled();
+    });
+
     test('should not call processExistingThumbnails on unrelated key change', () => {
+      global.syncInProgress = false;
       const changes = {
         'settings': { newValue: { theme: 'dark' } }
       };
@@ -350,6 +650,53 @@ describe('Popup Functionality', () => {
       storageChangeListener(changes, 'local');
       
       expect(global.processExistingThumbnails).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Sync Status Updates', () => {
+    test('should handle sync status update messages', () => {
+      const mockMessage = {
+        type: 'syncStatusUpdate',
+        status: 'syncing',
+        lastSyncTime: Date.now()
+      };
+
+      // Mock message listener
+      const messageListener = (message, sender, sendResponse) => {
+        if (message.type === 'syncStatusUpdate') {
+          if (message.status === 'syncing') {
+            global.syncInProgress = true;
+          } else if (message.status === 'success' || message.status === 'error') {
+            global.syncInProgress = false;
+          }
+          popup.updateSyncIndicator(message.status, message.lastSyncTime);
+          popup.updateSyncSettingsUI(message);
+        }
+      };
+
+      messageListener(mockMessage, null, null);
+      expect(global.syncInProgress).toBe(true);
+      expect(popup.updateSyncIndicator).toHaveBeenCalledWith('syncing', mockMessage.lastSyncTime);
+    });
+
+    test('should handle full sync complete message', async () => {
+      const mockMessage = {
+        type: 'fullSyncComplete'
+      };
+
+      // Mock message listener
+      const messageListener = async (message, sender, sendResponse) => {
+        if (message.type === 'fullSyncComplete') {
+          global.syncInProgress = false;
+          // Force complete refresh after full sync
+          setTimeout(async () => {
+            await mockYtStorage.getAllVideos();
+          }, 200);
+        }
+      };
+
+      await messageListener(mockMessage, null, null);
+      expect(global.syncInProgress).toBe(false);
     });
   });
 });

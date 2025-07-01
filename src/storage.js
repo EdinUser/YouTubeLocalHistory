@@ -174,13 +174,18 @@
         // Save video record
         async setVideo(videoId, data) {
             await this.ensureMigrated();
+            // Always save to local storage first (priority 1)
             await storage.set({ [`video_${videoId}`]: data });
+            // Then trigger sync if enabled
+            this.triggerSync(videoId);
         }
 
         // Remove video record
         async removeVideo(videoId) {
             await this.ensureMigrated();
             await storage.remove([`video_${videoId}`]);
+            // Trigger sync after removal
+            this.triggerSync();
         }
 
         // Get all video records
@@ -209,13 +214,18 @@
         // Save playlist record
         async setPlaylist(playlistId, data) {
             await this.ensureMigrated();
+            // Always save to local storage first (priority 1)
             await storage.set({ [`playlist_${playlistId}`]: data });
+            // Then trigger sync if enabled
+            this.triggerSync('playlist_' + playlistId);
         }
 
         // Remove playlist record
         async removePlaylist(playlistId) {
             await this.ensureMigrated();
             await storage.remove([`playlist_${playlistId}`]);
+            // Trigger sync after removal
+            this.triggerSync();
         }
 
         // Get all playlist records
@@ -260,7 +270,73 @@
             const keysToRemove = Object.keys(allData).filter(key => key.startsWith('video_') || key.startsWith('playlist_'));
             if (keysToRemove.length > 0) {
                 await storage.remove(keysToRemove);
+                // Trigger sync after clearing
+                this.triggerSync();
             }
+        }
+
+        // Helper method to trigger sync if available
+        triggerSync(videoId = null) {
+            // Reduce delay for more immediate syncing
+            setTimeout(() => {
+                // Try multiple approaches to ensure sync is triggered
+                let syncTriggered = false;
+                
+                // First try: Check if we're in background script context (has direct access to sync service)
+                if (window.ytSyncService && window.ytSyncService.syncEnabled) {
+                    if (videoId) {
+                        // Use efficient upload for specific video
+                        window.ytSyncService.uploadNewData(videoId).then(success => {
+                            if (success) {
+                                console.log('[Storage] ✅ Direct video upload triggered successfully');
+                                syncTriggered = true;
+                            }
+                        }).catch(error => {
+                            console.log('[Storage] ⚠️ Direct video upload failed:', error);
+                        });
+                    } else {
+                        // Fall back to full sync
+                        window.ytSyncService.triggerSync().then(success => {
+                            if (success) {
+                                console.log('[Storage] ✅ Direct sync trigger successful');
+                                syncTriggered = true;
+                            }
+                        }).catch(error => {
+                            console.log('[Storage] ⚠️ Direct sync trigger failed:', error);
+                        });
+                    }
+                    return; // Exit early if direct sync service is available
+                }
+                
+                // Second try: Send message to background script
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    const message = videoId ? 
+                        { type: 'uploadNewData', videoId: videoId } : 
+                        { type: 'triggerSync' };
+                        
+                    chrome.runtime.sendMessage(message).then(result => {
+                        if (result && result.success) {
+                            console.log('[Storage] ✅ Background sync trigger successful');
+                            syncTriggered = true;
+                        } else {
+                            console.log('[Storage] ⚠️ Background sync not available or failed');
+                        }
+                    }).catch(error => {
+                        console.log('[Storage] ⚠️ Could not reach background script for sync trigger:', error);
+                    });
+                }
+                
+                // Third try: Force immediate sync check (fallback for edge cases)
+                if (!syncTriggered) {
+                    setTimeout(() => {
+                        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                            chrome.runtime.sendMessage({ type: 'triggerSync' }).catch(() => {
+                                // Final fallback failed, but don't log as this is expected sometimes
+                            });
+                        }
+                    }, 2000); // Delayed fallback attempt
+                }
+            }, 50); // Reduced from 100ms to 50ms for faster triggering
         }
     }
 

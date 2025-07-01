@@ -173,8 +173,50 @@
 
         .left-controls {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .compact-button {
+            padding: 6px 10px;
+            font-size: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            min-width: auto;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .compact-button:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .danger-button {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+        }
+
+        .danger-button:hover {
+            background-color: var(--button-hover);
+        }
+
+        /* Specific button styling */
+        #ytvhtToggleTheme {
+            padding: 6px 10px;
+            min-width: 50px;
+            justify-content: center;
+        }
+
+        #ytvhtClosePopup {
+            padding: 6px 10px;
+            min-width: 45px;
+            justify-content: center;
         }
 
         button {
@@ -204,6 +246,76 @@
 
         #ytvhtToggleTheme:hover {
             background-color: var(--hover-bg);
+        }
+
+        /* Sync indicator styles */
+        .sync-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            font-size: 12px;
+            min-width: 80px;
+            justify-content: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .sync-icon {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .sync-disabled .sync-icon {
+            background-color: #999;
+        }
+
+        .sync-not_available .sync-icon {
+            background-color: #999;
+            opacity: 0.5;
+        }
+
+        .sync-initializing .sync-icon {
+            background-color: #ffa500;
+            animation: pulse 1.5s infinite;
+        }
+
+        .sync-syncing .sync-icon {
+            background-color: #007bff;
+            animation: spin 1s linear infinite;
+        }
+
+        .sync-success .sync-icon {
+            background-color: #28a745;
+        }
+
+        .sync-error .sync-icon {
+            background-color: #dc3545;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .sync-indicator:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .sync-text {
+            font-weight: 500;
+            color: var(--text-color);
         }
         .timestamp {
             color: var(--text-color);
@@ -567,14 +679,20 @@
     <h1>YT re:Watch</h1>
     <div class="controls">
         <div class="left-controls">
-            <button id="ytvhtToggleTheme" class="theme-toggle" title="Toggle theme" style="color: var(--text-color);">
+            <button id="ytvhtToggleTheme" class="compact-button" title="Toggle theme">
                 <span id="themeText">Theme</span>
             </button>
-            <button id="ytvhtExportHistory">Export History</button>
-            <button id="ytvhtImportHistory">Import History</button>
-            <button id="ytvhtClearHistory" style="background-color: #dc3545;">Clear History</button>
+            <button id="ytvhtClearHistory" class="compact-button danger-button" title="Clear all history">
+                Clear
+            </button>
         </div>
-        <button id="ytvhtClosePopup">Close</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div id="ytvhtSyncIndicator" class="sync-indicator sync-disabled" title="Sync status">
+                <div class="sync-icon"></div>
+                <span class="sync-text">Sync</span>
+            </div>
+            <button id="ytvhtClosePopup" class="compact-button">Close</button>
+        </div>
     </div>
     <div id="ytvhtMessage" class="message"></div>
 
@@ -722,17 +840,7 @@
         <div class="settings-form">
             <div class="settings-columns">
                 <div class="settings-column">
-                    <h3>General Settings</h3>
-                    <div class="settings-group">
-                        <label for="ytvhtPaginationCount">Items per Page</label>
-                        <input type="number" id="ytvhtPaginationCount" min="1" max="100" value="10">
-                        <div class="help-text">Number of items to show per page (1-100)</div>
-                    </div>
-                    <div class="settings-group">
-                        <label for="ytvhtAutoCleanPeriod">Auto-clean Period (days)</label>
-                        <input type="number" id="ytvhtAutoCleanPeriod" min="1" max="180" value="90">
-                        <div class="help-text">Automatically remove history older than this many days</div>
-                    </div>
+                    <h3>Interface & Display</h3>
                     <div class="settings-group">
                         <label for="ytvhtThemePreference">Theme</label>
                         <select id="ytvhtThemePreference">
@@ -743,17 +851,10 @@
                         <div class="help-text">Choose your preferred theme</div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtDebugMode">Debug Mode</label>
-                        <input type="checkbox" id="ytvhtDebugMode">
-                        <div class="help-text">Enable debug logging (for troubleshooting)</div>
+                        <label for="ytvhtPaginationCount">Items per Page</label>
+                        <input type="number" id="ytvhtPaginationCount" min="1" max="100" value="10">
+                        <div class="help-text">Number of items to show per page (1-100)</div>
                     </div>
-                    <div class="settings-group">
-                        <label>Extension Version</label>
-                        <div id="ytvhtVersion" class="version-text"></div>
-                    </div>
-                </div>
-                <div class="settings-column">
-                    <h3>Overlay Settings</h3>
                     <div class="settings-group">
                         <label for="ytvhtOverlayTitle">Overlay Title</label>
                         <input type="text" id="ytvhtOverlayTitle" maxlength="12" value="viewed">
@@ -784,6 +885,45 @@
                         <div class="help-text">Size of the overlay label and progress bar</div>
                     </div>
                 </div>
+                <div class="settings-column">
+                    <h3>Data & Sync</h3>
+                    <div class="settings-group">
+                        <label>Data Management</label>
+                        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                            <button id="ytvhtExportHistory" class="compact-button">Export</button>
+                            <button id="ytvhtImportHistory" class="compact-button" disabled>Import</button>
+                        </div>
+                        <div class="help-text">Export your history data (Import coming soon)</div>
+                    </div>
+                    <div class="settings-group">
+                        <label for="ytvhtAutoCleanPeriod">Auto-clean Period (days)</label>
+                        <input type="number" id="ytvhtAutoCleanPeriod" min="1" max="180" value="90">
+                        <div class="help-text">Automatically remove history older than this many days</div>
+                    </div>
+                    <div class="settings-group">
+                        <label for="ytvhtSyncEnabled">Firefox Sync</label>
+                        <input type="checkbox" id="ytvhtSyncEnabled">
+                        <div class="help-text">Sync your data across browser instances (Firefox only)</div>
+                    </div>
+                    <div class="settings-group">
+                        <label>Last Sync</label>
+                        <div id="ytvhtLastSyncTime" class="version-text">Never</div>
+                        <div class="help-text">
+                            <button id="ytvhtTriggerSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; margin-right: 4px;" disabled>Sync Now</button>
+                            <button id="ytvhtTriggerFullSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; background-color: #007bff;" disabled>Full Sync</button>
+                            <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">Full Sync cleans old data and re-syncs everything</div>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <label for="ytvhtDebugMode">Debug Mode</label>
+                        <input type="checkbox" id="ytvhtDebugMode">
+                        <div class="help-text">Enable debug logging (for troubleshooting)</div>
+                    </div>
+                    <div class="settings-group">
+                        <label>Extension Version</label>
+                        <div id="ytvhtVersion" class="version-text"></div>
+                    </div>
+                </div>
             </div>
             <div class="settings-actions">
                 <button id="ytvhtSaveSettings">Save Settings</button>
@@ -801,7 +941,7 @@
         </ul>
     </div>
     <script src="storage.js"></script>
-    <script src="popup-storage.js"></script>
+
     <script src="popup.js"></script>
 </body>
 </html>

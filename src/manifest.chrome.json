@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "YT re:Watch",
-    "version": "2.6.0",
+    "version": "2.6.2",
     "description": "Track and resume your YouTube watch history with YT re:Watch - Your personal video timekeeper.",
     "author": "Edin User",
     "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
