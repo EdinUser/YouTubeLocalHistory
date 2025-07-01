@@ -16,7 +16,7 @@ jobs:
           RELEASE_URL: ${{ github.event.release.html_url }}
           RELEASE_NAME: ${{ github.event.release.name }}
         run: |
-          curl -s -X POST https://api.telegram.org/bot${7953994005:AAGeECAVOgLYaLI2JnjTk4v5fxh3dqYrqZo}/sendMessage \
-          -d chat_id="${-1002843889267}" \
+          curl -s -X POST https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+          -d chat_id="${TELEGRAM_CHAT_ID}" \
           -d text="🆕 New release: *${RELEASE_NAME}* (${RELEASE_TAG})\n👉 [View on GitHub](${RELEASE_URL})" \
           -d parse_mode=Markdown
