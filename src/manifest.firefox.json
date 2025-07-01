@@ -21,6 +21,8 @@
   ],
   "background": {
     "scripts": [
+      "storage.js",
+      "sync-service.js", 
       "background.js"
     ]
   },

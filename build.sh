@@ -12,7 +12,7 @@ VERSION=$(grep '"version"' src/manifest.chrome.json | cut -d'"' -f4)
 # Function to copy common files
 copy_common_files() {
     local target_dir=$1
-    cp src/{background.js,content.js,popup.html,popup.js,storage.js,popup-storage.js} "$target_dir/"
+    cp src/{background.js,content.js,popup.html,popup.js,storage.js,sync-service.js} "$target_dir/"
     cp src/icon*.png "$target_dir/"
 }
 
@@ -29,8 +29,8 @@ echo "Building Firefox extension..."
 copy_common_files "build/firefox"
 cp src/manifest.firefox.json "build/firefox/manifest.json"
 cd build/firefox
-# For Firefox, we need to zip the files directly, not the directory
-zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js popup.html popup.js storage.js popup-storage.js icon*.png -x ".*"
+# For Firefox, we need to zip the files directly, not the directory  
+zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js popup.html popup.js storage.js sync-service.js icon*.png -x ".*"
 cd ../..
 
 echo -e "\nBuild complete!"
