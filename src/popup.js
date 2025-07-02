@@ -486,8 +486,9 @@ function updateActivityChart() {
 
     // Draw chart
     const maxActivity = Math.max(...activity, 1);
-    const barWidth = Math.floor((canvas.width - 40) / 7); // Leave space for margins
-    const barSpacing = Math.floor(barWidth * 0.2);
+    const availableWidth = canvas.width - 40; // Leave space for margins
+    const barWidth = Math.max(12, Math.floor(availableWidth / 7)); // Minimum 12px width
+    const barSpacing = Math.max(2, Math.min(6, Math.floor(barWidth * 0.15))); // 2-6px spacing
     const maxHeight = canvas.height - 40; // Leave space for labels
 
     // Draw background grid
@@ -632,8 +633,9 @@ function updateWatchTimeByHourChart() {
 
     // Draw chart
     const maxMinutes = Math.max(...hourlyMinutes, 1);
-    const barWidth = Math.floor((canvas.width - 60) / 24); // Leave space for labels
-    const barSpacing = Math.floor(barWidth * 0.2);
+    const availableWidth = canvas.width - 60; // Leave space for labels
+    const barWidth = Math.max(8, Math.floor(availableWidth / 24)); // Minimum 8px width
+    const barSpacing = Math.max(1, Math.min(4, Math.floor(barWidth * 0.15))); // 1-4px spacing
     const maxHeight = canvas.height - 60; // Leave space for labels
 
     // Draw background grid
@@ -1032,8 +1034,8 @@ function updatePaginationUI(current, total) {
     const pageNumbers = document.getElementById('ytvhtPageNumbers');
     pageNumbers.innerHTML = '';
 
-    if (total <= 10) {
-        // Show all pages if 10 or fewer
+    if (total <= 7) {
+        // Show all pages if 7 or fewer
         for (let i = 1; i <= total; i++) {
             addPageButton(i, current);
         }
@@ -1041,19 +1043,21 @@ function updatePaginationUI(current, total) {
         // Smart pagination for many pages
         addPageButton(1, current); // Always show first page
 
-        if (current > 4) {
+        if (current > 3) {
             addEllipsis(); // Add ... if current is far from start
         }
 
-        // Show current page and neighbors
-        const start = Math.max(2, current - 2);
-        const end = Math.min(total - 1, current + 2);
+        // Show current page and neighbors (1 before and 1 after)
+        const start = Math.max(2, current - 1);
+        const end = Math.min(total - 1, current + 1);
 
         for (let i = start; i <= end; i++) {
-            addPageButton(i, current);
+            if (i !== 1 && i !== total) { // Don't duplicate first/last page
+                addPageButton(i, current);
+            }
         }
 
-        if (current < total - 3) {
+        if (current < total - 2) {
             addEllipsis(); // Add ... if current is far from end
         }
 
@@ -1062,29 +1066,7 @@ function updatePaginationUI(current, total) {
         }
     }
 
-    // Add "Go to page" input for very large sets
-    if (total > 10) {
-        const goToSpan = document.createElement('span');
-        goToSpan.textContent = ' Go to: ';
-        goToSpan.style.marginLeft = '10px';
-        pageNumbers.appendChild(goToSpan);
 
-        const clonedInput = pageInput.cloneNode(true);
-        clonedInput.style.display = 'inline';
-        clonedInput.value = '';
-        clonedInput.placeholder = current;
-        clonedInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                const page = parseInt(this.value);
-                if (page) {
-                    goToPage(page);
-                    this.value = '';
-                    this.placeholder = currentPage;
-                }
-            }
-        });
-        pageNumbers.appendChild(clonedInput);
-    }
 }
 
 function addPageButton(pageNum, currentPage) {
@@ -1106,18 +1088,30 @@ function addPageButton(pageNum, currentPage) {
 
 function addEllipsis() {
     const span = document.createElement('span');
-    span.textContent = '...';
-    span.style.padding = '5px';
+    span.innerHTML = '&hellip;';  // HTML entity for ellipsis
+    span.style.cssText = `
+        padding: 5px 10px;
+        color: var(--text-color);
+        opacity: 0.7;
+        font-weight: bold;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        font-size: 16px;
+        letter-spacing: 2px;
+    `;
     document.getElementById('ytvhtPageNumbers').appendChild(span);
 }
 
-async function loadPlaylists() {
+async function loadPlaylists(showMessages = true) {
     try {
         log('Loading playlists from storage...');
         const playlists = await ytStorage.getAllPlaylists();
 
         if (!playlists || Object.keys(playlists).length === 0) {
-            showMessage('No playlists found.', 'info');
+            if (showMessages) {
+                showMessage('No playlists found.', 'info');
+            }
             allPlaylists = [];
         } else {
             // Convert the object of playlists to an array and sort by lastUpdated descending (most recent first)
@@ -1127,10 +1121,14 @@ async function loadPlaylists() {
         }
 
         currentPlaylistPage = 1;
-        displayPlaylistsPage();
+        if (showMessages) {
+            displayPlaylistsPage();
+        }
     } catch (error) {
         console.error('Error loading playlists:', error);
-        showMessage('Error loading playlists: ' + (error.message || 'Unknown error'), 'error');
+        if (showMessages) {
+            showMessage('Error loading playlists: ' + (error.message || 'Unknown error'), 'error');
+        }
     }
 }
 
@@ -1140,49 +1138,80 @@ function displayPlaylistsPage() {
     const paginationDiv = document.getElementById('ytvhtPlaylistsPagination');
     const body = document.getElementById('ytvhtPlaylistsBody');
     body.innerHTML = '';
+
     if (!allPlaylists.length) {
         noPlaylists.style.display = 'block';
         playlistsTable.style.display = 'none';
         paginationDiv.style.display = 'none';
         return;
     }
+
     noPlaylists.style.display = 'none';
     playlistsTable.style.display = '';
     paginationDiv.style.display = 'flex';
+
     const totalPages = Math.ceil(allPlaylists.length / playlistPageSize);
     if (currentPlaylistPage > totalPages) currentPlaylistPage = totalPages;
     if (currentPlaylistPage < 1) currentPlaylistPage = 1;
+
     const startIdx = (currentPlaylistPage - 1) * playlistPageSize;
     const endIdx = Math.min(startIdx + playlistPageSize, allPlaylists.length);
     const pageRecords = allPlaylists.slice(startIdx, endIdx);
-    pageRecords.forEach(record => {
-        const row = document.createElement('tr');
-        // Playlist title
-        const titleCell = document.createElement('td');
-        titleCell.textContent = record.title;
-        // Playlist link
-        const linkCell = document.createElement('td');
-        const link = document.createElement('a');
+
+    // Reuse existing rows when possible
+    while (body.rows.length > pageRecords.length) {
+        body.deleteRow(-1);
+    }
+
+    pageRecords.forEach((record, index) => {
+        let row = body.rows[index];
+        const isNewRow = !row;
+
+        if (isNewRow) {
+            row = document.createElement('tr');
+            const cell = document.createElement('td');
+            row.appendChild(cell);
+            body.appendChild(row);
+        }
+
+        // Get the cell
+        const cell = row.cells[0];
+        cell.className = 'playlist-cell';
+
+        // Create or update content
+        if (!cell.querySelector('.playlist-icon')) {
+            cell.innerHTML = `
+                <div class="playlist-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+                        <circle cx="20" cy="7" r="2"/>
+                        <circle cx="20" cy="12" r="2"/>
+                        <circle cx="20" cy="17" r="2"/>
+                    </svg>
+                </div>
+                <div class="playlist-content">
+                    <div class="playlist-title">
+                        <a class="video-link" target="_blank"></a>
+                    </div>
+                    <div class="playlist-details">
+                        <span class="playlist-date"></span>
+                        <button class="delete-button">Delete</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update content
+        const link = cell.querySelector('.video-link');
+        const date = cell.querySelector('.playlist-date');
+        const deleteButton = cell.querySelector('.delete-button');
+
         link.href = record.url;
-        link.className = 'video-link';
-        link.textContent = 'Open';
-        link.target = '_blank';
-        linkCell.appendChild(link);
-        // Saved date
-        const dateCell = document.createElement('td');
-        dateCell.textContent = formatDate(record.timestamp);
-        // Action
-        const actionCell = document.createElement('td');
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete';
+        link.textContent = record.title || 'Unknown Playlist';
+        date.textContent = formatDate(record.timestamp);
         deleteButton.onclick = () => deletePlaylist(record.playlistId);
-        actionCell.appendChild(deleteButton);
-        row.appendChild(titleCell);
-        row.appendChild(linkCell);
-        row.appendChild(dateCell);
-        row.appendChild(actionCell);
-        body.appendChild(row);
     });
+
     // Update pagination info and controls
     updatePlaylistPaginationUI(currentPlaylistPage, totalPages);
 }
@@ -1227,8 +1256,8 @@ function updatePlaylistPaginationUI(current, total) {
     const pageNumbers = document.getElementById('ytvhtPlaylistPageNumbers');
     pageNumbers.innerHTML = '';
 
-    if (total <= 10) {
-        // Show all pages if 10 or fewer
+    if (total <= 7) {
+        // Show all pages if 7 or fewer
         for (let i = 1; i <= total; i++) {
             addPlaylistPageButton(i, current);
         }
@@ -1236,19 +1265,21 @@ function updatePlaylistPaginationUI(current, total) {
         // Smart pagination for many pages
         addPlaylistPageButton(1, current); // Always show first page
 
-        if (current > 4) {
+        if (current > 3) {
             addPlaylistEllipsis(); // Add ... if current is far from start
         }
 
-        // Show current page and neighbors
-        const start = Math.max(2, current - 2);
-        const end = Math.min(total - 1, current + 2);
+        // Show current page and neighbors (1 before and 1 after)
+        const start = Math.max(2, current - 1);
+        const end = Math.min(total - 1, current + 1);
 
         for (let i = start; i <= end; i++) {
-            addPlaylistPageButton(i, current);
+            if (i !== 1 && i !== total) { // Don't duplicate first/last page
+                addPlaylistPageButton(i, current);
+            }
         }
 
-        if (current < total - 3) {
+        if (current < total - 2) {
             addPlaylistEllipsis(); // Add ... if current is far from end
         }
 
@@ -1257,29 +1288,7 @@ function updatePlaylistPaginationUI(current, total) {
         }
     }
 
-    // Add "Go to page" input for very large sets
-    if (total > 10) {
-        const goToSpan = document.createElement('span');
-        goToSpan.textContent = ' Go to: ';
-        goToSpan.style.marginLeft = '10px';
-        pageNumbers.appendChild(goToSpan);
 
-        const clonedInput = pageInput.cloneNode(true);
-        clonedInput.style.display = 'inline';
-        clonedInput.value = '';
-        clonedInput.placeholder = current;
-        clonedInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                const page = parseInt(this.value);
-                if (page) {
-                    goToPlaylistPage(page);
-                    this.value = '';
-                    this.placeholder = currentPlaylistPage;
-                }
-            }
-        });
-        pageNumbers.appendChild(clonedInput);
-    }
 }
 
 function addPlaylistPageButton(pageNum, currentPage) {
@@ -1301,8 +1310,18 @@ function addPlaylistPageButton(pageNum, currentPage) {
 
 function addPlaylistEllipsis() {
     const span = document.createElement('span');
-    span.textContent = '...';
-    span.style.margin = '0 5px';
+    span.innerHTML = '&hellip;';  // HTML entity for ellipsis
+    span.style.cssText = `
+        padding: 5px 10px;
+        color: var(--text-color);
+        opacity: 0.7;
+        font-weight: bold;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        font-size: 16px;
+        letter-spacing: 2px;
+    `;
     document.getElementById('ytvhtPlaylistPageNumbers').appendChild(span);
 }
 
@@ -1524,6 +1543,12 @@ function switchTab(tab) {
         } else if (tab === 'settings') {
             // Initialize settings tab
             initSettingsTab();
+        } else if (tab === 'playlists') {
+            // Load playlists when switching to playlists tab
+            loadPlaylists(true);
+        } else if (tab === 'shorts') {
+            // Display shorts when switching to shorts tab
+            displayShortsPage();
         }
     }
 }
@@ -1944,7 +1969,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
         playlistsTab.addEventListener('click', () => {
             switchTab('playlists');
-            loadPlaylists();
+            loadPlaylists(true);
         });
         analyticsTab.addEventListener('click', () => {
             switchTab('analytics');
@@ -1985,6 +2010,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Load initial data
         await loadHistory(true);
+
+        // Load playlists for analytics (don't show messages)
+        await loadPlaylists(false);
 
         // Initialize sync functionality
         initSyncIntegration();
@@ -2079,45 +2107,39 @@ function updateShortsPaginationUI(current, total) {
     // Generate page numbers (smart pagination)
     pageNumbers.innerHTML = '';
 
-    if (total <= 10) {
+    if (total <= 7) {
+        // Show all pages if 7 or fewer
         for (let i = 1; i <= total; i++) {
             addShortsPageButton(i, current);
         }
     } else {
-        addShortsPageButton(1, current);
-        if (current > 4) addShortsEllipsis();
-        const start = Math.max(2, current - 2);
-        const end = Math.min(total - 1, current + 2);
-        for (let i = start; i <= end; i++) {
-            addShortsPageButton(i, current);
+        // Smart pagination for many pages
+        addShortsPageButton(1, current); // Always show first page
+
+        if (current > 3) {
+            addShortsEllipsis(); // Add ... if current is far from start
         }
-        if (current < total - 3) addShortsEllipsis();
-        if (total > 1) addShortsPageButton(total, current);
-    }
 
-    // Add "Go to page" input for very large sets
-    if (total > 10) {
-        const goToSpan = document.createElement('span');
-        goToSpan.textContent = ' Go to: ';
-        goToSpan.style.marginLeft = '10px';
-        pageNumbers.appendChild(goToSpan);
+        // Show current page and neighbors (1 before and 1 after)
+        const start = Math.max(2, current - 1);
+        const end = Math.min(total - 1, current + 1);
 
-        const clonedInput = pageInput.cloneNode(true);
-        clonedInput.style.display = 'inline';
-        clonedInput.value = '';
-        clonedInput.placeholder = current;
-        clonedInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                const page = parseInt(this.value);
-                if (page) {
-                    goToShortsPage(page);
-                    this.value = '';
-                    this.placeholder = currentShortsPage;
-                }
+        for (let i = start; i <= end; i++) {
+            if (i !== 1 && i !== total) { // Don't duplicate first/last page
+                addShortsPageButton(i, current);
             }
-        });
-        pageNumbers.appendChild(clonedInput);
+        }
+
+        if (current < total - 2) {
+            addShortsEllipsis(); // Add ... if current is far from end
+        }
+
+        if (total > 1) {
+            addShortsPageButton(total, current); // Always show last page
+        }
     }
+
+
 }
 
 function addShortsPageButton(pageNum, currentPage) {
@@ -2139,8 +2161,18 @@ function addShortsPageButton(pageNum, currentPage) {
 
 function addShortsEllipsis() {
     const span = document.createElement('span');
-    span.textContent = '...';
-    span.style.padding = '5px';
+    span.innerHTML = '&hellip;';  // HTML entity for ellipsis
+    span.style.cssText = `
+        padding: 5px 10px;
+        color: var(--text-color);
+        opacity: 0.7;
+        font-weight: bold;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        font-size: 16px;
+        letter-spacing: 2px;
+    `;
     document.getElementById('ytvhtShortsPageNumbers').appendChild(span);
 }
 
@@ -2228,11 +2260,21 @@ window.testSyncImprovements = function() {
 };
 
 function initSyncIntegration() {
+    // Ensure sync indicator is visible by default
+    const indicatorElement = document.getElementById('ytvhtSyncIndicator');
+    if (indicatorElement) {
+        indicatorElement.style.display = 'flex';
+        indicatorElement.style.visibility = 'visible';
+    }
+    
     // Get initial sync status from background
     chrome.runtime.sendMessage({ type: 'getSyncStatus' }, (response) => {
         if (response) {
             updateSyncIndicator(response.status, response.lastSyncTime);
             updateSyncSettingsUI(response);
+        } else {
+            // Fallback if sync status fails
+            updateSyncIndicator('not_available', null);
         }
     });
 
