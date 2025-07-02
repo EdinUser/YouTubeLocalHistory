@@ -2,7 +2,152 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
-## [2.6.2] - 2025-01-03
+## [2.6.4]
+
+### ✨ Major New Features
+
+#### 🔄 Firefox Sync Integration
+- **Added comprehensive Firefox Sync support** (`src/sync-service.js`)
+  - Cross-device synchronization of video history and playlists
+  - Local storage priority with conflict resolution
+  - Automatic sync triggers on data changes
+  - Manual sync controls with full sync capability
+  - Intelligent sync status management and error handling
+  - Batch data processing for Firefox sync storage limits
+  - Real-time sync status indicator in popup interface
+  - Debug logging and sync testing capabilities
+
+#### 🎯 Enhanced User Interface
+- **Added sync status indicator** to popup interface
+  - Real-time sync status updates (Disabled, Initializing, Syncing, Success, Error)
+  - Visual sync progress animations
+  - Click-to-sync functionality
+  - Last sync time display
+- **Enhanced sync settings panel**
+  - Enable/disable sync toggle
+  - Manual sync trigger buttons
+  - Full sync with confirmation dialog
+  - Sync status and error reporting
+
+### 🎨 Major UI/UX Improvements
+
+#### 📋 Playlist Tab Redesign
+- **Card-Based Layout**: Transformed playlist tab from cramped table to modern card layout matching Videos/Shorts
+- **SVG Icons**: Replaced unreliable emoji characters with clean, scalable SVG playlist icons
+- **Visual Consistency**: Added proper line separators, spacing, and consistent styling across all tabs
+- **Enhanced Typography**: Improved font sizes, weights, and hierarchical text layout
+
+#### 🔢 Pagination System Overhaul
+- **Conservative Display**: Reduced pagination threshold from 10 to 7 pages for cleaner interface
+- **Smart Page Selection**: Show current page ± 1 neighbor instead of ± 2 for less clutter
+- **Clean Ellipsis**: Replaced ugly "..." text with proper HTML entity (…) with enhanced styling
+- **Removed UI Clutter**: Eliminated "Go to page" input that was breaking UI flow
+- **Applied Universally**: Enhanced pagination across Videos, Playlists, and Shorts tabs
+
+#### ⚙️ Settings Interface Polish
+- **Improved Column Spacing**: Increased settings gap from 10px to 25px for better visual separation
+- **Enhanced Readability**: Better distinction between Interface & Display and Data & Sync sections
+
+### 🐛 Critical Bug Fixes
+
+#### 📊 Analytics Tab Fixes
+- **Playlist Count Fix**: Resolved issue where playlist count always showed 0 initially
+- **Initialization Loading**: Added playlist loading during extension startup for accurate analytics
+- **Chart Bar Width Issues**: Set minimum bar widths (12px activity, 8px hourly) to prevent invisible bars
+
+#### 🔄 Tab Restoration & Sync
+- **Smart Tab Loading**: Fixed tab restoration not loading playlist data when extension opens
+- **Sync Indicator Visibility**: Enhanced sync indicator with defensive CSS and initialization code
+- **Data Loading Logic**: Added proper data loading to switchTab function for all tab types
+
+### 🚀 Core Improvements
+
+#### 📊 Storage System Enhancements
+- **Integrated sync triggering** across all storage operations
+  - Automatic sync triggers on video/playlist saves
+  - Sync triggers on data removal and clear operations
+  - Multiple fallback approaches for sync reliability
+  - Error handling to prevent sync failures from breaking storage
+- **Streamlined storage architecture**
+  - Removed `src/popup-storage.js` (functionality consolidated)
+  - Enhanced `src/storage.js` with sync integration
+  - Improved error handling and retry mechanisms
+
+#### 🎬 Video Position & Navigation Fixes
+- **Smart timestamp loading** improvements
+  - Added 250ms delay to prevent video interruption
+  - Respects YouTube's state restoration process
+  - Prevents loading timestamps during video transitions
+- **SPA navigation handling**
+  - Improved single-page application navigation detection
+  - Prevents video interruption during YouTube navigation
+  - Better handling of video ID changes and mode transitions
+
+#### 🎛️ Popup Interface Enhancements
+- **Sync-aware storage change listeners**
+  - Prevents duplicate UI updates during sync operations
+  - Improved storage change detection and filtering
+  - Better race condition handling
+- **Updated clear history functionality**
+  - Uses `clearHistoryOnly()` instead of `clear()` 
+  - Preserves settings and sync configuration
+  - Enhanced confirmation dialog with clearer warnings
+
+### 🔧 Technical Enhancements
+
+#### 🎯 Performance Improvements
+- **Optimized Chart Rendering**: Enhanced chart bar width calculations with minimum constraints
+- **Efficient Data Loading**: Load playlists during initialization instead of on-demand only
+- **Better Resource Management**: Improved sync indicator visibility with proper CSS rules
+
+#### 🧹 Code Quality
+- **Consistent Styling**: Standardized card-based layouts across all content tabs
+- **Enhanced Error Handling**: Better defensive programming for UI element initialization
+- **Visual Harmony**: Unified delete button placement and styling across all interfaces
+
+#### 📦 Build and Manifest Updates
+- **Version bump to 2.6.4** in both Chrome and Firefox manifests
+- **Firefox manifest enhancements**
+  - Added `sync-service.js` to background scripts
+  - Proper script loading order for sync functionality
+- **Build script improvements** (`build.sh`)
+  - Enhanced Firefox build process
+  - Better error handling and validation
+
+#### 🧪 Testing and Quality
+- **Comprehensive test updates**
+  - Updated popup tests for new sync functionality  
+  - Enhanced storage tests with sync integration
+  - Improved integration tests for video tracking
+  - Added sync service test coverage
+- **Mock improvements**
+  - Better Chrome runtime mocking for sync features
+  - Enhanced storage mocking with sync triggers
+  - Improved error handling in test scenarios
+
+### 💔 Breaking Changes
+
+- **Removed `src/popup-storage.js`** - functionality consolidated into main popup script
+- **Updated storage methods** - all storage operations now trigger sync when available
+- **Modified clear history behavior** - now uses `clearHistoryOnly()` to preserve settings
+
+### 🔄 Migration Notes
+
+- Existing installations will automatically migrate to the new storage system
+- Sync functionality is opt-in and disabled by default
+- All existing data and settings are preserved during the update
+- Firefox users can enable sync through the popup settings panel
+
+### 📈 Performance Improvements
+
+- **Reduced sync delays** from 250ms to 100ms for more responsive syncing
+- **Optimized sync storage** with intelligent batching and cleanup
+- **Enhanced error recovery** with multiple fallback mechanisms
+- **Improved memory usage** with better cleanup and resource management
+
+---
+
+## [2.6.2]
 
 ### ✨ Major New Features
 

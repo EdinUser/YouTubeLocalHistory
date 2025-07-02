@@ -43,11 +43,12 @@
 - **Playlist Metrics**: Analyze your playlist viewing habits
 
 ### 🎨 User Experience
-- **Modern UI/UX**: Card-based layout with thumbnails and improved error messages
+- **Modern UI/UX**: Unified card-based layout across Videos, Shorts, and Playlists with clean SVG icons
+- **Smart Pagination**: Conservative page display with clean ellipsis and intelligent navigation
 - **Dark Theme Support**: Full dark/light theme system with system preference detection
 - **Responsive Design**: Theme-aware visualizations and smooth transitions
-- **Tab State Persistence**: Extension remembers which tab (Videos, Shorts, Playlists) was last active
-- **Customizable Settings**: Adjust overlay appearance, auto-cleanup settings, and theme preferences
+- **Tab State Persistence**: Extension remembers which tab was last active with proper data loading
+- **Customizable Settings**: Enhanced settings interface with improved spacing and organization
 
 ### 🔧 Technical Features
 - **Cross-Browser Support**: Works on Chrome and Firefox with identical functionality
