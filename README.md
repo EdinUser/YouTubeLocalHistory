@@ -1,91 +1,188 @@
-<div align="center">
-
-# <img src="./src/icon128.png" alt="YT re:Watch" width="48" height="48" style="vertical-align: middle; margin-right: 10px;"> YT re:Watch
+# 🎬 YT re:Watch - YouTube History Extension for Multiple Accounts & Privacy
 
 [![Tests](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml/badge.svg)](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/EdinUser/YouTubeLocalHistory)](https://github.com/EdinUser/YouTubeLocalHistory/releases)
-[![Privacy First](https://img.shields.io/badge/Privacy-First-blueviolet?logo=privateinternetaccess)](https://github.com/EdinUser/YouTubeLocalHistory#privacy)
-[![Browser Support](https://img.shields.io/badge/Browser-Chrome_|_Firefox-FF7139?logo=googlechrome&logoColor=white)](https://github.com/EdinUser/YouTubeLocalHistory#installation)
-[![Local Storage](https://img.shields.io/badge/Data-Local_Only-important)](https://github.com/EdinUser/YouTubeLocalHistory#data-storage)
 [![Telegram Channel](https://img.shields.io/badge/Community-Telegram-2AABEE?logo=telegram&logoColor=white)](https://t.me/+eFftKWGVvSpiZjZk)
 
+# 📚 **[→ New User? Start Here! User-Friendly Guide](./docs/INDEX.md) ←**
+
+<div align="center">
+  <strong>🔄 YouTube Account Switching Made Easy! Same history across ALL accounts + YouTube history privacy!</strong>
+  <br>
+  <em>🔄 Multi-account extension • 📊 History privacy • ✨ No login required • 🎯 Progress tracking</em>
+  <br>
+  <em>📖 <a href="./docs/FAQ.md">FAQ</a> | 📚 <a href="./docs/DETAILED_GUIDE.md">Complete Guide</a> | 🔧 <a href="./docs/TECHNICAL.md">Developer Docs</a></em>
 </div>
 
-**YT re:Watch** is your personal YouTube companion that keeps track of your video journey. Never lose your place in a video again! This lightweight browser extension automatically saves your progress and helps you pick up right where you left off, all while keeping your data private and secure on your device.
+---
 
-## Features
+<div align="center">
+  <img src="./src/icon128.png" alt="YT re:Watch YouTube History Extension" width="96" height="96">
+  
+  [![Chrome Web Store](https://img.shields.io/badge/Get_it_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
+  [![Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
+  
+  *YouTube progress tracking without account limitations - Your viewing history stays private*
+</div>
 
-### 🎬 Video Tracking
-- **Automatic Progress Tracking**: Saves your current position in videos automatically with improved timestamp accuracy and instant updates
-- **YouTube Shorts Support**: Full tracking and display for YouTube Shorts with dedicated interface
-- **Smart Timestamp Loading**: 250ms delay to prevent video interruption with respect for YouTube's state restoration
-- **Progress Percentage**: View both watched time and percentage completion for each video
-- **Visual Indicators**: Shows "viewed" labels and progress bars on video thumbnails with modern card-based layout
+---
 
-### 🗂️ Data Management
-- **Local Storage**: All data is stored locally on your device using secure browser storage (`chrome.storage.local`)
-- **Playlist Tracking**: Saves playlist information for easy access with enhanced metrics
-- **Export/Import**: Backup and restore your watch history with support for both legacy and new formats
-- **Automatic Migration**: Seamless migration from IndexedDB to secure browser storage
+## 🎯 Perfect for YouTube Multiple Accounts & Privacy
 
-### 🔄 Sync & Cross-Device
-- **Firefox Sync Integration**: Automatically syncs data across devices when Firefox Sync is enabled
-- **Cross-Device Synchronization**: Real-time sync of video history and playlists with conflict resolution
-- **Sync Status Indicator**: Visual sync progress with manual sync controls
-- **Local Priority**: Local storage takes precedence during sync conflicts to ensure data integrity
+**🔄 Tired of losing YouTube progress when switching accounts? Need YouTube history without login?**
 
-### 📊 Analytics & Insights
-- **Analytics Dashboard**: Full analytics dashboard with interactive charts
-- **Watch Time Distribution**: See your viewing patterns by hour of day
-- **Content Type Analysis**: Compare time spent on regular videos vs Shorts
-- **Weekly Activity Tracking**: Visualize your weekly YouTube activity
-- **Completion Rate Statistics**: Track how often you finish videos
-- **Playlist Metrics**: Analyze your playlist viewing habits
+YT re:Watch is the **YouTube history extension** that solves account switching problems:
 
-### 🎨 User Experience
-- **Modern UI/UX**: Unified card-based layout across Videos, Shorts, and Playlists with clean SVG icons
-- **Smart Pagination**: Conservative page display with clean ellipsis and intelligent navigation
-- **Dark Theme Support**: Full dark/light theme system with system preference detection
-- **Responsive Design**: Theme-aware visualizations and smooth transitions
-- **Tab State Persistence**: Extension remembers which tab was last active with proper data loading
-- **Customizable Settings**: Enhanced settings interface with improved spacing and organization
+### 🔄 **YouTube Multiple Accounts Support**
+- ✅ **Same history across ALL YouTube accounts** - switch freely without losing progress
+- ✅ **YouTube without login** - track videos without any account required
+- ✅ **Account switching made easy** - consistent viewing history regardless of login status
+- ✅ **Multi-account workflow** - perfect for work/personal YouTube accounts
+- ✅ **Family computer friendly** - separate histories without account conflicts
 
-### 🔧 Technical Features
-- **Cross-Browser Support**: Works on Chrome and Firefox with identical functionality
-- **SPA Navigation Handling**: Improved single-page application navigation without video interruption
-- **Enhanced Security**: Encrypted data storage that cannot be accessed through browser developer tools
-- **Comprehensive Testing**: Full test suite covering sync, storage, and UI functionality
+### 🎯 **YouTube Progress Tracking & Visual Overlays**
+- ✅ **Progress bars on YouTube** - see completion percentage on video thumbnails
+- ✅ **"Viewed" labels** - customizable overlay showing watched videos
+- ✅ **Resume where you left off** - automatic video position tracking
+- ✅ **YouTube Shorts tracking** - separate tracking for short-form content
+- ✅ **Playlist discovery** - track and organize YouTube playlists
 
-## Installation
+### 🔒 **YouTube History Privacy** 
+- ✅ **Local storage only** - Google doesn't get your viewing progress data
+- ✅ **No YouTube tracking** - replaces Google's built-in history system
+- ✅ **Private YouTube browsing** - watch without affecting recommendations
+- ✅ **Cross-device sync** (Firefox) - private history sync across devices
 
-### Chrome
-#### Option 1: Install from Chrome Web Store
+### ⚠️ **Privacy Transparency**
+**What this extension protects:** YouTube viewing history and video progress tracking only  
+**What it DOESN'T protect:** IP tracking, cookies, browser fingerprinting, or other Google tracking
+
+**For complete privacy:** Combine with VPN, ad blockers, and privacy-focused browsers
+
+## 🚀 Get Started in 30 Seconds
+
+### Step 1: Install the Extension
+**Chrome Users:** [Get it from Chrome Web Store →](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
+
+**Firefox Users:** [Get it from Firefox Add-ons →](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
+
+### Step 2: That's It!
+- Go to YouTube and start watching videos
+- The extension works automatically in the background
+- Click the extension icon to see your watch history
+
+## 🎯 Perfect For These YouTube Users
+
+### 🔄 **Multi-Account Users** (#1 Use Case!)
+- "I have work and personal YouTube accounts - hate losing progress when switching"
+- "My family shares this computer and we need separate YouTube histories"
+- "I manage multiple YouTube channels and need consistent tracking"
+- "I want to use YouTube without staying logged in"
+
+### 🔒 **Privacy-Focused Users**
+- "I want YouTube history without Google tracking my viewing habits"
+- "I need to research topics without affecting my recommendations"
+- "I want to browse YouTube anonymously but still track what I watch"
+- "I need a private alternative to YouTube's built-in history"
+
+### 👨‍🎓 **Students & Content Creators**
+- "I watch educational content across different devices and accounts"
+- "I need to track my viewing progress without Google profiling"
+- "I want consistent YouTube history for research projects"
+- "I need to analyze my viewing patterns privately"
+
+---
+
+## 📱 What You'll See on YouTube
+
+### 🏷️ **Visual Overlays** (Key Feature!)
+The extension adds smart visual indicators directly on YouTube:
+- **"Viewed" labels** - Customizable text showing watched videos
+- **Progress bars** - Visual completion percentage on video thumbnails  
+- **Custom colors** - Choose from blue, red, green, purple, or orange
+- **Adjustable size** - Small, medium, large, or extra-large labels
+- **Works everywhere** - Video listings, search results, recommendations
+
+### 🎛️ **Extension Interface**
+Click the extension icon to access:
+- **Videos Tab** - Your main viewing history with progress tracking
+- **Shorts Tab** - Separate tracking for YouTube Shorts
+- **Playlists Tab** - Discovered playlists with metadata
+- **Analytics Tab** - Interactive charts showing viewing patterns
+- **Settings Tab** - Full customization options
+
+---
+
+## 🗂️ Key Features
+
+### 🔄 **Multi-Account & Privacy**
+- **Account Independence**: Same YouTube history across all accounts (or no account)
+- **Local Storage**: All data stored securely on your device only
+- **No Google Tracking**: YouTube doesn't get your viewing progress data
+- **Export/Import**: Backup and restore your YouTube history anytime
+
+### 🎯 **Progress Tracking**
+- **Visual Overlays**: Customizable "viewed" labels and progress bars
+- **Auto-save**: Tracks video position every 5 seconds
+- **YouTube Shorts**: Separate tracking for short-form content
+- **Playlist Discovery**: Track and organize YouTube playlists
+
+### 📊 **Analytics & Insights**
+- **Interactive Charts**: Viewing patterns by hour and day
+- **Content Analysis**: Compare regular videos vs Shorts
+- **Completion Rates**: Track how often you finish videos
+- **Weekly Activity**: Visualize your YouTube usage patterns
+
+### 🔄 **Cross-Device Sync (Firefox)**
+- **Firefox Sync**: Automatic cross-device synchronization
+- **Conflict Resolution**: Smart handling of sync conflicts
+- **Manual Sync**: Trigger sync anytime from settings
+- **Status Indicator**: Visual sync progress tracking
+
+### 🎨 **User Experience**
+- **Modern Interface**: Clean, card-based layout
+- **Dark/Light Theme**: Automatic system theme detection
+- **Smart Search**: Find videos quickly in your history
+- **Responsive Design**: Works perfectly on all screen sizes
+
+---
+
+## 🤝 Community & Support
+
+- 💬 **[Join our Telegram community](https://t.me/+eFftKWGVvSpiZjZk)** - Get help, share tips, and connect with other users
+- 📖 **[Read our documentation](./docs/INDEX.md)** - Complete guides for all skill levels
+- 🐛 **[Report bugs on GitHub](https://github.com/EdinUser/YouTubeLocalHistory/issues)** - Help improve the extension
+- ⭐ **[Rate us on browser stores](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)** - Support the project
+
+---
+
+## 📥 Installation
+
+### 🔥 **Recommended: Install from Browser Stores**
+
+**Chrome Users:**
 [![Get YT re:Watch on Chrome Web Store](https://img.shields.io/badge/Get_YT_re:Watch_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
-[![Chrome Users](https://img.shields.io/chrome-web-store/users/pebiokefjgdbfnkolmblaaladkmpilba?logo=googlechrome&color=green)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
-[![Chrome Rating](https://img.shields.io/chrome-web-store/rating/pebiokefjgdbfnkolmblaaladkmpilba?logo=googlechrome)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
 
-#### Option 2: Manual Installation
+**Firefox Users:**
+[![Get it on Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
+
+### 🔧 **For Developers: Manual Installation**
+
+<details>
+<summary>Click to expand developer installation instructions</summary>
+
+**Chrome:**
 1. Run `./build.sh` to build the extension
-2. Open Chrome and go to `chrome://extensions/`
+2. Open Chrome → `chrome://extensions/`
 3. Enable "Developer mode"
 4. Click "Load unpacked" and select the `dist/chrome` folder
 
-### Firefox
-#### Option 1: Install from Firefox Add-ons
-[![Get it on Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
-[![Firefox Users](https://img.shields.io/amo/users/yt-rewatch?logo=firefox&color=blue)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
-[![Firefox Rating](https://img.shields.io/amo/rating/yt-rewatch?logo=firefox)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
-
-#### Option 2: Manual Installation
+**Firefox:**
 1. Run `./build.sh` to build the extension
-2. Open Firefox and go to `about:debugging#/runtime/this-firefox`
+2. Open Firefox → `about:debugging#/runtime/this-firefox`
 3. Click "Load Temporary Add-on" and select the `manifest.json` file from the `dist/firefox` folder
 
-**Note**: Both extensions use the same secure storage system with automatic migration from IndexedDB. Firefox users can enable Firefox Sync to automatically sync their history across devices with real-time sync status indicators.
-
-## Community
-
-Join our [Telegram channel](https://t.me/+eFftKWGVvSpiZjZk) for updates, support, and discussions about YT re:Watch! 💬
+</details>
 
 ## Storage System
 
@@ -254,3 +351,20 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Release Notes
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed release notes and version history.
+
+---
+
+## 🎯 **Summary: Why Choose YT re:Watch?**
+
+**YT re:Watch** is the ultimate **YouTube history extension** for users who:
+- Switch between **multiple YouTube accounts** (work/personal)
+- Want **YouTube history without login** requirements
+- Need **YouTube progress tracking** with visual overlays
+- Prefer **YouTube privacy** over Google's tracking
+- Want **consistent viewing history** regardless of account status
+
+**Key Search Terms:** YouTube multiple accounts, YouTube account switching, YouTube history extension, YouTube progress tracking, YouTube without login, YouTube privacy extension, YouTube progress bar, YouTube viewed videos, YouTube multi-account, YouTube history sync
+
+**Perfect for:** Multi-account users, privacy-conscious users, students, researchers, content creators, families sharing computers, and anyone who wants reliable YouTube progress tracking without Google surveillance.
+
+⭐ **[Install now from Chrome Web Store](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)** or **[Firefox Add-ons](https://addons.mozilla.org/firefox/addon/yt-rewatch/)**
