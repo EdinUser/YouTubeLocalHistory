@@ -1,8 +1,8 @@
 // --- Debugging and Logging ---
-const DEBUG = true; // Set to false for production
+let debugEnabled = false; // Will be set from user settings
 
 function log(...args) {
-    if (DEBUG) {
+    if (debugEnabled) {
         console.log('[ythdb-popup]', ...args);
     }
 }
@@ -450,8 +450,69 @@ function updateAnalytics() {
 
     // Update all charts
     updateActivityChart();
-    updateContentTypeChart();
     updateWatchTimeByHourChart();
+    renderUnfinishedVideos();
+    renderTopChannels();
+    renderSkippedChannels();
+    renderCompletionBarChart();
+}
+
+// Render the top 5 longest unfinished videos (duration >= 10 min, watched < 90%)
+function renderUnfinishedVideos() {
+    const container = document.getElementById('unfinishedVideosList');
+    if (!container) return;
+
+    // Filter for long, unfinished videos
+    const unfinished = allHistoryRecords.filter(record => {
+        return record.duration >= 600 && (record.time / record.duration) < 0.9;
+    });
+
+    // Sort by absolute time left, descending
+    unfinished.sort((a, b) => ((b.duration - b.time) - (a.duration - a.time)));
+
+    // Take top 5
+    const topUnfinished = unfinished.slice(0, 5);
+
+    if (topUnfinished.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-color);opacity:0.7;">No unfinished long videos found.</span>';
+        return;
+    }
+
+    // Helper to sanitize text (replace mis-encoded dashes and clean up)
+    function sanitizeText(text) {
+        if (!text) return '';
+        return text
+            .replace(/â€" |â€" |â€" |â€\x9c|â€\x9d/g, '–') // common mis-encoded dashes
+            .replace(/â€™/g, "'") // apostrophe
+            .replace(/â€œ|â€/g, '"') // quotes
+            .replace(/â€¦/g, '...') // ellipsis
+            .replace(/â€¢/g, '-') // bullet
+            .replace(/\s+/g, ' ') // collapse whitespace
+            .trim();
+    }
+
+    // Render list
+    container.innerHTML = topUnfinished.map(record => {
+        const timeLeft = Math.max(0, Math.round(record.duration - record.time));
+        const watched = Math.round(record.time);
+        const total = Math.round(record.duration);
+        const minLeft = Math.floor(timeLeft / 60);
+        const secLeft = timeLeft % 60;
+        const minWatched = Math.floor(watched / 60);
+        const minTotal = Math.floor(total / 60);
+        const secWatched = watched % 60;
+        const secTotal = total % 60;
+        const timeLeftStr = `${minLeft}m${secLeft > 0 ? ' ' + secLeft + 's' : ''}`;
+        const watchedStr = `${minWatched}:${secWatched.toString().padStart(2, '0')}`;
+        const totalStr = `${minTotal}:${secTotal.toString().padStart(2, '0')}`;
+        const title = sanitizeText(record.title || 'Untitled');
+        const channel = sanitizeText(record.channelName || 'Unknown Channel');
+        return `<div style="margin-bottom:8px;">
+            <a href="${record.url}" target="_blank" style="font-weight:500; color:var(--button-bg); text-decoration:none;">${title}</a>
+            <span style="color:var(--text-color); opacity:0.8;"> - ${timeLeftStr} left (watched ${watchedStr}/${totalStr})<br>
+            <span style="font-size:12px; color:var(--text-color); opacity:0.7;">${channel}</span></span>
+        </div>`;
+    }).join('');
 }
 
 // Create activity chart
@@ -530,77 +591,7 @@ function updateActivityChart() {
     });
 }
 
-// Create content type distribution chart
-function updateContentTypeChart() {
-    const canvas = document.getElementById('ytvhtContentTypeChart');
-    if (!canvas) return;
-
-    // Set canvas size based on container
-    const container = canvas.parentElement;
-    canvas.width = container.clientWidth;
-    canvas.height = parseInt(canvas.style.height) || 200;
-
-    const ctx = canvas.getContext('2d');
-
-    // Clear previous chart
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Calculate data
-    const regularVideos = allHistoryRecords.length;
-    const shorts = allShortsRecords.length;
-    const total = regularVideos + shorts;
-
-    if (total === 0) {
-        // Draw "No data" message
-        ctx.fillStyle = getComputedStyle(document.documentElement)
-            .getPropertyValue('--text-color')
-            .trim();
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('No watch history data available', canvas.width / 2, canvas.height / 2);
-        return;
-    }
-
-    // Calculate pie chart dimensions
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = Math.min(centerX, centerY) - 40;
-
-    // Draw pie chart
-    let startAngle = 0;
-    const data = [
-        { label: 'Regular Videos', value: regularVideos, color: '#4285f4' },
-        { label: 'Shorts', value: shorts, color: '#ea4335' }
-    ];
-
-    data.forEach(segment => {
-        const angle = (segment.value / total) * 2 * Math.PI;
-
-        // Draw segment
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.arc(centerX, centerY, radius, startAngle, startAngle + angle);
-        ctx.closePath();
-        ctx.fillStyle = segment.color;
-        ctx.fill();
-
-        // Draw label
-        const labelAngle = startAngle + angle / 2;
-        const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
-        const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
-
-        ctx.fillStyle = getComputedStyle(document.documentElement)
-            .getPropertyValue('--text-color')
-            .trim();
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${segment.label}: ${segment.value}`, labelX, labelY);
-
-        startAngle += angle;
-    });
-}
-
-// Create watch time by hour chart
+// Restore the Watch Time by Hour chart function
 function updateWatchTimeByHourChart() {
     const canvas = document.getElementById('ytvhtWatchTimeByHourChart');
     if (!canvas) return;
@@ -1774,6 +1765,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Load settings first
         const settings = await loadSettings();
+        debugEnabled = settings.debug || false;
         log('Initial settings:', settings);
 
         // Function to handle theme changes
@@ -2562,4 +2554,186 @@ function updateSyncSettingsUI(syncStatus) {
         triggerFullSyncButton.disabled = !syncStatus.enabled || syncStatus.status === 'syncing';
         triggerFullSyncButton.textContent = syncStatus.status === 'syncing' ? 'Syncing...' : 'Full Sync';
     }
+}
+
+// Render the top 5 watched channels
+function renderTopChannels() {
+    const container = document.getElementById('topChannelsList');
+    if (!container) return;
+
+    // Aggregate by channel
+    const channelMap = {};
+    allHistoryRecords.forEach(record => {
+        const channel = record.channelName || 'Unknown Channel';
+        const channelId = record.channelId || '';
+        if (channel === 'Unknown Channel') return; // skip unknown
+        if (!channelMap[channel]) {
+            channelMap[channel] = {
+                channel,
+                channelId,
+                count: 0,
+                watchTime: 0
+            };
+        }
+        channelMap[channel].count++;
+        channelMap[channel].watchTime += record.time || 0;
+    });
+
+    let channels = Object.values(channelMap);
+    channels.sort((a, b) => b.count - a.count || b.watchTime - a.watchTime);
+    const topChannels = channels.slice(0, 5);
+
+    if (topChannels.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-color);opacity:0.7;">No channel data found.</span>';
+        return;
+    }
+
+    function formatWatchTime(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    function sanitizeText(text) {
+        if (!text) return '';
+        return text
+            .replace(/â€" |â€" |â€" |â€\x9c|â€\x9d/g, '-') // always use plain hyphen
+            .replace(/â€™/g, "'")
+            .replace(/â€œ|â€/g, '"')
+            .replace(/â€¦/g, '...')
+            .replace(/â€¢/g, '-')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    container.innerHTML = topChannels.map(ch => {
+        let channelUrl = '';
+        if (ch.channelId) {
+            if (ch.channelId.startsWith('UC')) {
+                channelUrl = `https://www.youtube.com/channel/${ch.channelId}`;
+            } else if (ch.channelId.startsWith('@')) {
+                channelUrl = `https://www.youtube.com/${ch.channelId}`;
+            }
+        }
+        const channelName = sanitizeText(ch.channel);
+        const link = channelUrl ? `<a href="${channelUrl}" target="_blank" style="font-weight:500; color:var(--button-bg); text-decoration:none;">${channelName}</a>` : `<span style="font-weight:500; color:var(--button-bg);">${channelName}</span>`;
+        return `<div style="margin-bottom:8px;">${link} <span style="color:var(--text-color); opacity:0.8;">- ${ch.count} videos, ${formatWatchTime(ch.watchTime)}</span></div>`;
+    }).join('');
+}
+
+// Render the top 5 skipped channels (long videos only, watched <10%)
+function renderSkippedChannels() {
+    const container = document.getElementById('skippedChannelsList');
+    if (!container) return;
+
+    // Only consider long videos
+    const longVideos = allHistoryRecords.filter(r => r.duration >= 600);
+    const skipped = longVideos.filter(r => (r.time / r.duration) < 0.1);
+
+    // Aggregate by channel
+    const channelMap = {};
+    skipped.forEach(record => {
+        const channel = record.channelName || 'Unknown Channel';
+        const channelId = record.channelId || '';
+        if (channel === 'Unknown Channel') return; // skip unknown
+        if (!channelMap[channel]) {
+            channelMap[channel] = { channel, channelId, count: 0 };
+        }
+        channelMap[channel].count++;
+    });
+    let channels = Object.values(channelMap);
+    channels.sort((a, b) => b.count - a.count);
+    const topSkipped = channels.slice(0, 5);
+
+    function sanitizeText(text) {
+        if (!text) return '';
+        return text
+            .replace(/â€" |â€" |â€" |â€\x9c|â€\x9d/g, '-')
+            .replace(/â€™/g, "'")
+            .replace(/â€œ|â€/g, '"')
+            .replace(/â€¦/g, '...')
+            .replace(/â€¢/g, '-')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    if (topSkipped.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-color);opacity:0.7;">No skipped channels found.</span>';
+    } else {
+        container.innerHTML = topSkipped.map(ch => {
+            let channelUrl = '';
+            if (ch.channelId) {
+                if (ch.channelId.startsWith('UC')) {
+                    channelUrl = `https://www.youtube.com/channel/${ch.channelId}`;
+                } else if (ch.channelId.startsWith('@')) {
+                    channelUrl = `https://www.youtube.com/${ch.channelId}`;
+                }
+            }
+            const channelName = sanitizeText(ch.channel);
+            const link = channelUrl ? `<a href="${channelUrl}" target="_blank" style="font-weight:500; color:var(--button-bg); text-decoration:none;">${channelName}</a>` : `<span style="font-weight:500; color:var(--button-bg);">${channelName}</span>`;
+            return `<div style="margin-bottom:8px;">${link} <span style="color:var(--text-color); opacity:0.8;">- ${ch.count} skipped</span></div>`;
+        }).join('');
+    }
+}
+
+// Render the completion bar chart (Skipped, Partial, Completed)
+function renderCompletionBarChart() {
+    const canvas = document.getElementById('completionBarChart');
+    const legendDiv = document.getElementById('completionBarLegend');
+    if (!canvas || !legendDiv) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Only consider long videos
+    const longVideos = allHistoryRecords.filter(r => r.duration >= 600);
+    const skipped = longVideos.filter(r => (r.time / r.duration) < 0.1);
+    const partial = longVideos.filter(r => (r.time / r.duration) >= 0.1 && (r.time / r.duration) < 0.9);
+    const completed = longVideos.filter(r => (r.time / r.duration) >= 0.9);
+    const counts = [skipped.length, partial.length, completed.length];
+    // Use short labels for x-axis
+    const labels = ['Skipped', 'Partial', 'Completed'];
+    // Use detailed labels for legend
+    const legendLabels = ['Skipped (<10%)', 'Partial (10-90%)', 'Completed (>=90%)'];
+    const colors = ['#e74c3c', '#f1c40f', '#2ecc40'];
+    const total = counts.reduce((a, b) => a + b, 0);
+
+    // Bar chart dimensions
+    const barWidth = 40;
+    const barGap = 40;
+    const chartHeight = canvas.height - 40;
+    const maxCount = Math.max(...counts, 1);
+    const baseY = canvas.height - 20;
+    const startX = 40;
+
+    // Draw bars
+    for (let i = 0; i < counts.length; i++) {
+        const barHeight = Math.round((counts[i] / maxCount) * chartHeight);
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(startX + i * (barWidth + barGap), baseY - barHeight, barWidth, barHeight);
+        // Draw count above bar
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(counts[i], startX + i * (barWidth + barGap) + barWidth / 2, baseY - barHeight - 8);
+    }
+
+    // Draw x-axis labels (short)
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = '#ccc';
+    ctx.textAlign = 'center';
+    for (let i = 0; i < labels.length; i++) {
+        ctx.fillText(labels[i], startX + i * (barWidth + barGap) + barWidth / 2, baseY + 16);
+    }
+
+    // Draw legend (to the right of the chart, detailed)
+    let legendHtml = '';
+    for (let i = 0; i < legendLabels.length; i++) {
+        const percent = total ? Math.round((counts[i] / total) * 100) : 0;
+        legendHtml += `<div style="margin-bottom:8px;display:flex;align-items:center;">
+            <span style="display:inline-block;width:16px;height:16px;background:${colors[i]};margin-right:8px;border-radius:3px;"></span>
+            <span style="color:var(--text-color);font-weight:500;flex:1;">${legendLabels[i]}</span>
+            <span style="color:var(--text-color);margin-left:8px;text-align:right;min-width:60px;">${counts[i]} (${percent}%)</span>
+        </div>`;
+    }
+    legendDiv.innerHTML = legendHtml;
 }

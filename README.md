@@ -129,8 +129,10 @@ Click the extension icon to access:
 
 ### 📊 **Analytics & Insights**
 - **Interactive Charts**: Viewing patterns by hour and day
-- **Content Analysis**: Compare regular videos vs Shorts
-- **Completion Rates**: Track how often you finish videos
+- **Longest Unfinished Videos**: Quickly resume long videos you haven't finished (shows channel, time left, and link)
+- **Top Watched Channels**: See your top 5 channels by videos watched (with links)
+- **Top Skipped Channels**: See your top 5 channels where you most often skip long videos (with links)
+- **Completion Bar Chart**: Visualize your completion rate for long videos (skipped, partial, completed) with a bar chart and legend
 - **Weekly Activity**: Visualize your YouTube usage patterns
 
 ### 🔄 **Cross-Device Sync (Firefox)**

@@ -110,7 +110,8 @@ await ytStorage.setSettings(newSettings);
   time: 150,                 // watched time in seconds
   duration: 300,             // total duration in seconds
   isShorts: false,           // true for YouTube Shorts
-  channelName: "Channel Name", // optional
+  channelName: "Channel Name", // always present
+  channelId: "UCxxxx...",      // always present
   thumbnailUrl: "https://..."  // optional
 }
 ```

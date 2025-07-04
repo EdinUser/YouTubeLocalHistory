@@ -512,6 +512,11 @@
             padding: 20px;
         }
 
+        .analytics-grid-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
         .analytics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -761,41 +766,61 @@
     <!-- Analytics Tab Container -->
     <div id="ytvhtAnalyticsContainer" style="display: none;">
         <div class="analytics-container">
-            <div class="analytics-grid">
-                <div class="analytics-card">
-                    <div class="analytics-label">Total Watch Time</div>
-                    <div class="analytics-value" id="totalWatchTime">0h</div>
+            <div class="analytics-grid-wrapper" style="max-width:900px;margin:0 auto;">
+                <div class="analytics-grid">
+                    <!-- Summary cards grid (top row) -->
+                    <div class="analytics-card">
+                        <div class="analytics-label">Total Watch Time</div>
+                        <div class="analytics-value" id="totalWatchTime">0h</div>
+                    </div>
+                    <div class="analytics-card">
+                        <div class="analytics-label">Videos Watched</div>
+                        <div class="analytics-value" id="videosWatched">0</div>
+                    </div>
+                    <div class="analytics-card">
+                        <div class="analytics-label">Shorts Watched</div>
+                        <div class="analytics-value" id="shortsWatched">0</div>
+                    </div>
+                    <div class="analytics-card">
+                        <div class="analytics-label">Avg. Duration</div>
+                        <div class="analytics-value" id="avgDuration">0m</div>
+                    </div>
+                    <div class="analytics-card">
+                        <div class="analytics-label">Completion Rate</div>
+                        <div class="analytics-value" id="completionRate">0%</div>
+                    </div>
+                    <div class="analytics-card">
+                        <div class="analytics-label">Playlists Saved</div>
+                        <div class="analytics-value" id="playlistsSaved">0</div>
+                    </div>
                 </div>
-                <div class="analytics-card">
-                    <div class="analytics-label">Videos Watched</div>
-                    <div class="analytics-value" id="videosWatched">0</div>
+                <!-- Unfinished Videos card, same width as grid -->
+                <div class="analytics-card" id="unfinishedVideosCard" style="margin-top:18px;">
+                    <div class="analytics-label">Longest Unfinished Videos</div>
+                    <div id="unfinishedVideosList" style="text-align:left; font-size:13px; margin-top:10px;"></div>
                 </div>
-                <div class="analytics-card">
-                    <div class="analytics-label">Shorts Watched</div>
-                    <div class="analytics-value" id="shortsWatched">0</div>
+                <!-- Row: Top Watched Channels & Top Skipped Channels side-by-side -->
+                <div class="analytics-row" style="display:flex; gap:24px; margin-top:18px; align-items:stretch;">
+                    <div class="analytics-card" id="topChannelsCard" style="flex:1;">
+                        <div class="analytics-label">Top Watched Channels</div>
+                        <div id="topChannelsList" style="text-align:left; font-size:13px; margin-top:10px;"></div>
+                    </div>
+                    <div class="analytics-card" id="skippedChannelsCard" style="flex:1;">
+                        <div class="analytics-label">Top Skipped Channels</div>
+                        <div id="skippedChannelsList" style="text-align:left; font-size:13px; margin-top:10px;"></div>
+                    </div>
                 </div>
-                <div class="analytics-card">
-                    <div class="analytics-label">Average Duration</div>
-                    <div class="analytics-value" id="avgDuration">0m</div>
-                </div>
-                <div class="analytics-card">
-                    <div class="analytics-label">Completion Rate</div>
-                    <div class="analytics-value" id="completionRate">0%</div>
-                </div>
-                <div class="analytics-card">
-                    <div class="analytics-label">Playlists Saved</div>
-                    <div class="analytics-value" id="playlistsSaved">0</div>
+                <!-- Row: Completion Bar Chart with legend on the right -->
+                <div class="analytics-row" style="display:flex; gap:24px; margin-top:18px; align-items:center;">
+                    <div class="analytics-card" id="completionBarCard" style="flex:2; display:flex; align-items:center;">
+                        <canvas id="completionBarChart" width="260" height="120" style="margin:0 24px 0 0;"></canvas>
+                        <div id="completionBarLegend" style="font-size:13px;"></div>
+                    </div>
                 </div>
             </div>
-
             <div class="analytics-chart">
                 <div class="analytics-title">Watch Activity (Last 7 Days)</div>
                 <canvas id="ytvhtActivityChart" style="width: 100%; height: 200px;"></canvas>
-            </div>
-
-            <div class="analytics-chart">
-                <div class="analytics-title">Content Type Distribution</div>
-                <canvas id="ytvhtContentTypeChart" style="width: 100%; height: 200px;"></canvas>
             </div>
 
             <div class="analytics-chart">

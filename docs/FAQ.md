@@ -98,11 +98,13 @@ Check the extension popup - your history should still be there.
 - They're separated to help you track different types of content
 
 ### Q: What can I see in the Analytics tab?
-**A:** Pretty charts showing:
+**A:** Interactive cards and charts showing:
 - How much time you spend watching videos each day
 - Your viewing patterns by hour of the day
-- Comparison between regular videos and Shorts
-- Your completion rate (how often you finish videos)
+- Longest unfinished videos (with channel and time left)
+- Top 5 watched channels (with links)
+- Top 5 skipped channels (with links)
+- Completion bar chart for long videos (skipped, partial, completed, with legend)
 
 ### Q: Can I search through my history?
 **A:** Yes! Use the search box at the top of the Videos tab to find specific videos by title.
