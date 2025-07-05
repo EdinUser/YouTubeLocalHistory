@@ -9,11 +9,15 @@ mkdir -p dist
 # Get current version from manifest
 VERSION=$(grep '"version"' src/manifest.chrome.json | cut -d'"' -f4)
 
+# Merge locale files before copying
+node merge_locales.js
+
 # Function to copy common files
 copy_common_files() {
     local target_dir=$1
     cp src/{background.js,content.js,popup.html,popup.js,storage.js,sync-service.js} "$target_dir/"
     cp src/icon*.png "$target_dir/"
+    # Removed copying of _locales directory
 }
 
 # Build Chrome extension
@@ -29,12 +33,16 @@ echo "Building Firefox extension..."
 copy_common_files "build/firefox"
 cp src/manifest.firefox.json "build/firefox/manifest.json"
 cd build/firefox
-# For Firefox, we need to zip the files directly, not the directory  
+# For Firefox, we need to zip the files directly, not the directory
 zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js popup.html popup.js storage.js sync-service.js icon*.png -x ".*"
+# Include _locales in the Firefox zip if it exists
+if [ -d _locales ]; then
+    zip -r "../../dist/youtube-local-history-firefox-v$VERSION.zip" _locales -x ".*"
+fi
 cd ../..
 
 echo -e "\nBuild complete!"
 echo "Chrome extension: dist/youtube-local-history-chrome-v$VERSION.zip"
 echo "Firefox extension: dist/youtube-local-history-firefox-v$VERSION.zip"
 echo -e "\nPackage contents:"
-ls -lh dist/ 
+ls -lh dist/

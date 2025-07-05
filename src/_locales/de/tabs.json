@@ -1,0 +1,230 @@
+{
+  "tab_videos": {
+    "message": "Videos",
+    "description": "Tab label for videos"
+  },
+  "tab_shorts": {
+    "message": "Shorts",
+    "description": "Tab label for shorts"
+  },
+  "tab_playlists": {
+    "message": "Playlists",
+    "description": "Tab label for playlists"
+  },
+  "tab_analytics": {
+    "message": "Analysen",
+    "description": "Tab label for analytics"
+  },
+  "tab_settings": {
+    "message": "Einstellungen",
+    "description": "Tab label for settings"
+  },
+  "analytics_total_watch_time": {
+    "message": "Gesamte Wiedergabezeit",
+    "description": "Analytics card label for total watch time"
+  },
+  "analytics_videos_watched": {
+    "message": "Angesehene Videos",
+    "description": "Analytics card label for videos watched"
+  },
+  "analytics_shorts_watched": {
+    "message": "Angesehene Shorts",
+    "description": "Analytics card label for shorts watched"
+  },
+  "analytics_avg_duration": {
+    "message": "Durchschn. Dauer",
+    "description": "Analytics card label for average duration"
+  },
+  "analytics_completion_rate": {
+    "message": "Abschlussrate",
+    "description": "Analytics card label for completion rate"
+  },
+  "analytics_playlists_saved": {
+    "message": "Gespeicherte Playlists",
+    "description": "Analytics card label for playlists saved"
+  },
+  "analytics_unfinished_videos": {
+    "message": "Längste unvollendete Videos",
+    "description": "Analytics card label for longest unfinished videos"
+  },
+  "analytics_top_watched_channels": {
+    "message": "Meistgesehene Kanäle",
+    "description": "Analytics card label for top watched channels"
+  },
+  "analytics_top_skipped_channels": {
+    "message": "Meist übersprungene Kanäle",
+    "description": "Analytics card label for top skipped channels"
+  },
+  "analytics_completion_bar_skipped": {
+    "message": "Übersprungen",
+    "description": "Label for skipped videos in completion bar chart"
+  },
+  "analytics_completion_bar_partial": {
+    "message": "Teilweise",
+    "description": "Label for partially watched videos in completion bar chart"
+  },
+  "analytics_completion_bar_completed": {
+    "message": "Abgeschlossen",
+    "description": "Label for completed videos in completion bar chart"
+  },
+  "analytics_completion_bar_skipped_legend": {
+    "message": "Übersprungen (<10%)",
+    "description": "Legend label for skipped videos in completion bar chart"
+  },
+  "analytics_completion_bar_partial_legend": {
+    "message": "Teilweise (10-90%)",
+    "description": "Legend label for partially watched videos in completion bar chart"
+  },
+  "analytics_completion_bar_completed_legend": {
+    "message": "Abgeschlossen (>=90%)",
+    "description": "Legend label for completed videos in completion bar chart"
+  },
+  "analytics_activity_7_days": {
+    "message": "Sehaktivität (letzte 7 Tage)",
+    "description": "Title for watch activity chart"
+  },
+  "analytics_watch_time_by_hour": {
+    "message": "Wiedergabezeit nach Stunde",
+    "description": "Title for watch time by hour chart"
+  },
+  "analytics_unfinished_none": {
+    "message": "Keine unvollendeten langen Videos gefunden.",
+    "description": "Message when no unfinished long videos are found"
+  },
+  "analytics_top_channels_none": {
+    "message": "Keine Kanaldaten gefunden.",
+    "description": "Message when no channel data is found"
+  },
+  "analytics_top_skipped_none": {
+    "message": "Keine übersprungenen Kanäle gefunden.",
+    "description": "Message when no skipped channels are found"
+  },
+  "analytics_no_unfinished_long_videos": {
+    "message": "Keine unvollendeten langen Videos gefunden.",
+    "description": "Message when no unfinished long videos are found"
+  },
+  "analytics_no_channel_data": {
+    "message": "Keine Kanaldaten gefunden.",
+    "description": "Message when no channel data is found"
+  },
+  "analytics_no_skipped_channel_data": {
+    "message": "Keine übersprungenen Kanäle gefunden.",
+    "description": "Message when no skipped channels are found"
+  },
+  "analytics_left": {
+    "message": "verbleibend",
+    "description": "Label for time left (e.g., 5m left)"
+  },
+  "analytics_watched": {
+    "message": "angesehen",
+    "description": "Label for watched time (e.g., watched 3:00/10:00)"
+  },
+  "analytics_untitled": {
+    "message": "Ohne Titel",
+    "description": "Fallback title for videos with no title"
+  },
+  "analytics_unknown_channel": {
+    "message": "Unbekannter Kanal",
+    "description": "Fallback for unknown channel name"
+  },
+  "analytics_channel_videos": {
+    "message": "$1 Videos, $2",
+    "description": "Channel analytics: e.g. 1 videos, 7m"
+  },
+  "analytics_skipped_count": {
+    "message": "$1 übersprungen",
+    "description": "e.g. 1 skipped"
+  },
+  "analytics_completed_count": {
+    "message": "$1 abgeschlossen",
+    "description": "e.g. 1 completed"
+  },
+  "analytics_partial_count": {
+    "message": "$1 teilweise",
+    "description": "e.g. 1 partial"
+  },
+  "analytics_duration_minutes": {
+    "message": "$1m",
+    "description": "Duration in minutes, e.g. 7m"
+  },
+  "analytics_duration_hours_minutes": {
+    "message": "$1h $2m",
+    "description": "Duration in hours and minutes, e.g. 1h 7m"
+  },
+  "videos_search_placeholder": {
+    "message": "Videos nach Titel suchen...",
+    "description": "Placeholder for video search input"
+  },
+  "videos_no_history": {
+    "message": "Kein Verlauf gefunden. Fangen Sie an, Videos anzusehen!",
+    "description": "Message when no video history is found"
+  },
+  "videos_no_search_results": {
+    "message": "Keine Videos gefunden, die Ihrer Suche entsprechen.",
+    "description": "Message when no videos match the search query"
+  },
+  "videos_pagination_page_info": {
+    "message": "Video-Seite {CURRENT} von {TOTAL}",
+    "description": "Pagination info for videos tab"
+  },
+  "videos_pagination_first": {
+    "message": "Erste Seite",
+    "description": "Tooltip for first page button"
+  },
+  "videos_pagination_prev": {
+    "message": "Vorherige Seite",
+    "description": "Tooltip for previous page button"
+  },
+  "videos_pagination_next": {
+    "message": "Nächste Seite",
+    "description": "Tooltip for next page button"
+  },
+  "videos_pagination_last": {
+    "message": "Letzte Seite",
+    "description": "Tooltip for last page button"
+  },
+  "videos_delete": {
+    "message": "Löschen",
+    "description": "Button label for deleting a video"
+  },
+  "videos_unknown_title": {
+    "message": "Unbekannter Titel",
+    "description": "Fallback title for videos with no title"
+  },
+  "videos_thumbnail_alt": {
+    "message": "Video-Miniaturbild",
+    "description": "Alt text for video thumbnail image"
+  },
+  "shorts_search_placeholder": {
+    "message": "Shorts nach Titel suchen...",
+    "description": "Placeholder for shorts search input"
+  },
+  "shorts_no_history": {
+    "message": "Keine Shorts gefunden. Schauen Sie sich Shorts an, um sie hier zu sehen!",
+    "description": "Message when no shorts history is found"
+  },
+  "shorts_pagination_page_info": {
+    "message": "Short-Seite {CURRENT} von {TOTAL}",
+    "description": "Pagination info for shorts tab"
+  },
+  "shorts_delete": {
+    "message": "Löschen",
+    "description": "Button label for deleting a short"
+  },
+  "playlists_no_history": {
+    "message": "Noch keine Playlists gespeichert. Besuchen Sie eine Playlist, um sie zu speichern!",
+    "description": "Message when no playlists are saved"
+  },
+  "playlists_pagination_page_info": {
+    "message": "Playlist-Seite {CURRENT} von {TOTAL}",
+    "description": "Pagination info for playlists tab"
+  },
+  "playlists_delete": {
+    "message": "Löschen",
+    "description": "Button label for deleting a playlist"
+  },
+  "playlists_unknown_title": {
+    "message": "Unbekannte Playlist",
+    "description": "Fallback title for playlists with no title"
+  }
+} 

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
-    <title>YT re:Watch</title>
+    <title data-i18n="popup_title">YT re:Watch</title>
     <style>
         :root {
             /* Light theme (default) */
@@ -735,32 +735,30 @@
     </style>
 </head>
 <body>
-    <h1>YT re:Watch</h1>
+    <h1 data-i18n="popup_title">YT re:Watch</h1>
     <div class="controls">
         <div class="left-controls">
-            <button id="ytvhtToggleTheme" class="compact-button" title="Toggle theme">
-                <span id="themeText">Theme</span>
+            <button id="ytvhtToggleTheme" class="compact-button" data-i18n-title="theme_toggle_tooltip">
+                <span id="themeText" data-i18n="theme_toggle">Theme</span>
             </button>
-            <button id="ytvhtClearHistory" class="compact-button danger-button" title="Clear all history">
-                Clear
-            </button>
+            <button id="ytvhtClearHistory" class="compact-button danger-button" data-i18n-title="clear_tooltip" data-i18n="clear_label">Clear</button>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-            <div id="ytvhtSyncIndicator" class="sync-indicator sync-disabled" title="Sync status">
+            <div id="ytvhtSyncIndicator" class="sync-indicator sync-disabled" data-i18n-title="sync_status_tooltip">
                 <div class="sync-icon"></div>
-                <span class="sync-text">Sync</span>
+                <span class="sync-text" data-i18n="sync_status">Sync</span>
             </div>
-            <button id="ytvhtClosePopup" class="compact-button">Close</button>
+            <button id="ytvhtClosePopup" class="compact-button" data-i18n="close_label">Close</button>
         </div>
     </div>
     <div id="ytvhtMessage" class="message"></div>
 
     <div class="tab-bar">
-        <button id="ytvhtTabVideos" class="tab">Videos</button>
-        <button id="ytvhtTabShorts" class="tab">Shorts</button>
-        <button id="ytvhtTabPlaylists" class="tab">Playlists</button>
-        <button id="ytvhtTabAnalytics" class="tab">Analytics</button>
-        <button id="ytvhtTabSettings" class="tab">Settings</button>
+        <button id="ytvhtTabVideos" class="tab" data-i18n="tab_videos">Videos</button>
+        <button id="ytvhtTabShorts" class="tab" data-i18n="tab_shorts">Shorts</button>
+        <button id="ytvhtTabPlaylists" class="tab" data-i18n="tab_playlists">Playlists</button>
+        <button id="ytvhtTabAnalytics" class="tab" data-i18n="tab_analytics">Analytics</button>
+        <button id="ytvhtTabSettings" class="tab" data-i18n="tab_settings">Settings</button>
     </div>
 
     <!-- Analytics Tab Container -->
@@ -770,43 +768,43 @@
                 <div class="analytics-grid">
                     <!-- Summary cards grid (top row) -->
                     <div class="analytics-card">
-                        <div class="analytics-label">Total Watch Time</div>
+                        <div class="analytics-label" data-i18n="analytics_total_watch_time">Total Watch Time</div>
                         <div class="analytics-value" id="totalWatchTime">0h</div>
                     </div>
                     <div class="analytics-card">
-                        <div class="analytics-label">Videos Watched</div>
+                        <div class="analytics-label" data-i18n="analytics_videos_watched">Videos Watched</div>
                         <div class="analytics-value" id="videosWatched">0</div>
                     </div>
                     <div class="analytics-card">
-                        <div class="analytics-label">Shorts Watched</div>
+                        <div class="analytics-label" data-i18n="analytics_shorts_watched">Shorts Watched</div>
                         <div class="analytics-value" id="shortsWatched">0</div>
                     </div>
                     <div class="analytics-card">
-                        <div class="analytics-label">Avg. Duration</div>
+                        <div class="analytics-label" data-i18n="analytics_avg_duration">Avg. Duration</div>
                         <div class="analytics-value" id="avgDuration">0m</div>
                     </div>
                     <div class="analytics-card">
-                        <div class="analytics-label">Completion Rate</div>
+                        <div class="analytics-label" data-i18n="analytics_completion_rate">Completion Rate</div>
                         <div class="analytics-value" id="completionRate">0%</div>
                     </div>
                     <div class="analytics-card">
-                        <div class="analytics-label">Playlists Saved</div>
+                        <div class="analytics-label" data-i18n="analytics_playlists_saved">Playlists Saved</div>
                         <div class="analytics-value" id="playlistsSaved">0</div>
                     </div>
                 </div>
                 <!-- Unfinished Videos card, same width as grid -->
                 <div class="analytics-card" id="unfinishedVideosCard" style="margin-top:18px;">
-                    <div class="analytics-label">Longest Unfinished Videos</div>
+                    <div class="analytics-label" data-i18n="analytics_unfinished_videos">Longest Unfinished Videos</div>
                     <div id="unfinishedVideosList" style="text-align:left; font-size:13px; margin-top:10px;"></div>
                 </div>
                 <!-- Row: Top Watched Channels & Top Skipped Channels side-by-side -->
                 <div class="analytics-row" style="display:flex; gap:24px; margin-top:18px; align-items:stretch;">
                     <div class="analytics-card" id="topChannelsCard" style="flex:1;">
-                        <div class="analytics-label">Top Watched Channels</div>
+                        <div class="analytics-label" data-i18n="analytics_top_watched_channels">Top Watched Channels</div>
                         <div id="topChannelsList" style="text-align:left; font-size:13px; margin-top:10px;"></div>
                     </div>
                     <div class="analytics-card" id="skippedChannelsCard" style="flex:1;">
-                        <div class="analytics-label">Top Skipped Channels</div>
+                        <div class="analytics-label" data-i18n="analytics_top_skipped_channels">Top Skipped Channels</div>
                         <div id="skippedChannelsList" style="text-align:left; font-size:13px; margin-top:10px;"></div>
                     </div>
                 </div>
@@ -819,12 +817,12 @@
                 </div>
             </div>
             <div class="analytics-chart">
-                <div class="analytics-title">Watch Activity (Last 7 Days)</div>
+                <div class="analytics-title" data-i18n="analytics_activity_7_days">Watch Activity (Last 7 Days)</div>
                 <canvas id="ytvhtActivityChart" style="width: 100%; height: 200px;"></canvas>
             </div>
 
             <div class="analytics-chart">
-                <div class="analytics-title">Watch Time by Hour</div>
+                <div class="analytics-title" data-i18n="analytics_watch_time_by_hour">Watch Time by Hour</div>
                 <canvas id="ytvhtWatchTimeByHourChart" style="width: 100%; height: 200px;"></canvas>
             </div>
         </div>
@@ -833,53 +831,53 @@
     <!-- Videos Tab Container -->
     <div id="ytvhtVideosContainer">
         <div class="search-container">
-            <input type="text" id="ytvhtSearchInput" class="search-input" placeholder="Search videos by title..." />
+            <input type="text" id="ytvhtSearchInput" class="search-input" data-i18n-placeholder="videos_search_placeholder" placeholder="Search videos by title..." />
         </div>
         <table class="history-table" id="ytvhtVideosTable">
             <tbody id="ytvhtHistoryTable">
                 <!-- History items will be inserted here -->
             </tbody>
         </table>
-        <div id="ytvhtNoHistory" class="no-history" style="display: none;">
+        <div id="ytvhtNoHistory" class="no-history" data-i18n="videos_no_history" style="display: none;">
             No history found. Start watching some videos!
         </div>
         <!-- Add Videos Pagination Controls -->
         <div id="ytvhtPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;">
-            <button id="ytvhtFirstPage" title="First page">&laquo;</button>
-            <button id="ytvhtPrevPage" title="Previous page">&lt;</button>
+            <button id="ytvhtFirstPage" data-i18n-title="videos_pagination_first" title="First page">&laquo;</button>
+            <button id="ytvhtPrevPage" data-i18n-title="videos_pagination_prev" title="Previous page">&lt;</button>
             <div id="ytvhtPageNumbers" style="display:flex; gap:5px; align-items:center;">
                 <!-- Page numbers will be inserted here -->
             </div>
-            <input id="ytvhtPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
-            <span id="ytvhtPageInfo">Video Page 1 of 1</span>
-            <button id="ytvhtNextPage" title="Next page">&gt;</button>
-            <button id="ytvhtLastPage" title="Last page">&raquo;</button>
+            <input id="ytvhtPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" data-i18n-title="videos_pagination_page_info" title="Go to page">
+            <span id="ytvhtPageInfo" data-i18n="videos_pagination_page_info">Video Page 1 of 1</span>
+            <button id="ytvhtNextPage" data-i18n-title="videos_pagination_next" title="Next page">&gt;</button>
+            <button id="ytvhtLastPage" data-i18n-title="videos_pagination_last" title="Last page">&raquo;</button>
         </div>
     </div>
 
     <!-- Shorts Tab Container -->
     <div id="ytvhtShortsContainer" style="display:none;">
         <div class="search-container">
-            <input type="text" id="ytvhtShortsSearchInput" class="search-input" placeholder="Search shorts by title..." />
+            <input type="text" id="ytvhtShortsSearchInput" class="search-input" data-i18n-placeholder="shorts_search_placeholder" placeholder="Search shorts by title..." />
         </div>
         <table class="history-table" id="ytvhtShortsTable">
             <tbody id="ytvhtShortsBody">
                 <!-- Shorts items will be inserted here -->
             </tbody>
         </table>
-        <div id="ytvhtNoShorts" class="no-history" style="display: none;">
+        <div id="ytvhtNoShorts" class="no-history" data-i18n="shorts_no_history" style="display: none;">
             No Shorts found. Watch some Shorts to see them here!
         </div>
         <div id="ytvhtShortsPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;">
-            <button id="ytvhtFirstShortsPage" title="First page">&laquo;</button>
-            <button id="ytvhtPrevShortsPage" title="Previous page">&lt;</button>
+            <button id="ytvhtFirstShortsPage" data-i18n-title="videos_pagination_first" title="First page">&laquo;</button>
+            <button id="ytvhtPrevShortsPage" data-i18n-title="videos_pagination_prev" title="Previous page">&lt;</button>
             <div id="ytvhtShortsPageNumbers" style="display:flex; gap:5px; align-items:center;">
                 <!-- Shorts page numbers will be inserted here -->
             </div>
-            <input id="ytvhtShortsPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
-            <span id="ytvhtShortsPageInfo">Short Page 1 of 1</span>
-            <button id="ytvhtNextShortsPage" title="Next page">&gt;</button>
-            <button id="ytvhtLastShortsPage" title="Last page">&raquo;</button>
+            <input id="ytvhtShortsPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" data-i18n-title="shorts_pagination_page_info" title="Go to page">
+            <span id="ytvhtShortsPageInfo" data-i18n="shorts_pagination_page_info">Short Page 1 of 1</span>
+            <button id="ytvhtNextShortsPage" data-i18n-title="videos_pagination_next" title="Next page">&gt;</button>
+            <button id="ytvhtLastShortsPage" data-i18n-title="videos_pagination_last" title="Last page">&raquo;</button>
         </div>
     </div>
 
@@ -890,19 +888,19 @@
                 <!-- Playlist items will be inserted here -->
             </tbody>
         </table>
-        <div id="ytvhtNoPlaylists" class="no-history" style="display: none;">
+        <div id="ytvhtNoPlaylists" class="no-history" data-i18n="playlists_no_history" style="display: none;">
             No playlists saved yet. Visit a playlist to save it!
         </div>
         <div id="ytvhtPlaylistsPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;">
-            <button id="ytvhtFirstPlaylistPage" title="First page">&laquo;</button>
-            <button id="ytvhtPrevPlaylistPage" title="Previous page">&lt;</button>
+            <button id="ytvhtFirstPlaylistPage" data-i18n-title="videos_pagination_first" title="First page">&laquo;</button>
+            <button id="ytvhtPrevPlaylistPage" data-i18n-title="videos_pagination_prev" title="Previous page">&lt;</button>
             <div id="ytvhtPlaylistPageNumbers" style="display:flex; gap:5px; align-items:center;">
                 <!-- Page numbers will be inserted here -->
             </div>
-            <input id="ytvhtPlaylistPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" title="Go to page">
-            <span id="ytvhtPlaylistsPageInfo">Playlist Page 1 of 1</span>
-            <button id="ytvhtNextPlaylistPage" title="Next page">&gt;</button>
-            <button id="ytvhtLastPlaylistPage" title="Last page">&raquo;</button>
+            <input id="ytvhtPlaylistPageInput" type="number" min="1" style="width:60px; text-align:center; display:none;" data-i18n-title="playlists_pagination_page_info" title="Go to page">
+            <span id="ytvhtPlaylistsPageInfo" data-i18n="playlists_pagination_page_info">Playlist Page 1 of 1</span>
+            <button id="ytvhtNextPlaylistPage" data-i18n-title="videos_pagination_next" title="Next page">&gt;</button>
+            <button id="ytvhtLastPlaylistPage" data-i18n-title="videos_pagination_last" title="Last page">&raquo;</button>
         </div>
     </div>
 
@@ -911,28 +909,28 @@
         <div class="settings-form">
             <div class="settings-columns">
                 <div class="settings-column">
-                    <h3>Interface & Display</h3>
+                    <h3 data-i18n="settings_interface_display">Interface & Display</h3>
                     <div class="settings-group">
-                        <label for="ytvhtThemePreference">Theme</label>
+                        <label for="ytvhtThemePreference" data-i18n="settings_theme_label">Theme</label>
                         <select id="ytvhtThemePreference">
-                            <option value="system">System Default</option>
-                            <option value="light">Light</option>
-                            <option value="dark">Dark</option>
+                            <option value="system" data-i18n="theme_system">System Default</option>
+                            <option value="light" data-i18n="theme_light">Light</option>
+                            <option value="dark" data-i18n="theme_dark">Dark</option>
                         </select>
-                        <div class="help-text">Choose your preferred theme</div>
+                        <div class="help-text" data-i18n="settings_theme_help">Choose your preferred theme</div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtPaginationCount">Items per Page</label>
+                        <label for="ytvhtPaginationCount" data-i18n="settings_pagination_label">Items per Page</label>
                         <input type="number" id="ytvhtPaginationCount" min="1" max="100" value="10">
-                        <div class="help-text">Number of items to show per page (1-100)</div>
+                        <div class="help-text" data-i18n="settings_pagination_help">Number of items to show per page (1-100)</div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtOverlayTitle">Overlay Title</label>
+                        <label for="ytvhtOverlayTitle" data-i18n="settings_overlay_title_label">Overlay Title</label>
                         <input type="text" id="ytvhtOverlayTitle" maxlength="12" value="viewed">
-                        <div class="help-text">Text to show in the overlay (max 12 characters)</div>
+                        <div class="help-text" data-i18n="settings_overlay_title_help">Text to show in the overlay (max 12 characters)</div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtOverlayColor">Overlay Color</label>
+                        <label for="ytvhtOverlayColor" data-i18n="settings_overlay_color_label">Overlay Color</label>
                         <div class="color-selector">
                             <select id="ytvhtOverlayColor">
                                 <option value="blue">Blue</option>
@@ -943,72 +941,72 @@
                             </select>
                             <span id="ytvhtColorPreview" class="color-preview"></span>
                         </div>
-                        <div class="help-text">Color of the progress bar overlay</div>
+                        <div class="help-text" data-i18n="settings_overlay_color_help">Color of the progress bar overlay</div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtOverlayLabelSize">Overlay Size</label>
+                        <label for="ytvhtOverlayLabelSize" data-i18n="settings_overlay_size_label">Overlay Size</label>
                         <select id="ytvhtOverlayLabelSize">
                             <option value="small">Small</option>
                             <option value="medium" selected>Medium</option>
                             <option value="large">Large</option>
                             <option value="xlarge">Extra Large</option>
                         </select>
-                        <div class="help-text">Size of the overlay label and progress bar</div>
+                        <div class="help-text" data-i18n="settings_overlay_size_help">Size of the overlay label and progress bar</div>
                     </div>
                 </div>
                 <div class="settings-column">
-                    <h3>Data & Sync</h3>
+                    <h3 data-i18n="settings_data_sync">Data & Sync</h3>
                     <div class="settings-group">
-                        <label>Data Management</label>
+                        <label data-i18n="settings_data_management_label">Data Management</label>
                         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                            <button id="ytvhtExportHistory" class="compact-button">Export</button>
-                            <button id="ytvhtImportHistory" class="compact-button" disabled>Import</button>
+                            <button id="ytvhtExportHistory" class="compact-button" data-i18n="settings_export">Export</button>
+                            <button id="ytvhtImportHistory" class="compact-button" disabled data-i18n="settings_import">Import</button>
                         </div>
-                        <div class="help-text">Export your history data (Import coming soon)</div>
+                        <div class="help-text" data-i18n="settings_export_help">Export your history data (Import coming soon)</div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtAutoCleanPeriod">Auto-clean Period (days)</label>
+                        <label for="ytvhtAutoCleanPeriod" data-i18n="settings_auto_clean_label">Auto-clean Period (days)</label>
                         <input type="number" id="ytvhtAutoCleanPeriod" min="1" max="180" value="90">
-                        <div class="help-text">Automatically remove history older than this many days</div>
+                        <div class="help-text" data-i18n="settings_auto_clean_help">Automatically remove history older than this many days</div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtSyncEnabled">Firefox Sync</label>
+                        <label for="ytvhtSyncEnabled" data-i18n="settings_sync_label">Firefox Sync</label>
                         <input type="checkbox" id="ytvhtSyncEnabled">
-                        <div class="help-text">Sync your data across browser instances (Firefox only)</div>
+                        <div class="help-text" data-i18n="settings_sync_help">Sync your data across browser instances (Firefox only)</div>
                     </div>
                     <div class="settings-group">
-                        <label>Last Sync</label>
-                        <div id="ytvhtLastSyncTime" class="version-text">Never</div>
+                        <label data-i18n="settings_last_sync_label">Last Sync</label>
+                        <div id="ytvhtLastSyncTime" class="version-text" data-i18n="message_never">Never</div>
                         <div class="help-text">
-                            <button id="ytvhtTriggerSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; margin-right: 4px;" disabled>Sync Now</button>
-                            <button id="ytvhtTriggerFullSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; background-color: #007bff;" disabled>Full Sync</button>
-                            <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">Full Sync cleans old data and re-syncs everything</div>
+                            <button id="ytvhtTriggerSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; margin-right: 4px;" disabled data-i18n="settings_sync_now">Sync Now</button>
+                            <button id="ytvhtTriggerFullSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; background-color: #007bff;" disabled data-i18n="settings_full_sync">Full Sync</button>
+                            <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;" data-i18n="settings_full_sync_help">Full Sync cleans old data and re-syncs everything</div>
                         </div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtDebugMode">Debug Mode</label>
+                        <label for="ytvhtDebugMode" data-i18n="settings_debug_label">Debug Mode</label>
                         <input type="checkbox" id="ytvhtDebugMode">
-                        <div class="help-text">Enable debug logging (for troubleshooting)</div>
+                        <div class="help-text" data-i18n="settings_debug_help">Enable debug logging (for troubleshooting)</div>
                     </div>
                     <div class="settings-group">
-                        <label>Extension Version</label>
+                        <label data-i18n="settings_version_label">Extension Version</label>
                         <div id="ytvhtVersion" class="version-text"></div>
                     </div>
                 </div>
             </div>
             <div class="settings-actions">
-                <button id="ytvhtSaveSettings">Save Settings</button>
+                <button id="ytvhtSaveSettings" data-i18n="settings_save">Save Settings</button>
             </div>
         </div>
     </div>
 
     <div id="ytvhtInstructions" class="instructions" style="display:none;">
-        <p><strong>Script Execution Disabled</strong></p>
-        <p>If you are seeing this message, it means that script execution is disabled for this extension. Please follow these steps to enable it:</p>
+        <p><strong data-i18n="instructions_script_disabled_title">Script Execution Disabled</strong></p>
+        <p data-i18n="instructions_script_disabled_body">If you are seeing this message, it means that script execution is disabled for this extension. Please follow these steps to enable it:</p>
         <ul>
-            <li>Go to Firefox settings: <strong>about:preferences#privacy</strong></li>
-            <li>Ensure "Enhanced Tracking Protection" is set to "Standard" or "Custom" and does not block scripts</li>
-            <li>Check for any content blocking: click the shield icon in the address bar when the popup is open and ensure no scripts are blocked</li>
+            <li data-i18n="instructions_script_disabled_step1">Go to Firefox settings: <strong>about:preferences#privacy</strong></li>
+            <li data-i18n="instructions_script_disabled_step2">Ensure "Enhanced Tracking Protection" is set to "Standard" or "Custom" and does not block scripts</li>
+            <li data-i18n="instructions_script_disabled_step3">Check for any content blocking: click the shield icon in the address bar when the popup is open and ensure no scripts are blocked</li>
         </ul>
     </div>
     <script src="storage.js"></script>

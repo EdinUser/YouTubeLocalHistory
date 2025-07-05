@@ -1,0 +1,146 @@
+{
+  "extensionName": {
+    "message": "Historial Local de YouTube",
+    "description": "The name of the extension"
+  },
+  "popup_title": {
+    "message": "YT re:Watch",
+    "description": "Popup window title and main heading"
+  },
+  "theme_toggle": {
+    "message": "Tema",
+    "description": "Button label for toggling theme"
+  },
+  "theme_toggle_tooltip": {
+    "message": "Cambiar tema",
+    "description": "Tooltip for theme toggle button"
+  },
+  "theme_light": {
+    "message": "Claro",
+    "description": "Label for light theme option"
+  },
+  "theme_dark": {
+    "message": "Oscuro",
+    "description": "Label for dark theme option"
+  },
+  "theme_auto": {
+    "message": "Auto",
+    "description": "Label for auto/system theme option"
+  },
+  "theme_switch_to_dark": {
+    "message": "Cambiar a tema oscuro",
+    "description": "Tooltip for switching to dark theme"
+  },
+  "theme_switch_to_light": {
+    "message": "Cambiar a tema claro",
+    "description": "Tooltip for switching to light theme"
+  },
+  "theme_system": {
+    "message": "Predeterminado del sistema",
+    "description": "Label for system default theme option"
+  },
+  "theme_currently_following_system": {
+    "message": "Siguiendo el tema del sistema - Clic para anular",
+    "description": "Tooltip for auto theme option"
+  },
+  "clear_label": {
+    "message": "Limpiar",
+    "description": "Button label for clearing all history"
+  },
+  "clear_tooltip": {
+    "message": "Limpiar todo el historial",
+    "description": "Tooltip for clear history button"
+  },
+  "close_label": {
+    "message": "Cerrar",
+    "description": "Button label for closing the popup"
+  },
+  "sync_status": {
+    "message": "Sincronización",
+    "description": "Label for sync status indicator"
+  },
+  "sync_status_tooltip": {
+    "message": "Estado de sincronización",
+    "description": "Tooltip for sync status indicator"
+  },
+  "instructions_script_disabled_title": {
+    "message": "Ejecución de scripts deshabilitada",
+    "description": "Title for script execution disabled instructions"
+  },
+  "instructions_script_disabled_body": {
+    "message": "Si ve este mensaje, significa que la ejecución de scripts está deshabilitada para esta extensión. Por favor, siga estos pasos para habilitarla:",
+    "description": "Body text for script execution disabled instructions"
+  },
+  "instructions_script_disabled_step1": {
+    "message": "Vaya a la configuración de Firefox: about:preferences#privacy",
+    "description": "Step 1 for enabling script execution"
+  },
+  "instructions_script_disabled_step2": {
+    "message": "Asegúrese de que \"Protección mejorada contra rastreo\" esté en \"Estándar\" o \"Personalizado\" y no bloquee scripts",
+    "description": "Step 2 for enabling script execution"
+  },
+  "instructions_script_disabled_step3": {
+    "message": "Verifique el bloqueo de contenido: haga clic en el icono de escudo en la barra de direcciones cuando la ventana emergente esté abierta y asegúrese de que no haya scripts bloqueados",
+    "description": "Step 3 for enabling script execution"
+  },
+  "delete_label": {
+    "message": "Eliminar",
+    "description": "Button label for deleting an item (video, playlist, short)"
+  },
+  "pagination_page_info": {
+    "message": "Página $1 de $2",
+    "description": "Pagination info, e.g. Page 1 of 11"
+  },
+  "chart_skipped": {
+    "message": "Omitido",
+    "description": "Chart label: Skipped"
+  },
+  "chart_partial": {
+    "message": "Parcial",
+    "description": "Chart label: Partial"
+  },
+  "chart_completed": {
+    "message": "Completado",
+    "description": "Chart label: Completed"
+  },
+  "chart_skipped_legend": {
+    "message": "Omitido (<10%)",
+    "description": "Chart legend: Skipped (<10%)"
+  },
+  "chart_partial_legend": {
+    "message": "Parcial (10-90%)",
+    "description": "Chart legend: Partial (10-90%)"
+  },
+  "chart_completed_legend": {
+    "message": "Completado (>=90%)",
+    "description": "Chart legend: Completed (>=90%)"
+  },
+  "chart_minutes": {
+    "message": "Minutos",
+    "description": "Chart axis label: Minutes"
+  },
+  "chart_hour_of_day": {
+    "message": "Hora del día",
+    "description": "Chart axis label: Hour of Day"
+  },
+  "date_today": {
+    "message": "Hoy",
+    "description": "Label for today's date"
+  },
+  "date_yesterday": {
+    "message": "Ayer",
+    "description": "Label for yesterday's date"
+  },
+  "date_unknown": {
+    "message": "Desconocido",
+    "description": "Label for unknown date"
+  },
+  "search_no_videos_found": {
+    "message": "No se encontraron videos que coincidan con su búsqueda.",
+    "description": "Message when no videos match the search"
+  },
+  "history_no_history_found": {
+    "message": "No se encontró historial. ¡Comience a ver algunos videos!",
+    "description": "Message when no history is found"
+  }
+} 
