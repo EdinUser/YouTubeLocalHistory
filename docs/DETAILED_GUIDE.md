@@ -129,27 +129,19 @@ After watching videos, you'll notice:
 - **Completion Rate**: How often you finish videos (shown as %)
 - **Playlists Saved**: Number of playlists you've discovered
 
-**Interactive Charts:**
+**Analytics Cards:**
+- **Longest Unfinished Videos**: Resume long videos you haven't finished (shows channel, time left, and link)
+- **Top Watched Channels**: Your top 5 channels by videos watched (with links)
+- **Top Skipped Channels**: Your top 5 channels where you most often skip long videos (with links)
+- **Completion Bar Chart**: See your completion rate for long videos (skipped, partial, completed) with a bar chart and legend
 
-1. **Weekly Activity Chart** (Bar Chart)
-   - Shows videos watched each day for the past 7 days
-   - Bars are higher on days when you watched more videos
-   - Helps you see your viewing patterns throughout the week
+**Other Interactive Charts:**
+- **Weekly Activity Chart** (Bar Chart): Videos watched each day for the past 7 days
+- **Watch Time by Hour** (Bar Chart): What time of day you watch the most content
 
-2. **Content Type Distribution** (Pie Chart)
-   - Compares time spent on regular videos vs Shorts
-   - Shows the ratio of your viewing habits
-   - Helps you understand what type of content you prefer
-
-3. **Watch Time by Hour** (Bar Chart)
-   - Shows what time of day you watch the most content
-   - Each bar represents an hour of the day (0-23)
-   - Helps you identify your peak viewing times
-
-**How to read the charts:**
-- Hover over chart elements to see exact values
-- Charts update automatically as you watch more content
-- All charts adapt to your chosen theme (light/dark)
+**How to read the new completion bar chart:**
+- Each bar shows the count of long videos that were skipped, partially watched, or completed
+- The legend to the right shows the color, label, and percentage for each segment
 
 ### ⚙️ Settings Tab (Customization)
 

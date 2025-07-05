@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "YT re:Watch",
-    "version": "2.6.4",
+    "version": "2.6.5",
     "description": "YouTube history extension for multiple accounts - Track progress across all accounts with privacy. Visual overlays, account switching, no login required.",
     "author": "Edin User",
     "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",

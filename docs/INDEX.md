@@ -102,6 +102,11 @@ The extension adds helpful visual indicators directly on YouTube:
 **Analytics Tab** - See your viewing patterns:
 ![Analytics charts](./images/ytrw_stats2.jpg)
 
+- **Longest Unfinished Videos**: Resume long videos you haven't finished (shows channel, time left, and link)
+- **Top Watched Channels**: Your top 5 channels by videos watched (with links)
+- **Top Skipped Channels**: Your top 5 channels where you most often skip long videos (with links)
+- **Completion Bar Chart**: See your completion rate for long videos (skipped, partial, completed) with a bar chart and legend
+
 **Settings Tab** - Customize everything:
 ![Settings customization](./images/ytrw_settings.jpg)
 

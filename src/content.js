@@ -597,13 +597,30 @@
         }
         title = title || 'Unknown Title';
 
+        // Extract channel name and channelId from the channel link
+        let channelName = 'Unknown Channel';
+        let channelId = '';
+        const channelLink = document.querySelector('ytd-video-owner-renderer ytd-channel-name a');
+        if (channelLink) {
+            channelName = channelLink.textContent.trim();
+            // Extract the href, which is either /@handle or /channel/UCxxxx
+            const href = channelLink.getAttribute('href') || '';
+            if (href.startsWith('/@')) {
+                channelId = href.slice(1); // '@handle'
+            } else if (href.startsWith('/channel/')) {
+                channelId = href.replace('/channel/', ''); // 'UCxxxx...'
+            }
+        }
+
         const record = {
             videoId,
             title,
             time: currentTime,
             duration,
             timestamp: Date.now(),
-            url: getCleanVideoUrl()
+            url: getCleanVideoUrl(),
+            channelName,
+            channelId
         };
 
         try {
@@ -654,6 +671,21 @@
             }
         }
 
+        // Extract channel name and channelId for Shorts
+        let channelName = 'Unknown';
+        let channelId = 'Unknown';
+        const channelLink = document.querySelector('ytd-channel-name a, #owner-name a');
+        if (channelLink) {
+            channelName = channelLink.textContent?.trim() || 'Unknown';
+            const href = channelLink.getAttribute('href') || '';
+            const match = href.match(/\/channel\/([a-zA-Z0-9_-]+)/) || href.match(/\/@([a-zA-Z0-9_\.-]+)/);
+            if (match) {
+                channelId = match[1];
+            } else {
+                channelId = href;
+            }
+        }
+
         const record = {
             videoId: videoId,
             time: currentTime,
@@ -661,7 +693,9 @@
             timestamp: Date.now(),
             title: title,
             url: getCleanVideoUrl(),
-            isShorts: true
+            isShorts: true,
+            channelName,
+            channelId
         };
 
         try {
