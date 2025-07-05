@@ -474,25 +474,23 @@ function renderUnfinishedVideos() {
     const topUnfinished = unfinished.slice(0, 5);
 
     if (topUnfinished.length === 0) {
-        container.innerHTML = `<span style="color:var(--text-color);opacity:0.7;">${chrome.i18n.getMessage('analytics_no_unfinished_long_videos')}</span>`;
+        // Use textContent for plain text, or build DOM for styled text
+        container.textContent = chrome.i18n.getMessage('analytics_no_unfinished_long_videos');
         return;
     }
 
-    // Helper to sanitize text (replace mis-encoded dashes and clean up)
-    function sanitizeText(text) {
-        if (!text) return '';
-        return text
-            .replace(/â€" |â€" |â€" |â€\x9c|â€\x9d/g, '–') // common mis-encoded dashes
-            .replace(/â€™/g, "'") // apostrophe
-            .replace(/â€œ|â€/g, '"') // quotes
-            .replace(/â€¦/g, '...') // ellipsis
-            .replace(/â€¢/g, '-') // bullet
-            .replace(/\s+/g, ' ') // collapse whitespace
-            .trim();
-    }
-
-    // Render list
-    container.innerHTML = topUnfinished.map(record => {
+    // Helper to create a safe unfinished video entry
+    function createUnfinishedVideoEntry(record) {
+        const div = document.createElement('div');
+        div.style.marginBottom = '8px';
+        const a = document.createElement('a');
+        a.href = record.url;
+        a.target = '_blank';
+        a.style.fontWeight = '500';
+        a.style.color = 'var(--button-bg)';
+        a.style.textDecoration = 'none';
+        a.textContent = sanitizeText(record.title || 'Untitled');
+        div.appendChild(a);
         const timeLeft = Math.max(0, Math.round(record.duration - record.time));
         const watched = Math.round(record.time);
         const total = Math.round(record.duration);
@@ -505,14 +503,44 @@ function renderUnfinishedVideos() {
         const timeLeftStr = `${minLeft}m${secLeft > 0 ? ' ' + secLeft + 's' : ''}`;
         const watchedStr = `${minWatched}:${secWatched.toString().padStart(2, '0')}`;
         const totalStr = `${minTotal}:${secTotal.toString().padStart(2, '0')}`;
-        const title = sanitizeText(record.title || 'Untitled');
-        const channel = sanitizeText(record.channelName || 'Unknown Channel');
-        return `<div style="margin-bottom:8px;">
-            <a href="${record.url}" target="_blank" style="font-weight:500; color:var(--button-bg); text-decoration:none;">${title}</a>
-            <span style="color:var(--text-color); opacity:0.8;"> - ${timeLeftStr} left (watched ${watchedStr}/${totalStr})<br>
-            <span style="font-size:12px; color:var(--text-color); opacity:0.7;">${channel}</span></span>
-        </div>`;
-    }).join('');
+        // Use a <div> for details, with a <span> for the main text, a <br>, and a <span> for the channel
+        const details = document.createElement('div');
+        details.style.color = 'var(--text-color)';
+        details.style.opacity = '0.8';
+        details.style.display = 'flex';
+        details.style.alignItems = 'center';
+        details.style.justifyContent = 'space-between';
+
+        const leftDetails = document.createElement('div');
+        leftDetails.style.display = 'flex';
+        leftDetails.style.flexDirection = 'column';
+
+        const mainText = document.createElement('span');
+        mainText.textContent = ` - ${timeLeftStr} left (watched ${watchedStr}/${totalStr})`;
+        leftDetails.appendChild(mainText);
+        leftDetails.appendChild(document.createElement('br'));
+        const channel = document.createElement('span');
+        channel.style.fontSize = '12px';
+        channel.style.color = 'var(--text-color)';
+        channel.style.opacity = '0.7';
+        channel.textContent = sanitizeText(record.channelName || 'Unknown Channel');
+        leftDetails.appendChild(channel);
+
+        details.appendChild(leftDetails);
+
+        // Add delete button aligned right
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'delete-button';
+        deleteButton.textContent = chrome.i18n.getMessage('delete_label');
+        deleteButton.style.marginLeft = 'auto';
+        deleteButton.onclick = () => deleteRecord(record.videoId);
+        details.appendChild(deleteButton);
+        div.appendChild(details);
+        return div;
+    }
+    // Clear and append all entries
+    container.innerHTML = '';
+    topUnfinished.forEach(record => container.appendChild(createUnfinishedVideoEntry(record)));
 }
 
 // Create activity chart
@@ -741,19 +769,35 @@ function displayHistoryPage() {
 
         // Create or update content
         if (!cell.querySelector('.video-thumbnail')) {
-            cell.innerHTML = `
-                <img class="video-thumbnail" alt="Video thumbnail">
-                <div class="video-content">
-                    <div class="video-title">
-                        <a class="video-link" target="_blank"></a>
-                    </div>
-                    <div class="video-details">
-                        <span class="video-progress"></span>
-                        <span class="video-date"></span>
-                        <button class="delete-button">${chrome.i18n.getMessage('delete_label')}</button>
-                    </div>
-                </div>
-            `;
+            // Build DOM nodes instead of using innerHTML
+            cell.innerHTML = '';
+            const img = document.createElement('img');
+            img.className = 'video-thumbnail';
+            img.alt = 'Video thumbnail';
+            cell.appendChild(img);
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'video-content';
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'video-title';
+            const a = document.createElement('a');
+            a.className = 'video-link';
+            a.target = '_blank';
+            titleDiv.appendChild(a);
+            contentDiv.appendChild(titleDiv);
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'video-details';
+            const progressSpan = document.createElement('span');
+            progressSpan.className = 'video-progress';
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'video-date';
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button';
+            deleteButton.textContent = chrome.i18n.getMessage('delete_label');
+            detailsDiv.appendChild(progressSpan);
+            detailsDiv.appendChild(dateSpan);
+            detailsDiv.appendChild(deleteButton);
+            contentDiv.appendChild(detailsDiv);
+            cell.appendChild(contentDiv);
         }
 
         // Update content
@@ -1171,25 +1215,32 @@ function displayPlaylistsPage() {
 
         // Create or update content
         if (!cell.querySelector('.playlist-icon')) {
-            cell.innerHTML = `
-                <div class="playlist-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
-                        <circle cx="20" cy="7" r="2"/>
-                        <circle cx="20" cy="12" r="2"/>
-                        <circle cx="20" cy="17" r="2"/>
-                    </svg>
-                </div>
-                <div class="playlist-content">
-                    <div class="playlist-title">
-                        <a class="video-link" target="_blank"></a>
-                    </div>
-                    <div class="playlist-details">
-                        <span class="playlist-date"></span>
-                        <button class="delete-button">${chrome.i18n.getMessage('delete_label')}</button>
-                    </div>
-                </div>
-            `;
+            // Build DOM nodes instead of using innerHTML
+            cell.innerHTML = '';
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'playlist-icon';
+            iconDiv.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/><circle cx="20" cy="7" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="20" cy="17" r="2"/></svg>`;
+            cell.appendChild(iconDiv);
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'playlist-content';
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'playlist-title';
+            const a = document.createElement('a');
+            a.className = 'video-link';
+            a.target = '_blank';
+            titleDiv.appendChild(a);
+            contentDiv.appendChild(titleDiv);
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'playlist-details';
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'playlist-date';
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button';
+            deleteButton.textContent = chrome.i18n.getMessage('delete_label');
+            detailsDiv.appendChild(dateSpan);
+            detailsDiv.appendChild(deleteButton);
+            contentDiv.appendChild(detailsDiv);
+            cell.appendChild(contentDiv);
         }
 
         // Update content
@@ -2584,29 +2635,13 @@ function renderTopChannels() {
     const topChannels = channels.slice(0, 5);
 
     if (topChannels.length === 0) {
-        container.innerHTML = `<span style="color:var(--text-color);opacity:0.7;">${chrome.i18n.getMessage('analytics_no_channel_data')}</span>`;
+        container.textContent = chrome.i18n.getMessage('analytics_no_channel_data');
         return;
     }
-
-    function formatWatchTime(seconds) {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        return h > 0 ? `${h}h ${m}m` : `${m}m`;
-    }
-
-    function sanitizeText(text) {
-        if (!text) return '';
-        return text
-            .replace(/â€" |â€" |â€" |â€\x9c|â€\x9d/g, '-') // always use plain hyphen
-            .replace(/â€™/g, "'")
-            .replace(/â€œ|â€/g, '"')
-            .replace(/â€¦/g, '...')
-            .replace(/â€¢/g, '-')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-    container.innerHTML = topChannels.map(ch => {
+    // Helper to create a safe channel entry
+    function createChannelEntry(ch) {
+        const div = document.createElement('div');
+        div.style.marginBottom = '8px';
         let channelUrl = '';
         if (ch.channelId) {
             if (ch.channelId.startsWith('UC')) {
@@ -2616,9 +2651,31 @@ function renderTopChannels() {
             }
         }
         const channelName = sanitizeText(ch.channel);
-        const link = channelUrl ? `<a href="${channelUrl}" target="_blank" style="font-weight:500; color:var(--button-bg); text-decoration:none;">${channelName}</a>` : `<span style="font-weight:500; color:var(--button-bg);">${channelName}</span>`;
-        return `<div style="margin-bottom:8px;">${link} <span style="color:var(--text-color); opacity:0.8;">- ${chrome.i18n.getMessage('analytics_channel_videos', [ch.count, formatWatchTime(ch.watchTime)])}</span></div>`;
-    }).join('');
+        let link;
+        if (channelUrl) {
+            link = document.createElement('a');
+            link.href = channelUrl;
+            link.target = '_blank';
+            link.style.fontWeight = '500';
+            link.style.color = 'var(--button-bg)';
+            link.style.textDecoration = 'none';
+            link.textContent = channelName;
+        } else {
+            link = document.createElement('span');
+            link.style.fontWeight = '500';
+            link.style.color = 'var(--button-bg)';
+            link.textContent = channelName;
+        }
+        div.appendChild(link);
+        const details = document.createElement('span');
+        details.style.color = 'var(--text-color)';
+        details.style.opacity = '0.8';
+        details.textContent = ` - ${chrome.i18n.getMessage('analytics_channel_videos', [ch.count, formatWatchTime(ch.watchTime)])}`;
+        div.appendChild(details);
+        return div;
+    }
+    container.innerHTML = '';
+    topChannels.forEach(ch => container.appendChild(createChannelEntry(ch)));
 }
 
 // Render the top 5 skipped channels (long videos only, watched <10%)
@@ -2648,19 +2705,22 @@ function renderSkippedChannels() {
     function sanitizeText(text) {
         if (!text) return '';
         return text
-            .replace(/â€" |â€" |â€" |â€\x9c|â€\x9d/g, '-')
-            .replace(/â€™/g, "'")
-            .replace(/â€œ|â€/g, '"')
-            .replace(/â€¦/g, '...')
-            .replace(/â€¢/g, '-')
-            .replace(/\s+/g, ' ')
+            .replace(/\u00e2\u20ac\" |\u00e2\u20ac\" |\u00e2\u20ac\" |\u00e2\u20ac\\x9c|\u00e2\u20ac\\x9d/g, '–') // common mis-encoded dashes
+            .replace(/\u00e2\u20ac\u2122/g, "'") // apostrophe
+            .replace(/\u00e2\u20ac\u0153|\u00e2\u20ac\u009d/g, '"') // quotes
+            .replace(/\u00e2\u20ac\u00a6/g, '...') // ellipsis
+            .replace(/\u00e2\u20ac\u00a2/g, '-') // bullet
+            .replace(/\s+/g, ' ') // collapse whitespace
             .trim();
     }
 
     if (topSkipped.length === 0) {
-        container.innerHTML = `<span style="color:var(--text-color);opacity:0.7;">${chrome.i18n.getMessage('analytics_no_skipped_channel_data')}</span>`;
+        container.textContent = chrome.i18n.getMessage('analytics_no_skipped_channel_data');
     } else {
-        container.innerHTML = topSkipped.map(ch => {
+        // Helper to create a safe skipped channel entry
+        function createSkippedChannelEntry(ch) {
+            const div = document.createElement('div');
+            div.style.marginBottom = '8px';
             let channelUrl = '';
             if (ch.channelId) {
                 if (ch.channelId.startsWith('UC')) {
@@ -2670,9 +2730,31 @@ function renderSkippedChannels() {
                 }
             }
             const channelName = sanitizeText(ch.channel);
-            const link = channelUrl ? `<a href="${channelUrl}" target="_blank" style="font-weight:500; color:var(--button-bg); text-decoration:none;">${channelName}</a>` : `<span style="font-weight:500; color:var(--button-bg);">${channelName}</span>`;
-            return `<div style="margin-bottom:8px;">${link} <span style="color:var(--text-color); opacity:0.8;">- ${chrome.i18n.getMessage('analytics_skipped_count', [ch.count])}</span></div>`;
-        }).join('');
+            let link;
+            if (channelUrl) {
+                link = document.createElement('a');
+                link.href = channelUrl;
+                link.target = '_blank';
+                link.style.fontWeight = '500';
+                link.style.color = 'var(--button-bg)';
+                link.style.textDecoration = 'none';
+                link.textContent = channelName;
+            } else {
+                link = document.createElement('span');
+                link.style.fontWeight = '500';
+                link.style.color = 'var(--button-bg)';
+                link.textContent = channelName;
+            }
+            div.appendChild(link);
+            const details = document.createElement('span');
+            details.style.color = 'var(--text-color)';
+            details.style.opacity = '0.8';
+            details.textContent = ` - ${chrome.i18n.getMessage('analytics_skipped_count', [ch.count])}`;
+            div.appendChild(details);
+            return div;
+        }
+        container.innerHTML = '';
+        topSkipped.forEach(ch => container.appendChild(createSkippedChannelEntry(ch)));
     }
 }
 
@@ -2743,7 +2825,36 @@ function renderCompletionBarChart() {
             <span style="color:var(--text-color);margin-left:8px;text-align:right;min-width:60px;">${counts[i]} (${percent}%)</span>
         </div>`;
     }
-    legendDiv.innerHTML = legendHtml;
+    // Replace with safe DOM construction
+    legendDiv.innerHTML = '';
+    for (let i = 0; i < legendLabels.length; i++) {
+        const row = document.createElement('div');
+        row.style.marginBottom = '8px';
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        const colorBox = document.createElement('span');
+        colorBox.style.display = 'inline-block';
+        colorBox.style.width = '16px';
+        colorBox.style.height = '16px';
+        colorBox.style.background = colors[i];
+        colorBox.style.marginRight = '8px';
+        colorBox.style.borderRadius = '3px';
+        row.appendChild(colorBox);
+        const label = document.createElement('span');
+        label.style.color = 'var(--text-color)';
+        label.style.fontWeight = '500';
+        label.style.flex = '1';
+        label.textContent = legendLabels[i];
+        row.appendChild(label);
+        const count = document.createElement('span');
+        count.style.color = 'var(--text-color)';
+        count.style.marginLeft = '8px';
+        count.style.textAlign = 'right';
+        count.style.minWidth = '60px';
+        count.textContent = `${counts[i]} (${total ? Math.round((counts[i] / total) * 100) : 0}%)`;
+        row.appendChild(count);
+        legendDiv.appendChild(row);
+    }
 }
 
 // Localization helper: localize all elements with data-i18n* attributes
@@ -2784,3 +2895,22 @@ document.addEventListener('DOMContentLoaded', () => {
 // For example:
 // alert(chrome.i18n.getMessage('alert_some_error'));
 // ...
+
+// Add global helpers at the top of the file
+function sanitizeText(text) {
+    if (!text) return '';
+    return text
+        .replace(/\u00e2\u20ac\" |\u00e2\u20ac\" |\u00e2\u20ac\" |\u00e2\u20ac\\x9c|\u00e2\u20ac\\x9d/g, '–') // common mis-encoded dashes
+        .replace(/\u00e2\u20ac\u2122/g, "'") // apostrophe
+        .replace(/\u00e2\u20ac\u0153|\u00e2\u20ac\u009d/g, '"') // quotes
+        .replace(/\u00e2\u20ac\u00a6/g, '...') // ellipsis
+        .replace(/\u00e2\u20ac\u00a2/g, '-') // bullet
+        .replace(/\s+/g, ' ') // collapse whitespace
+        .trim();
+}
+
+function formatWatchTime(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}

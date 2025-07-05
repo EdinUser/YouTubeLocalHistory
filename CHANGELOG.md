@@ -2,7 +2,7 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
-## [3.0.0] - Upcoming
+## [3.0.0]
 
 ### ✨ Major New Features
 
