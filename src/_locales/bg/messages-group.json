@@ -44,16 +44,16 @@
     "description": "Error message for invalid import file format, $1 is the detail"
   },
   "message_confirm_clear_history": {
-    "message": "Сигурни ли сте, че искате да изчистите цялата история? Това не може да бъде отменено.",
-    "description": "Confirmation message for clearing all history"
+    "message": "Сигурни ли сте, че искате да изчистите цялата история? Това не може да се отмени.",
+    "description": "Confirmation for clearing all history."
   },
   "message_confirm_full_sync": {
-    "message": "Пълната синхронизация ще изчисти старите данни и ще синхронизира всичко наново. Това може да отнеме известно време. Продължавате ли?",
-    "description": "Confirmation message for full sync"
+    "message": "Пълната синхронизация ще изчисти старите данни и ще синхронизира всичко наново. Може да отнеме време. Продължавате ли?",
+    "description": "Confirmation for full sync."
   },
   "message_warning_clear_all": {
-    "message": "ВНИМАНИЕ: Това ще изтрие ЗАВИНАГИ цялата ви история на гледане и плейлисти в YouTube.\n\nТова действие не може да бъде отменено. Сигурни ли сте, че искате да продължите?",
-    "description": "Warning message for clearing all history and playlists"
+    "message": "ВНИМАНИЕ: Това ще изтрие цялата ви история и плейлисти в YouTube. Това не може да се отмени. Продължавате ли?",
+    "description": "Warning for clearing all history and playlists."
   },
   "message_all_history_cleared": {
     "message": "Цялата история на видеа и плейлисти е изчистена успешно",
