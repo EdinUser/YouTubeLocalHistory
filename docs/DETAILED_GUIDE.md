@@ -1,3 +1,9 @@
+# ❤️ Support the Project
+
+If you find YT re:Watch helpful, you can support ongoing development on [Patreon](https://patreon.com/EdinUser)!
+
+[![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange?logo=patreon&logoColor=white)](https://patreon.com/EdinUser)
+
 # 📖 Complete User Guide for YT re:Watch
 
 *A step-by-step guide to master your YouTube viewing experience*

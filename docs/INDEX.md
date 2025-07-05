@@ -15,6 +15,12 @@
   *Keep track of your YouTube journey - Your data stays private on your device*
 </div>
 
+# ❤️ Support the Project
+
+If you find YT re:Watch helpful, you can support ongoing development on [Patreon](https://patreon.com/EdinUser)!
+
+[![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange?logo=patreon&logoColor=white)](https://patreon.com/EdinUser)
+
 ---
 
 ## 🤔 What is YT re:Watch?

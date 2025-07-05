@@ -381,3 +381,9 @@ This extension supports multiple languages:
 - Bulgarian (bg)
 
 **Note:** All non-English translations are currently machine-generated. If you are a native speaker and notice any issues, please consider contributing improvements! See `src/_locales/README.md` for translation guidelines.
+
+## ❤️ Support the Project
+
+If you find YT re:Watch useful, consider supporting development on [Patreon](https://patreon.com/EdinUser)!
+
+[![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange?logo=patreon&logoColor=white)](https://patreon.com/EdinUser)
