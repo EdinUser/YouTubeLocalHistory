@@ -45,15 +45,15 @@
   },
   "message_confirm_clear_history": {
     "message": "Sind Sie sicher, dass Sie den gesamten Verlauf löschen möchten? Dies kann nicht rückgängig gemacht werden.",
-    "description": "Confirmation message for clearing all history"
+    "description": "Confirmation for clearing all history."
   },
   "message_confirm_full_sync": {
-    "message": "Vollständige Synchronisierung bereinigt alte Daten und synchronisiert alles neu. Dies kann einen Moment dauern. Fortfahren?",
-    "description": "Confirmation message for full sync"
+    "message": "Vollständige Synchronisierung bereinigt alte Daten und synchronisiert alles neu. Dies kann dauern. Fortfahren?",
+    "description": "Confirmation for full sync."
   },
   "message_warning_clear_all": {
-    "message": "WARNUNG: Dadurch wird Ihr gesamter YouTube-Verlauf und alle Playlists dauerhaft gelöscht.\n\nDiese Aktion kann nicht rückgängig gemacht werden. Sind Sie sicher, dass Sie fortfahren möchten?",
-    "description": "Warning message for clearing all history and playlists"
+    "message": "WARNUNG: Dadurch wird Ihr gesamter YouTube-Verlauf und alle Playlists gelöscht. Dies kann nicht rückgängig gemacht werden. Fortfahren?",
+    "description": "Warning for clearing all history and playlists."
   },
   "message_all_history_cleared": {
     "message": "Der gesamte Video- und Playlist-Verlauf wurde erfolgreich gelöscht",

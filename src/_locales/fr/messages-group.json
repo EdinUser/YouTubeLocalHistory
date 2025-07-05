@@ -52,7 +52,7 @@
     "description": "Confirmation message for full sync"
   },
   "message_warning_clear_all": {
-    "message": "ATTENTION : Cela supprimera définitivement TOUT votre historique de visionnage YouTube et vos playlists.\n\nCette action est irréversible. Êtes-vous sûr de vouloir continuer ?",
+    "message": "ATTENTION : Cela supprimera tout votre historique et vos playlists YouTube. Cette action est irréversible. Continuer ?",
     "description": "Warning message for clearing all history and playlists"
   },
   "message_all_history_cleared": {

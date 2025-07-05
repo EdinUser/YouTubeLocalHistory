@@ -45,15 +45,15 @@
     },
     "message_confirm_clear_history": {
         "message": "Are you sure you want to clear all history? This cannot be undone.",
-        "description": "Confirmation message for clearing all history"
+        "description": "Confirmation for clearing all history."
     },
     "message_confirm_full_sync": {
         "message": "Full Sync will clean up old data and re-sync everything. This may take a moment. Continue?",
-        "description": "Confirmation message for full sync"
+        "description": "Confirmation for full sync."
     },
     "message_warning_clear_all": {
-        "message": "WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?",
-        "description": "Warning message for clearing all history and playlists"
+        "message": "WARNING: This will permanently delete ALL your YouTube viewing history and playlists. This cannot be undone. Continue?",
+        "description": "Warning for clearing all history and playlists."
     },
     "message_all_history_cleared": {
         "message": "All video and playlist history has been cleared successfully",
