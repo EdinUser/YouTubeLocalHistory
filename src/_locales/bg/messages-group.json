@@ -1,0 +1,234 @@
+{
+  "message_no_active_tab": {
+    "message": "Няма активен раздел.",
+    "description": "Error message when no active tab is found"
+  },
+  "message_video_removed": {
+    "message": "Видеото е премахнато от историята",
+    "description": "Success message when a video is removed from history"
+  },
+  "message_error_removing_video": {
+    "message": "Грешка при премахване на видеото: $1",
+    "description": "Error message when removing a video fails, $1 is the error detail"
+  },
+  "message_history_cleared": {
+    "message": "Историята е изчистена успешно",
+    "description": "Success message when history is cleared"
+  },
+  "message_error_clearing_history": {
+    "message": "Грешка при изчистване на историята: $1",
+    "description": "Error message when clearing history fails, $1 is the error detail"
+  },
+  "message_export_success": {
+    "message": "Историята е експортирана успешно: $1 видеа, $2 плейлисти",
+    "description": "Success message when history is exported, $1 is video count, $2 is playlist count"
+  },
+  "message_error_exporting_history": {
+    "message": "Грешка при експортиране на историята: $1",
+    "description": "Error message when exporting history fails, $1 is the error detail"
+  },
+  "message_import_success": {
+    "message": "Историята $1 успешно: $2 видеа, $3 плейлисти",
+    "description": "Success message when history is imported, $1 is mode, $2 is video count, $3 is playlist count"
+  },
+  "message_error_importing_history": {
+    "message": "Грешка при импортиране на историята: $1",
+    "description": "Error message when importing history fails, $1 is the error detail"
+  },
+  "message_no_data_in_import": {
+    "message": "Не са намерени данни във файла за импортиране",
+    "description": "Error message when no data is found in import file"
+  },
+  "message_invalid_file_format": {
+    "message": "Невалиден файлов формат: $1",
+    "description": "Error message for invalid import file format, $1 is the detail"
+  },
+  "message_confirm_clear_history": {
+    "message": "Сигурни ли сте, че искате да изчистите цялата история? Това не може да бъде отменено.",
+    "description": "Confirmation message for clearing all history"
+  },
+  "message_confirm_full_sync": {
+    "message": "Пълната синхронизация ще изчисти старите данни и ще синхронизира всичко наново. Това може да отнеме известно време. Продължавате ли?",
+    "description": "Confirmation message for full sync"
+  },
+  "message_warning_clear_all": {
+    "message": "ВНИМАНИЕ: Това ще изтрие ЗАВИНАГИ цялата ви история на гледане и плейлисти в YouTube.\n\nТова действие не може да бъде отменено. Сигурни ли сте, че искате да продължите?",
+    "description": "Warning message for clearing all history and playlists"
+  },
+  "message_all_history_cleared": {
+    "message": "Цялата история на видеа и плейлисти е изчистена успешно",
+    "description": "Success message when all history and playlists are cleared"
+  },
+  "message_export_completed": {
+    "message": "Експортирането е завършено успешно",
+    "description": "Success message when export is completed"
+  },
+  "message_failed_to_initialize": {
+    "message": "Неуспешно инициализиране на разширението: $1",
+    "description": "Error message when extension initialization fails, $1 is the error detail"
+  },
+  "message_error_loading_history": {
+    "message": "Грешка при зареждане на историята: $1",
+    "description": "Error message when loading history fails, $1 is the error detail"
+  },
+  "message_no_playlists_found": {
+    "message": "Няма намерени плейлисти.",
+    "description": "Message when no playlists are found"
+  },
+  "message_error_loading_playlists": {
+    "message": "Грешка при зареждане на плейлистите: $1",
+    "description": "Error message when loading playlists fails, $1 is the error detail"
+  },
+  "message_playlist_removed": {
+    "message": "Плейлистът е премахнат",
+    "description": "Success message when a playlist is removed"
+  },
+  "message_error_removing_playlist": {
+    "message": "Грешка при премахване на плейлист: $1",
+    "description": "Error message when removing a playlist fails, $1 is the error detail"
+  },
+  "message_auto_clean_updated": {
+    "message": "Периодът за автоматично почистване е обновен",
+    "description": "Success message when auto-clean period is updated"
+  },
+  "message_pagination_count_updated": {
+    "message": "Броят на страниците е обновен",
+    "description": "Message when pagination count is updated"
+  },
+  "message_overlay_title_updated": {
+    "message": "Заглавието на наслагването е обновено",
+    "description": "Message when overlay title is updated"
+  },
+  "message_overlay_color_updated": {
+    "message": "Цветът на наслагването е обновен",
+    "description": "Message when overlay color is updated"
+  },
+  "message_overlay_size_updated": {
+    "message": "Размерът на наслагването е обновен",
+    "description": "Message when overlay label size is updated"
+  },
+  "message_theme_preference_updated": {
+    "message": "Предпочитанията за тема са обновени",
+    "description": "Message when theme preference is updated"
+  },
+  "message_debug_mode_enabled": {
+    "message": "Режимът за отстраняване на грешки е активиран",
+    "description": "Message when debug mode is enabled"
+  },
+  "message_debug_mode_disabled": {
+    "message": "Режимът за отстраняване на грешки е деактивиран",
+    "description": "Message when debug mode is disabled"
+  },
+  "message_sync_disabled": {
+    "message": "Синхронизацията е изключена - Кликнете, за да я активирате",
+    "description": "Tooltip for disabled sync status"
+  },
+  "message_sync_not_available": {
+    "message": "Синхронизацията не е налична - Изисква се Firefox Sync",
+    "description": "Tooltip for unavailable sync status"
+  },
+  "message_sync_initializing": {
+    "message": "Инициализиране на синхронизацията...",
+    "description": "Tooltip for initializing sync status"
+  },
+  "message_sync_syncing": {
+    "message": "Синхронизиране на данни...",
+    "description": "Tooltip for syncing data status"
+  },
+  "message_sync_ready": {
+    "message": "Синхронизацията е готова",
+    "description": "Tooltip for sync ready status"
+  },
+  "message_sync_error": {
+    "message": "Грешка при синхронизация - Кликнете за повторен опит",
+    "description": "Tooltip for sync error status"
+  },
+  "message_sync_off": {
+    "message": "Изключено",
+    "description": "Label for sync off status"
+  },
+  "message_sync_na": {
+    "message": "Н/Д",
+    "description": "Label for sync not available status"
+  },
+  "message_sync_init": {
+    "message": "Инициализиране",
+    "description": "Label for sync initializing status"
+  },
+  "message_sync_on": {
+    "message": "Включено",
+    "description": "Label for sync on status"
+  },
+  "message_sync": {
+    "message": "Синхронизация",
+    "description": "Label for sync status"
+  },
+  "message_syncing": {
+    "message": "Синхронизиране...",
+    "description": "Label for syncing status"
+  },
+  "message_synced": {
+    "message": "Синхронизирано",
+    "description": "Label for synced status"
+  },
+  "message_sync_now": {
+    "message": "Синхронизирай сега",
+    "description": "Button label for sync now"
+  },
+  "message_full_sync": {
+    "message": "Пълна синхронизация",
+    "description": "Button label for full sync"
+  },
+  "message_syncing_status": {
+    "message": "Синхронизира се...",
+    "description": "Status text for syncing"
+  },
+  "message_synced_status": {
+    "message": "Синхронизирано",
+    "description": "Status text for synced"
+  },
+  "message_never": {
+    "message": "Никога",
+    "description": "Label for never synced"
+  },
+  "message_just_now": {
+    "message": "Току-що",
+    "description": "Label for just now sync time"
+  },
+  "message_minutes_ago": {
+    "message": "преди {MINUTES} минути",
+    "description": "Label for minutes ago sync time"
+  },
+  "message_hours_ago": {
+    "message": "преди {HOURS} часа",
+    "description": "Label for hours ago sync time"
+  },
+  "message_days_ago": {
+    "message": "преди {DAYS} дни",
+    "description": "Label for days ago sync time"
+  },
+  "message_firefox_sync_not_available": {
+    "message": "Firefox Sync не е наличен. Моля, активирайте Firefox Sync в настройките на браузъра си.",
+    "description": "Error message when Firefox Sync is not available"
+  },
+  "message_failed_to_enable_sync": {
+    "message": "Неуспешно активиране на синхронизацията. Моля, проверете настройките на Firefox Sync.",
+    "description": "Error message when enabling sync fails"
+  },
+  "message_failed_to_disable_sync": {
+    "message": "Неуспешно изключване на синхронизацията.",
+    "description": "Error message when disabling sync fails"
+  },
+  "message_sync_currently_disabled": {
+    "message": "Синхронизацията е изключена в момента.",
+    "description": "Error message when sync is currently disabled"
+  },
+  "message_full_sync_initiated": {
+    "message": "Стартира се пълна синхронизация... Това може да отнеме малко време.",
+    "description": "Message when full sync is initiated"
+  },
+  "message_unknown_error": {
+    "message": "Неизвестна грешка",
+    "description": "Fallback for unknown error details"
+  }
+} 

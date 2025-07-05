@@ -48,4 +48,8 @@ Welcome! Find the right guide for you:
 
 ---
 
-*Most people start with the **[Quick Setup Guide](./INDEX.md)** →* 
+*Most people start with the **[Quick Setup Guide](./INDEX.md)** →*
+
+## Multilanguage Support
+
+This extension is available in several languages. See the main [README](../README.md) and [TECHNICAL.md](./TECHNICAL.md) for details on translation and contributing improvements. 

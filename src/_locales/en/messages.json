@@ -1,0 +1,146 @@
+{
+    "extensionName": {
+        "message": "YouTube Local History",
+        "description": "The name of the extension"
+    },
+    "popup_title": {
+        "message": "YT re:Watch",
+        "description": "Popup window title and main heading"
+    },
+    "theme_toggle": {
+        "message": "Theme",
+        "description": "Button label for toggling theme"
+    },
+    "theme_toggle_tooltip": {
+        "message": "Toggle theme",
+        "description": "Tooltip for theme toggle button"
+    },
+    "theme_light": {
+        "message": "Light",
+        "description": "Label for light theme option"
+    },
+    "theme_dark": {
+        "message": "Dark",
+        "description": "Label for dark theme option"
+    },
+    "theme_auto": {
+        "message": "Auto",
+        "description": "Label for auto/system theme option"
+    },
+    "theme_switch_to_dark": {
+        "message": "Switch to dark theme",
+        "description": "Tooltip for switching to dark theme"
+    },
+    "theme_switch_to_light": {
+        "message": "Switch to light theme",
+        "description": "Tooltip for switching to light theme"
+    },
+    "theme_system": {
+        "message": "System Default",
+        "description": "Label for system default theme option"
+    },
+    "theme_currently_following_system": {
+        "message": "Currently following system theme - Click to override",
+        "description": "Tooltip for auto theme option"
+    },
+    "clear_label": {
+        "message": "Clear",
+        "description": "Button label for clearing all history"
+    },
+    "clear_tooltip": {
+        "message": "Clear all history",
+        "description": "Tooltip for clear history button"
+    },
+    "close_label": {
+        "message": "Close",
+        "description": "Button label for closing the popup"
+    },
+    "sync_status": {
+        "message": "Sync",
+        "description": "Label for sync status indicator"
+    },
+    "sync_status_tooltip": {
+        "message": "Sync status",
+        "description": "Tooltip for sync status indicator"
+    },
+    "instructions_script_disabled_title": {
+        "message": "Script Execution Disabled",
+        "description": "Title for script execution disabled instructions"
+    },
+    "instructions_script_disabled_body": {
+        "message": "If you are seeing this message, it means that script execution is disabled for this extension. Please follow these steps to enable it:",
+        "description": "Body text for script execution disabled instructions"
+    },
+    "instructions_script_disabled_step1": {
+        "message": "Go to Firefox settings: about:preferences#privacy",
+        "description": "Step 1 for enabling script execution"
+    },
+    "instructions_script_disabled_step2": {
+        "message": "Ensure \"Enhanced Tracking Protection\" is set to \"Standard\" or \"Custom\" and does not block scripts",
+        "description": "Step 2 for enabling script execution"
+    },
+    "instructions_script_disabled_step3": {
+        "message": "Check for any content blocking: click the shield icon in the address bar when the popup is open and ensure no scripts are blocked",
+        "description": "Step 3 for enabling script execution"
+    },
+    "delete_label": {
+        "message": "Delete",
+        "description": "Button label for deleting an item (video, playlist, short)"
+    },
+    "pagination_page_info": {
+        "message": "Page $1 of $2",
+        "description": "Pagination info, e.g. Page 1 of 11"
+    },
+    "chart_skipped": {
+        "message": "Skipped",
+        "description": "Chart label: Skipped"
+    },
+    "chart_partial": {
+        "message": "Partial",
+        "description": "Chart label: Partial"
+    },
+    "chart_completed": {
+        "message": "Completed",
+        "description": "Chart label: Completed"
+    },
+    "chart_skipped_legend": {
+        "message": "Skipped (<10%)",
+        "description": "Chart legend: Skipped (<10%)"
+    },
+    "chart_partial_legend": {
+        "message": "Partial (10-90%)",
+        "description": "Chart legend: Partial (10-90%)"
+    },
+    "chart_completed_legend": {
+        "message": "Completed (>=90%)",
+        "description": "Chart legend: Completed (>=90%)"
+    },
+    "chart_minutes": {
+        "message": "Minutes",
+        "description": "Chart axis label: Minutes"
+    },
+    "chart_hour_of_day": {
+        "message": "Hour of Day",
+        "description": "Chart axis label: Hour of Day"
+    },
+    "date_today": {
+        "message": "Today",
+        "description": "Label for today's date"
+    },
+    "date_yesterday": {
+        "message": "Yesterday",
+        "description": "Label for yesterday's date"
+    },
+    "date_unknown": {
+        "message": "Unknown",
+        "description": "Label for unknown date"
+    },
+    "search_no_videos_found": {
+        "message": "No videos found matching your search.",
+        "description": "Message when no videos match the search"
+    },
+    "history_no_history_found": {
+        "message": "No history found. Start watching some videos!",
+        "description": "Message when no history is found"
+    }
+}

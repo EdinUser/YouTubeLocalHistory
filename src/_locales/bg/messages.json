@@ -1,0 +1,148 @@
+{
+  "extensionName": {
+      "message": "YouTube Локална История",
+      "description": "The name of the extension"
+  },
+  "popup_title" : {
+      "message": "YT re:Watch",
+      "description": "Popup window title and main heading"
+  },
+  "theme_toggle" : {
+      "message": "Тема",
+      "description": "Button label for toggling theme"
+  },
+  "theme_toggle_tooltip" : {
+      "message": "Превключване на темата",
+      "description": "Tooltip for theme toggle button"
+  },
+  "theme_light" : {
+      "message": "Светла",
+      "description": "Label for light theme option"
+  },
+  "theme_dark" : {
+      "message": "Тъмна",
+      "description": "Label for dark theme option"
+  },
+  "theme_auto" : {
+      "message": "Автоматично",
+      "description": "Label for auto/system theme option"
+  },
+  "theme_switch_to_dark" : {
+      "message": "Превключване на тъмна тема",
+      "description": "Tooltip for switching to dark theme"
+  },
+  "theme_switch_to_light" : {
+      "message": "Превключване на светла тема",
+      "description": "Tooltip for switching to light theme"
+  },
+  "theme_system" : {
+      "message": "Системни настройки",
+      "description": "Label for system default theme option"
+  },
+  "theme_currently_following_system" : {
+      "message": "Следва системната тема - Кликнете за ръчно превключване",
+      "description": "Tooltip for auto theme option"
+  },
+  "clear_label" : {
+      "message": "Изчисти",
+      "description": "Button label for clearing all history"
+  },
+  "clear_tooltip" : {
+      "message": "Изчисти цялата история",
+      "description": "Tooltip for clear history button"
+  },
+  "close_label" : {
+      "message": "Затвори",
+      "description": "Button label for closing the popup"
+  },
+  "sync_status" : {
+      "message": "Синхронизация",
+      "description": "Label for sync status indicator"
+  },
+  "sync_status_tooltip" : {
+      "message": "Състояние на синхронизацията",
+      "description": "Tooltip for sync status indicator"
+  },
+
+  "instructions_script_disabled_title" : {
+      "message": "Изпълнението на скриптове е изключено",
+      "description": "Title for script execution disabled instructions"
+  },
+  "instructions_script_disabled_body" : {
+      "message": "Ако виждате това съобщение, изпълнението на скриптове е изключено за това разширение. Моля, следвайте тези стъпки, за да го активирате:",
+      "description": "Body text for script execution disabled instructions"
+  },
+  "instructions_script_disabled_step1" : {
+      "message": "Отидете в настройките на Firefox: about:preferences#privacy",
+      "description": "Step 1 for enabling script execution"
+  },
+  "instructions_script_disabled_step2" : {
+      "message": "Уверете се, че \"Enhanced Tracking Protection\" е на \"Standard\" или \"Custom\" и не блокира скриптове",
+      "description": "Step 2 for enabling script execution"
+  },
+  "instructions_script_disabled_step3" : {
+      "message": "Проверете за блокиране на съдържание: кликнете върху иконата на щит в адресната лента, когато прозорецът е отворен, и се уверете, че няма блокирани скриптове",
+      "description": "Step 3 for enabling script execution"
+  },
+  "delete_label" : {
+      "message": "Изтрий",
+      "description": "Button label for deleting an item (video, playlist, short)"
+  },
+  "pagination_page_info" : {
+      "message": "Страница $1 от $2",
+      "description": "Pagination info, e.g. Page 1 of 11"
+  },
+  "chart_skipped" : {
+      "message": "Пропуснато",
+      "description": "Chart label: Skipped"
+  },
+  "chart_partial" : {
+      "message": "Частично",
+      "description": "Chart label: Partial"
+  },
+  "chart_completed" : {
+      "message": "Завършено",
+      "description": "Chart label: Completed"
+  },
+  "chart_skipped_legend" : {
+      "message": "Пропуснато (<10%)",
+      "description": "Chart legend: Skipped (<10%)"
+  },
+  "chart_partial_legend" : {
+      "message": "Частично (10-90%)",
+      "description": "Chart legend: Partial (10-90%)"
+  },
+  "chart_completed_legend" : {
+      "message": "Завършено (>=90%)",
+      "description": "Chart legend: Completed (>=90%)"
+  },
+  "chart_minutes" : {
+      "message": "Минути",
+      "description": "Chart axis label: Minutes"
+  },
+  "chart_hour_of_day" : {
+      "message": "Час от деня",
+      "description": "Chart axis label: Hour of Day"
+  },
+
+  "date_today" : {
+      "message": "Днес",
+      "description": "Label for today's date"
+  },
+  "date_yesterday" : {
+      "message": "Вчера",
+      "description": "Label for yesterday's date"
+  },
+  "date_unknown" : {
+      "message": "Непозната",
+      "description": "Label for unknown date"
+  },
+  "search_no_videos_found" : {
+      "message": "Не са намерени видеа, отговарящи на търсенето ви.",
+      "description": "Message when no videos match the search"
+  },
+  "history_no_history_found" : {
+      "message": "Не е намерена история. Започнете да гледате видеа, за да се появи тук!",
+      "description": "Message when no history is found"
+  }
+}

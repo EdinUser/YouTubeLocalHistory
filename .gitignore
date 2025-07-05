@@ -1,6 +1,7 @@
 # Build outputs
 build/
 dist/
+helpers/
 *.zip
 *.xpi
 
@@ -44,11 +45,9 @@ pids
 *.pid.lock
 
 # Coverage directory used by tools like istanbul
-coverage/
 *.lcov
 
 # Dependency directories
-node_modules/
 jspm_packages/
 
 # Optional npm cache directory

@@ -80,7 +80,7 @@ function formatDuration(seconds) {
 
 // Format date in a more readable way
 function formatDate(timestamp) {
-    if (!timestamp) return 'Unknown';
+    if (!timestamp) return chrome.i18n.getMessage('date_unknown');
 
     const date = new Date(timestamp);
     const now = new Date();
@@ -93,13 +93,13 @@ function formatDate(timestamp) {
     });
 
     if (isToday) {
-        return `Today ${timeStr}`;
+        return chrome.i18n.getMessage('date_today') + ' ' + timeStr;
     }
 
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     if (date.toDateString() === yesterday.toDateString()) {
-        return `Yesterday ${timeStr}`;
+        return chrome.i18n.getMessage('date_yesterday') + ' ' + timeStr;
     }
 
     return date.toLocaleDateString('en-US', {
@@ -347,7 +347,7 @@ async function loadHistory(isInitialLoad = false) {
             const videoKeys = Object.keys(history).filter(k => k.startsWith('video_'));
             const sortedKeys = videoKeys.sort((a, b) => (history[b].timestamp || 0) - (history[a].timestamp || 0));
             const newestKeys = sortedKeys.slice(0, 3);
-            
+
             console.log('[Popup] Sample newest videos from storage:', newestKeys.map(key => ({
                 key: key,
                 title: history[key]?.title || 'No title',
@@ -357,7 +357,7 @@ async function loadHistory(isInitialLoad = false) {
 
         if (!history || Object.keys(history).length === 0) {
             if (isInitialLoad) {
-                showMessage('No history found.', 'info');
+                showMessage(chrome.i18n.getMessage('history_no_history_found'), 'info');
             }
             allHistoryRecords = [];
             allShortsRecords = [];
@@ -389,7 +389,7 @@ async function loadHistory(isInitialLoad = false) {
     } catch (error) {
         console.error('Error loading history:', error);
         if (isInitialLoad) {
-            showMessage('Error loading history: ' + (error.message || 'Unknown error'), 'error');
+            showMessage(chrome.i18n.getMessage('error_loading_history', [error.message || chrome.i18n.getMessage('unknown_error')]), 'error');
         }
     }
 }
@@ -474,7 +474,7 @@ function renderUnfinishedVideos() {
     const topUnfinished = unfinished.slice(0, 5);
 
     if (topUnfinished.length === 0) {
-        container.innerHTML = '<span style="color:var(--text-color);opacity:0.7;">No unfinished long videos found.</span>';
+        container.innerHTML = `<span style="color:var(--text-color);opacity:0.7;">${chrome.i18n.getMessage('analytics_no_unfinished_long_videos')}</span>`;
         return;
     }
 
@@ -682,9 +682,9 @@ function updateWatchTimeByHourChart() {
         .trim();
     ctx.font = '12px Arial';
     ctx.textAlign = 'right';
-    ctx.fillText('Minutes', 25, 35);
+    ctx.fillText(chrome.i18n.getMessage('chart_minutes'), 25, 35);
     ctx.textAlign = 'center';
-    ctx.fillText('Hour of Day', canvas.width / 2, canvas.height - 5);
+    ctx.fillText(chrome.i18n.getMessage('chart_hour_of_day'), canvas.width / 2, canvas.height - 5);
 }
 
 // Update displayHistoryPage to use new layout
@@ -701,8 +701,8 @@ function displayHistoryPage() {
         historyTable.innerHTML = '';
         noHistory.style.display = 'block';
         noHistory.textContent = searchQuery
-            ? 'No videos found matching your search.'
-            : 'No history found. Start watching some videos!';
+            ? chrome.i18n.getMessage('search_no_videos_found')
+            : chrome.i18n.getMessage('history_no_history_found');
         paginationDiv.style.display = 'none';
         return;
     }
@@ -750,7 +750,7 @@ function displayHistoryPage() {
                     <div class="video-details">
                         <span class="video-progress"></span>
                         <span class="video-date"></span>
-                        <button class="delete-button">Delete</button>
+                        <button class="delete-button">${chrome.i18n.getMessage('delete_label')}</button>
                     </div>
                 </div>
             `;
@@ -787,24 +787,24 @@ function displayHistoryPage() {
 async function deleteRecord(videoId) {
     try {
         await ytStorage.removeVideo(videoId);
-        showMessage('Video removed from history');
+        showMessage(chrome.i18n.getMessage('message_video_removed'));
         // Remove from local array and refresh page
         allHistoryRecords = allHistoryRecords.filter(r => r.videoId !== videoId);
         displayHistoryPage();
     } catch (error) {
         console.error('Error deleting record:', error);
-        showMessage('Error removing video: ' + (error.message || 'Unknown error'), 'error');
+        showMessage(chrome.i18n.getMessage('message_error_removing_video', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
     }
 }
 
 async function clearHistory() {
-    if (!confirm('Are you sure you want to clear all history? This cannot be undone.')) {
+    if (!confirm(chrome.i18n.getMessage('message_confirm_clear_history'))) {
         return;
     }
 
     try {
         await ytStorage.clear();
-        showMessage('History cleared successfully');
+        showMessage(chrome.i18n.getMessage('message_history_cleared'));
         allHistoryRecords = [];
         allPlaylists = [];
         currentPage = 1;
@@ -815,7 +815,7 @@ async function clearHistory() {
         }
     } catch (error) {
         console.error('Error clearing history:', error);
-        showMessage('Error clearing history: ' + (error.message || 'Unknown error'), 'error');
+        showMessage(chrome.i18n.getMessage('message_error_clearing_history', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
     }
 }
 
@@ -849,10 +849,10 @@ async function exportHistory() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showMessage(`History exported successfully: ${videos.length} videos, ${playlists.length} playlists`);
+        showMessage(chrome.i18n.getMessage('message_export_success', [videos.length, playlists.length]));
     } catch (error) {
         console.error('Error exporting history:', error);
-        showMessage('Error exporting history: ' + (error.message || 'Unknown error'), 'error');
+        showMessage(chrome.i18n.getMessage('message_error_exporting_history', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
     }
 }
 
@@ -892,7 +892,7 @@ async function importHistory() {
             }
 
             if (videos.length === 0 && playlists.length === 0) {
-                showMessage('No data found in import file', 'error');
+                showMessage(chrome.i18n.getMessage('message_no_data_in_import'), 'error');
                 return;
             }
 
@@ -902,7 +902,7 @@ async function importHistory() {
                 for (const video of videos) {
                     await ytStorage.setVideo(video.videoId, video);
                 }
-                showMessage(`Imported ${videos.length} videos`);
+                showMessage(chrome.i18n.getMessage('message_import_success', ['replaced', videos.length, playlists.length]));
                 loadHistory();
                 return;
             }
@@ -938,12 +938,12 @@ async function importHistory() {
             }
 
             const mode = mergeMode ? 'merged' : 'replaced';
-            showMessage(`History ${mode} successfully: ${importedVideos} videos, ${importedPlaylists} playlists`);
+            showMessage(chrome.i18n.getMessage('message_import_success', [mode, importedVideos, importedPlaylists]));
             loadHistory();
 
         } catch (error) {
             console.error('Import error:', error);
-            showMessage('Error importing history: ' + (error.message || 'Unknown error'), 'error');
+            showMessage(chrome.i18n.getMessage('message_error_importing_history', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
         }
     };
 
@@ -1009,7 +1009,7 @@ function goToPage(page) {
 }
 
 function updatePaginationUI(current, total) {
-    document.getElementById('ytvhtPageInfo').textContent = `Page ${current} of ${total}`;
+    document.getElementById('ytvhtPageInfo').textContent = chrome.i18n.getMessage('pagination_page_info', [current, total]);
 
     // Update button states
     document.getElementById('ytvhtFirstPage').disabled = current === 1;
@@ -1101,7 +1101,7 @@ async function loadPlaylists(showMessages = true) {
 
         if (!playlists || Object.keys(playlists).length === 0) {
             if (showMessages) {
-                showMessage('No playlists found.', 'info');
+                showMessage(chrome.i18n.getMessage('playlists_no_playlists_found'), 'info');
             }
             allPlaylists = [];
         } else {
@@ -1118,7 +1118,7 @@ async function loadPlaylists(showMessages = true) {
     } catch (error) {
         console.error('Error loading playlists:', error);
         if (showMessages) {
-            showMessage('Error loading playlists: ' + (error.message || 'Unknown error'), 'error');
+            showMessage(chrome.i18n.getMessage('error_loading_playlists', [error.message || chrome.i18n.getMessage('unknown_error')]), 'error');
         }
     }
 }
@@ -1186,7 +1186,7 @@ function displayPlaylistsPage() {
                     </div>
                     <div class="playlist-details">
                         <span class="playlist-date"></span>
-                        <button class="delete-button">Delete</button>
+                        <button class="delete-button">${chrome.i18n.getMessage('delete_label')}</button>
                     </div>
                 </div>
             `;
@@ -1231,7 +1231,7 @@ function goToPlaylistPage(page) {
 }
 
 function updatePlaylistPaginationUI(current, total) {
-    document.getElementById('ytvhtPlaylistsPageInfo').textContent = `Page ${current} of ${total}`;
+    document.getElementById('ytvhtPlaylistsPageInfo').textContent = chrome.i18n.getMessage('pagination_page_info', [current, total]);
 
     // Update button states
     document.getElementById('ytvhtFirstPlaylistPage').disabled = current === 1;
@@ -1319,12 +1319,12 @@ function addPlaylistEllipsis() {
 async function deletePlaylist(playlistId) {
     try {
         await ytStorage.removePlaylist(playlistId);
-        showMessage('Playlist removed');
+        showMessage(chrome.i18n.getMessage('message_playlist_removed'));
         allPlaylists = allPlaylists.filter(r => r.playlistId !== playlistId);
         displayPlaylistsPage();
     } catch (error) {
         console.error('Error deleting playlist:', error);
-        showMessage('Error removing playlist: ' + (error.message || 'Unknown error'), 'error');
+        showMessage(chrome.i18n.getMessage('message_error_removing_playlist', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
     }
 }
 
@@ -1403,7 +1403,7 @@ async function initSettingsTab() {
             const settings = await loadSettings();
             settings.autoCleanPeriod = parseInt(this.value);
             await saveSettings(settings);
-            showMessage('Auto-clean period updated');
+            showMessage(chrome.i18n.getMessage('message_overlay_color_updated'));
         });
     } else {
         log('Error: Auto-clean period element not found');
@@ -1416,7 +1416,7 @@ async function initSettingsTab() {
             const settings = await loadSettings();
             settings.paginationCount = parseInt(this.value);
             await saveSettings(settings);
-            showMessage('Pagination count updated');
+            showMessage(chrome.i18n.getMessage('message_pagination_count_updated'));
         });
     } else {
         log('Error: Pagination count element not found');
@@ -1429,7 +1429,7 @@ async function initSettingsTab() {
             const settings = await loadSettings();
             settings.overlayTitle = this.value;
             await saveSettings(settings);
-            showMessage('Overlay title updated');
+            showMessage(chrome.i18n.getMessage('message_overlay_title_updated'));
         });
     } else {
         log('Error: Overlay title element not found');
@@ -1443,7 +1443,7 @@ async function initSettingsTab() {
             settings.overlayColor = this.value;
             updateColorPreview(this.value);
             await saveSettings(settings);
-            showMessage('Overlay color updated');
+            showMessage(chrome.i18n.getMessage('message_overlay_color_updated'));
         });
     } else {
         log('Error: Overlay color element not found');
@@ -1456,7 +1456,7 @@ async function initSettingsTab() {
             const settings = await loadSettings();
             settings.overlayLabelSize = this.value;
             await saveSettings(settings);
-            showMessage('Overlay size updated');
+            showMessage(chrome.i18n.getMessage('message_overlay_size_updated'));
         });
     } else {
         log('Error: Overlay label size element not found');
@@ -1471,7 +1471,7 @@ async function initSettingsTab() {
             settings.themePreference = this.value;
             await saveSettings(settings);
             await applyTheme(this.value);
-            showMessage('Theme preference updated');
+            showMessage(chrome.i18n.getMessage('message_theme_preference_updated'));
         });
     } else {
         log('Error: Theme preference element not found');
@@ -1485,7 +1485,7 @@ async function initSettingsTab() {
             const settings = await loadSettings();
             settings.debug = this.checked;
             await saveSettings(settings);
-            showMessage(this.checked ? 'Debug mode enabled' : 'Debug mode disabled');
+            showMessage(chrome.i18n.getMessage('message_debug_mode_enabled'));
         });
     } else {
         log('Error: Debug mode element not found');
@@ -1699,11 +1699,11 @@ function toggleDarkMode(enable) {
 function updateThemeToggleText(themePreference) {
     const themeText = document.getElementById('themeText');
     const toggleButton = document.getElementById('ytvhtToggleTheme');
-    
+
     if (themeText) {
         let text = 'Theme';
         let tooltip = 'Toggle theme';
-        
+
         switch (themePreference) {
             case 'light':
                 text = 'Light';
@@ -1719,7 +1719,7 @@ function updateThemeToggleText(themePreference) {
                 tooltip = 'Currently following system theme - Click to override';
                 break;
         }
-        
+
         themeText.textContent = text;
         if (toggleButton) {
             toggleButton.title = tooltip;
@@ -1891,7 +1891,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Set up event listeners
         clearButton.addEventListener('click', async () => {
             // Show confirmation dialog
-            const confirmed = confirm('WARNING: This will permanently delete ALL your YouTube viewing history and playlists.\n\nThis action cannot be undone. Are you sure you want to continue?');
+            const confirmed = confirm(chrome.i18n.getMessage('message_warning_clear_all'));
 
             if (!confirmed) {
                 return;
@@ -1911,10 +1911,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 displayShortsPage();
                 displayPlaylistsPage();
 
-                showMessage('All video and playlist history has been cleared successfully');
+                showMessage(chrome.i18n.getMessage('message_all_history_cleared'));
             } catch (error) {
                 console.error('Error clearing history:', error);
-                showMessage('Error clearing history: ' + (error.message || 'Unknown error'), 'error');
+                showMessage(chrome.i18n.getMessage('message_error_clearing_history', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
             }
         });
 
@@ -1931,10 +1931,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 a.download = 'youtube_history_backup.json';
                 a.click();
                 URL.revokeObjectURL(url);
-                showMessage('Export completed successfully');
+                showMessage(chrome.i18n.getMessage('message_export_success', [history.length, playlists.length]));
             } catch (error) {
                 console.error('Error exporting history:', error);
-                showMessage('Error exporting history: ' + (error.message || 'Unknown error'), 'error');
+                showMessage(chrome.i18n.getMessage('message_error_exporting_history', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
             }
         });
 
@@ -2012,7 +2012,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         log('Initialization complete');
     } catch (error) {
         console.error('Error during initialization:', error);
-        showMessage('Failed to initialize extension: ' + (error.message || 'Unknown error'), 'error');
+        showMessage(chrome.i18n.getMessage('message_failed_to_initialize', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
     }
 });
 
@@ -2085,7 +2085,7 @@ function updateShortsPaginationUI(current, total) {
         return;
     }
 
-    pageInfo.textContent = `Page ${current} of ${total}`;
+    pageInfo.textContent = chrome.i18n.getMessage('pagination_page_info', [current, total]);
 
     // Update button states
     firstBtn.disabled = current === 1;
@@ -2215,7 +2215,7 @@ function displayShortsPage() {
         // Action buttons
         const actionCell = document.createElement('td');
         const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete';
+        deleteButton.textContent = chrome.i18n.getMessage('delete_label');
         deleteButton.onclick = () => deleteRecord(record.videoId);
         actionCell.appendChild(deleteButton);
 
@@ -2258,7 +2258,7 @@ function initSyncIntegration() {
         indicatorElement.style.display = 'flex';
         indicatorElement.style.visibility = 'visible';
     }
-    
+
     // Get initial sync status from background
     chrome.runtime.sendMessage({ type: 'getSyncStatus' }, (response) => {
         if (response) {
@@ -2283,14 +2283,14 @@ function initSyncIntegration() {
             updateSyncSettingsUI(message);
         } else if (message.type === 'fullSyncComplete') {
             syncInProgress = false; // Ensure flag is cleared
-            
+
             // Force complete refresh after full sync
             setTimeout(async () => {
                 await loadHistory(false);
             }, 200);
         } else if (message.type === 'regularSyncComplete') {
             syncInProgress = false; // Ensure flag is cleared
-            
+
             // Force complete refresh after regular sync
             setTimeout(async () => {
                 await loadHistory(false);
@@ -2308,15 +2308,15 @@ function initSyncIntegration() {
     const syncEnabledCheckbox = document.getElementById('ytvhtSyncEnabled');
     const triggerSyncButton = document.getElementById('ytvhtTriggerSync');
     const triggerFullSyncButton = document.getElementById('ytvhtTriggerFullSync');
-    
+
     if (syncEnabledCheckbox) {
         syncEnabledCheckbox.addEventListener('change', handleSyncToggle);
     }
-    
+
     if (triggerSyncButton) {
         triggerSyncButton.addEventListener('click', handleManualSync);
     }
-    
+
     if (triggerFullSyncButton) {
         triggerFullSyncButton.addEventListener('click', handleManualFullSync);
     }
@@ -2331,24 +2331,24 @@ function updateSyncIndicator(status, lastSyncTime) {
 
     // Remove all status classes
     indicator.className = 'sync-indicator';
-    
+
     // Add current status class
     indicator.classList.add('sync-' + status);
-    
+
     // Update text and tooltip
     const textElement = indicator.querySelector('.sync-text');
-    
+
     // Get or create a single status element (remove any duplicates first)
     const existingElements = indicator.parentNode.querySelectorAll('.sync-status');
     existingElements.forEach((el, index) => {
         if (index > 0) el.remove(); // Remove duplicates, keep only first
     });
-    
+
     let statusElement = existingElements[0];
     if (!statusElement) {
         statusElement = createSyncStatusElement(indicator);
     }
-    
+
     const tooltips = {
         'disabled': 'Sync disabled - Click to enable',
         'not_available': 'Sync not available - Firefox Sync required',
@@ -2357,7 +2357,7 @@ function updateSyncIndicator(status, lastSyncTime) {
         'success': lastSyncTime ? `Last sync: ${formatSyncTime(lastSyncTime)}` : 'Sync ready',
         'error': 'Sync error - Click to retry'
     };
-    
+
     const statusText = {
         'disabled': 'Off',
         'not_available': 'N/A',
@@ -2366,17 +2366,17 @@ function updateSyncIndicator(status, lastSyncTime) {
         'success': 'On',
         'error': 'Error'
     };
-    
+
     if (textElement) {
         textElement.textContent = statusText[status] || 'Sync';
     }
-    
+
     // Clear any existing timeout to prevent conflicts
     if (syncStatusTimeout) {
         clearTimeout(syncStatusTimeout);
         syncStatusTimeout = null;
     }
-    
+
     // Update status text next to sync button (simplified - no Unicode symbols)
     if (statusElement) {
         if (status === 'syncing') {
@@ -2397,7 +2397,7 @@ function updateSyncIndicator(status, lastSyncTime) {
             statusElement.textContent = '';
         }
     }
-    
+
     indicator.title = tooltips[status] || 'Sync status';
 }
 
@@ -2409,17 +2409,17 @@ function createSyncStatusElement(indicator) {
         font-size: 12px;
         font-weight: 500;
     `;
-    
+
     indicator.parentNode.insertBefore(statusElement, indicator.nextSibling);
     return statusElement;
 }
 
 function formatSyncTime(timestamp) {
     if (!timestamp) return 'Never';
-    
+
     const now = Date.now();
     const diff = now - timestamp;
-    
+
     if (diff < 60000) { // Less than 1 minute
         return 'Just now';
     } else if (diff < 3600000) { // Less than 1 hour
@@ -2437,17 +2437,17 @@ function formatSyncTime(timestamp) {
 async function handleSyncIndicatorClick() {
     chrome.runtime.sendMessage({ type: 'getSyncStatus' }, (response) => {
         if (!response) return;
-        
+
         if (response.status === 'not_available') {
-            showMessage('Firefox Sync is not available. Please enable Firefox Sync in your browser settings.', 'error');
+            showMessage(chrome.i18n.getMessage('message_firefox_sync_not_available'), 'error');
             return;
         }
-        
+
         if (response.status === 'disabled') {
             // Enable sync
             chrome.runtime.sendMessage({ type: 'enableSync' }, (result) => {
                 if (!result || !result.success) {
-                    showMessage('Failed to enable sync. Please check your Firefox Sync settings.', 'error');
+                    showMessage(chrome.i18n.getMessage('message_failed_to_enable_sync'), 'error');
                 }
                 // Sync indicator will show success status
             });
@@ -2455,14 +2455,14 @@ async function handleSyncIndicatorClick() {
             // Retry sync
             chrome.runtime.sendMessage({ type: 'triggerSync' }, (result) => {
                 if (!result || !result.success) {
-                    showMessage('Sync is currently disabled.', 'error');
+                    showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
                 }
             });
         } else if (response.enabled) {
             // Manual sync trigger
             chrome.runtime.sendMessage({ type: 'triggerSync' }, (result) => {
                 if (!result || !result.success) {
-                    showMessage('Sync is currently disabled.', 'error');
+                    showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
                 }
             });
         }
@@ -2471,12 +2471,12 @@ async function handleSyncIndicatorClick() {
 
 async function handleSyncToggle(event) {
     const enabled = event.target.checked;
-    
+
     if (enabled) {
         chrome.runtime.sendMessage({ type: 'enableSync' }, (result) => {
             if (!result || !result.success) {
                 event.target.checked = false;
-                showMessage('Failed to enable sync. Please check your Firefox Sync settings.', 'error');
+                showMessage(chrome.i18n.getMessage('message_failed_to_enable_sync'), 'error');
             }
             // Removed success message - sync indicator shows status
         });
@@ -2484,7 +2484,7 @@ async function handleSyncToggle(event) {
         chrome.runtime.sendMessage({ type: 'disableSync' }, (result) => {
             if (!result || !result.success) {
                 event.target.checked = true;
-                showMessage('Failed to disable sync.', 'error');
+                showMessage(chrome.i18n.getMessage('message_failed_to_disable_sync'), 'error');
             }
             // Removed success message - sync indicator shows status
         });
@@ -2494,24 +2494,24 @@ async function handleSyncToggle(event) {
 async function handleManualSync() {
     chrome.runtime.sendMessage({ type: 'triggerSync' }, (result) => {
         if (!result || !result.success) {
-            showMessage('Sync is currently disabled.', 'error');
+            showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
         }
         // Removed sync initiated message - sync indicator shows status
     });
 }
 
 async function handleManualFullSync() {
-    if (!confirm('Full Sync will clean up old data and re-sync everything. This may take a moment. Continue?')) {
+    if (!confirm(chrome.i18n.getMessage('message_confirm_full_sync'))) {
         return;
     }
-    
+
     console.log('[Popup] 🚀 Full sync button clicked');
     chrome.runtime.sendMessage({ type: 'triggerFullSync' }, (result) => {
         console.log('[Popup] 🚀 triggerFullSync response:', result);
         if (result && result.success) {
-            showMessage('Full sync initiated... This may take a moment.', 'success');
+            showMessage(chrome.i18n.getMessage('message_full_sync_initiated'));
         } else {
-            showMessage('Sync is currently disabled.', 'error');
+            showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
         }
     });
 }
@@ -2526,28 +2526,28 @@ function updateSyncSettingsUI(syncStatus) {
         });
         return;
     }
-    
+
     // Update checkbox
     const syncEnabledCheckbox = document.getElementById('ytvhtSyncEnabled');
     if (syncEnabledCheckbox) {
         syncEnabledCheckbox.checked = syncStatus.enabled;
         syncEnabledCheckbox.disabled = !syncStatus.available;
     }
-    
+
     // Update last sync time
     const lastSyncElement = document.getElementById('ytvhtLastSyncTime');
     if (lastSyncElement) {
-        lastSyncElement.textContent = syncStatus.lastSyncTime ? 
+        lastSyncElement.textContent = syncStatus.lastSyncTime ?
             formatSyncTime(syncStatus.lastSyncTime) : 'Never';
     }
-    
+
     // Update sync now button
     const triggerSyncButton = document.getElementById('ytvhtTriggerSync');
     if (triggerSyncButton) {
         triggerSyncButton.disabled = !syncStatus.enabled || syncStatus.status === 'syncing';
         triggerSyncButton.textContent = syncStatus.status === 'syncing' ? 'Syncing...' : 'Sync Now';
     }
-    
+
     // Update full sync button
     const triggerFullSyncButton = document.getElementById('ytvhtTriggerFullSync');
     if (triggerFullSyncButton) {
@@ -2584,7 +2584,7 @@ function renderTopChannels() {
     const topChannels = channels.slice(0, 5);
 
     if (topChannels.length === 0) {
-        container.innerHTML = '<span style="color:var(--text-color);opacity:0.7;">No channel data found.</span>';
+        container.innerHTML = `<span style="color:var(--text-color);opacity:0.7;">${chrome.i18n.getMessage('analytics_no_channel_data')}</span>`;
         return;
     }
 
@@ -2617,7 +2617,7 @@ function renderTopChannels() {
         }
         const channelName = sanitizeText(ch.channel);
         const link = channelUrl ? `<a href="${channelUrl}" target="_blank" style="font-weight:500; color:var(--button-bg); text-decoration:none;">${channelName}</a>` : `<span style="font-weight:500; color:var(--button-bg);">${channelName}</span>`;
-        return `<div style="margin-bottom:8px;">${link} <span style="color:var(--text-color); opacity:0.8;">- ${ch.count} videos, ${formatWatchTime(ch.watchTime)}</span></div>`;
+        return `<div style="margin-bottom:8px;">${link} <span style="color:var(--text-color); opacity:0.8;">- ${chrome.i18n.getMessage('analytics_channel_videos', [ch.count, formatWatchTime(ch.watchTime)])}</span></div>`;
     }).join('');
 }
 
@@ -2658,7 +2658,7 @@ function renderSkippedChannels() {
     }
 
     if (topSkipped.length === 0) {
-        container.innerHTML = '<span style="color:var(--text-color);opacity:0.7;">No skipped channels found.</span>';
+        container.innerHTML = `<span style="color:var(--text-color);opacity:0.7;">${chrome.i18n.getMessage('analytics_no_skipped_channel_data')}</span>`;
     } else {
         container.innerHTML = topSkipped.map(ch => {
             let channelUrl = '';
@@ -2671,7 +2671,7 @@ function renderSkippedChannels() {
             }
             const channelName = sanitizeText(ch.channel);
             const link = channelUrl ? `<a href="${channelUrl}" target="_blank" style="font-weight:500; color:var(--button-bg); text-decoration:none;">${channelName}</a>` : `<span style="font-weight:500; color:var(--button-bg);">${channelName}</span>`;
-            return `<div style="margin-bottom:8px;">${link} <span style="color:var(--text-color); opacity:0.8;">- ${ch.count} skipped</span></div>`;
+            return `<div style="margin-bottom:8px;">${link} <span style="color:var(--text-color); opacity:0.8;">- ${chrome.i18n.getMessage('analytics_skipped_count', [ch.count])}</span></div>`;
         }).join('');
     }
 }
@@ -2691,9 +2691,17 @@ function renderCompletionBarChart() {
     const completed = longVideos.filter(r => (r.time / r.duration) >= 0.9);
     const counts = [skipped.length, partial.length, completed.length];
     // Use short labels for x-axis
-    const labels = ['Skipped', 'Partial', 'Completed'];
+    const labels = [
+      chrome.i18n.getMessage('chart_skipped'),
+      chrome.i18n.getMessage('chart_partial'),
+      chrome.i18n.getMessage('chart_completed')
+    ];
     // Use detailed labels for legend
-    const legendLabels = ['Skipped (<10%)', 'Partial (10-90%)', 'Completed (>=90%)'];
+    const legendLabels = [
+      chrome.i18n.getMessage('chart_skipped_legend'),
+      chrome.i18n.getMessage('chart_partial_legend'),
+      chrome.i18n.getMessage('chart_completed_legend')
+    ];
     const colors = ['#e74c3c', '#f1c40f', '#2ecc40'];
     const total = counts.reduce((a, b) => a + b, 0);
 
@@ -2737,3 +2745,42 @@ function renderCompletionBarChart() {
     }
     legendDiv.innerHTML = legendHtml;
 }
+
+// Localization helper: localize all elements with data-i18n* attributes
+function localizeHtmlPage() {
+  // Set text content for elements with data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const msg = chrome.i18n.getMessage(key);
+    if (msg) el.textContent = msg;
+  });
+  // Set title attribute for elements with data-i18n-title
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    const msg = chrome.i18n.getMessage(key);
+    if (msg) el.title = msg;
+  });
+  // Set placeholder attribute for elements with data-i18n-placeholder
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    const msg = chrome.i18n.getMessage(key);
+    if (msg) el.placeholder = msg;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  localizeHtmlPage();
+  // ... existing code ...
+
+// ... existing code ...
+// Replace all user-facing text in JS with chrome.i18n.getMessage
+// Example:
+// document.getElementById('ytvhtMessage').textContent = chrome.i18n.getMessage('message_some_key');
+// ...
+});
+
+// ... existing code ...
+// For all dynamic text assignments, replace hardcoded strings with chrome.i18n.getMessage('key')
+// For example:
+// alert(chrome.i18n.getMessage('alert_some_error'));
+// ...

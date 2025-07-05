@@ -370,3 +370,14 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed release notes and version history.
 **Perfect for:** Multi-account users, privacy-conscious users, students, researchers, content creators, families sharing computers, and anyone who wants reliable YouTube progress tracking without Google surveillance.
 
 ⭐ **[Install now from Chrome Web Store](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)** or **[Firefox Add-ons](https://addons.mozilla.org/firefox/addon/yt-rewatch/)**
+
+## Multilanguage Support
+
+This extension supports multiple languages:
+- English (en)
+- German (de)
+- Spanish (es)
+- French (fr)
+- Bulgarian (bg)
+
+**Note:** All non-English translations are currently machine-generated. If you are a native speaker and notice any issues, please consider contributing improvements! See `src/_locales/README.md` for translation guidelines.

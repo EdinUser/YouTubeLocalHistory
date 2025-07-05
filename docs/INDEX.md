@@ -1,3 +1,9 @@
+# 🎉 What's New in 3.0.0
+
+- 🌐 Full multilanguage support (English, German, Spanish, French, Bulgarian)
+- 📊 Major analytics/statistics dashboard redesign with new charts and insights
+- All non-English translations are machine-generated—help us improve them!
+
 # 🎬 YT re:Watch - Never Lose Your Place in YouTube Videos Again!
 
 <div align="center">
@@ -100,7 +106,14 @@ The extension adds helpful visual indicators directly on YouTube:
 ![Shorts tab interface](./images/ytrw_shorts.jpg)
 
 **Analytics Tab** - See your viewing patterns:
-![Analytics charts](./images/ytrw_stats2.jpg)
+![Analytics dashboard summary and top channels](./images/ytrw_stats1.jpg)
+*Summary cards and top channels in the Analytics tab*
+
+![Analytics completion bar and unfinished videos](./images/ytrw_stats2.jpg)
+*Completion bar chart, unfinished videos, and skipped channels*
+
+![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
+*Watch activity by day and by hour in the Analytics tab*
 
 - **Longest Unfinished Videos**: Resume long videos you haven't finished (shows channel, time left, and link)
 - **Top Watched Channels**: Your top 5 channels by videos watched (with links)
@@ -195,4 +208,8 @@ Because we store everything locally:
 
 <div align="center">
   <sub>Made with ❤️ for YouTube enthusiasts everywhere</sub>
-</div> 
+</div>
+
+## 🌐 Multilanguage Support
+
+YT re:Watch is available in multiple languages. All non-English translations are currently machine-generated. If you're a native speaker, your help is welcome—see the technical docs for how to contribute! 

@@ -1,0 +1,114 @@
+{
+  "settings_interface_display": {
+    "message": "Interfaz y visualización",
+    "description": "Settings section title for interface and display"
+  },
+  "settings_theme_label": {
+    "message": "Tema",
+    "description": "Label for theme selection in settings"
+  },
+  "settings_theme_help": {
+    "message": "Elija su tema preferido",
+    "description": "Help text for theme selection"
+  },
+  "settings_pagination_label": {
+    "message": "Elementos por página",
+    "description": "Label for pagination count in settings"
+  },
+  "settings_pagination_help": {
+    "message": "Número de elementos a mostrar por página (1-100)",
+    "description": "Help text for pagination count"
+  },
+  "settings_overlay_title_label": {
+    "message": "Título de superposición",
+    "description": "Label for overlay title in settings"
+  },
+  "settings_overlay_title_help": {
+    "message": "Texto para mostrar en la superposición (máx. 12 caracteres)",
+    "description": "Help text for overlay title"
+  },
+  "settings_overlay_color_label": {
+    "message": "Color de superposición",
+    "description": "Label for overlay color in settings"
+  },
+  "settings_overlay_color_help": {
+    "message": "Color de la barra de progreso de la superposición",
+    "description": "Help text for overlay color"
+  },
+  "settings_overlay_size_label": {
+    "message": "Tamaño de superposición",
+    "description": "Label for overlay size in settings"
+  },
+  "settings_overlay_size_help": {
+    "message": "Tamaño de la etiqueta y barra de progreso de la superposición",
+    "description": "Help text for overlay size"
+  },
+  "settings_data_sync": {
+    "message": "Datos y sincronización",
+    "description": "Settings section title for data and sync"
+  },
+  "settings_data_management_label": {
+    "message": "Gestión de datos",
+    "description": "Label for data management section"
+  },
+  "settings_export": {
+    "message": "Exportar",
+    "description": "Button label for exporting history"
+  },
+  "settings_import": {
+    "message": "Importar",
+    "description": "Button label for importing history"
+  },
+  "settings_export_help": {
+    "message": "Exporta tus datos de historial (Importar próximamente)",
+    "description": "Help text for export/import"
+  },
+  "settings_auto_clean_label": {
+    "message": "Período de limpieza automática (días)",
+    "description": "Label for auto-clean period in settings"
+  },
+  "settings_auto_clean_help": {
+    "message": "Elimina automáticamente el historial más antiguo que este número de días",
+    "description": "Help text for auto-clean period"
+  },
+  "settings_sync_label": {
+    "message": "Firefox Sync",
+    "description": "Label for Firefox Sync option"
+  },
+  "settings_sync_help": {
+    "message": "Sincroniza tus datos entre instancias del navegador (solo Firefox)",
+    "description": "Help text for Firefox Sync"
+  },
+  "settings_last_sync_label": {
+    "message": "Última sincronización",
+    "description": "Label for last sync time"
+  },
+  "settings_sync_now": {
+    "message": "Sincronizar ahora",
+    "description": "Button label for triggering sync"
+  },
+  "settings_full_sync": {
+    "message": "Sincronización completa",
+    "description": "Button label for triggering full sync"
+  },
+  "settings_full_sync_help": {
+    "message": "La sincronización completa limpia los datos antiguos y vuelve a sincronizar todo",
+    "description": "Help text for full sync"
+  },
+  "settings_debug_label": {
+    "message": "Modo de depuración",
+    "description": "Label for debug mode option"
+  },
+  "settings_debug_help": {
+    "message": "Habilitar registro de depuración (para solucionar problemas)",
+    "description": "Help text for debug mode"
+  },
+  "settings_version_label": {
+    "message": "Versión de la extensión",
+    "description": "Label for extension version display"
+  },
+  "settings_save": {
+    "message": "Guardar configuración",
+    "description": "Button label for saving settings"
+  }
+} 

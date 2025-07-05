@@ -1,0 +1,234 @@
+{
+  "message_no_active_tab": {
+    "message": "Aucun onglet actif trouvé.",
+    "description": "Error message when no active tab is found"
+  },
+  "message_video_removed": {
+    "message": "Vidéo supprimée de l'historique",
+    "description": "Success message when a video is removed from history"
+  },
+  "message_error_removing_video": {
+    "message": "Erreur lors de la suppression de la vidéo : $1",
+    "description": "Error message when removing a video fails, $1 is the error detail"
+  },
+  "message_history_cleared": {
+    "message": "Historique effacé avec succès",
+    "description": "Success message when history is cleared"
+  },
+  "message_error_clearing_history": {
+    "message": "Erreur lors de l'effacement de l'historique : $1",
+    "description": "Error message when clearing history fails, $1 is the error detail"
+  },
+  "message_export_success": {
+    "message": "Historique exporté avec succès : $1 vidéos, $2 playlists",
+    "description": "Success message when history is exported, $1 is video count, $2 is playlist count"
+  },
+  "message_error_exporting_history": {
+    "message": "Erreur lors de l'exportation de l'historique : $1",
+    "description": "Error message when exporting history fails, $1 is the error detail"
+  },
+  "message_import_success": {
+    "message": "Historique $1 avec succès : $2 vidéos, $3 playlists",
+    "description": "Success message when history is imported, $1 is mode, $2 is video count, $3 is playlist count"
+  },
+  "message_error_importing_history": {
+    "message": "Erreur lors de l'importation de l'historique : $1",
+    "description": "Error message when importing history fails, $1 is the error detail"
+  },
+  "message_no_data_in_import": {
+    "message": "Aucune donnée trouvée dans le fichier d'importation",
+    "description": "Error message when no data is found in import file"
+  },
+  "message_invalid_file_format": {
+    "message": "Format de fichier invalide : $1",
+    "description": "Error message for invalid import file format, $1 is the detail"
+  },
+  "message_confirm_clear_history": {
+    "message": "Êtes-vous sûr de vouloir effacer tout l'historique ? Cette action est irréversible.",
+    "description": "Confirmation message for clearing all history"
+  },
+  "message_confirm_full_sync": {
+    "message": "La synchronisation complète nettoiera les anciennes données et resynchronisera tout. Cela peut prendre un moment. Continuer ?",
+    "description": "Confirmation message for full sync"
+  },
+  "message_warning_clear_all": {
+    "message": "ATTENTION : Cela supprimera définitivement TOUT votre historique de visionnage YouTube et vos playlists.\n\nCette action est irréversible. Êtes-vous sûr de vouloir continuer ?",
+    "description": "Warning message for clearing all history and playlists"
+  },
+  "message_all_history_cleared": {
+    "message": "Tout l'historique des vidéos et des playlists a été effacé avec succès",
+    "description": "Success message when all history and playlists are cleared"
+  },
+  "message_export_completed": {
+    "message": "Exportation terminée avec succès",
+    "description": "Success message when export is completed"
+  },
+  "message_failed_to_initialize": {
+    "message": "Échec de l'initialisation de l'extension : $1",
+    "description": "Error message when extension initialization fails, $1 is the error detail"
+  },
+  "message_error_loading_history": {
+    "message": "Erreur lors du chargement de l'historique : $1",
+    "description": "Error message when loading history fails, $1 is the error detail"
+  },
+  "message_no_playlists_found": {
+    "message": "Aucune playlist trouvée.",
+    "description": "Message when no playlists are found"
+  },
+  "message_error_loading_playlists": {
+    "message": "Erreur lors du chargement des playlists : $1",
+    "description": "Error message when loading playlists fails, $1 is the error detail"
+  },
+  "message_playlist_removed": {
+    "message": "Playlist supprimée",
+    "description": "Success message when a playlist is removed"
+  },
+  "message_error_removing_playlist": {
+    "message": "Erreur lors de la suppression de la playlist : $1",
+    "description": "Error message when removing a playlist fails, $1 is the error detail"
+  },
+  "message_auto_clean_updated": {
+    "message": "Période de nettoyage auto mise à jour",
+    "description": "Success message when auto-clean period is updated"
+  },
+  "message_pagination_count_updated": {
+    "message": "Nombre de pages mis à jour",
+    "description": "Message when pagination count is updated"
+  },
+  "message_overlay_title_updated": {
+    "message": "Titre de superposition mis à jour",
+    "description": "Message when overlay title is updated"
+  },
+  "message_overlay_color_updated": {
+    "message": "Couleur de superposition mise à jour",
+    "description": "Message when overlay color is updated"
+  },
+  "message_overlay_size_updated": {
+    "message": "Taille de la superposition mise à jour",
+    "description": "Message when overlay label size is updated"
+  },
+  "message_theme_preference_updated": {
+    "message": "Préférence de thème mise à jour",
+    "description": "Message when theme preference is updated"
+  },
+  "message_debug_mode_enabled": {
+    "message": "Mode débogage activé",
+    "description": "Message when debug mode is enabled"
+  },
+  "message_debug_mode_disabled": {
+    "message": "Mode débogage désactivé",
+    "description": "Message when debug mode is disabled"
+  },
+  "message_sync_disabled": {
+    "message": "Synchronisation désactivée - Cliquez pour activer",
+    "description": "Tooltip for disabled sync status"
+  },
+  "message_sync_not_available": {
+    "message": "Synchronisation non disponible - Firefox Sync requis",
+    "description": "Tooltip for unavailable sync status"
+  },
+  "message_sync_initializing": {
+    "message": "Initialisation de la synchronisation...",
+    "description": "Tooltip for initializing sync status"
+  },
+  "message_sync_syncing": {
+    "message": "Synchronisation des données...",
+    "description": "Tooltip for syncing data status"
+  },
+  "message_sync_ready": {
+    "message": "Synchronisation prête",
+    "description": "Tooltip for sync ready status"
+  },
+  "message_sync_error": {
+    "message": "Erreur de synchronisation - Cliquez pour réessayer",
+    "description": "Tooltip for sync error status"
+  },
+  "message_sync_off": {
+    "message": "Désactivé",
+    "description": "Label for sync off status"
+  },
+  "message_sync_na": {
+    "message": "N/A",
+    "description": "Label for sync not available status"
+  },
+  "message_sync_init": {
+    "message": "Init",
+    "description": "Label for sync initializing status"
+  },
+  "message_sync_on": {
+    "message": "Activé",
+    "description": "Label for sync on status"
+  },
+  "message_sync": {
+    "message": "Synchronisation",
+    "description": "Label for sync status"
+  },
+  "message_syncing": {
+    "message": "Synchronisation...",
+    "description": "Label for syncing status"
+  },
+  "message_synced": {
+    "message": "Synchronisé",
+    "description": "Label for synced status"
+  },
+  "message_sync_now": {
+    "message": "Synchroniser maintenant",
+    "description": "Button label for sync now"
+  },
+  "message_full_sync": {
+    "message": "Synchronisation complète",
+    "description": "Button label for full sync"
+  },
+  "message_syncing_status": {
+    "message": "Synchronisation...",
+    "description": "Status text for syncing"
+  },
+  "message_synced_status": {
+    "message": "Synchronisé",
+    "description": "Status text for synced"
+  },
+  "message_never": {
+    "message": "Jamais",
+    "description": "Label for never synced"
+  },
+  "message_just_now": {
+    "message": "À l'instant",
+    "description": "Label for just now sync time"
+  },
+  "message_minutes_ago": {
+    "message": "il y a {MINUTES}m",
+    "description": "Label for minutes ago sync time"
+  },
+  "message_hours_ago": {
+    "message": "il y a {HOURS}h",
+    "description": "Label for hours ago sync time"
+  },
+  "message_days_ago": {
+    "message": "il y a {DAYS}j",
+    "description": "Label for days ago sync time"
+  },
+  "message_firefox_sync_not_available": {
+    "message": "Firefox Sync n'est pas disponible. Veuillez activer Firefox Sync dans les paramètres de votre navigateur.",
+    "description": "Error message when Firefox Sync is not available"
+  },
+  "message_failed_to_enable_sync": {
+    "message": "Échec de l'activation de la synchronisation. Veuillez vérifier vos paramètres Firefox Sync.",
+    "description": "Error message when enabling sync fails"
+  },
+  "message_failed_to_disable_sync": {
+    "message": "Échec de la désactivation de la synchronisation.",
+    "description": "Error message when disabling sync fails"
+  },
+  "message_sync_currently_disabled": {
+    "message": "La synchronisation est actuellement désactivée.",
+    "description": "Error message when sync is currently disabled"
+  },
+  "message_full_sync_initiated": {
+    "message": "Synchronisation complète lancée... Cela peut prendre un moment.",
+    "description": "Message when full sync is initiated"
+  },
+  "message_unknown_error": {
+    "message": "Erreur inconnue",
+    "description": "Fallback for unknown error details"
+  }
+} 
