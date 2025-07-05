@@ -70,56 +70,22 @@ After watching videos, you'll notice:
 - **Progress bar**: Shows how much of the video you've watched
 - **Percentage indicator**: Shows completion percentage (e.g., "75%")
 
----
+### Videos Tab (Your Main History)
 
-## 📋 Using Each Tab
-
-### 📹 Videos Tab (Your Main History)
-
-**What you'll see:**
-- **Video thumbnail**: Preview image of the video
-- **Video title**: Clickable title that opens the video
-- **Progress**: Shows watched time and percentage (e.g., "5:30 (45%)")
-- **Date**: When you last watched the video
-- **Delete button**: Remove video from your history
-
-**Actions you can take:**
-- **Search**: Use the search box to find specific videos
-- **Click title**: Opens the video in YouTube
-- **Navigate pages**: Use pagination controls at the bottom
-- **Delete videos**: Click "Delete" to remove individual videos
-
-**Tips:**
-- Videos are sorted by most recently watched first
-- Use search to quickly find long videos you were watching
-- The progress shows both time (5:30) and percentage (45%)
+![Videos tab interface](./images/ytrw_videos.jpg)
+*The Videos tab shows your complete YouTube watch history, with progress, search, and delete options.*
 
 ### 🎬 Shorts Tab (YouTube Shorts)
 
-**What's different from Videos:**
-- Designed specifically for YouTube Shorts (vertical videos)
-- Shows duration instead of progress (Shorts are usually under 60 seconds)
-- Separate tracking helps you see how much time you spend on Shorts vs regular videos
-
-**Why it's separate:**
-- Shorts and regular videos are different types of content
-- Helps you understand your viewing patterns better
-- You can see if you're spending too much time on short-form content
+![Shorts tab interface](./images/ytrw_shorts.jpg)
+*The Shorts tab tracks your YouTube Shorts viewing separately, helping you understand your short-form content habits.*
 
 ### 📝 Playlists Tab
 
-**What you'll see:**
-- **Playlist icon**: Visual indicator for playlists
-- **Playlist title**: Name of the playlist
-- **Date discovered**: When you first viewed the playlist
-- **Delete button**: Remove from your saved playlists
+![Playlists tab interface](./images/ytrw_playlists.jpg)
+*The Playlists tab lists all playlists you've discovered, with quick access and management options.*
 
-**How playlists are saved:**
-- Automatically saved when you visit a playlist page
-- Includes both public and private playlists
-- Helps you remember playlists you found interesting
-
-### 📊 Analytics Tab (Your Viewing Insights)
+### 📊 Analytics Tab (Statistics Dashboard)
 
 **Overview Cards:**
 - **Total Watch Time**: How much time you've spent watching videos
@@ -143,6 +109,15 @@ After watching videos, you'll notice:
 - Each bar shows the count of long videos that were skipped, partially watched, or completed
 - The legend to the right shows the color, label, and percentage for each segment
 
+![Analytics dashboard summary and top channels](./images/ytrw_stats1.jpg)
+*Summary cards and top channels in the Analytics tab.*
+
+![Analytics completion bar and unfinished videos](./images/ytrw_stats2.jpg)
+*Completion bar chart, unfinished videos, and skipped channels.*
+
+![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
+*Watch activity by day and by hour in the Analytics tab.*
+
 ### ⚙️ Settings Tab (Customization)
 
 **Theme Settings:**
@@ -150,18 +125,20 @@ After watching videos, you'll notice:
   - *System*: Follows your computer's theme
   - *Light*: Always use light theme
   - *Dark*: Always use dark theme
-- **Quick toggle**: Click the theme button in the popup header
+- **Quick toggle**: Click the theme button in the popup header to switch between light and dark modes instantly.
 
 **Overlay Customization:**
 - **Overlay Title**: Text shown on video thumbnails (max 12 characters)
   - Default: "viewed"
   - Examples: "seen", "watched", "✓", "done"
-- **Overlay Color**: Color of the progress bar
+  - Changes apply immediately to all overlays
+- **Overlay Color**: Color of the progress bar and overlay label
   - Options: Blue, Red, Green, Purple, Orange
-  - See live preview as you change colors
+  - See a live preview as you change colors
 - **Overlay Label Size**: Size of the text and progress bar
   - Options: Small, Medium, Large, Extra Large
   - Affects both text size and progress bar thickness
+  - Pick based on your screen size and preference
 
 **Data Management:**
 - **Auto-clean Period**: Automatically remove old history
@@ -170,18 +147,27 @@ After watching videos, you'll notice:
   - Helps keep your history manageable
 - **Items per Page**: How many videos to show per page
   - Range: 5-20 items
-  - Default: 10 items
-  - Adjust based on your screen size preference
+  - Larger numbers = less scrolling, smaller numbers = faster loading
+- **Export History**: Back up your data to a file
+- **Import History**: Restore or merge data from a backup
 
 **Sync Settings (Firefox Only):**
 - **Enable Sync**: Toggle Firefox Sync integration
-- **Sync Status**: Shows current sync state
+- **Sync Status**: Shows current sync state (green = synced, blue = syncing, red = error, gray = disabled)
 - **Manual Sync**: Force an immediate sync
 - **Full Sync**: Complete data cleanup and re-sync
 
 **Advanced Settings:**
 - **Debug Mode**: Enable detailed logging for troubleshooting
 - **Version Info**: Shows current extension version
+
+![Settings tab interface](./images/ytrw_settings.jpg)
+*Customize your experience in the Settings tab, including theme, overlays, and data management.*
+
+### What You See on YouTube
+
+![YouTube overlay showing viewed videos](./images/ytrw_overlay.jpg)
+*Visual overlays on YouTube show which videos you've watched and your progress at a glance.*
 
 ---
 
@@ -412,6 +398,10 @@ The export file contains:
 - Chrome users can use manual export/import
 
 ---
+
+## 🎯 Multilanguage Support
+
+YT re:Watch is available in English, German, Spanish, French, and Bulgarian. All non-English translations are currently machine-generated. If you notice any issues or want to help improve translations, see the technical documentation for how to contribute.
 
 ## 📞 Still Need Help?
 

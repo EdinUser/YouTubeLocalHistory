@@ -2,6 +2,32 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [3.0.0] - Upcoming
+
+### ✨ Major New Features
+
+#### 🌐 Multilanguage Support (i18n)
+- Full support for English, German, Spanish, French, and Bulgarian.
+- All non-English translations are currently machine-generated. Native speakers are encouraged to contribute improvements!
+- All locale keys now use only underscores for Chrome/Firefox compatibility.
+
+#### 📊 Analytics & Statistics Dashboard Redesign
+- Completely redesigned Analytics Tab in the popup.
+- New summary cards: Total Watch Time, Videos Watched, Shorts Watched, Average Duration, Completion Rate, Playlists Saved.
+- Longest Unfinished Videos: List of long videos you haven't finished, with time left and channel info.
+- Top Watched Channels: Top 5 channels by videos watched and total watch time.
+- Top Skipped Channels: Top 5 channels where you most often skip long videos.
+- Completion Bar Chart: Visualizes completion rates for long videos (skipped, partial, completed) with a legend.
+- Watch Activity (Last 7 Days): Bar chart of videos watched per day.
+- Watch Time by Hour: Bar chart of when you watch the most content.
+- Improved data aggregation and display logic for all analytics.
+- Better i18n support for all analytics/statistics labels and messages.
+
+### 🛠️ Other Improvements
+- Numerous bug fixes, UI/UX improvements, and codebase refactoring for maintainability.
+
+---
+
 ## [2.6.4]
 
 ### ✨ Major New Features

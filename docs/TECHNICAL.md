@@ -17,8 +17,19 @@ src/
 ├── sync-service.js        # Firefox Sync integration
 ├── manifest.chrome.json   # Chrome extension manifest
 ├── manifest.firefox.json  # Firefox extension manifest
+├── _locales/              # Multilanguage (i18n) support
+│   ├── en/                # English locale files
+│   ├── de/                # German locale files
+│   ├── es/                # Spanish locale files
+│   ├── fr/                # French locale files
+│   └── bg/                # Bulgarian locale files
 └── icons/                 # Extension icons
 ```
+
+- All user-facing text is managed via locale files in the `_locales/<lang>/` directories.
+- Supported languages: English, German, Spanish, French, Bulgarian.
+- All locale keys use only underscores for Chrome/Firefox compatibility.
+- See the i18n section below for more details.
 
 ### Core Components
 
@@ -55,12 +66,32 @@ src/
   - Storage quota management
 
 #### 5. **Sync Service** (`sync-service.js`)
-- **Purpose**: Firefox Sync integration
+- **Purpose**: Firefox Sync integration (not available in Chrome)
 - **Key Functions**:
   - Conflict resolution
   - Incremental sync
-  - Cross-device synchronization
+  - Cross-device synchronization (Firefox only)
   - Sync status tracking
+  - Manual/auto sync controls (Firefox only)
+  - Debug and test utilities for sync (Firefox only)
+  - Sync is opt-in and disabled by default
+
+### Analytics & Statistics Dashboard
+- The popup's Analytics tab aggregates and visualizes user viewing data:
+  - **Summary cards:**
+    - Total watch time
+    - Videos watched
+    - Shorts watched
+    - Average duration
+    - Completion rate
+    - Playlists saved
+  - **Longest unfinished videos:** List of long videos you haven't finished, with time left and channel info.
+  - **Top watched channels:** Top 5 channels by videos watched and total watch time.
+  - **Top skipped channels:** Top 5 channels where you most often skip long videos.
+  - **Completion bar chart:** Visualizes completion rates for long videos (skipped, partial, completed) with a legend.
+  - **Watch activity (last 7 days):** Bar chart of videos watched per day.
+  - **Watch time by hour:** Bar chart of when you watch the most content.
+- All analytics are calculated locally for privacy.
 
 ---
 
@@ -101,7 +132,7 @@ await ytStorage.setSettings(newSettings);
 #### Data Structure
 
 **Video Record:**
-```javascript
+```json5
 {
   videoId: "dQw4w9WgXcQ",
   title: "Video Title",
@@ -117,7 +148,7 @@ await ytStorage.setSettings(newSettings);
 ```
 
 **Playlist Record:**
-```javascript
+```json5
 {
   playlistId: "PLrAXtmRdnEQy4...",
   title: "Playlist Title",
@@ -518,6 +549,61 @@ async function migrateV1ToV2() {
 - 💬 **[Join our Telegram community](https://t.me/+eFftKWGVvSpiZjZk)** - Connect with other developers
 - 🐛 **[Report bugs on GitHub](https://github.com/EdinUser/YouTubeLocalHistory/issues)** - Found an issue?
 - 📖 **[Read the source code](https://github.com/EdinUser/YouTubeLocalHistory)** - Open source development
+
+---
+
+## 📋 Feature Parity Table
+
+| Feature                        | Chrome | Firefox |
+|------------------------------- |:------:|:-------:|
+| Local video history            |   ✅   |   ✅    |
+| Visual overlays on YouTube     |   ✅   |   ✅    |
+| Analytics/statistics dashboard |   ✅   |   ✅    |
+| Multilanguage (i18n) support   |   ✅   |   ✅    |
+| Export/import history          |   ✅   |   ✅    |
+| Sync across devices            |   ❌   |   ✅    |
+| Manual/auto sync controls      |   ❌   |   ✅    |
+| Debug sync tools               |   ❌   |   ✅    |
+
+---
+
+## Internationalization (i18n) System
+
+- All locale files are in `src/_locales/<lang>/`.
+- Supported languages: English (en), German (de), Spanish (es), French (fr), Bulgarian (bg).
+- All message keys must use only ASCII letters, numbers, and underscores (`[a-zA-Z0-9_]`). Dots and dashes are not allowed (Chrome requirement).
+- **⚠️ All non-English translations are currently machine-generated. Native speakers are encouraged to review and improve translations.**
+- To contribute, edit the appropriate `messages.json`, `messages-group.json`, `tabs.json`, or `settings.json` file in your language folder. See `src/_locales/README.md` for details.
+
+**Example Structure:**
+```
+_locales/
+  en/
+    messages.json
+    messages-group.json
+    tabs.json
+    settings.json
+  de/
+    messages.json
+    messages-group.json
+    tabs.json
+    settings.json
+  es/
+    messages.json
+    messages-group.json
+    tabs.json
+    settings.json
+  fr/
+    messages.json
+    messages-group.json
+    tabs.json
+    settings.json
+  bg/
+    messages.json
+    messages-group.json
+    tabs.json
+    settings.json
+```
 
 ---
 

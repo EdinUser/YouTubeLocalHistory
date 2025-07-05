@@ -267,4 +267,20 @@ Check out our [Contributing Guide](./CONTRIBUTING.md) for more details.
 
 ---
 
-*Can't find your question? Join our [Telegram community](https://t.me/+eFftKWGVvSpiZjZk) - we're friendly and helpful!* 
+*Can't find your question? Join our [Telegram community](https://t.me/+eFftKWGVvSpiZjZk) - we're friendly and helpful!*
+
+## 🌐 Multilanguage Support
+
+### Q: What languages does YT re:Watch support?
+**A:** English, German, Spanish, French, and Bulgarian. All non-English translations are currently machine-generated. Native speakers are encouraged to help improve translations!
+
+### Q: How can I help improve translations?
+**A:** See the technical documentation for translation guidelines. You can submit improvements via pull request.
+
+## 📊 Analytics & Statistics
+
+### Q: What's new in the Analytics tab?
+**A:** The Analytics tab now features summary cards, longest unfinished videos, top watched/skipped channels, a completion bar chart, and new activity charts. All analytics are calculated locally and never leave your device.
+
+### Q: How do I interpret the completion bar chart?
+**A:** It shows the number of long videos you skipped, partially watched, or completed. The legend explains each category. 
