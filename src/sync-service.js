@@ -1,11 +1,11 @@
 // Firefox Sync Service
 // Handles syncing data between browser instances with local storage priority
-(function() {
+(function () {
     'use strict';
 
     // Debug settings - will be loaded from storage
     let debugEnabled = false;
-    
+
     // Debug logging function
     function log(...args) {
         if (debugEnabled) {
@@ -22,10 +22,10 @@
     async function loadDebugSetting() {
         try {
             const storage = isFirefox ? browser.storage.local : chrome.storage.local;
-            const result = isFirefox ? 
+            const result = isFirefox ?
                 await storage.get(['settings']) :
                 await new Promise(resolve => storage.get(['settings'], resolve));
-            
+
             const settings = result.settings || {};
             debugEnabled = settings.debug || false;
             log('Debug logging', debugEnabled ? 'enabled' : 'disabled');
@@ -36,7 +36,7 @@
     }
 
     // Browser detection
-    const isFirefox = (function() {
+    const isFirefox = (function () {
         try {
             return typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
         } catch (e) {
@@ -48,7 +48,7 @@
     // Sync statuses
     const SYNC_STATUS = {
         DISABLED: 'disabled',
-        INITIALIZING: 'initializing', 
+        INITIALIZING: 'initializing',
         SYNCING: 'syncing',
         SUCCESS: 'success',
         ERROR: 'error',
@@ -105,12 +105,12 @@
                     // Check if Firefox Sync is available
                     log('Testing Firefox Sync availability...');
                     log('Extension ID:', browser.runtime.id);
-                    
+
                     const testKey = '__sync_test__';
-                    await browser.storage.sync.set({ [testKey]: true });
+                    await browser.storage.sync.set({[testKey]: true});
                     const result = await browser.storage.sync.get(testKey);
                     await browser.storage.sync.remove(testKey);
-                    
+
                     log('Sync test result:', result);
                     return true;
                 } else if (isChrome) {
@@ -129,17 +129,17 @@
             try {
                 const storage = this.getLocalStorage();
                 const result = await storage.get(['syncSettings']);
-                return result.syncSettings || { enabled: false };
+                return result.syncSettings || {enabled: false};
             } catch (error) {
                 logError('Error getting sync settings:', error);
-                return { enabled: false };
+                return {enabled: false};
             }
         }
 
         async setSyncSettings(settings) {
             try {
                 const storage = this.getLocalStorage();
-                await storage.set({ syncSettings: settings });
+                await storage.set({syncSettings: settings});
             } catch (error) {
                 logError('Error saving sync settings:', error);
             }
@@ -148,15 +148,27 @@
         getLocalStorage() {
             if (isFirefox) {
                 return {
-                    async get(keys) { return await browser.storage.local.get(keys); },
-                    async set(data) { return await browser.storage.local.set(data); },
-                    async remove(keys) { return await browser.storage.local.remove(keys); }
+                    async get(keys) {
+                        return await browser.storage.local.get(keys);
+                    },
+                    async set(data) {
+                        return await browser.storage.local.set(data);
+                    },
+                    async remove(keys) {
+                        return await browser.storage.local.remove(keys);
+                    }
                 };
             } else {
                 return {
-                    async get(keys) { return new Promise(resolve => chrome.storage.local.get(keys, resolve)); },
-                    async set(data) { return new Promise(resolve => chrome.storage.local.set(data, resolve)); },
-                    async remove(keys) { return new Promise(resolve => chrome.storage.local.remove(keys, resolve)); }
+                    async get(keys) {
+                        return new Promise(resolve => chrome.storage.local.get(keys, resolve));
+                    },
+                    async set(data) {
+                        return new Promise(resolve => chrome.storage.local.set(data, resolve));
+                    },
+                    async remove(keys) {
+                        return new Promise(resolve => chrome.storage.local.remove(keys, resolve));
+                    }
                 };
             }
         }
@@ -164,17 +176,33 @@
         getSyncStorage() {
             if (isFirefox) {
                 return {
-                    async get(keys) { return await browser.storage.sync.get(keys); },
-                    async set(data) { return await browser.storage.sync.set(data); },
-                    async remove(keys) { return await browser.storage.sync.remove(keys); },
-                    async clear() { return await browser.storage.sync.clear(); }
+                    async get(keys) {
+                        return await browser.storage.sync.get(keys);
+                    },
+                    async set(data) {
+                        return await browser.storage.sync.set(data);
+                    },
+                    async remove(keys) {
+                        return await browser.storage.sync.remove(keys);
+                    },
+                    async clear() {
+                        return await browser.storage.sync.clear();
+                    }
                 };
             } else {
                 return {
-                    async get(keys) { return new Promise(resolve => chrome.storage.sync.get(keys, resolve)); },
-                    async set(data) { return new Promise(resolve => chrome.storage.sync.set(data, resolve)); },
-                    async remove(keys) { return new Promise(resolve => chrome.storage.sync.remove(keys, resolve)); },
-                    async clear() { return new Promise(resolve => chrome.storage.sync.clear(resolve)); }
+                    async get(keys) {
+                        return new Promise(resolve => chrome.storage.sync.get(keys, resolve));
+                    },
+                    async set(data) {
+                        return new Promise(resolve => chrome.storage.sync.set(data, resolve));
+                    },
+                    async remove(keys) {
+                        return new Promise(resolve => chrome.storage.sync.remove(keys, resolve));
+                    },
+                    async clear() {
+                        return new Promise(resolve => chrome.storage.sync.clear(resolve));
+                    }
                 };
             }
         }
@@ -182,7 +210,7 @@
         async enableSync() {
             try {
                 this.updateStatus(SYNC_STATUS.INITIALIZING);
-                
+
                 const syncAvailable = await this.isSyncAvailable();
                 if (!syncAvailable) {
                     this.updateStatus(SYNC_STATUS.NOT_AVAILABLE);
@@ -190,12 +218,12 @@
                 }
 
                 this.syncEnabled = true;
-                await this.setSyncSettings({ enabled: true, lastSyncTime: Date.now() });
-                
+                await this.setSyncSettings({enabled: true, lastSyncTime: Date.now()});
+
                 // Perform full sync when first enabling to ensure clean state
                 await this.performFullSync();
                 this.startPeriodicSync();
-                
+
                 this.updateStatus(SYNC_STATUS.SUCCESS);
                 return true;
             } catch (error) {
@@ -209,7 +237,7 @@
             try {
                 this.syncEnabled = false;
                 this.stopPeriodicSync();
-                await this.setSyncSettings({ enabled: false });
+                await this.setSyncSettings({enabled: false});
                 this.updateStatus(SYNC_STATUS.DISABLED);
                 return true;
             } catch (error) {
@@ -235,7 +263,7 @@
                 // Get all local data
                 const localStorage = this.getLocalStorage();
                 const localData = await localStorage.get(null);
-                
+
                 // Get all sync data (should be clean now)
                 const syncStorage = this.getSyncStorage();
                 const syncData = await syncStorage.get(null);
@@ -245,7 +273,7 @@
                 log('Sync data items:', Object.keys(syncData).filter(k => k.startsWith(sharedPrefix + 'video_') || k.startsWith(sharedPrefix + 'playlist_')).length);
                 log('🔍 Raw sync storage keys:', Object.keys(syncData).filter(k => k.startsWith('ytrewatch_')).slice(0, 5));
                 log('🔍 Firefox Sync working?', Object.keys(syncData).length > 0 ? 'YES - has data' : 'NO - empty');
-                
+
                 // Debug: Look for the specific video that should be syncing
                 const specificVideo = 'ytrewatch_video_8DwLcxEEZss';
                 if (syncData[specificVideo]) {
@@ -257,7 +285,7 @@
 
                 // Merge data with local storage priority and conflict resolution
                 const mergedData = await this.mergeData(localData, syncData);
-                
+
                 // Save merged data back to local storage first (priority 1)
                 // Local storage uses original keys (without prefix)
                 const dataToSave = this.filterLocalStorageData(mergedData);
@@ -268,10 +296,10 @@
                         title: dataToSave[key].title,
                         timestamp: new Date(dataToSave[key].timestamp).toLocaleString()
                     })));
-                    
+
                     await localStorage.set(dataToSave);
                     log('✅ Successfully saved', Object.keys(dataToSave).length, 'items to local storage');
-                    
+
                     // Verify the data was actually saved
                     const verification = await localStorage.get(Object.keys(dataToSave).slice(0, 1));
                     log('Verification - local storage data:', verification);
@@ -284,14 +312,14 @@
                 log('Updated sync storage');
 
                 this.lastSyncTime = Date.now();
-                await this.setSyncSettings({ 
-                    enabled: true, 
-                    lastSyncTime: this.lastSyncTime 
+                await this.setSyncSettings({
+                    enabled: true,
+                    lastSyncTime: this.lastSyncTime
                 });
 
                 this.updateStatus(SYNC_STATUS.SUCCESS);
                 log('Full sync completed successfully');
-                
+
                 // Notify other parts of the extension that a full sync completed
                 this.notifyFullSyncComplete();
             } catch (error) {
@@ -311,16 +339,16 @@
                 const syncData = await syncStorage.get(null);
                 const now = Date.now();
                 const oneWeekAgo = now - (7 * 24 * 60 * 60 * 1000); // 7 days ago
-                
+
                 let itemsToRemove = [];
-                
+
                 // Find old sync items to clean up (NOT local storage items)
                 const sharedPrefix = 'ytrewatch_'; // Must match filterSyncableData
                 Object.keys(syncData).forEach(key => {
                     if (key.startsWith(sharedPrefix + 'video_') || key.startsWith(sharedPrefix + 'playlist_')) {
                         const item = syncData[key];
                         const itemTime = item.timestamp || item.lastUpdated || 0;
-                        
+
                         // Remove sync items older than a week that seem stale
                         if (itemTime < oneWeekAgo) {
                             log('Marking old SYNC item for cleanup:', key, 'age:', Math.floor((now - itemTime) / (24 * 60 * 60 * 1000)), 'days');
@@ -328,7 +356,7 @@
                         }
                     }
                 });
-                
+
                 // Remove old sync items in batches (NOT from local storage)
                 if (itemsToRemove.length > 0) {
                     log('Cleaning up', itemsToRemove.length, 'old SYNC items (local storage untouched)');
@@ -355,7 +383,7 @@
 
             try {
                 log('🔄 Starting regular sync...');
-                
+
                 const localStorage = this.getLocalStorage();
                 const syncStorage = this.getSyncStorage();
 
@@ -363,7 +391,7 @@
                 const now = Date.now();
                 const recentSyncThreshold = 2 * 60 * 1000; // 2 minutes
                 const isRecentSync = this.lastSyncTime && (now - this.lastSyncTime) < recentSyncThreshold;
-                
+
                 if (isRecentSync) {
                     log('🚀 Recent sync detected - performing optimized sync');
                     await this.performOptimizedSync(localStorage, syncStorage);
@@ -373,14 +401,14 @@
                 }
 
                 this.lastSyncTime = Date.now();
-                await this.setSyncSettings({ 
-                    enabled: true, 
-                    lastSyncTime: this.lastSyncTime 
+                await this.setSyncSettings({
+                    enabled: true,
+                    lastSyncTime: this.lastSyncTime
                 });
 
                 this.updateStatus(SYNC_STATUS.SUCCESS);
                 log('✅ Regular sync completed successfully');
-                
+
                 // Notify popup of sync completion
                 this.notifyRegularSyncComplete();
             } catch (error) {
@@ -394,31 +422,31 @@
         // Optimized sync for recent changes only
         async performOptimizedSync(localStorage, syncStorage) {
             log('🚀 Running optimized sync...');
-            
+
             // Only get recent local changes (last 15 minutes to account for Firefox Sync delays)
             const recentThreshold = Date.now() - (15 * 60 * 1000);
             const allLocalData = await localStorage.get(null);
             const recentLocalChanges = {};
-            
+
             Object.keys(allLocalData).forEach(key => {
-                if ((key.startsWith('video_') || key.startsWith('playlist_')) && 
+                if ((key.startsWith('video_') || key.startsWith('playlist_')) &&
                     allLocalData[key].timestamp > recentThreshold) {
                     recentLocalChanges[key] = allLocalData[key];
                 }
             });
-            
+
             if (Object.keys(recentLocalChanges).length > 0) {
                 log('📤 Found', Object.keys(recentLocalChanges).length, 'recent local changes to upload');
                 await this.updateSyncStorage(recentLocalChanges);
             }
-            
+
             // Quick check for any recent sync changes
             const syncData = await syncStorage.get(null);
             const sharedPrefix = 'ytrewatch_';
             const recentSyncChanges = {};
-            
+
             Object.keys(syncData).forEach(key => {
-                if (key.startsWith(sharedPrefix) && 
+                if (key.startsWith(sharedPrefix) &&
                     syncData[key].timestamp > recentThreshold) {
                     const localKey = key.replace(sharedPrefix, '');
                     if (!allLocalData[localKey] || allLocalData[localKey].timestamp < syncData[key].timestamp) {
@@ -426,12 +454,12 @@
                     }
                 }
             });
-            
+
             if (Object.keys(recentSyncChanges).length > 0) {
                 log('📥 Found', Object.keys(recentSyncChanges).length, 'recent sync changes to download');
                 await localStorage.set(recentSyncChanges);
             }
-            
+
             log('✅ Optimized sync completed');
         }
 
@@ -448,13 +476,13 @@
             const syncData = await syncStorage.get(null);
             const syncVideoKeys = Object.keys(syncData).filter(k => k.startsWith('ytrewatch_video_'));
             log('🌐 Sync data loaded:', syncVideoKeys.length, 'videos');
-            
+
             // Show newest sync videos to debug what we're getting
             const newestSyncVideos = syncVideoKeys
-                .map(k => ({ key: k, timestamp: syncData[k].timestamp || 0, title: syncData[k].title || 'No title' }))
+                .map(k => ({key: k, timestamp: syncData[k].timestamp || 0, title: syncData[k].title || 'No title'}))
                 .sort((a, b) => b.timestamp - a.timestamp)
                 .slice(0, 5);
-            
+
             log('🌐 Newest videos in sync storage:');
             newestSyncVideos.forEach(v => {
                 const videoId = v.key.replace('ytrewatch_video_', '');
@@ -467,7 +495,7 @@
                 const localKey = syncKey.replace('ytrewatch_', '');
                 return !localData[localKey];
             });
-            
+
             if (newVideosFromSync.length > 0) {
                 log('🆕 Found NEW videos in sync storage that aren\'t local:', newVideosFromSync.length);
                 newVideosFromSync.forEach(syncKey => {
@@ -482,11 +510,11 @@
             // Merge the data
             log('🔄 Starting merge process...');
             const mergedData = await this.mergeData(localData, syncData);
-            
+
             // Count changes
             const mergedVideoCount = Object.keys(mergedData).filter(k => k.startsWith('video_')).length;
             const videoChanges = mergedVideoCount - localVideoCount;
-            
+
             log('📊 Merge results:');
             log(`  Local videos before: ${localVideoCount}`);
             log(`  Merged videos after: ${mergedVideoCount}`);
@@ -497,7 +525,7 @@
             if (Object.keys(dataToSave).length > Object.keys(this.filterLocalStorageData(localData)).length) {
                 log('💾 Saving updated data to local storage...');
                 log('💾 Data to save:', Object.keys(dataToSave).length, 'items');
-                
+
                 // Show what's being added
                 const newKeys = Object.keys(dataToSave).filter(k => !localData[k]);
                 if (newKeys.length > 0) {
@@ -507,10 +535,10 @@
                         log(`  ${key}: ${item.title || 'No title'} - ${new Date(item.timestamp).toLocaleTimeString()}`);
                     });
                 }
-                
+
                 await localStorage.set(dataToSave);
                 log('✅ Merged data saved to local storage');
-                
+
                 // Verify data was saved - check for the new videos we just added
                 if (newKeys.length > 0) {
                     const verification = await localStorage.get(newKeys.slice(0, 3));
@@ -535,99 +563,104 @@
         }
 
         async mergeData(localData, syncData) {
-            const merged = { ...localData };
+            const merged = {};
             let conflictsResolved = 0;
             let syncWins = 0;
             let localWins = 0;
             let newItemsAdded = 0;
             const sharedPrefix = 'ytrewatch_'; // Must match filterSyncableData
-            
-            log('🔄 Starting data merge...');
-            
-            // Show sample of what we're merging
-            const localVideoKeys = Object.keys(localData).filter(k => k.startsWith('video_'));
-            const syncVideoKeys = Object.keys(syncData).filter(k => k.startsWith(sharedPrefix + 'video_'));
-            
-            log('📊 Merge inputs:');
-            log(`  Local videos: ${localVideoKeys.length}`);
-            log(`  Sync videos: ${syncVideoKeys.length}`);
-            
-            if (localVideoKeys.length > 0) {
-                log('📖 Local data sample:', localVideoKeys.slice(0, 3).map(key => ({
-                    key: key,
-                    title: localData[key]?.title || 'No title',
-                    timestamp: new Date(localData[key]?.timestamp || 0).toLocaleString()
-                })));
+            const now = Date.now();
+            const tombstoneRetentionMs = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+            // Fail-safe: If last sync was 29 days or more ago, discard all local data and use remote only
+            const lastSync = this.lastSyncTime || 0;
+            if (now - lastSync >= 29 * 24 * 60 * 60 * 1000) {
+                // Only keep remote (sync) data
+                Object.keys(syncData).forEach(syncKey => {
+                    if (syncKey.startsWith(sharedPrefix)) {
+                        merged[syncKey.replace(sharedPrefix, '')] = syncData[syncKey];
+                    }
+                });
+                console.warn('[SyncService] Local data is stale (29+ days since last sync). All local video, playlist, and tombstone data replaced with remote.');
+                return merged;
             }
-            
-            if (syncVideoKeys.length > 0) {
-                log('🌐 Sync data sample:', syncVideoKeys.slice(0, 3).map(syncKey => {
-                    const item = syncData[syncKey];
-                    return {
-                        syncKey: syncKey,
-                        title: item?.title || 'No title',
-                        timestamp: new Date(item?.timestamp || 0).toLocaleString()
-                    };
-                }));
-            }
-            
-            // Process video records from sync data (remove shared prefix)
+
+            // Gather all tombstones (local and sync)
+            const localTombstones = Object.keys(localData).filter(k => k.startsWith('deleted_video_')).reduce((acc, k) => {
+                acc[k] = localData[k];
+                return acc;
+            }, {});
+            const syncTombstones = Object.keys(syncData).filter(k => k.startsWith(sharedPrefix + 'deleted_video_')).reduce((acc, k) => {
+                acc[k.replace(sharedPrefix, '')] = syncData[k];
+                return acc;
+            }, {});
+            const allTombstones = {...localTombstones, ...syncTombstones};
+
+            // Remove videos that have a valid tombstone
+            Object.keys(allTombstones).forEach(tombKey => {
+                const videoId = tombKey.replace('deleted_video_', '');
+                const tomb = allTombstones[tombKey];
+                if (!tomb || !tomb.deletedAt) return;
+                // Remove from merged if present and tombstone is newer
+                const videoKey = `video_${videoId}`;
+                const mergedRecord = localData[videoKey];
+                if (mergedRecord && mergedRecord.timestamp && tomb.deletedAt > mergedRecord.timestamp) {
+                    // skip
+                } else if (mergedRecord && !mergedRecord.timestamp) {
+                    // Defensive: if no timestamp, prefer tombstone
+                    // skip
+                }
+                // Always keep the tombstone in merged if not expired
+                if (now - tomb.deletedAt <= tombstoneRetentionMs) {
+                    merged[tombKey] = tomb;
+                } else {
+                    // If expired, remove tombstone
+                    // skip
+                }
+            });
+
+            // Now process normal merge for videos/playlists (skip those with tombstones)
             Object.keys(syncData).forEach(syncKey => {
                 if (syncKey.startsWith(sharedPrefix + 'video_') || syncKey.startsWith(sharedPrefix + 'playlist_')) {
                     // Remove shared prefix to get original key
                     const key = syncKey.replace(sharedPrefix, '');
+                    if (key.startsWith('video_')) {
+                        const tombKey = `deleted_video_${key.replace('video_', '')}`;
+                        if (allTombstones[tombKey]) return; // skip, already handled
+                    }
                     const localItem = localData[key];
-                    const syncItem = syncData[syncKey]; // Use prefixed key for sync data
-                    
-                    if (!localItem) {
-                        // No local copy, use sync data
+                    const syncItem = syncData[syncKey];
+                    if (!localItem && !merged[key]) {
                         merged[key] = syncItem;
                         newItemsAdded++;
-                        log('➕ Adding from sync:', key, syncItem.title || 'No title', 
-                                  `(${new Date(syncItem.timestamp).toLocaleTimeString()})`);
                     } else if (!syncItem) {
-                        // No sync copy, keep local data
                         merged[key] = localItem;
-                        log('📍 Keeping local (no sync version):', key);
-                    } else {
+                    } else if (!key.startsWith('video_') || !allTombstones[`deleted_video_${key.replace('video_', '')}`]) {
                         // Both exist, resolve conflict using timestamp (last write wins)
                         const localTimestamp = localItem.timestamp || localItem.lastUpdated || 0;
                         const syncTimestamp = syncItem.timestamp || syncItem.lastUpdated || 0;
-                        
                         conflictsResolved++;
-                        
                         if (syncTimestamp > localTimestamp) {
                             merged[key] = syncItem;
                             syncWins++;
-                            log('🌐 Conflict resolved - SYNC WINS:', key, 
-                                'Local:', new Date(localTimestamp).toLocaleString(), 
-                                'vs Sync:', new Date(syncTimestamp).toLocaleString(),
-                                '- Title:', syncItem.title || 'No title');
                         } else if (localTimestamp > syncTimestamp) {
                             merged[key] = localItem;
                             localWins++;
-                            log('📍 Conflict resolved - LOCAL WINS:', key,
-                                'Local:', new Date(localTimestamp).toLocaleString(), 
-                                'vs Sync:', new Date(syncTimestamp).toLocaleString(),
-                                '- Title:', localItem.title || 'No title');
                         } else {
-                            // Equal timestamps - prefer local (current behavior)
                             merged[key] = localItem;
                             localWins++;
-                            log('⚖️ Equal timestamps - keeping local:', key,
-                                       '- Timestamp:', new Date(localTimestamp).toLocaleString());
                         }
+                    }
+                }
+                // Also sync tombstones
+                if (syncKey.startsWith(sharedPrefix + 'deleted_video_')) {
+                    const key = syncKey.replace(sharedPrefix, '');
+                    if (!merged[key]) {
+                        merged[key] = syncData[syncKey];
                     }
                 }
             });
 
-            log('✅ Merge complete:');
-            log(`  New items added: ${newItemsAdded}`);
-            log(`  Conflicts resolved: ${conflictsResolved}`);
-            log(`  Sync wins: ${syncWins}`);
-            log(`  Local wins: ${localWins}`);
-            log(`  Total merged items: ${Object.keys(merged).filter(k => k.startsWith('video_') || k.startsWith('playlist_')).length}`);
-            
             return merged;
         }
 
@@ -636,9 +669,9 @@
             // Add shared prefix to ensure cross-instance compatibility for debug installations
             const syncable = {};
             const sharedPrefix = 'ytrewatch_'; // Consistent across all instances
-            
+
             Object.keys(data).forEach(key => {
-                if (key.startsWith('video_') || key.startsWith('playlist_')) {
+                if (key.startsWith('video_') || key.startsWith('playlist_') || key.startsWith('deleted_video_')) {
                     // Use shared prefix for sync storage to work across different extension IDs
                     syncable[sharedPrefix + key] = data[key];
                 }
@@ -650,9 +683,9 @@
             // Local storage uses original keys (no prefix)
             // Only save video and playlist data, not settings or migration flags
             const localData = {};
-            
+
             Object.keys(data).forEach(key => {
-                if (key.startsWith('video_') || key.startsWith('playlist_')) {
+                if (key.startsWith('video_') || key.startsWith('playlist_') || key.startsWith('deleted_video_')) {
                     // Save with original key (no prefix) for local storage compatibility
                     localData[key] = data[key];
                 }
@@ -663,10 +696,10 @@
         async updateSyncStorage(data) {
             const syncStorage = this.getSyncStorage();
             const syncableData = this.filterSyncableData(data);
-            
+
             // Firefox/Chrome sync storage has size limits, so we need to chunk the data
             const chunks = this.chunkData(syncableData);
-            
+
             for (const chunk of chunks) {
                 await syncStorage.set(chunk);
             }
@@ -679,13 +712,13 @@
 
             Object.entries(data).forEach(([key, value]) => {
                 const itemSize = JSON.stringify(value).length;
-                
+
                 if (currentSize + itemSize > maxSize && Object.keys(currentChunk).length > 0) {
                     chunks.push(currentChunk);
                     currentChunk = {};
                     currentSize = 0;
                 }
-                
+
                 currentChunk[key] = value;
                 currentSize += itemSize;
             });
@@ -701,14 +734,48 @@
             if (this.syncInterval) {
                 clearInterval(this.syncInterval);
             }
-            
+
             // Set sync interval to 5 minutes - reasonable fallback since we have immediate sync + storage listeners
             this.syncInterval = setInterval(() => {
                 this.performInitialSync();
             }, 5 * 60 * 1000); // 5 minutes - balanced between responsiveness and resource usage
-            
+
             // Add Firefox Sync storage change listener for real-time remote updates
             this.setupSyncStorageListener();
+
+            // Set up daily tombstone cleanup
+            this.setupTombstoneCleanup();
+        }
+
+        // Set up periodic tombstone cleanup (once per day)
+        setupTombstoneCleanup() {
+            if (this.tombstoneCleanupInterval) {
+                clearInterval(this.tombstoneCleanupInterval);
+            }
+
+            // Clean up tombstones once per day
+            this.tombstoneCleanupInterval = setInterval(async () => {
+                try {
+                    if (window.ytStorage && window.ytStorage.cleanupTombstones) {
+                        await window.ytStorage.cleanupTombstones();
+                        log('✅ Periodic tombstone cleanup completed');
+                    }
+                } catch (error) {
+                    logError('⚠️ Periodic tombstone cleanup failed:', error);
+                }
+            }, 24 * 60 * 60 * 1000); // 24 hours
+
+            // Also run cleanup immediately on startup
+            setTimeout(async () => {
+                try {
+                    if (window.ytStorage && window.ytStorage.cleanupTombstones) {
+                        await window.ytStorage.cleanupTombstones();
+                        log('✅ Initial tombstone cleanup completed');
+                    }
+                } catch (error) {
+                    logError('⚠️ Initial tombstone cleanup failed:', error);
+                }
+            }, 5000); // 5 seconds after startup
         }
 
         // Add listener for changes coming FROM Firefox Sync (remote changes)
@@ -730,10 +797,10 @@
             this.syncStorageListener = (changes, area) => {
                 if (area === 'sync' && this.syncEnabled && !this.syncInProgress) {
                     // Check if any of our sync keys changed
-                    const relevantChanges = Object.keys(changes).filter(key => 
+                    const relevantChanges = Object.keys(changes).filter(key =>
                         key.startsWith('ytrewatch_video_') || key.startsWith('ytrewatch_playlist_')
                     );
-                    
+
                     if (relevantChanges.length > 0) {
                         log('🔥 Remote sync changes detected:', relevantChanges.length, 'items');
                         // Trigger immediate sync to pull remote changes
@@ -765,7 +832,12 @@
                 clearInterval(this.syncInterval);
                 this.syncInterval = null;
             }
-            
+
+            if (this.tombstoneCleanupInterval) {
+                clearInterval(this.tombstoneCleanupInterval);
+                this.tombstoneCleanupInterval = null;
+            }
+
             // Remove sync storage listener
             if (this.syncStorageListener) {
                 try {
@@ -791,7 +863,7 @@
                     logError('Error in status callback:', error);
                 }
             });
-            
+
             // Broadcast status update to popup (when running in background)
             if (typeof chrome !== 'undefined' && chrome.runtime) {
                 chrome.runtime.sendMessage({
@@ -808,7 +880,7 @@
 
         notifyFullSyncComplete() {
             log('🔔 Notifying popup that full sync completed');
-            
+
             // Send message to popup (when running in background)
             if (typeof chrome !== 'undefined' && chrome.runtime) {
                 chrome.runtime.sendMessage({
@@ -824,7 +896,7 @@
 
         notifyRegularSyncComplete() {
             log('🔔 Notifying popup that regular sync completed');
-            
+
             // Send message to popup (when running in background)
             if (typeof chrome !== 'undefined' && chrome.runtime) {
                 chrome.runtime.sendMessage({
@@ -859,7 +931,7 @@
                 log('❌ Sync disabled, aborting');
                 return false;
             }
-            
+
             log('🔥 Calling performInitialSync()');
             await this.performInitialSync();
             log('🔥 performInitialSync() completed');
@@ -872,7 +944,7 @@
                 log('📤 Upload skipped - sync disabled');
                 return false;
             }
-            
+
             if (this.syncInProgress) {
                 log('📤 Upload skipped - sync in progress');
                 return false;
@@ -881,18 +953,18 @@
             try {
                 const localStorage = this.getLocalStorage();
                 let dataToUpload;
-                
+
                 if (videoId) {
                     // Upload specific video or playlist
                     const itemKey = videoId.startsWith('playlist_') ? videoId : `video_${videoId}`;
                     log('📤 Uploading specific item:', itemKey);
-                    
+
                     const itemData = await localStorage.get([itemKey]);
                     if (itemData[itemKey]) {
-                        dataToUpload = { [itemKey]: itemData[itemKey] };
+                        dataToUpload = {[itemKey]: itemData[itemKey]};
                         const itemType = videoId.startsWith('playlist_') ? 'playlist' : 'video';
                         const item = itemData[itemKey];
-                        
+
                         log('📤 Found item to upload:');
                         log(`  Type: ${itemType}`);
                         log(`  ID: ${videoId}`);
@@ -920,12 +992,12 @@
                     log('🌐 Uploading to sync storage...');
                     await this.updateSyncStorage(dataToUpload);
                     log('✅ Upload completed successfully');
-                    
+
                     // Verify the upload by reading it back
                     if (videoId && !videoId.startsWith('playlist_')) {
                         const syncStorage = this.getSyncStorage();
                         const verifyKey = `ytrewatch_video_${videoId}`;
-                        
+
                         // Small delay to ensure data is written
                         setTimeout(async () => {
                             try {
@@ -944,20 +1016,20 @@
                             }
                         }, 1000);
                     }
-                    
+
                     this.lastSyncTime = Date.now();
-                    await this.setSyncSettings({ 
-                        enabled: true, 
-                        lastSyncTime: this.lastSyncTime 
+                    await this.setSyncSettings({
+                        enabled: true,
+                        lastSyncTime: this.lastSyncTime
                     });
-                    
+
                     this.updateStatus(SYNC_STATUS.SUCCESS);
-                    
+
                     // Log what was uploaded for debugging
                     log('📋 Upload summary:');
                     log(`  Items uploaded: ${Object.keys(dataToUpload).length}`);
                     log(`  Sync timestamp updated: ${new Date(this.lastSyncTime).toLocaleTimeString()}`);
-                    
+
                     return true;
                 } else {
                     log('⚠️ No data to upload');
@@ -974,7 +1046,7 @@
             if (!this.syncEnabled) {
                 return false;
             }
-            
+
             await this.performFullSync();
             return true;
         }
@@ -984,20 +1056,20 @@
             try {
                 const syncStorage = this.getSyncStorage();
                 const testKey = 'ytrewatch_test_' + Date.now();
-                const testValue = { message: 'Hello from PC', timestamp: Date.now() };
-                
+                const testValue = {message: 'Hello from PC', timestamp: Date.now()};
+
                 log('🧪 Testing Firefox Sync - writing test data...');
-                await syncStorage.set({ [testKey]: testValue });
-                
+                await syncStorage.set({[testKey]: testValue});
+
                 log('🧪 Test data written. Check other device in 30 seconds.');
                 log('🧪 Test key:', testKey);
-                
+
                 // Check if we can read it back immediately
                 setTimeout(async () => {
                     const result = await syncStorage.get(testKey);
                     log('🧪 Local readback test:', result);
                 }, 2000);
-                
+
                 return testKey;
             } catch (error) {
                 logError('🧪 Sync test failed:', error);
@@ -1014,35 +1086,35 @@
                 const allSyncData = await syncStorage.get(null);
                 log('🔍 Retrieved sync data, keys:', Object.keys(allSyncData).length);
                 const videoKeys = Object.keys(allSyncData).filter(k => k.startsWith('ytrewatch_video_'));
-                
+
                 log('🔍 DEBUG: Total items in Firefox Sync:', Object.keys(allSyncData).length);
                 log('🔍 DEBUG: Video items in sync:', videoKeys.length);
                 log('🔍 DEBUG: Sample video keys:', videoKeys.slice(0, 5));
                 log('🔍 DEBUG: Looking for target video ytrewatch_video_8DwLcxEEZss:', !!allSyncData['ytrewatch_video_8DwLcxEEZss']);
-                
+
                 if (allSyncData['ytrewatch_video_8DwLcxEEZss']) {
                     log('🎯 DEBUG: Target video data:', allSyncData['ytrewatch_video_8DwLcxEEZss']);
                 }
-                
+
                 // Show newest videos with timestamps to identify propagation delay
                 const newestVideos = videoKeys
-                    .map(k => ({ key: k, timestamp: allSyncData[k].timestamp || 0 }))
+                    .map(k => ({key: k, timestamp: allSyncData[k].timestamp || 0}))
                     .sort((a, b) => b.timestamp - a.timestamp)
                     .slice(0, 5);
-                
+
                 log('🔍 DEBUG: Newest videos in Firefox Sync:');
                 newestVideos.forEach(v => {
                     const videoId = v.key.replace('ytrewatch_video_', '');
                     const timeAgo = Math.floor((Date.now() - v.timestamp) / 1000);
                     log(`  ${videoId} - ${new Date(v.timestamp).toLocaleTimeString()} (${timeAgo}s ago)`);
                 });
-                
+
                 return {
                     total: Object.keys(allSyncData).length,
                     videos: videoKeys.length,
                     hasTarget: !!allSyncData['ytrewatch_video_8DwLcxEEZss'],
-                    newest: newestVideos.map(v => ({ 
-                        id: v.key.replace('ytrewatch_video_', ''), 
+                    newest: newestVideos.map(v => ({
+                        id: v.key.replace('ytrewatch_video_', ''),
                         secondsAgo: Math.floor((Date.now() - v.timestamp) / 1000)
                     }))
                 };
@@ -1057,19 +1129,19 @@
             try {
                 const syncStorage = this.getSyncStorage();
                 const testKey = `ytrewatch_delay_test_${Date.now()}`;
-                const testData = { 
+                const testData = {
                     message: `Delay test from PC at ${new Date().toLocaleTimeString()}`,
-                    timestamp: Date.now() 
+                    timestamp: Date.now()
                 };
-                
+
                 log('⏱️ Testing sync propagation delay...');
                 log('⏱️ Writing test data:', testKey);
-                
-                await syncStorage.set({ [testKey]: testData });
-                
+
+                await syncStorage.set({[testKey]: testData});
+
                 log('⏱️ Test data uploaded. Check other PC every 30 seconds.');
                 log('⏱️ Run this on other PC: chrome.runtime.sendMessage({type:"debugSyncStorage"}, console.log)');
-                
+
                 return testKey;
             } catch (error) {
                 logError('⏱️ Delay test failed:', error);
@@ -1081,7 +1153,7 @@
         async testSyncFlow() {
             try {
                 log('🧪 Testing complete sync flow...');
-                
+
                 const testVideoId = `test_${Date.now()}`;
                 const testVideo = {
                     videoId: testVideoId,
@@ -1092,13 +1164,13 @@
                     url: `https://www.youtube.com/watch?v=${testVideoId}`,
                     isTest: true
                 };
-                
+
                 // 1. Save test video locally
                 log('1️⃣ Saving test video locally...');
                 const localStorage = this.getLocalStorage();
-                await localStorage.set({ [`video_${testVideoId}`]: testVideo });
+                await localStorage.set({[`video_${testVideoId}`]: testVideo});
                 log('✅ Test video saved locally');
-                
+
                 // 2. Upload to sync storage
                 log('2️⃣ Uploading test video to sync storage...');
                 const uploaded = await this.uploadNewData(testVideoId);
@@ -1107,39 +1179,39 @@
                     return false;
                 }
                 log('✅ Test video uploaded to sync');
-                
+
                 // 3. Wait a moment for sync to propagate
                 log('3️⃣ Waiting for sync propagation...');
                 await new Promise(resolve => setTimeout(resolve, 2000));
-                
+
                 // 4. Delete local copy
                 log('4️⃣ Deleting local copy...');
                 await localStorage.remove([`video_${testVideoId}`]);
                 log('✅ Local copy deleted');
-                
+
                 // 5. Perform sync to download it back
                 log('5️⃣ Performing sync to download test video...');
                 await this.performInitialSync();
-                
+
                 // 6. Check if it was restored
                 log('6️⃣ Checking if test video was restored...');
                 const restored = await localStorage.get([`video_${testVideoId}`]);
-                
+
                 if (restored[`video_${testVideoId}`]) {
                     log('✅ SUCCESS! Test video was restored:', restored[`video_${testVideoId}`].title);
-                    
+
                     // Clean up test video
                     await localStorage.remove([`video_${testVideoId}`]);
                     const syncStorage = this.getSyncStorage();
                     await syncStorage.remove([`ytrewatch_video_${testVideoId}`]);
                     log('🧹 Test video cleaned up');
-                    
+
                     return true;
                 } else {
                     log('❌ FAILED! Test video was not restored');
                     return false;
                 }
-                
+
             } catch (error) {
                 logError('🧪 Sync flow test failed:', error);
                 return false;
@@ -1155,11 +1227,11 @@
         async testSyncImprovements() {
             try {
                 log('🧪 Testing sync improvements...');
-                
+
                 // Test 1: Check if storage listener is working
                 log('1️⃣ Testing storage change listener...');
                 log('Storage listener active:', !!this.syncStorageListener);
-                
+
                 // Test 2: Test immediate sync trigger
                 log('2️⃣ Testing immediate sync trigger...');
                 const testVideoId = `improvement_test_${Date.now()}`;
@@ -1172,37 +1244,37 @@
                     url: `https://www.youtube.com/watch?v=${testVideoId}`,
                     isSyncTest: true
                 };
-                
+
                 // Save test video and measure sync trigger time
                 const startTime = Date.now();
                 const localStorage = this.getLocalStorage();
-                await localStorage.set({ [`video_${testVideoId}`]: testVideo });
-                
+                await localStorage.set({[`video_${testVideoId}`]: testVideo});
+
                 // Trigger immediate sync
                 const uploaded = await this.uploadNewData(testVideoId);
                 const uploadTime = Date.now() - startTime;
-                
+
                 log('⏱️ Upload trigger time:', uploadTime + 'ms', uploaded ? '✅' : '❌');
-                
+
                 // Test 3: Test optimized sync vs full sync
                 log('3️⃣ Testing optimized sync...');
                 const lastSyncBefore = this.lastSyncTime;
                 this.lastSyncTime = Date.now() - (1 * 60 * 1000); // Set last sync to 1 minute ago
-                
+
                 const syncStartTime = Date.now();
                 await this.performInitialSync();
                 const syncDuration = Date.now() - syncStartTime;
-                
+
                 log('⏱️ Optimized sync duration:', syncDuration + 'ms');
-                
+
                 // Restore original last sync time
                 this.lastSyncTime = lastSyncBefore;
-                
+
                 // Clean up test video
                 await localStorage.remove([`video_${testVideoId}`]);
                 const syncStorage = this.getSyncStorage();
                 await syncStorage.remove([`ytrewatch_video_${testVideoId}`]);
-                
+
                 log('✅ Sync improvement tests completed');
                 return {
                     listenerActive: !!this.syncStorageListener,
@@ -1210,7 +1282,7 @@
                     uploadSuccess: uploaded,
                     optimizedSyncTime: syncDuration
                 };
-                
+
             } catch (error) {
                 logError('🧪 Sync improvement test failed:', error);
                 return false;
@@ -1221,14 +1293,14 @@
     // Create global sync service instance
     window.ytSyncService = new SyncService();
     window.SYNC_STATUS = SYNC_STATUS;
-    
+
     // Make loadDebugSetting available globally for settings updates
-    window.updateSyncDebug = async function() {
+    window.updateSyncDebug = async function () {
         await loadDebugSetting();
     };
-    
+
     // Make debug function available globally for manual testing
-    window.debugSync = async function() {
+    window.debugSync = async function () {
         if (window.ytSyncService) {
             log('🔍 Manual debug call...');
             const result = await window.ytSyncService.debugSyncStorage();
@@ -1240,4 +1312,4 @@
         }
     };
 
-})(); 
+})();

@@ -1,11 +1,11 @@
 // Simple storage wrapper using cross-browser storage API
 // with automatic migration from IndexedDB if it exists
 
-(function() {
+(function () {
     'use strict';
 
     // Browser detection - safer approach
-    const isFirefox = (function() {
+    const isFirefox = (function () {
         try {
             return typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
         } catch (e) {
@@ -77,9 +77,9 @@
 
                 // Try to migrate from IndexedDB
                 await this.migrateFromIndexedDB();
-                
+
                 // Mark as migrated
-                await storage.set({ '__migrated__': true });
+                await storage.set({'__migrated__': true});
                 this.migrated = true;
                 console.log('[Storage] Migration completed successfully');
             } catch (error) {
@@ -92,9 +92,9 @@
         async migrateFromIndexedDB() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open('YouTubeHistoryDB', 3);
-                
+
                 request.onerror = () => reject(new Error('IndexedDB not accessible'));
-                
+
                 request.onsuccess = async (event) => {
                     const db = event.target.result;
                     const migrationData = {};
@@ -146,7 +146,7 @@
                 const transaction = db.transaction([storeName], 'readonly');
                 const store = transaction.objectStore(storeName);
                 const request = store.getAll();
-                
+
                 request.onsuccess = () => resolve(request.result || []);
                 request.onerror = () => reject(request.error);
             });
@@ -158,7 +158,7 @@
                 const transaction = db.transaction([storeName], 'readonly');
                 const store = transaction.objectStore(storeName);
                 const request = store.get(key);
-                
+
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);
             });
@@ -175,7 +175,7 @@
         async setVideo(videoId, data) {
             await this.ensureMigrated();
             // Always save to local storage first (priority 1)
-            await storage.set({ [`video_${videoId}`]: data });
+            await storage.set({[`video_${videoId}`]: data});
             // Then trigger sync if enabled
             this.triggerSync(videoId);
         }
@@ -183,7 +183,11 @@
         // Remove video record
         async removeVideo(videoId) {
             await this.ensureMigrated();
+            // Remove the video record
             await storage.remove([`video_${videoId}`]);
+            // Create a tombstone with deletedAt timestamp
+            const tombstoneKey = `deleted_video_${videoId}`;
+            await storage.set({[tombstoneKey]: {deletedAt: Date.now()}});
             // Trigger sync after removal
             this.triggerSync();
         }
@@ -193,14 +197,14 @@
             await this.ensureMigrated();
             const allData = await storage.get(null);
             const videos = {};
-            
+
             Object.keys(allData).forEach(key => {
                 if (key.startsWith('video_')) {
                     const videoId = key.replace('video_', '');
                     videos[videoId] = allData[key];
                 }
             });
-            
+
             return videos;
         }
 
@@ -215,7 +219,7 @@
         async setPlaylist(playlistId, data) {
             await this.ensureMigrated();
             // Always save to local storage first (priority 1)
-            await storage.set({ [`playlist_${playlistId}`]: data });
+            await storage.set({[`playlist_${playlistId}`]: data});
             // Then trigger sync if enabled
             this.triggerSync('playlist_' + playlistId);
         }
@@ -233,14 +237,14 @@
             await this.ensureMigrated();
             const allData = await storage.get(null);
             const playlists = {};
-            
+
             Object.keys(allData).forEach(key => {
                 if (key.startsWith('playlist_')) {
                     const playlistId = key.replace('playlist_', '');
                     playlists[playlistId] = allData[key];
                 }
             });
-            
+
             return playlists;
         }
 
@@ -254,7 +258,7 @@
         // Save settings
         async setSettings(settings) {
             await this.ensureMigrated();
-            await storage.set({ 'settings': settings });
+            await storage.set({'settings': settings});
         }
 
         // Clear all data
@@ -281,7 +285,7 @@
             setTimeout(() => {
                 // Try multiple approaches to ensure sync is triggered
                 let syncTriggered = false;
-                
+
                 // First try: Check if we're in background script context (has direct access to sync service)
                 if (window.ytSyncService && window.ytSyncService.syncEnabled) {
                     if (videoId) {
@@ -307,13 +311,13 @@
                     }
                     return; // Exit early if direct sync service is available
                 }
-                
+
                 // Second try: Send message to background script
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                    const message = videoId ? 
-                        { type: 'uploadNewData', videoId: videoId } : 
-                        { type: 'triggerSync' };
-                        
+                    const message = videoId ?
+                        {type: 'uploadNewData', videoId: videoId} :
+                        {type: 'triggerSync'};
+
                     chrome.runtime.sendMessage(message).then(result => {
                         if (result && result.success) {
                             console.log('[Storage] ✅ Background sync trigger successful');
@@ -325,12 +329,12 @@
                         console.log('[Storage] ⚠️ Could not reach background script for sync trigger:', error);
                     });
                 }
-                
+
                 // Third try: Force immediate sync check (fallback for edge cases)
                 if (!syncTriggered) {
                     setTimeout(() => {
                         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                            chrome.runtime.sendMessage({ type: 'triggerSync' }).catch(() => {
+                            chrome.runtime.sendMessage({type: 'triggerSync'}).catch(() => {
                                 // Final fallback failed, but don't log as this is expected sometimes
                             });
                         }
@@ -338,9 +342,24 @@
                 }
             }, 50); // Reduced from 100ms to 50ms for faster triggering
         }
+
+        // Clean up tombstones older than 30 days (default)
+        async cleanupTombstones(retentionMs = 30 * 24 * 60 * 60 * 1000) {
+            await this.ensureMigrated();
+            const allData = await storage.get(null);
+            const now = Date.now();
+            const tombstoneKeys = Object.keys(allData).filter(key => key.startsWith('deleted_video_'));
+            const oldTombstones = tombstoneKeys.filter(key => {
+                const tomb = allData[key];
+                return tomb && tomb.deletedAt && (now - tomb.deletedAt > retentionMs);
+            });
+            if (oldTombstones.length > 0) {
+                await storage.remove(oldTombstones);
+            }
+        }
     }
 
     // Create global storage instance
     window.ytStorage = new SimpleStorage();
 
-})(); 
+})();
