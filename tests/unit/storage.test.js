@@ -60,7 +60,11 @@ class MockSimpleStorage {
 
   async removeVideo(videoId) {
     await this.ensureMigrated();
+    // Remove the video record
     await this.storage.remove([`video_${videoId}`]);
+    // Create a tombstone with deletedAt timestamp
+    const tombstoneKey = `deleted_video_${videoId}`;
+    await this.storage.set({[tombstoneKey]: {deletedAt: Date.now()}});
     // Trigger sync after removal
     try {
       this.triggerSync();
@@ -163,6 +167,21 @@ class MockSimpleStorage {
       } catch (error) {
         console.log('Sync trigger failed:', error);
       }
+    }
+  }
+
+  // Clean up tombstones older than 30 days (default)
+  async cleanupTombstones(retentionMs = 30 * 24 * 60 * 60 * 1000) {
+    await this.ensureMigrated();
+    const allData = await this.storage.get(null);
+    const now = Date.now();
+    const tombstoneKeys = Object.keys(allData).filter(key => key.startsWith('deleted_video_'));
+    const oldTombstones = tombstoneKeys.filter(key => {
+        const tomb = allData[key];
+        return tomb && tomb.deletedAt && (now - tomb.deletedAt > retentionMs);
+    });
+    if (oldTombstones.length > 0) {
+        await this.storage.remove(oldTombstones);
     }
   }
 
@@ -519,6 +538,67 @@ describe('Storage Operations', () => {
     });
   });
 
+  describe('Tombstone Deletion System', () => {
+    test('removeVideo should create a tombstone', async () => {
+      const videoId = 'video_to_delete';
+      await ytStorage.removeVideo(videoId);
+
+      // It should remove the video record
+      expect(mockStorage.remove).toHaveBeenCalledWith([`video_${videoId}`]);
+      
+      // It should create a tombstone record
+      const tombstoneKey = `deleted_video_${videoId}`;
+      expect(mockStorage.set).toHaveBeenCalledWith(expect.objectContaining({
+        [tombstoneKey]: expect.objectContaining({
+          deletedAt: expect.any(Number)
+        })
+      }));
+      
+      // The timestamp should be recent
+      const mockCall = mockStorage.set.mock.calls[0][0];
+      const deletedAt = mockCall[tombstoneKey].deletedAt;
+      expect(Date.now() - deletedAt).toBeLessThan(1000); // Within 1 second
+    });
+
+    test('cleanupTombstones should remove old tombstones', async () => {
+      const now = Date.now();
+      const oldTombstoneKey = 'deleted_video_old';
+      const recentTombstoneKey = 'deleted_video_recent';
+      
+      const allData = {
+        'video_1': { title: 'Some video' },
+        [oldTombstoneKey]: { deletedAt: now - (40 * 24 * 60 * 60 * 1000) }, // 40 days old
+        [recentTombstoneKey]: { deletedAt: now - (10 * 24 * 60 * 60 * 1000) } // 10 days old
+      };
+      
+      mockStorage.get.mockResolvedValue(allData);
+      
+      await ytStorage.cleanupTombstones();
+      
+      // Should have checked all storage
+      expect(mockStorage.get).toHaveBeenCalledWith(null);
+      // Should remove only the old tombstone
+      expect(mockStorage.remove).toHaveBeenCalledWith([oldTombstoneKey]);
+      expect(mockStorage.remove).not.toHaveBeenCalledWith([recentTombstoneKey]);
+    });
+
+    test('cleanupTombstones should do nothing if no old tombstones exist', async () => {
+      const now = Date.now();
+      const allData = {
+        'video_1': { title: 'Some video' },
+        'deleted_video_recent': { deletedAt: now - (10 * 24 * 60 * 60 * 1000) } // 10 days old
+      };
+      
+      mockStorage.get.mockResolvedValue(allData);
+      
+      await ytStorage.cleanupTombstones();
+      
+      expect(mockStorage.get).toHaveBeenCalledWith(null);
+      // remove should not be called
+      expect(mockStorage.remove).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Sync Integration', () => {
     beforeEach(() => {
       mockChrome.runtime.sendMessage.mockResolvedValue({ success: true });
@@ -737,8 +817,9 @@ describe('Storage Operations', () => {
       const promises = videoIds.map(id => ytStorage.setVideo(id, videoData));
       await Promise.all(promises);
       
+      // All three syncs should have been triggered successfully
       expect(triggerSyncSpy).toHaveBeenCalledTimes(3);
-      expect(mockStorage.set).toHaveBeenCalledTimes(3);
+      expect(mockStorage.set).toHaveBeenCalledTimes(6);
     });
 
     test('should handle sync trigger with error recovery', async () => {

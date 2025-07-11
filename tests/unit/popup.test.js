@@ -91,6 +91,28 @@ global.showMessage = jest.fn();
 global.updateSyncIndicator = jest.fn();
 global.updateSyncSettingsUI = jest.fn();
 
+// Localization helper from popup.js
+const localizeHtmlPage = () => {
+    // Set text content for elements with data-i18n
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        const msg = chrome.i18n.getMessage(key);
+        if (msg) el.textContent = msg;
+    });
+    // Set title attribute for elements with data-i18n-title
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        const msg = chrome.i18n.getMessage(key);
+        if (msg) el.title = msg;
+    });
+    // Set placeholder attribute for elements with data-i18n-placeholder
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        const msg = chrome.i18n.getMessage(key);
+        if (msg) el.placeholder = msg;
+    });
+};
+
 // Import mocks
 jest.mock('../../src/content.js');
 jest.mock('../../src/popup.js');
@@ -697,6 +719,45 @@ describe('Popup Functionality', () => {
 
       await messageListener(mockMessage, null, null);
       expect(global.syncInProgress).toBe(false);
+    });
+  });
+
+  describe('Localization', () => {
+    beforeEach(() => {
+        // Mock the i18n API
+        global.chrome.i18n = {
+            getMessage: jest.fn((key, substitutions) => {
+                const messages = {
+                    'popup_title': 'Test Title',
+                    'search_placeholder': 'Test Search...',
+                    'button_tooltip': 'Test Tooltip'
+                };
+                return messages[key] || `??${key}??`;
+            })
+        };
+    });
+
+    test('should localize elements with data-i18n attributes', () => {
+        // Set up DOM with i18n attributes
+        document.body.innerHTML = `
+            <h1 data-i18n="popup_title"></h1>
+            <input type="text" data-i18n-placeholder="search_placeholder">
+            <button data-i18n-title="button_tooltip"></button>
+            <span data-i18n="non_existent_key"></span>
+        `;
+        
+        localizeHtmlPage();
+
+        expect(document.querySelector('h1').textContent).toBe('Test Title');
+        expect(document.querySelector('input').placeholder).toBe('Test Search...');
+        expect(document.querySelector('button').title).toBe('Test Tooltip');
+        // It should handle non-existent keys gracefully
+        expect(document.querySelector('span').textContent).toBe('??non_existent_key??');
+
+        expect(chrome.i18n.getMessage).toHaveBeenCalledWith('popup_title');
+        expect(chrome.i18n.getMessage).toHaveBeenCalledWith('search_placeholder');
+        expect(chrome.i18n.getMessage).toHaveBeenCalledWith('button_tooltip');
+        expect(chrome.i18n.getMessage).toHaveBeenCalledWith('non_existent_key');
     });
   });
 });

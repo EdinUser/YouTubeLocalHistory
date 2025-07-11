@@ -1,3 +1,4 @@
+
 /**
  * End-to-End tests for YT re:Watch Extension
  *
@@ -217,4 +218,4 @@ test.describe('Accessibility Tests', () => {
     const video = page.locator('video');
     await expect(video).toHaveAttribute('controls');
   });
-});
+}); 

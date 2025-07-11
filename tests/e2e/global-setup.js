@@ -1,8 +1,8 @@
-/**
- * Global setup for Playwright E2E tests
- */
 
-const { chromium } = require('@playwright/test');
+/**
+ * Global setup for Playwright tests
+ * This runs once before all tests.
+ */
 
 async function globalSetup(config) {
   console.log('Setting up E2E test environment...');
