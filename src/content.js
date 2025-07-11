@@ -1028,6 +1028,14 @@
             }
         }
 
+        if (thumbnail.tagName === 'YT-LOCKUP-VIEW-MODEL' || thumbnail.closest('yt-lockup-view-model')) {
+            const lockupLink = thumbnail.querySelector('a[href*="watch?v="]');
+            if (lockupLink) {
+                const videoId = lockupLink.href.match(/[?&]v=([^&]+)/)?.[1];
+                return videoId;
+            }
+        }
+
         // Check for regular video links
         let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="], a#video-title[href*="watch?v="]');
         if (anchor) {
@@ -1060,8 +1068,16 @@
         // For playlist items, we need to target the thumbnail container
         let targetElement = thumbnailElement;
         
+        if (thumbnailElement.tagName === 'YT-LOCKUP-VIEW-MODEL' || thumbnailElement.closest('yt-lockup-view-model')) {
+            const thumbnailContainer = thumbnailElement.querySelector('.yt-lockup-view-model-wiz__content-image');
+            if (thumbnailContainer) {
+                targetElement = thumbnailContainer;
+            } else {
+                return;
+            }
+        }
         // If we're in a playlist panel video renderer, find the thumbnail container
-        if (thumbnailElement.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' || thumbnailElement.closest('ytd-playlist-panel-video-renderer')) {
+        else if (thumbnailElement.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' || thumbnailElement.closest('ytd-playlist-panel-video-renderer')) {
             const thumbnailContainer = thumbnailElement.querySelector('#thumbnail-container ytd-thumbnail') || 
                                     thumbnailElement.querySelector('ytd-thumbnail') ||
                                     thumbnailElement.querySelector('#thumbnail-container');
@@ -1142,7 +1158,7 @@
             if (mutation.type === 'attributes') {
                 const target = mutation.target;
                 if (target.tagName === 'IMG' && target.id === 'img') {
-                    const videoElement = target.closest('ytd-playlist-panel-video-renderer, ytd-playlist-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer');
+                    const videoElement = target.closest('ytd-playlist-panel-video-renderer, ytd-playlist-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer, yt-lockup-view-model');
                     if (videoElement) {
                         processVideoElement(videoElement);
                     }
@@ -1161,13 +1177,14 @@
                         node.tagName === 'YTD-GRID-VIDEO-RENDERER' ||
                         node.tagName === 'YTD-VIDEO-RENDERER' ||
                         node.tagName === 'YTD-COMPACT-VIDEO-RENDERER' ||
-                        node.tagName === 'YTD-COMPACT-RADIO-RENDERER'
+                        node.tagName === 'YTD-COMPACT-RADIO-RENDERER' ||
+                        node.tagName === 'YT-LOCKUP-VIEW-MODEL'
                     )) {
                         processVideoElement(node);
                     }
 
                     // Also check for video elements inside the added node
-                    const videoElements = node.querySelectorAll('ytd-playlist-panel-video-renderer, ytd-playlist-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer');
+                    const videoElements = node.querySelectorAll('ytd-playlist-panel-video-renderer, ytd-playlist-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer, yt-lockup-view-model');
                     if (videoElements.length > 0) {
                         videoElements.forEach(element => processVideoElement(element));
                     }
@@ -1191,7 +1208,7 @@
         mainThumbnails.forEach(element => processVideoElement(element));
 
         // Process right column recommendations
-        const rightColumnThumbnails = document.querySelectorAll('ytd-compact-video-renderer, ytd-compact-radio-renderer');
+        const rightColumnThumbnails = document.querySelectorAll('ytd-compact-video-renderer, ytd-compact-radio-renderer, yt-lockup-view-model');
         rightColumnThumbnails.forEach(element => processVideoElement(element));
     }
 
