@@ -34,12 +34,12 @@ src/
 ### Core Components
 
 #### 1. **Background Script** (`background.js`)
-- **Purpose**: Service worker handling cross-tab communication
+- **Purpose**: Service worker (Chrome) or persistent script (Firefox) that handles cross-tab communication and global state.
 - **Key Functions**:
-  - Message routing between content scripts and popup
-  - Storage event coordination
-  - Sync status management
-  - Extension lifecycle management
+  - **State Management**: Uses `chrome.storage.session` to reliably manage state (like the active popup window ID and last video update) across service worker restarts in Chrome. This prevents data loss when the service worker becomes inactive. For Firefox, it uses in-memory variables.
+  - **Message Routing**: Manages communication between the content scripts, the popup, and other extension components.
+  - **Popup Handling**: Ensures only one popup window is open at a time, focusing the existing window if the action is triggered again.
+  - **Sync Coordination**: Manages and triggers the Firefox Sync service.
 
 #### 2. **Content Script** (`content.js`)
 - **Purpose**: Injected into YouTube pages for video tracking

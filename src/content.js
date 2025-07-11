@@ -171,7 +171,11 @@
             saveIntervalId = null;
         }
         if (messageListener) {
-            chrome.runtime.onMessage.removeListener(messageListener);
+            // During page unload, the runtime might be disconnected.
+            // Check if it's still available before trying to remove the listener.
+            if (chrome.runtime && chrome.runtime.onMessage) {
+                chrome.runtime.onMessage.removeListener(messageListener);
+            }
             messageListener = null;
         }
 
@@ -826,7 +830,6 @@
             debouncedSave();
             if (!video.paused) startSaveInterval();
         });
-        addTrackedEventListener(window, 'beforeunload', () => saveTimestamp());
     }
 
     // This function is called when YouTube's SPA navigation is complete.

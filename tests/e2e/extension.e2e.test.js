@@ -124,6 +124,46 @@ test.describe('YT re:Watch Extension E2E', () => {
 
 // Extension-specific tests (would require extension to be loaded)
 test.describe('Extension Functionality (requires extension)', () => {
+  let backgroundPage;
+
+  test.beforeEach(async ({ context }) => {
+    // Find the background service worker
+    backgroundPage = context.serviceWorkers().find(sw => sw.url().includes('background.js'));
+    if (!backgroundPage) {
+      // If not found, wait for it to be created
+      backgroundPage = await context.waitForEvent('serviceworker');
+    }
+    await backgroundPage.waitForLoadState();
+  });
+
+  test('should open a single popup and focus it on subsequent clicks', async ({ context, page }) => {
+    // Ensure we're on a valid page
+    await page.goto('https://www.youtube.com');
+
+    // Function to get the number of popup pages
+    const getPopupCount = () => context.pages().filter(p => p.url().includes('popup.html')).length;
+
+    // --- First Click: Open Popup ---
+    // Simulate the extension action being clicked
+    await backgroundPage.evaluate(() => chrome.runtime.sendMessage({ type: 'openPopup' }));
+    
+    // Wait for the popup to open
+    await context.waitForEvent('page');
+    expect(getPopupCount()).toBe(1);
+
+    // --- Second Click: Focus Existing Popup ---
+    // Simulate the extension action being clicked again
+    await backgroundPage.evaluate(() => chrome.runtime.sendMessage({ type: 'openPopup' }));
+
+    // Wait a moment to ensure no new page is created
+    await page.waitForTimeout(500);
+    expect(getPopupCount()).toBe(1);
+
+    // Verify the existing popup is focused (the last page in the context should be the popup)
+    const lastPage = context.pages()[context.pages().length - 1];
+    expect(lastPage.url()).toContain('popup.html');
+  });
+
   test.skip('should track video progress', async ({ page }) => {
     // This test would require the extension to be loaded
     // and would test actual video tracking functionality
