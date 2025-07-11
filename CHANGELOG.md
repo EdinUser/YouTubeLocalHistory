@@ -20,6 +20,11 @@ All notable changes to YT re:Watch will be documented in this file.
 ### 🐛 Bug Fixes
 - **Video Overlay**: Fixed an issue where the "viewed" overlay was not appearing on related videos in the right-hand column of a video page. This was caused by a YouTube UI update that introduced a new `yt-lockup-view-model` element, which is now correctly handled.
 
+### 🚀 Core Stability
+- **Chrome MV3 Compatibility**: Refactored the background script to use `chrome.storage.session` for state management, preventing state loss when the service worker becomes inactive. This fixes bugs related to popup handling and ensures reliable operation on Chrome.
+- **Enhanced Reliability**: Replaced unreliable `beforeunload` events with `pagehide` and added defensive checks to prevent race conditions and errors during page unload.
+- **Improved Popup Handling**: The extension now focuses the existing popup window instead of opening a duplicate if the action is triggered multiple times.
+
 ### 🛠️ Other Improvements
 - Automatic tombstone cleanup and storage optimization
 - Improved sync reliability with enhanced conflict resolution

@@ -171,7 +171,11 @@
             saveIntervalId = null;
         }
         if (messageListener) {
-            chrome.runtime.onMessage.removeListener(messageListener);
+            // During page unload, the runtime might be disconnected.
+            // Check if it's still available before trying to remove the listener.
+            if (chrome.runtime && chrome.runtime.onMessage) {
+                chrome.runtime.onMessage.removeListener(messageListener);
+            }
             messageListener = null;
         }
 
@@ -182,9 +186,9 @@
         }
         pendingOperations.clear();
 
-        // Clear all tracked videos and their listeners
-        trackedVideos.clear();
-        videoEventListeners.clear();
+        // The WeakSet and WeakMap used for trackedVideos and videoEventListeners
+        // do not need to be (and cannot be) cleared manually. They will be
+        // garbage-collected automatically when the page unloads.
 
         // Reset state variables
         isInitialized = false;
@@ -225,8 +229,8 @@
         video.addEventListener(event, handler);
     }
 
-    // Setup cleanup on page unload only (not both beforeunload and pagehide)
-    window.addEventListener('beforeunload', cleanup);
+    // Use 'pagehide' for reliable cleanup on page unload
+    window.addEventListener('pagehide', cleanup);
 
     // Inject CSS to avoid CSP issues with inline styles
     function injectCSS() {
@@ -826,7 +830,6 @@
             debouncedSave();
             if (!video.paused) startSaveInterval();
         });
-        addTrackedEventListener(window, 'beforeunload', () => saveTimestamp());
     }
 
     // This function is called when YouTube's SPA navigation is complete.
