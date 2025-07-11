@@ -182,9 +182,9 @@
         }
         pendingOperations.clear();
 
-        // Clear all tracked videos and their listeners
-        trackedVideos.clear();
-        videoEventListeners.clear();
+        // The WeakSet and WeakMap used for trackedVideos and videoEventListeners
+        // do not need to be (and cannot be) cleared manually. They will be
+        // garbage-collected automatically when the page unloads.
 
         // Reset state variables
         isInitialized = false;
@@ -225,8 +225,8 @@
         video.addEventListener(event, handler);
     }
 
-    // Setup cleanup on page unload only (not both beforeunload and pagehide)
-    window.addEventListener('beforeunload', cleanup);
+    // Use 'pagehide' for reliable cleanup on page unload
+    window.addEventListener('pagehide', cleanup);
 
     // Inject CSS to avoid CSP issues with inline styles
     function injectCSS() {
