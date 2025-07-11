@@ -77,6 +77,7 @@ src/
   - Sync is opt-in and disabled by default
   - Tombstone-based deletion system with 30-day retention
   - Stale device protection for devices offline 29+ days
+  - Prevents deleted content from reappearing in UI or sync operations
 
 #### 6. **Tombstone Deletion System**
 - **Purpose**: Ensures deleted videos stay deleted across all devices
