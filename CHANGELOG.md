@@ -17,6 +17,9 @@ All notable changes to YT re:Watch will be documented in this file.
 - **Resolved immediate video restoration** when delete button was clicked
 - **Enhanced popup filtering** prevents deleted videos from appearing in the UI
 
+### 🐛 Bug Fixes
+- **Video Overlay**: Fixed an issue where the "viewed" overlay was not appearing on related videos in the right-hand column of a video page. This was caused by a YouTube UI update that introduced a new `yt-lockup-view-model` element, which is now correctly handled.
+
 ### 🛠️ Other Improvements
 - Automatic tombstone cleanup and storage optimization
 - Improved sync reliability with enhanced conflict resolution
