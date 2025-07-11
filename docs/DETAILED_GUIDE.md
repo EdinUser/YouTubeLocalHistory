@@ -156,6 +156,10 @@ After watching videos, you'll notice:
   - Larger numbers = less scrolling, smaller numbers = faster loading
 - **Export History**: Back up your data to a file
 - **Import History**: Restore or merge data from a backup
+- **Robust Deletion System**: Deleted videos stay deleted with tombstone protection
+  - Videos deleted from history won't reappear after sync
+  - 30-day protection period ensures deletions persist across all devices
+  - Automatic cleanup of deletion markers after 30 days
 
 **Sync Settings (Firefox Only):**
 - **Enable Sync**: Toggle Firefox Sync integration
@@ -216,6 +220,7 @@ After watching videos, you'll notice:
 - **Full Sync**: Use "Full Sync" to resolve conflicts
 - **Check Firefox Sync**: Ensure it's working in Firefox settings
 - **Network Issues**: Make sure you have a stable internet connection
+- **Stale Device Protection**: Devices offline for 29+ days automatically get fresh data to prevent conflicts
 
 ---
 

@@ -120,6 +120,7 @@ Click the extension icon to access:
 - **Local Storage**: All data stored securely on your device only
 - **No Google Tracking**: YouTube doesn't get your viewing progress data
 - **Export/Import**: Backup and restore your YouTube history anytime
+- **Robust Deletion System**: Deleted videos stay deleted across all devices with tombstone-based protection
 
 ### 🎯 **Progress Tracking**
 - **Visual Overlays**: Customizable "viewed" labels and progress bars
@@ -137,9 +138,10 @@ Click the extension icon to access:
 
 ### 🔄 **Cross-Device Sync (Firefox)**
 - **Firefox Sync**: Automatic cross-device synchronization
-- **Conflict Resolution**: Smart handling of sync conflicts
+- **Conflict Resolution**: Smart handling of sync conflicts with deletion protection
 - **Manual Sync**: Trigger sync anytime from settings
 - **Status Indicator**: Visual sync progress tracking
+- **Stale Device Protection**: Automatic handling of devices offline for extended periods
 
 ### 🎨 **User Experience**
 - **Modern Interface**: Clean, card-based layout

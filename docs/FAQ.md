@@ -112,6 +112,24 @@ Check the extension popup - your history should still be there.
 ### Q: Can I delete individual videos from my history?
 **A:** Yes, click the "Delete" button next to any video to remove it from your history.
 
+### Q: Will deleted videos stay deleted?
+**A:** YES! We've implemented a robust deletion system:
+- **Deleted videos stay deleted** across all your devices
+- **Tombstone protection** ensures deletions are respected during sync
+- **30-day protection period** prevents accidentally restoring deleted videos
+- **Works across accounts** - deletions persist even when switching YouTube accounts
+- **Automatic cleanup** removes old deletion markers after 30 days
+
+This solves the common problem where deleted videos would reappear after syncing between devices.
+
+### Q: What happens if I delete a video on one device?
+**A:** The deletion will be protected and synchronized:
+1. Video is immediately removed from your history
+2. A deletion marker is created to protect the deletion
+3. When you sync to other devices, the video will be removed there too
+4. The video won't reappear even if you switch YouTube accounts
+5. Protection lasts for 30 days to ensure all your devices learn about the deletion
+
 ---
 
 ## 🔐 Privacy & Data
@@ -198,6 +216,13 @@ Check the extension popup - your history should still be there.
 3. Go to Settings tab
 4. Toggle "Enable Sync" on
 5. Your history will automatically sync across your Firefox devices
+
+### Q: What happens if I don't use a device for a long time?
+**A:** We have a "stale device protection" system:
+- If a device hasn't synced for 29+ days, it's considered "stale"
+- When a stale device comes back online, it will get fresh data from your other devices
+- This prevents old devices from restoring videos you deleted on your active devices
+- Your viewing history stays consistent across all devices, even after long periods offline
 
 ---
 

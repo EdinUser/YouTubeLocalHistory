@@ -75,6 +75,17 @@ src/
   - Manual/auto sync controls (Firefox only)
   - Debug and test utilities for sync (Firefox only)
   - Sync is opt-in and disabled by default
+  - Tombstone-based deletion system with 30-day retention
+  - Stale device protection for devices offline 29+ days
+
+#### 6. **Tombstone Deletion System**
+- **Purpose**: Ensures deleted videos stay deleted across all devices
+- **Key Functions**:
+  - Creates deletion markers (`deleted_video_<id>`) when videos are removed
+  - 30-day tombstone retention with automatic cleanup
+  - Cross-device deletion propagation via sync
+  - Stale device fail-safe for devices offline 29+ days
+  - Prevents deleted content from reappearing in UI or sync operations
 
 ### Analytics & Statistics Dashboard
 - The popup's Analytics tab aggregates and visualizes user viewing data:
@@ -121,6 +132,9 @@ await ytStorage.setVideo(videoId, {
 // Remove video
 await ytStorage.removeVideo(videoId);
 
+// Clean up expired tombstones (30 days default)
+await ytStorage.cleanupTombstones();
+
 // Get all playlists
 const playlists = await ytStorage.getAllPlaylists();
 
@@ -158,6 +172,32 @@ await ytStorage.setSettings(newSettings);
   videoCount: 25            // optional
 }
 ```
+
+**Tombstone Record:**
+```json5
+{
+  deletedAt: 1640995200000  // Unix timestamp when video was deleted
+}
+```
+
+#### Deletion System Behavior
+
+**When a video is deleted:**
+1. The video record (`video_<id>`) is removed from storage
+2. A tombstone marker (`deleted_video_<id>`) is created with deletion timestamp
+3. Sync is triggered to propagate the deletion across devices
+4. UI immediately filters out the deleted video
+
+**During sync operations:**
+- Tombstones are synchronized across all devices
+- If a tombstone exists and is newer than a video record, the video is not restored
+- Videos are removed from both local and sync storage when tombstones are present
+- Tombstones older than 30 days are automatically cleaned up
+
+**Stale device protection:**
+- If a device hasn't synced for 29+ days, all local data is discarded
+- Remote (sync) data completely replaces local data
+- This prevents old devices from resurrecting deleted videos
 
 ### Message API
 

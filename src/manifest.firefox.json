@@ -1,61 +1,61 @@
 {
-  "manifest_version": 3,
-  "name": "YT re:Watch",
-  "version": "3.0.0",
-  "description": "YouTube history extension for multiple accounts. Track progress with privacy: visual overlays, account switching, no login required",
-  "author": "Edin User",
-  "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "fallenangelbg@protonmail.com"
-    }
-  },
-  "permissions": [
-    "storage",
-    "unlimitedStorage",
-    "activeTab",
-    "scripting"
-  ],
-  "host_permissions": [
-    "*://*.youtube.com/*"
-  ],
-  "background": {
-    "scripts": [
-      "storage.js",
-      "sync-service.js",
-      "background.js"
-    ]
-  },
-  "content_scripts": [
-    {
-      "matches": [
+    "manifest_version": 3,
+    "name": "YT re:Watch",
+    "version": "3.0.1",
+    "description": "YouTube history extension for multiple accounts. Track progress with privacy: visual overlays, account switching, no login required",
+    "author": "Edin User",
+    "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "fallenangelbg@protonmail.com"
+        }
+    },
+    "permissions": [
+        "storage",
+        "unlimitedStorage",
+        "activeTab",
+        "scripting"
+    ],
+    "host_permissions": [
         "*://*.youtube.com/*"
-      ],
-      "js": [
-        "storage.js",
-        "content.js"
-      ],
-      "run_at": "document_end"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "icon48.png"
-      ],
-      "matches": [
-        "*://*.youtube.com/*"
-      ]
-    }
-  ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "YouTube History"
-  },
-  "icons": {
-    "48": "icon48.png",
-    "96": "icon96.png"
-  },
-  "default_locale": "en"
+    ],
+    "background": {
+        "scripts": [
+            "storage.js",
+            "sync-service.js",
+            "background.js"
+        ]
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.youtube.com/*"
+            ],
+            "js": [
+                "storage.js",
+                "content.js"
+            ],
+            "run_at": "document_end"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "icon48.png"
+            ],
+            "matches": [
+                "*://*.youtube.com/*"
+            ]
+        }
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "YouTube History"
+    },
+    "icons": {
+        "48": "icon48.png",
+        "96": "icon96.png"
+    },
+    "default_locale": "en"
 }
 

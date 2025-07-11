@@ -2,6 +2,28 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [3.0.1]
+
+### ✨ Major New Features
+
+#### 🔄 Tombstone-Based Deletion System
+- **Robust video deletion** with tombstone markers to prevent deleted videos from reappearing after sync
+- **30-day tombstone retention** ensures deletion consistency across all devices
+- **Stale device protection** automatically handles devices that haven't synced for 29+ days
+- **Cross-device deletion propagation** ensures deletions are respected on all synchronized devices
+
+### 🐛 Critical Bug Fixes
+- **Fixed deleted videos reappearing** after sync operations
+- **Resolved immediate video restoration** when delete button was clicked
+- **Enhanced popup filtering** prevents deleted videos from appearing in the UI
+
+### 🛠️ Other Improvements
+- Automatic tombstone cleanup and storage optimization
+- Improved sync reliability with enhanced conflict resolution
+- Better handling of offline devices and stale data scenarios
+
+---
+
 ## [3.0.0]
 
 ### ✨ Major New Features

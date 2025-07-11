@@ -213,7 +213,7 @@ async function initStorage() {
         });
 
         // Get any updates that happened while popup was closed
-        chrome.runtime.sendMessage({ type: 'getLatestUpdate' }, (response) => {
+        chrome.runtime.sendMessage({type: 'getLatestUpdate'}, (response) => {
             if (response?.lastUpdate) {
                 log('Received latest update from background:', response.lastUpdate);
                 updateVideoRecord(response.lastUpdate);
@@ -234,7 +234,8 @@ async function initStorage() {
                         if (key.startsWith('video_')) {
                             const videoId = key.replace('video_', '');
                             if (change.newValue) {
-                                updateVideoRecord(change.newValue);
+                                // Check for tombstone before adding/updating
+                                checkTombstoneAndUpdateVideo(videoId, change.newValue);
                             } else {
                                 // Record was deleted
                                 allHistoryRecords = allHistoryRecords.filter(r => r.videoId !== videoId);
@@ -280,6 +281,26 @@ function handleStorageUpdates(changes) {
 
     if (needsRefresh) {
         displayHistoryPage();
+    }
+}
+
+// Check for tombstone before updating video record
+async function checkTombstoneAndUpdateVideo(videoId, videoRecord) {
+    try {
+        // Get all storage data to check for tombstone
+        const allData = await chrome.storage.local.get(null);
+        const tombstoneKey = `deleted_video_${videoId}`;
+
+        if (allData[tombstoneKey]) {
+            console.log('[Popup] Video has tombstone, not adding to UI:', videoId);
+            return; // Don't add video if tombstone exists
+        }
+
+        // No tombstone, safe to update
+        updateVideoRecord(videoRecord);
+    } catch (error) {
+        console.error('Error checking tombstone:', error);
+        // If we can't check tombstone, err on the side of caution and don't add
     }
 }
 
@@ -339,31 +360,57 @@ function updateVideoRecord(record) {
 async function loadHistory(isInitialLoad = false) {
     try {
         log('Loading history from storage...');
-        const history = await ytStorage.getAllVideos();
+        const allData = await chrome.storage.local.get(null);
 
-        console.log('[Popup] Raw history data from storage:', Object.keys(history).length, 'items');
-        if (Object.keys(history).length > 0) {
+        // Extract videos and tombstones
+        const videos = {};
+        const tombstones = {};
+
+        Object.keys(allData).forEach(key => {
+            if (key.startsWith('video_')) {
+                const videoId = key.replace('video_', '');
+                videos[videoId] = allData[key];
+            } else if (key.startsWith('deleted_video_')) {
+                const videoId = key.replace('deleted_video_', '');
+                tombstones[videoId] = allData[key];
+            }
+        });
+
+        // Filter out videos that have active tombstones
+        const filteredVideos = {};
+        Object.keys(videos).forEach(videoId => {
+            if (!tombstones[videoId]) {
+                filteredVideos[`video_${videoId}`] = videos[videoId];
+            } else {
+                console.log('[Popup] Filtering out video with tombstone:', videoId);
+            }
+        });
+
+        console.log('[Popup] Raw history data from storage:', Object.keys(videos).length, 'items');
+        console.log('[Popup] Filtered history data (after tombstones):', Object.keys(filteredVideos).length, 'items');
+
+        if (Object.keys(filteredVideos).length > 0) {
             // Show newest videos first for sync debugging
-            const videoKeys = Object.keys(history).filter(k => k.startsWith('video_'));
-            const sortedKeys = videoKeys.sort((a, b) => (history[b].timestamp || 0) - (history[a].timestamp || 0));
+            const videoKeys = Object.keys(filteredVideos);
+            const sortedKeys = videoKeys.sort((a, b) => (filteredVideos[b].timestamp || 0) - (filteredVideos[a].timestamp || 0));
             const newestKeys = sortedKeys.slice(0, 3);
 
             console.log('[Popup] Sample newest videos from storage:', newestKeys.map(key => ({
                 key: key,
-                title: history[key]?.title || 'No title',
-                timestamp: new Date(history[key]?.timestamp || 0).toLocaleTimeString()
+                title: filteredVideos[key]?.title || 'No title',
+                timestamp: new Date(filteredVideos[key]?.timestamp || 0).toLocaleTimeString()
             })));
         }
 
-        if (!history || Object.keys(history).length === 0) {
+        if (!filteredVideos || Object.keys(filteredVideos).length === 0) {
             if (isInitialLoad) {
                 showMessage(chrome.i18n.getMessage('history_no_history_found'), 'info');
             }
             allHistoryRecords = [];
             allShortsRecords = [];
         } else {
-            const newRegularVideos = extractRegularVideoRecords(history);
-            const newShortsRecords = extractShortsRecords(history);
+            const newRegularVideos = extractRegularVideoRecords(filteredVideos);
+            const newShortsRecords = extractShortsRecords(filteredVideos);
 
             // Only sort and update if there are actual changes
             if (JSON.stringify(newRegularVideos) !== JSON.stringify(allHistoryRecords)) {
@@ -538,6 +585,7 @@ function renderUnfinishedVideos() {
         div.appendChild(details);
         return div;
     }
+
     // Clear and append all entries
     container.innerHTML = '';
     topUnfinished.forEach(record => container.appendChild(createUnfinishedVideoEntry(record)));
@@ -612,10 +660,10 @@ function updateActivityChart() {
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         const dateLabel = days[i].slice(5).replace('-', '/');
-        ctx.fillText(dateLabel, x + (barWidth - barSpacing)/2, canvas.height - 5);
+        ctx.fillText(dateLabel, x + (barWidth - barSpacing) / 2, canvas.height - 5);
 
         // Draw count label
-        ctx.fillText(count.toString(), x + (barWidth - barSpacing)/2, y - 5);
+        ctx.fillText(count.toString(), x + (barWidth - barSpacing) / 2, y - 5);
     });
 }
 
@@ -690,7 +738,7 @@ function updateWatchTimeByHourChart() {
         ctx.textAlign = 'center';
         ctx.fillText(
             hour.toString().padStart(2, '0'),
-            x + (barWidth - barSpacing)/2,
+            x + (barWidth - barSpacing) / 2,
             canvas.height - 20
         );
 
@@ -698,7 +746,7 @@ function updateWatchTimeByHourChart() {
         if (minutes > 0) {
             ctx.fillText(
                 `${minutes}m`,
-                x + (barWidth - barSpacing)/2,
+                x + (barWidth - barSpacing) / 2,
                 y - 5
             );
         }
@@ -1450,7 +1498,7 @@ async function initSettingsTab() {
     // Auto-clean period
     const autoCleanPeriod = document.getElementById('ytvhtAutoCleanPeriod');
     if (autoCleanPeriod) {
-        autoCleanPeriod.addEventListener('change', async function() {
+        autoCleanPeriod.addEventListener('change', async function () {
             const settings = await loadSettings();
             settings.autoCleanPeriod = parseInt(this.value);
             await saveSettings(settings);
@@ -1463,7 +1511,7 @@ async function initSettingsTab() {
     // Pagination count
     const paginationCount = document.getElementById('ytvhtPaginationCount');
     if (paginationCount) {
-        paginationCount.addEventListener('change', async function() {
+        paginationCount.addEventListener('change', async function () {
             const settings = await loadSettings();
             settings.paginationCount = parseInt(this.value);
             await saveSettings(settings);
@@ -1476,7 +1524,7 @@ async function initSettingsTab() {
     // Overlay title
     const overlayTitle = document.getElementById('ytvhtOverlayTitle');
     if (overlayTitle) {
-        overlayTitle.addEventListener('change', async function() {
+        overlayTitle.addEventListener('change', async function () {
             const settings = await loadSettings();
             settings.overlayTitle = this.value;
             await saveSettings(settings);
@@ -1489,7 +1537,7 @@ async function initSettingsTab() {
     // Overlay color
     const overlayColor = document.getElementById('ytvhtOverlayColor');
     if (overlayColor) {
-        overlayColor.addEventListener('change', async function() {
+        overlayColor.addEventListener('change', async function () {
             const settings = await loadSettings();
             settings.overlayColor = this.value;
             updateColorPreview(this.value);
@@ -1503,7 +1551,7 @@ async function initSettingsTab() {
     // Overlay label size
     const overlayLabelSize = document.getElementById('ytvhtOverlayLabelSize');
     if (overlayLabelSize) {
-        overlayLabelSize.addEventListener('change', async function() {
+        overlayLabelSize.addEventListener('change', async function () {
             const settings = await loadSettings();
             settings.overlayLabelSize = this.value;
             await saveSettings(settings);
@@ -1517,7 +1565,7 @@ async function initSettingsTab() {
     const themePreference = document.getElementById('ytvhtThemePreference');
     if (themePreference) {
         themePreference.value = settings.themePreference || 'system';
-        themePreference.addEventListener('change', async function() {
+        themePreference.addEventListener('change', async function () {
             const settings = await loadSettings();
             settings.themePreference = this.value;
             await saveSettings(settings);
@@ -1532,7 +1580,7 @@ async function initSettingsTab() {
     const debugMode = document.getElementById('ytvhtDebugMode');
     if (debugMode) {
         debugMode.checked = settings.debug || false;
-        debugMode.addEventListener('change', async function() {
+        debugMode.addEventListener('change', async function () {
             const settings = await loadSettings();
             settings.debug = this.checked;
             await saveSettings(settings);
@@ -2285,7 +2333,7 @@ function displayShortsPage() {
 // ========== SYNC INTEGRATION ==========
 
 // Keep only essential debug functions for troubleshooting
-window.debugSyncViaMessage = function() {
+window.debugSyncViaMessage = function () {
     chrome.runtime.sendMessage({type: 'debugSyncStorage'}, (response) => {
         console.log('[Popup] 🔍 debugSyncStorage response:', response);
         if (chrome.runtime.lastError) {
@@ -2295,7 +2343,7 @@ window.debugSyncViaMessage = function() {
     });
 };
 
-window.testSyncImprovements = function() {
+window.testSyncImprovements = function () {
     chrome.runtime.sendMessage({type: 'testSyncImprovements'}, (response) => {
         console.log('[Popup] 🚀 Sync test results:', response.success ? response.data : response.error);
         return response;
@@ -2311,7 +2359,7 @@ function initSyncIntegration() {
     }
 
     // Get initial sync status from background
-    chrome.runtime.sendMessage({ type: 'getSyncStatus' }, (response) => {
+    chrome.runtime.sendMessage({type: 'getSyncStatus'}, (response) => {
         if (response) {
             updateSyncIndicator(response.status, response.lastSyncTime);
             updateSyncSettingsUI(response);
@@ -2486,7 +2534,7 @@ function formatSyncTime(timestamp) {
 }
 
 async function handleSyncIndicatorClick() {
-    chrome.runtime.sendMessage({ type: 'getSyncStatus' }, (response) => {
+    chrome.runtime.sendMessage({type: 'getSyncStatus'}, (response) => {
         if (!response) return;
 
         if (response.status === 'not_available') {
@@ -2496,7 +2544,7 @@ async function handleSyncIndicatorClick() {
 
         if (response.status === 'disabled') {
             // Enable sync
-            chrome.runtime.sendMessage({ type: 'enableSync' }, (result) => {
+            chrome.runtime.sendMessage({type: 'enableSync'}, (result) => {
                 if (!result || !result.success) {
                     showMessage(chrome.i18n.getMessage('message_failed_to_enable_sync'), 'error');
                 }
@@ -2504,14 +2552,14 @@ async function handleSyncIndicatorClick() {
             });
         } else if (response.status === 'error') {
             // Retry sync
-            chrome.runtime.sendMessage({ type: 'triggerSync' }, (result) => {
+            chrome.runtime.sendMessage({type: 'triggerSync'}, (result) => {
                 if (!result || !result.success) {
                     showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
                 }
             });
         } else if (response.enabled) {
             // Manual sync trigger
-            chrome.runtime.sendMessage({ type: 'triggerSync' }, (result) => {
+            chrome.runtime.sendMessage({type: 'triggerSync'}, (result) => {
                 if (!result || !result.success) {
                     showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
                 }
@@ -2524,7 +2572,7 @@ async function handleSyncToggle(event) {
     const enabled = event.target.checked;
 
     if (enabled) {
-        chrome.runtime.sendMessage({ type: 'enableSync' }, (result) => {
+        chrome.runtime.sendMessage({type: 'enableSync'}, (result) => {
             if (!result || !result.success) {
                 event.target.checked = false;
                 showMessage(chrome.i18n.getMessage('message_failed_to_enable_sync'), 'error');
@@ -2532,7 +2580,7 @@ async function handleSyncToggle(event) {
             // Removed success message - sync indicator shows status
         });
     } else {
-        chrome.runtime.sendMessage({ type: 'disableSync' }, (result) => {
+        chrome.runtime.sendMessage({type: 'disableSync'}, (result) => {
             if (!result || !result.success) {
                 event.target.checked = true;
                 showMessage(chrome.i18n.getMessage('message_failed_to_disable_sync'), 'error');
@@ -2543,7 +2591,7 @@ async function handleSyncToggle(event) {
 }
 
 async function handleManualSync() {
-    chrome.runtime.sendMessage({ type: 'triggerSync' }, (result) => {
+    chrome.runtime.sendMessage({type: 'triggerSync'}, (result) => {
         if (!result || !result.success) {
             showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
         }
@@ -2557,7 +2605,7 @@ async function handleManualFullSync() {
     }
 
     console.log('[Popup] 🚀 Full sync button clicked');
-    chrome.runtime.sendMessage({ type: 'triggerFullSync' }, (result) => {
+    chrome.runtime.sendMessage({type: 'triggerFullSync'}, (result) => {
         console.log('[Popup] 🚀 triggerFullSync response:', result);
         if (result && result.success) {
             showMessage(chrome.i18n.getMessage('message_full_sync_initiated'));
@@ -2570,7 +2618,7 @@ async function handleManualFullSync() {
 function updateSyncSettingsUI(syncStatus) {
     if (!syncStatus) {
         // Get status from background if not provided
-        chrome.runtime.sendMessage({ type: 'getSyncStatus' }, (response) => {
+        chrome.runtime.sendMessage({type: 'getSyncStatus'}, (response) => {
             if (response) {
                 updateSyncSettingsUI(response);
             }
@@ -2638,6 +2686,7 @@ function renderTopChannels() {
         container.textContent = chrome.i18n.getMessage('analytics_no_channel_data');
         return;
     }
+
     // Helper to create a safe channel entry
     function createChannelEntry(ch) {
         const div = document.createElement('div');
@@ -2674,6 +2723,7 @@ function renderTopChannels() {
         div.appendChild(details);
         return div;
     }
+
     container.innerHTML = '';
     topChannels.forEach(ch => container.appendChild(createChannelEntry(ch)));
 }
@@ -2694,7 +2744,7 @@ function renderSkippedChannels() {
         const channelId = record.channelId || '';
         if (channel === 'Unknown Channel') return; // skip unknown
         if (!channelMap[channel]) {
-            channelMap[channel] = { channel, channelId, count: 0 };
+            channelMap[channel] = {channel, channelId, count: 0};
         }
         channelMap[channel].count++;
     });
@@ -2753,6 +2803,7 @@ function renderSkippedChannels() {
             div.appendChild(details);
             return div;
         }
+
         container.innerHTML = '';
         topSkipped.forEach(ch => container.appendChild(createSkippedChannelEntry(ch)));
     }
@@ -2774,15 +2825,15 @@ function renderCompletionBarChart() {
     const counts = [skipped.length, partial.length, completed.length];
     // Use short labels for x-axis
     const labels = [
-      chrome.i18n.getMessage('chart_skipped'),
-      chrome.i18n.getMessage('chart_partial'),
-      chrome.i18n.getMessage('chart_completed')
+        chrome.i18n.getMessage('chart_skipped'),
+        chrome.i18n.getMessage('chart_partial'),
+        chrome.i18n.getMessage('chart_completed')
     ];
     // Use detailed labels for legend
     const legendLabels = [
-      chrome.i18n.getMessage('chart_skipped_legend'),
-      chrome.i18n.getMessage('chart_partial_legend'),
-      chrome.i18n.getMessage('chart_completed_legend')
+        chrome.i18n.getMessage('chart_skipped_legend'),
+        chrome.i18n.getMessage('chart_partial_legend'),
+        chrome.i18n.getMessage('chart_completed_legend')
     ];
     const colors = ['#e74c3c', '#f1c40f', '#2ecc40'];
     const total = counts.reduce((a, b) => a + b, 0);
@@ -2859,29 +2910,29 @@ function renderCompletionBarChart() {
 
 // Localization helper: localize all elements with data-i18n* attributes
 function localizeHtmlPage() {
-  // Set text content for elements with data-i18n
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    const msg = chrome.i18n.getMessage(key);
-    if (msg) el.textContent = msg;
-  });
-  // Set title attribute for elements with data-i18n-title
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    const key = el.getAttribute('data-i18n-title');
-    const msg = chrome.i18n.getMessage(key);
-    if (msg) el.title = msg;
-  });
-  // Set placeholder attribute for elements with data-i18n-placeholder
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const key = el.getAttribute('data-i18n-placeholder');
-    const msg = chrome.i18n.getMessage(key);
-    if (msg) el.placeholder = msg;
-  });
+    // Set text content for elements with data-i18n
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        const msg = chrome.i18n.getMessage(key);
+        if (msg) el.textContent = msg;
+    });
+    // Set title attribute for elements with data-i18n-title
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        const msg = chrome.i18n.getMessage(key);
+        if (msg) el.title = msg;
+    });
+    // Set placeholder attribute for elements with data-i18n-placeholder
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        const msg = chrome.i18n.getMessage(key);
+        if (msg) el.placeholder = msg;
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  localizeHtmlPage();
-  // ... existing code ...
+    localizeHtmlPage();
+    // ... existing code ...
 
 // ... existing code ...
 // Replace all user-facing text in JS with chrome.i18n.getMessage
