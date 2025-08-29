@@ -2,6 +2,27 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [3.0.3] - 2025-08-29
+
+### 🐛 Fixes
+- Restored watched overlays on YouTube Home after recent layout changes
+- Improved video ID detection for new home tiles and playlist items
+- Ensured overlays render above thumbnails (higher z-index)
+
+### 🧪 Stability
+- Hardened tests and minor internal cleanups
+
+— Small compatibility release; no settings or UI changes
+
+## [3.0.2] - 2025-07-30
+
+### 🐛 Bug Fixes
+- **Fixed incorrect "viewed" overlays** on unwatched videos in YouTube's home feed
+- **Improved thumbnail processing** to handle YouTube's dynamic content loading
+- **Reduced console logging** for cleaner developer experience
+- **Enhanced memory management** with better cleanup of processed elements
+- **Fixed race conditions** in thumbnail overlay processing
+
 ## [3.0.1]
 
 ### ✨ Major New Features

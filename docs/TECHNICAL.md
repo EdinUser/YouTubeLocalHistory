@@ -48,6 +48,32 @@ src/
   - DOM manipulation for overlays
   - SPA navigation handling
   - YouTube API interaction
+  - Thumbnail processing and overlay management
+
+#### Thumbnail Processing System
+
+The extension implements a robust system for processing video thumbnails and applying overlays to indicate watched status. Key components:
+
+1. **Element Processing Pipeline**
+   - `processVideoElement()`: Main entry point for processing video elements
+   - `getVideoIdFromThumbnail()`: Extracts video IDs from various YouTube thumbnail elements
+   - `addViewedLabelToThumbnail()`: Applies the visual overlay to thumbnails
+
+2. **Performance Optimizations**
+   - Uses `requestAnimationFrame` for smooth processing
+   - Implements cleanup of stale operations
+   - Handles YouTube's dynamic content loading
+   - Prevents memory leaks with proper cleanup
+
+3. **Error Handling**
+   - Graceful handling of missing or invalid elements
+   - Automatic retry mechanism for failed operations
+   - Debug logging for troubleshooting
+
+4. **Overlay System**
+   - Customizable overlay appearance
+   - Progress indicators for partially watched videos
+   - Responsive design for different thumbnail sizes
 
 #### 3. **Popup Interface** (`popup.js`, `popup.html`)
 - **Purpose**: User interface for viewing and managing history
@@ -106,6 +132,28 @@ src/
 - All analytics are calculated locally for privacy.
 
 ---
+
+## 🖼️ Thumbnail Overlay System
+
+The extension provides visual indicators on video thumbnails to show watched status. This system is designed to work with YouTube's dynamic content loading and SPA navigation.
+
+### Overlay Types
+- **Viewed**: Solid overlay indicating fully watched videos
+- **In Progress**: Progress bar showing watch progress
+- **New**: No overlay for unwatched content
+
+### Implementation Details
+- Uses MutationObserver to detect new thumbnails
+- Handles YouTube's dynamic content loading
+- Optimized for performance with minimal DOM operations
+- Cleanup of unused elements to prevent memory leaks
+
+### Customization
+Overlay appearance can be customized via extension settings:
+- Label text (e.g., "Watched", "Viewed")
+- Overlay color
+- Label size
+- Progress bar visibility
 
 ## 🔌 API Reference
 

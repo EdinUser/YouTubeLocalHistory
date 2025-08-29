@@ -101,7 +101,7 @@ The extension adds helpful visual indicators directly on YouTube:
 **Overlay Customization Options:**
 - **Text**: Change "viewed" to any word you prefer (max 12 characters)
 - **Colors**: Choose from blue, red, green, purple, or orange
-- **Size**: Small, medium, or large labels
+- **Size**: Small, medium, large, or extra large labels
 - **Learn more**: [Complete customization guide](./DETAILED_GUIDE.md#overlay-customization)
 
 ### 🎛️ **Extension Interface**

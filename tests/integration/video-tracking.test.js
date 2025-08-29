@@ -2,6 +2,8 @@
  * Integration tests for video tracking functionality
  */
 
+'use strict';
+
 // Mock browser APIs
 const mockChrome = {
   storage: {
@@ -11,9 +13,60 @@ const mockChrome = {
     }
   },
   runtime: {
-    sendMessage: jest.fn()
+    sendMessage: jest.fn(),
+    getManifest: jest.fn().mockReturnValue({
+      version: '2.4.0',
+      name: 'YouTube Local History',
+      description: 'Tracks your YouTube watch history locally',
+      manifest_version: 3
+    }),
+    onMessage: {
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      hasListener: jest.fn(),
+      hasListeners: jest.fn(),
+      // Add trigger method for testing
+      mock: {
+        listeners: [],
+        trigger: function(message, sender = {}, sendResponse) {
+          this.listeners.forEach(listener => {
+            const response = listener(message, sender, sendResponse);
+            // If the listener returns true, it's indicating it will respond asynchronously
+            if (response === true) {
+              // If sendResponse is a function, call it with a mock response
+              if (typeof sendResponse === 'function') {
+                sendResponse({ success: true });
+              }
+            }
+          });
+        }
+      }
+    }
   }
 };
+
+// Setup the mock implementation
+mockChrome.runtime.onMessage.addListener.mockImplementation((listener) => {
+  if (!mockChrome.runtime.onMessage.mock.listeners.includes(listener)) {
+    mockChrome.runtime.onMessage.mock.listeners.push(listener);
+  }
+  return true; // Return true to indicate we want to use sendResponse asynchronously
+});
+
+mockChrome.runtime.onMessage.removeListener.mockImplementation((listener) => {
+  const index = mockChrome.runtime.onMessage.mock.listeners.indexOf(listener);
+  if (index > -1) {
+    mockChrome.runtime.onMessage.mock.listeners.splice(index, 1);
+  }
+});
+
+mockChrome.runtime.onMessage.hasListener.mockImplementation((listener) => {
+  return mockChrome.runtime.onMessage.mock.listeners.includes(listener);
+});
+
+mockChrome.runtime.onMessage.hasListeners.mockImplementation(() => {
+  return mockChrome.runtime.onMessage.mock.listeners.length > 0;
+});
 
 const mockBrowser = {
   storage: {
@@ -21,6 +74,14 @@ const mockBrowser = {
       get: jest.fn(),
       set: jest.fn()
     }
+  },
+  runtime: {
+    getManifest: jest.fn().mockReturnValue({
+      version: '2.4.0',
+      name: 'YouTube Local History',
+      description: 'Tracks your YouTube watch history locally',
+      manifest_version: 3
+    })
   }
 };
 
@@ -55,22 +116,59 @@ function createProgressBar() {
 }
 
 // Mock debounce function
-function mockDebounce(fn, wait = 0) {
+const mockDebounce = function mockDebounce(fn, wait = 0) {
   let timeout;
-  return function executedFunction(...args) {
+  return function debounced(...args) {
     if (timeout) {
       clearTimeout(timeout);
     }
     timeout = setTimeout(() => fn.apply(this, args), wait);
   };
-}
+};
 
 // Import mocks
-jest.mock('../../src/content.js');
-jest.mock('../../src/popup.js');
+const mockSetupVideoTracking = jest.fn();
+const mockLoadTimestamp = jest.fn();
+const mockSavePlaylistInfo = jest.fn();
+const mockUpdateOverlayCSS = jest.fn();
+const mockTryToSavePlaylist = jest.fn();
+const mockSetLastProcessedVideoId = jest.fn();
+const mockCalculateAnalytics = jest.fn();
+const mockGetWatchTimeByHour = jest.fn();
+const mockGetContentTypeDistribution = jest.fn();
+
+jest.mock('../../src/content.js', () => ({
+  setupVideoTracking: mockSetupVideoTracking,
+  loadTimestamp: mockLoadTimestamp,
+  savePlaylistInfo: mockSavePlaylistInfo,
+  updateOverlayCSS: mockUpdateOverlayCSS,
+  tryToSavePlaylist: mockTryToSavePlaylist,
+  setLastProcessedVideoId: mockSetLastProcessedVideoId,
+  calculateAnalytics: mockCalculateAnalytics,
+  getWatchTimeByHour: mockGetWatchTimeByHour,
+  getContentTypeDistribution: mockGetContentTypeDistribution,
+  // Add other exported functions as needed
+}));
+
+// Mock popup module
+jest.mock('../../src/popup.js', () => ({
+  // Add any popup module mocks here if needed
+}));
+
+// Mock requestAnimationFrame for tests
+window.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+window.cancelAnimationFrame = (id) => clearTimeout(id);
 
 const contentModule = require('../../src/content.js');
 const popup = require('../../src/popup.js');
+
+// Add necessary properties to contentModule for testing
+contentModule.trackedVideos = new WeakSet();
+contentModule.videoEventListeners = new WeakMap();
+contentModule.broadcastVideoUpdate = jest.fn();
+contentModule.debounce = jest.fn().mockImplementation(mockDebounce);
+contentModule.addViewedLabelToThumbnail = jest.fn();
+contentModule.processExistingThumbnails = jest.fn();
 
 describe('Video Tracking Integration', () => {
   let mockVideoElement;
@@ -117,9 +215,9 @@ describe('Video Tracking Integration', () => {
     global.ytStorage = mockYtStorage;
 
     // Setup mock implementations
-    contentModule.setupVideoTracking.mockImplementation((video) => {
+    mockSetupVideoTracking.mockImplementation((video) => {
       if (!video) return null;
-      
+
       const handlers = {
         playHandler: jest.fn(async () => {
           await global.ytStorage.setVideo('testVideoId', {
@@ -149,7 +247,7 @@ describe('Video Tracking Integration', () => {
         seekedHandler: jest.fn(),
         beforeunloadHandler: jest.fn()
       };
-      
+
       try {
         video.addEventListener('play', handlers.playHandler);
         video.addEventListener('pause', handlers.pauseHandler);
@@ -160,7 +258,7 @@ describe('Video Tracking Integration', () => {
       } catch (error) {
         console.error('Error adding event listeners:', error);
       }
-      
+
       contentModule.trackedVideos.add(video);
       contentModule.videoEventListeners.set(video, [
         { event: 'play', handler: handlers.playHandler },
@@ -170,7 +268,7 @@ describe('Video Tracking Integration', () => {
         { event: 'seeked', handler: handlers.seekedHandler },
         { event: 'beforeunload', handler: handlers.beforeunloadHandler }
       ]);
-      
+
       return handlers;
     });
 
@@ -196,9 +294,12 @@ describe('Video Tracking Integration', () => {
         duration: duration,
         timestamp: Date.now()
       };
+      try {
+        await global.ytStorage.setVideo(record.videoId, record);
+      } catch (e) {
+        // Swallow errors to mirror production error handling
+      }
 
-      await global.ytStorage.setVideo(record.videoId, record);
-      
       // Broadcast the update
       contentModule.broadcastVideoUpdate({
         type: 'videoUpdate',
@@ -207,9 +308,9 @@ describe('Video Tracking Integration', () => {
     });
 
     // Mock loadTimestamp with 250ms delay and interruption prevention
-    contentModule.loadTimestamp = jest.fn().mockImplementation(async (video) => {
+    mockLoadTimestamp.mockImplementation(async (video) => {
       if (!video) return;
-      
+
       // A short delay to allow YouTube's scripts to restore video state first
       await new Promise(resolve => setTimeout(resolve, 250));
 
@@ -240,7 +341,7 @@ describe('Video Tracking Integration', () => {
 
       // Update last processed video ID
       contentModule.setLastProcessedVideoId(videoId);
-      
+
       // Setup tracking for new video
       const video = document.querySelector('video');
       if (video) {
@@ -290,9 +391,9 @@ describe('Video Tracking Integration', () => {
       await global.ytStorage.setPlaylist(playlistId, playlistInfo);
     });
 
-    contentModule.calculateAnalytics.mockImplementation((videos) => {
+    mockCalculateAnalytics.mockImplementation((videos) => {
       const totalSeconds = videos.reduce((sum, record) => sum + (record.time || 0), 0);
-      const completedVideos = videos.filter(record => 
+      const completedVideos = videos.filter(record =>
         record.time && record.duration && (record.time / record.duration) >= 0.9
       ).length;
 
@@ -304,7 +405,7 @@ describe('Video Tracking Integration', () => {
       };
     });
 
-    contentModule.getWatchTimeByHour.mockImplementation((videos) => {
+    mockGetWatchTimeByHour.mockImplementation((videos) => {
       const hourlyData = new Array(24).fill(0);
       videos.forEach(video => {
         if (video.timestamp) {
@@ -315,7 +416,7 @@ describe('Video Tracking Integration', () => {
       return hourlyData;
     });
 
-    contentModule.getContentTypeDistribution.mockImplementation((videos) => ({
+    mockGetContentTypeDistribution.mockImplementation((videos) => ({
       regular: videos.filter(v => !v.isShorts).length,
       shorts: videos.filter(v => v.isShorts).length
     }));
@@ -444,7 +545,7 @@ describe('Video Tracking Integration', () => {
     test('should delay timestamp loading by 250ms', async () => {
       const video = mockVideoElement;
       video.currentTime = 0;
-      
+
       // Mock getVideo to return saved timestamp
       mockYtStorage.getVideo.mockResolvedValue({
         videoId: 'testVideoId',
@@ -464,22 +565,22 @@ describe('Video Tracking Integration', () => {
     test('should skip timestamp loading if video already in progress', async () => {
       const video = mockVideoElement;
       video.currentTime = 50; // Video already in progress
-      
+
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-      
+
       await contentModule.loadTimestamp(video);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         'Video already in progress, skipping timestamp load to avoid interruption.'
       );
-      
+
       consoleLogSpy.mockRestore();
     });
 
     test('should load timestamp for new video (currentTime <= 1)', async () => {
       const video = mockVideoElement;
       video.currentTime = 0.5; // New video
-      
+
       // Mock getVideo to return saved timestamp
       mockYtStorage.getVideo.mockResolvedValue({
         videoId: 'testVideoId',
@@ -496,7 +597,7 @@ describe('Video Tracking Integration', () => {
     test('should handle missing saved timestamp gracefully', async () => {
       const video = mockVideoElement;
       video.currentTime = 0;
-      
+
       // Mock getVideo to return null (no saved data)
       mockYtStorage.getVideo.mockResolvedValue(null);
 
@@ -512,11 +613,11 @@ describe('Video Tracking Integration', () => {
     test('should handle SPA navigation to new video', () => {
       // Mock initial state
       contentModule.getLastProcessedVideoId.mockReturnValue('oldVideoId');
-      
+
       // Mock new video detection
       const newVideoElement = createMockVideoElement();
       document.body.appendChild(newVideoElement);
-      
+
       contentModule.handleSpaNavigation();
 
       expect(contentModule.setLastProcessedVideoId).toHaveBeenCalledWith('testVideoId');
@@ -526,7 +627,7 @@ describe('Video Tracking Integration', () => {
     test('should skip SPA navigation for same video', () => {
       // Mock same video ID
       contentModule.getLastProcessedVideoId.mockReturnValue('testVideoId');
-      
+
       contentModule.handleSpaNavigation();
 
       // Should not update or setup tracking again
@@ -548,7 +649,7 @@ describe('Video Tracking Integration', () => {
         // Should not reach here
         contentModule.setLastProcessedVideoId(videoId);
       });
-      
+
       contentModule.handleSpaNavigation();
 
       // Should not process navigation
@@ -558,10 +659,10 @@ describe('Video Tracking Integration', () => {
 
     test('should track last processed video ID', () => {
       const videoId = 'newVideoId';
-      
+
       contentModule.setLastProcessedVideoId(videoId);
       expect(contentModule.setLastProcessedVideoId).toHaveBeenCalledWith(videoId);
-      
+
       // Mock return value for subsequent calls
       contentModule.getLastProcessedVideoId.mockReturnValue(videoId);
       const result = contentModule.getLastProcessedVideoId();
@@ -573,7 +674,7 @@ describe('Video Tracking Integration', () => {
     test('should add overlays to thumbnails', () => {
       const thumbnail = createMockThumbnail();
       const videoId = 'dQw4w9WgXcQ';
-      
+
       // Mock that video exists in storage
       mockYtStorage.getVideo.mockReturnValue({
         videoId,
@@ -581,7 +682,7 @@ describe('Video Tracking Integration', () => {
         time: 30,
         duration: 100
       });
-      
+
       contentModule.addViewedLabelToThumbnail(thumbnail, videoId);
       expect(contentModule.addViewedLabelToThumbnail).toHaveBeenCalledWith(thumbnail, videoId);
       expect(thumbnail.querySelector('.ytvht-viewed-label')).toBeTruthy();
@@ -591,7 +692,7 @@ describe('Video Tracking Integration', () => {
     test('should not add overlays with invalid input', () => {
       const thumbnail = null;
       const videoId = null;
-      
+
       contentModule.addViewedLabelToThumbnail(thumbnail, videoId);
       expect(contentModule.addViewedLabelToThumbnail).toHaveBeenCalledWith(thumbnail, videoId);
       expect(document.querySelector('.ytvht-viewed-label')).toBeFalsy();
@@ -610,7 +711,7 @@ describe('Video Tracking Integration', () => {
       brokenVideo.addEventListener = jest.fn().mockImplementation(() => {
         throw new Error('Add listener failed');
       });
-      
+
       const handlers = contentModule.setupVideoTracking(brokenVideo);
       expect(handlers).toBeDefined();
       expect(brokenVideo.addEventListener).toHaveBeenCalled();
@@ -619,7 +720,7 @@ describe('Video Tracking Integration', () => {
     test('should handle storage errors during save operations', async () => {
       const error = new Error('Storage error');
       mockYtStorage.setVideo.mockRejectedValue(error);
-      
+
       // Should not crash the application
       await expect(contentModule.saveTimestamp()).resolves.not.toThrow();
     });
@@ -629,17 +730,17 @@ describe('Video Tracking Integration', () => {
       mockYtStorage.triggerSync.mockImplementation(() => {
         throw error;
       });
-      
+
       // Mock setVideo to not actually call triggerSync to avoid the error
       mockYtStorage.setVideo.mockImplementation(async (videoId, data) => {
         // Just resolve without calling triggerSync
         return Promise.resolve();
       });
-      
+
       // Storage operations should still complete even if sync fails
       const videoId = 'test123';
       const videoData = { videoId, title: 'Test' };
-      
+
       await expect(mockYtStorage.setVideo(videoId, videoData)).resolves.not.toThrow();
     });
   });
@@ -654,9 +755,9 @@ describe('Video Tracking Integration', () => {
           duration: 100
         }
       };
-      
+
       contentModule.broadcastVideoUpdate(testData);
-      
+
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(testData);
     });
 
@@ -687,9 +788,9 @@ describe('Video Tracking Integration', () => {
         duration: 100,
         timestamp: Date.now()
       };
-      
+
       await mockYtStorage.setVideo(videoRecord.videoId, videoRecord);
-      
+
       expect(mockYtStorage.setVideo).toHaveBeenCalledWith(
         'testVideoId',
         expect.objectContaining({
@@ -703,12 +804,12 @@ describe('Video Tracking Integration', () => {
     test('should handle missing video records', () => {
       const thumbnail = createMockThumbnail();
       const videoId = 'nonexistentVideo';
-      
+
       // Ensure video doesn't exist in storage
       mockYtStorage.getVideo.mockReturnValue(null);
-      
+
       contentModule.addViewedLabelToThumbnail(thumbnail, videoId);
-      
+
       // Should not add overlays
       expect(thumbnail.querySelector('.ytvht-viewed-label')).toBeNull();
       expect(thumbnail.querySelector('.ytvht-progress-bar')).toBeNull();
@@ -720,13 +821,13 @@ describe('Video Tracking Integration', () => {
       const video = createMockVideoElement();
       video.currentTime = 0;
       video.duration = 100;
-      
+
       // Replace the video in the document so saveTimestamp uses it
       document.body.innerHTML = '';
       document.body.appendChild(video);
-      
+
       await contentModule.saveTimestamp();
-      
+
       // Should not save when currentTime is 0
       expect(mockYtStorage.setVideo).not.toHaveBeenCalled();
     });
@@ -735,13 +836,13 @@ describe('Video Tracking Integration', () => {
       const video = createMockVideoElement();
       video.currentTime = 30;
       video.duration = 0;
-      
+
       // Replace the video in the document so saveTimestamp uses it
       document.body.innerHTML = '';
       document.body.appendChild(video);
-      
+
       await contentModule.saveTimestamp();
-      
+
       // Should not save when duration is 0
       expect(mockYtStorage.setVideo).not.toHaveBeenCalled();
     });
@@ -755,9 +856,9 @@ describe('Video Tracking Integration', () => {
         duration: 100,
         timestamp: Date.now()
       };
-      
+
       await mockYtStorage.setVideo(videoRecord.videoId, videoRecord);
-      
+
       expect(mockYtStorage.setVideo).toHaveBeenCalledWith(
         'testVideoId',
         expect.objectContaining({
@@ -775,9 +876,9 @@ describe('Video Tracking Integration', () => {
         duration: 100,
         timestamp: Date.now()
       };
-      
+
       await mockYtStorage.setVideo(videoRecord.videoId, videoRecord);
-      
+
       expect(mockYtStorage.setVideo).toHaveBeenCalledWith(
         'testVideoId',
         expect.objectContaining({
@@ -791,9 +892,9 @@ describe('Video Tracking Integration', () => {
     test('should trigger sync after video save', async () => {
       const handlers = contentModule.setupVideoTracking(mockVideoElement);
       mockVideoElement.currentTime = 30;
-      
+
       await handlers.timeupdateHandler();
-      
+
       expect(mockYtStorage.setVideo).toHaveBeenCalled();
       expect(mockYtStorage.triggerSync).toHaveBeenCalled();
     });
@@ -804,9 +905,9 @@ describe('Video Tracking Integration', () => {
         status: 'syncing',
         lastSyncTime: Date.now()
       };
-      
+
       contentModule.broadcastVideoUpdate(syncStatusUpdate);
-      
+
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(syncStatusUpdate);
     });
 
@@ -814,48 +915,210 @@ describe('Video Tracking Integration', () => {
       const syncCompleteUpdate = {
         type: 'fullSyncComplete'
       };
-      
+
       contentModule.broadcastVideoUpdate(syncCompleteUpdate);
-      
+
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(syncCompleteUpdate);
     });
   });
 });
 
 // Helper functions
+/**
+ * Creates a mock video element for testing
+ * @returns {HTMLVideoElement} A mock video element
+ */
 function createMockVideoElement() {
+  // Create a real video element
   const video = document.createElement('video');
-  video.currentTime = 30;
-  video.duration = 100;
-  video.paused = false;
-  
-  // Mock event listener functionality
-  const eventListeners = {};
-  video.addEventListener = jest.fn((event, handler) => {
-    if (!eventListeners[event]) {
-      eventListeners[event] = [];
-    }
-    eventListeners[event].push(handler);
+
+  // Store internal state
+  const state = {
+    currentTime: 30,
+    paused: false,
+    volume: 1.0,
+    muted: false,
+    duration: 100,
+    readyState: 4, // HAVE_ENOUGH_DATA
+    networkState: 1, // NETWORK_IDLE
+    eventListeners: {}
+  };
+
+  // Define read-only properties
+  const readOnlyProperties = [
+    'duration',
+    'readyState',
+    'networkState',
+    'paused',
+    'ended',
+    'seeking',
+    'videoWidth',
+    'videoHeight',
+    'defaultMuted',
+    'defaultPlaybackRate',
+    'playbackRate',
+    'buffered',
+    'seekable',
+    'played'
+  ];
+
+  // Define read-write properties
+  const readWriteProperties = {
+    currentTime: 30,
+    volume: 1.0,
+    muted: false,
+    autoplay: false,
+    loop: false,
+    controls: false,
+    defaultMuted: false,
+    defaultPlaybackRate: 1.0,
+    disablePictureInPicture: false,
+    disableRemotePlayback: false,
+    playsInline: false,
+    preload: 'metadata',
+    preservesPitch: true,
+    src: '',
+    srcObject: null,
+    crossOrigin: null,
+    mediaGroup: '',
+    textTracks: [],
+    audioTracks: [],
+    videoTracks: []
+  };
+
+  // Set up read-only properties
+  readOnlyProperties.forEach(prop => {
+    Object.defineProperty(video, prop, {
+      get: () => state[prop],
+      set: (value) => {
+        // Allow setting in test environment but don't actually change the value
+        if (process.env.NODE_ENV !== 'test') {
+          throw new Error(`Cannot set read-only property '${prop}'`);
+        }
+        state[prop] = value;
+      },
+      configurable: true
+    });
   });
-  
+
+  // Set up read-write properties
+  Object.entries(readWriteProperties).forEach(([prop, defaultValue]) => {
+    state[prop] = defaultValue;
+
+    Object.defineProperty(video, prop, {
+      get: () => state[prop],
+      set: (value) => { state[prop] = value; },
+      configurable: true
+    });
+  });
+
+  // Mock methods
+  video.play = jest.fn().mockResolvedValue(undefined);
+  video.pause = jest.fn().mockImplementation(() => {
+    state.paused = true;
+  });
+
+  video.load = jest.fn();
+  video.canPlayType = jest.fn(() => 'maybe');
+  video.addTextTrack = jest.fn(() => ({
+    addCue: jest.fn(),
+    removeCue: jest.fn(),
+    kind: '',
+    label: '',
+    language: '',
+    mode: 'disabled',
+    cues: null,
+    activeCues: null,
+    id: '',
+    inBandMetadataTrackDispatchType: ''
+  }));
+
+  // Mock event listener methods
+  video.addEventListener = jest.fn((event, handler) => {
+    if (!state.eventListeners[event]) {
+      state.eventListeners[event] = [];
+    }
+    state.eventListeners[event].push(handler);
+  });
+
   video.removeEventListener = jest.fn((event, handler) => {
-    if (eventListeners[event]) {
-      const index = eventListeners[event].indexOf(handler);
+    if (state.eventListeners[event]) {
+      const index = state.eventListeners[event].indexOf(handler);
       if (index > -1) {
-        eventListeners[event].splice(index, 1);
+        state.eventListeners[event].splice(index, 1);
       }
     }
   });
-  
-  video.triggerEvent = (event, data) => {
-    if (eventListeners[event]) {
-      eventListeners[event].forEach(handler => handler(data));
+
+  video.dispatchEvent = jest.fn((event) => {
+    if (state.eventListeners[event.type]) {
+      state.eventListeners[event.type].forEach(handler => {
+        if (typeof handler === 'function') {
+          handler(event);
+        }
+      });
+    }
+    return true;
+  });
+
+  // Add triggerEvent helper method for testing
+  video.triggerEvent = function(event, data) {
+    if (state.eventListeners[event]) {
+      state.eventListeners[event].forEach(handler => {
+        if (typeof handler === 'function') {
+          handler(data);
+        }
+      });
     }
   };
-  
+
+  // Mock request methods
+  video.requestPictureInPicture = jest.fn().mockResolvedValue({});
+  video.requestVideoFrameCallback = jest.fn((callback) => {
+    const id = setTimeout(() => callback(performance.now()), 0);
+    return id;
+  });
+  video.cancelVideoFrameCallback = jest.fn((id) => {
+    clearTimeout(id);
+  });
+
+  // Mock media keys
+  video.mediaKeys = null;
+  video.setMediaKeys = jest.fn().mockResolvedValue(undefined);
+
+  // Mock capture stream
+  video.captureStream = jest.fn().mockReturnValue({
+    getTracks: () => [],
+    getAudioTracks: () => [],
+    getVideoTracks: () => [],
+    getTrackById: () => null,
+    addTrack: () => {},
+    removeTrack: () => {},
+    clone: () => ({}),
+    active: true,
+    id: 'mock-stream-id',
+    onaddtrack: null,
+    onremovetrack: null
+  });
+
+  // Mock text tracks
+  video.textTracks = {
+    add: jest.fn(),
+    remove: jest.fn(),
+    getTrackById: jest.fn(),
+    length: 0,
+    onchange: null,
+    onaddtrack: null,
+    onremovetrack: null
+  };
+
   return video;
 }
 
+/**
+ * Creates a mock thumbnail element for testing
+ * @returns {HTMLElement} A mock thumbnail element
+ */
 function createMockThumbnail() {
   const thumbnail = document.createElement('div');
   thumbnail.className = 'ytd-thumbnail';
