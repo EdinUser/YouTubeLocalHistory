@@ -10,6 +10,12 @@ const mockChrome = {
   },
   runtime: {
     sendMessage: jest.fn(),
+    getManifest: jest.fn().mockReturnValue({
+      version: '2.4.0',
+      name: 'YouTube Local History',
+      description: 'Tracks your YouTube watch history locally',
+      manifest_version: 3
+    }),
     onMessage: {
       addListener: jest.fn((listener) => {
         mockChrome.runtime.onMessage.listeners.push(listener);

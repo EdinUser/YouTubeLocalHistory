@@ -248,7 +248,7 @@
                 color: #fff !important;
                 font-size: 16px !important;
                 font-weight: bold !important;
-                z-index: 2 !important;
+                z-index: 9999 !important;
                 border-radius: 0 0 4px 0 !important;
                 pointer-events: none !important;
             }
@@ -258,7 +258,7 @@
                 left: 0 !important;
                 height: 3px !important;
                 background-color: #4285f4 !important;
-                z-index: 2 !important;
+                z-index: 9999 !important;
                 pointer-events: none !important;
             }
             .ytvht-info {
@@ -932,7 +932,7 @@
         // First check if we're even on a page that could have a playlist
         const urlParams = new URLSearchParams(window.location.search);
         const playlistId = urlParams.get('list');
-        
+
         if (!playlistId) {
             // No playlist ID in URL, no need to retry
             log('No playlist ID in URL, skipping playlist save');
@@ -941,7 +941,7 @@
 
         log(`Trying to save playlist (${retries} retries left)...`);
         const playlistInfo = getPlaylistInfo();
-        
+
         if (playlistInfo) {
             log('Playlist info found, saving...');
             savePlaylistInfo(playlistInfo);
@@ -950,7 +950,7 @@
             // This means the UI probably hasn't loaded yet
             log(`Playlist title not found for ID ${playlistId}, will retry in 3 seconds... (${retries} retries left)`);
             clearTimeout(playlistRetryTimeout);
-            
+
             // Exponential backoff: wait longer between retries
             const delay = Math.min(3000 * (4 - retries), 5000);
             playlistRetryTimeout = setTimeout(() => {
@@ -1024,7 +1024,7 @@
         if (thumbnail.tagName === 'YTD-COMPACT-VIDEO-RENDERER' || thumbnail.closest('ytd-compact-video-renderer')) {
             const videoId = thumbnail.getAttribute('video-id');
             if (videoId) return videoId;
-            
+
             const compactLink = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
             if (compactLink) {
                 return compactLink.href.match(/[?&]v=([^&]+)/)?.[1];
@@ -1039,10 +1039,24 @@
             }
         }
 
-        // Check for regular video links
+        // Check for regular video links (legacy ids) and generic anchors
         let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="], a#video-title[href*="watch?v="]');
         if (anchor) {
             return anchor.href.match(/[?&]v=([^&]+)/)?.[1];
+        }
+
+        // New home layout often uses anchors without ids
+        anchor = thumbnail.querySelector('a[href*="/watch?v="]');
+        if (anchor) {
+            return anchor.href.match(/[?&]v=([^&]+)/)?.[1];
+        }
+
+        // Some containers expose a data attribute with the id
+        const dataVideoId = thumbnail.getAttribute('data-video-id') ||
+                            thumbnail.getAttribute('data-context-item-id') ||
+                            thumbnail.getAttribute('data-content-id');
+        if (dataVideoId && /^[a-zA-Z0-9_-]{11}$/.test(dataVideoId)) {
+            return dataVideoId;
         }
 
         // Check if the thumbnail itself is the anchor
@@ -1070,18 +1084,22 @@
 
         // For playlist items, we need to target the thumbnail container
         let targetElement = thumbnailElement;
-        
+
         if (thumbnailElement.tagName === 'YT-LOCKUP-VIEW-MODEL' || thumbnailElement.closest('yt-lockup-view-model')) {
-            const thumbnailContainer = thumbnailElement.querySelector('.yt-lockup-view-model-wiz__content-image');
+            const thumbnailContainer = thumbnailElement.querySelector('.yt-lockup-view-model-wiz__content-image') ||
+                                       thumbnailElement.querySelector('a[href*="/watch?v="]') ||
+                                       thumbnailElement.querySelector('ytd-thumbnail') ||
+                                       thumbnailElement.querySelector('#thumbnail');
             if (thumbnailContainer) {
                 targetElement = thumbnailContainer;
             } else {
-                return;
+                // Fallback to the entire tile to ensure visibility on new layouts
+                targetElement = thumbnailElement;
             }
         }
         // If we're in a playlist panel video renderer, find the thumbnail container
         else if (thumbnailElement.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' || thumbnailElement.closest('ytd-playlist-panel-video-renderer')) {
-            const thumbnailContainer = thumbnailElement.querySelector('#thumbnail-container ytd-thumbnail') || 
+            const thumbnailContainer = thumbnailElement.querySelector('#thumbnail-container ytd-thumbnail') ||
                                     thumbnailElement.querySelector('ytd-thumbnail') ||
                                     thumbnailElement.querySelector('#thumbnail-container');
             if (thumbnailContainer) {
@@ -1092,7 +1110,7 @@
         }
         // For regular playlist items
         else if (thumbnailElement.tagName === 'YTD-PLAYLIST-VIDEO-RENDERER' || thumbnailElement.closest('ytd-playlist-video-renderer')) {
-            const thumbnailContainer = thumbnailElement.querySelector('ytd-thumbnail') || 
+            const thumbnailContainer = thumbnailElement.querySelector('ytd-thumbnail') ||
                                     thumbnailElement.querySelector('a#thumbnail');
             if (thumbnailContainer) {
                 targetElement = thumbnailContainer;
@@ -1102,11 +1120,12 @@
         }
         // For other video types, keep existing logic
         else if (thumbnailElement.tagName !== 'YTD-THUMBNAIL' && !(thumbnailElement.tagName === 'A' && thumbnailElement.id === 'thumbnail')) {
-            const inner = thumbnailElement.querySelector('ytd-thumbnail, a#thumbnail');
+            const inner = thumbnailElement.querySelector('ytd-thumbnail, a#thumbnail, a[href*="/watch?v="]');
             if (inner) {
                 targetElement = inner;
             } else {
-                return;
+                // As a last resort, overlay the element itself
+                targetElement = thumbnailElement;
             }
         }
 
@@ -1207,7 +1226,8 @@
         playlistVideos.forEach(element => processVideoElement(element));
 
         // Process main feed thumbnails
-        const mainThumbnails = document.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer');
+        // Include new lockup-based tiles on home page
+        const mainThumbnails = document.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, yt-lockup-view-model');
         mainThumbnails.forEach(element => processVideoElement(element));
 
         // Process right column recommendations
@@ -1215,51 +1235,92 @@
         rightColumnThumbnails.forEach(element => processVideoElement(element));
     }
 
-    // Enhanced processVideoElement with cleanup tracking
+    // Enhanced processVideoElement with improved cleanup and debug logging
     function processVideoElement(element) {
+        if (!element || !element.isConnected) {
+            if (currentSettings?.debug) log('[Overlay] Skipping invalid or disconnected element');
+            return;
+        }
+
         // Clean up any existing pending operations for this element
         if (pendingOperations.has(element)) {
             const ops = pendingOperations.get(element);
-            if (ops.timeout) clearTimeout(ops.timeout);
-            if (ops.rafId) cancelAnimationFrame(ops.rafId);
+            if (ops.timeout) {
+                if (currentSettings?.debug) log('[Overlay] Clearing existing timeout for element');
+                clearTimeout(ops.timeout);
+            }
+            if (ops.rafId) {
+                if (currentSettings?.debug) log('[Overlay] Cancelling existing animation frame for element');
+                cancelAnimationFrame(ops.rafId);
+            }
             pendingOperations.delete(element);
         }
 
         const ops = {};
-        ops.rafId = requestAnimationFrame(() => {
-            ops.rafId = null;
-            
-            // Only log for our target video
-            if (element.innerHTML.includes('u_Lxkt50xOg')) {
-                log('Found target video in element, processing...');
+
+        const process = (retryCount = 0) => {
+            if (!element.isConnected) {
+                if (currentSettings?.debug) log('[Overlay] Element no longer connected, aborting');
+                return;
             }
 
             const videoId = getVideoIdFromThumbnail(element);
             if (videoId) {
-                if (videoId === 'u_Lxkt50xOg') {
-                    log('Found target video! Processing overlay...');
-                }
+                // YouTube home uses templated/shadow DOM; skip strict HTML containment check
                 addViewedLabelToThumbnail(element, videoId);
-                pendingOperations.delete(element);
-            } else {
-                // If we can't get the video ID yet, try again after a short delay
+                return;
+            }
+
+            // Retry logic with exponential backoff
+            if (retryCount < 2) {
+                const delay = 100 * (retryCount + 1);
+                // Don't log retry attempts - they're normal behavior
                 ops.timeout = setTimeout(() => {
                     ops.timeout = null;
-                    const retryVideoId = getVideoIdFromThumbnail(element);
-                    if (retryVideoId) {
-                        if (retryVideoId === 'u_Lxkt50xOg') {
-                            log('Found target video on retry! Processing overlay...');
-                        }
-                        addViewedLabelToThumbnail(element, retryVideoId);
-                    } else if (element.innerHTML.includes('u_Lxkt50xOg')) {
-                        log('Failed to extract video ID for target video even after retry');
-                    }
-                    pendingOperations.delete(element);
-                }, 100);
-            }
+                    process(retryCount + 1);
+                }, delay);
+                pendingOperations.set(element, ops);
+            } // No logging for max retries - normal behavior with YouTube's dynamic content
+        };
+
+        // Initial processing - no need to log this
+        ops.rafId = requestAnimationFrame(() => {
+            ops.rafId = null;
+            process();
         });
-        
+
         pendingOperations.set(element, ops);
+    }
+
+    // Add cleanup observer for removed elements
+    if (typeof MutationObserver !== 'undefined' && !window.ytvhtCleanupObserver) {
+        window.ytvhtCleanupObserver = new MutationObserver((mutations) => {
+            if (!currentSettings?.debug) return;
+
+            mutations.forEach((mutation) => {
+                mutation.removedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const elements = [node, ...node.querySelectorAll('*')];
+                        elements.forEach(el => {
+                            if (pendingOperations.has(el)) {
+                                // Don't log cleanup of removed elements by default
+                                const ops = pendingOperations.get(el);
+                                if (ops.timeout) clearTimeout(ops.timeout);
+                                if (ops.rafId) cancelAnimationFrame(ops.rafId);
+                                pendingOperations.delete(el);
+                            }
+                        });
+                    }
+                });
+            });
+        });
+
+        window.ytvhtCleanupObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        // Don't log observer startup
     }
 
     // Handle messages from popup
@@ -1520,7 +1581,7 @@
         try {
             injectCSS();
             const settings = await loadSettings() || DEFAULT_SETTINGS;
-            
+
             // Check for version update
             if (settings.version !== EXTENSION_VERSION) {
                 log('Version updated:', { old: settings.version, new: EXTENSION_VERSION });

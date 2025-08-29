@@ -2,6 +2,8 @@
  * Memory leak detection and cleanup tests
  */
 
+const { createMockVideoElement, createMockThumbnail } = require('../test-helpers');
+
 describe('Memory Leak Prevention', () => {
   let mockVideoElement;
   let mockThumbnailElement;
