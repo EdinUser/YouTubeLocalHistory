@@ -735,10 +735,10 @@
                 clearInterval(this.syncInterval);
             }
 
-            // Set sync interval to 5 minutes - reasonable fallback since we have immediate sync + storage listeners
+            // Set sync interval to 10 minutes - less frequent to reduce resource usage
             this.syncInterval = setInterval(() => {
                 this.performInitialSync();
-            }, 5 * 60 * 1000); // 5 minutes - balanced between responsiveness and resource usage
+            }, 10 * 60 * 1000); // 10 minutes
 
             // Add Firefox Sync storage change listener for real-time remote updates
             this.setupSyncStorageListener();
