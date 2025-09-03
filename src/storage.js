@@ -61,6 +61,8 @@
     class SimpleStorage {
         constructor() {
             this.migrated = false;
+            // Disable immediate sync on every update by default
+            this.immediateSyncOnUpdate = false;
         }
 
         // Check if migration is needed and perform it
@@ -176,8 +178,10 @@
             await this.ensureMigrated();
             // Always save to local storage first (priority 1)
             await storage.set({[`video_${videoId}`]: data});
-            // Then trigger sync if enabled
-            this.triggerSync(videoId);
+            // Only trigger sync if immediateSyncOnUpdate is true
+            if (this.immediateSyncOnUpdate) {
+                this.triggerSync(videoId);
+            }
         }
 
         // Remove video record
@@ -188,8 +192,10 @@
             // Create a tombstone with deletedAt timestamp
             const tombstoneKey = `deleted_video_${videoId}`;
             await storage.set({[tombstoneKey]: {deletedAt: Date.now()}});
-            // Trigger sync after removal
-            this.triggerSync();
+            // Only trigger sync if immediateSyncOnUpdate is true
+            if (this.immediateSyncOnUpdate) {
+                this.triggerSync();
+            }
         }
 
         // Get all video records
