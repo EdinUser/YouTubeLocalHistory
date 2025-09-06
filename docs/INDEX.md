@@ -1,3 +1,12 @@
+# 🎉 What's New in 3.1.0
+
+- 📝 Per-playlist "Ignore videos" toggle in Playlists tab
+- ⏸️ Global "Pause history in playlists" setting
+
+# 🎉 What's New in 3.0.4
+
+- 🗑️ "Remove from history" button on YouTube thumbnails (hover to reveal)
+
 # 🎉 What's New in 3.0.0
 
 - 🌐 Full multilanguage support (English, German, Spanish, French, Bulgarian)

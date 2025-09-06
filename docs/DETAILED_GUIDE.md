@@ -91,6 +91,10 @@ After watching videos, you'll notice:
 ![Playlists tab interface](./images/ytrw_playlists.jpg)
 *The Playlists tab lists all playlists you've discovered, with quick access and management options.*
 
+**Playlist Controls:**
+- **Ignore videos (per‑playlist toggle):** When enabled for a specific playlist, YT re:Watch will not save watch progress for videos watched while viewing that playlist.
+- **Works with global pause:** If either the global "Pause history in playlists" setting is enabled or a playlist's "Ignore" toggle is on, progress in that playlist won't be recorded.
+
 ### 📊 Analytics Tab (Statistics Dashboard)
 
 **Overview Cards:**
@@ -173,6 +177,9 @@ After watching videos, you'll notice:
 
 ![Settings tab interface](./images/ytrw_settings.jpg)
 *Customize your experience in the Settings tab, including theme, overlays, and data management.*
+
+**Playlist Settings:**
+- **Pause history in playlists (global):** When enabled, the extension does not save watch progress for videos played while you are browsing within any playlist. Use this if you generally don't want playlist sessions to affect your history.
 
 ### What You See on YouTube
 
