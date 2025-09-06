@@ -123,6 +123,14 @@
         "message": "Hour of Day",
         "description": "Chart axis label: Hour of Day"
     },
+    "message_pause_in_playlists_enabled": {
+        "message": "Paused history in playlists enabled",
+        "description": "Toast when global pause in playlists is enabled"
+    },
+    "message_pause_in_playlists_disabled": {
+        "message": "Paused history in playlists disabled",
+        "description": "Toast when global pause in playlists is disabled"
+    },
     "date_today": {
         "message": "Today",
         "description": "Label for today's date"
@@ -142,5 +150,38 @@
     "history_no_history_found": {
         "message": "No history found. Start watching some videos!",
         "description": "Message when no history is found"
+    }
+    ,
+    "playlists_ignore_toggle_label": {
+        "message": "Ignore",
+        "description": "Label next to playlist ignore checkbox"
+    },
+    "playlists_ignore_toggle_tooltip": {
+        "message": "Ignore videos in this playlist",
+        "description": "Tooltip for playlist ignore checkbox"
+    },
+    "playlists_ignore_enabled": {
+        "message": "Playlist will be ignored",
+        "description": "Toast when ignore is enabled"
+    },
+    "playlists_ignore_disabled": {
+        "message": "Playlist will be tracked",
+        "description": "Toast when ignore is disabled"
+    },
+    "content_toggle_pause": {
+        "message": "re:Watch — Click to pause history",
+        "description": "Button text when tracking is active"
+    },
+    "content_toggle_paused": {
+        "message": "re:Watch — History paused. Click to activate",
+        "description": "Button text when tracking is paused"
+    },
+    "content_toggle_pause_title": {
+        "message": "re:Watch — Click to pause history for this playlist",
+        "description": "Tooltip when tracking is active"
+    },
+    "content_toggle_paused_title": {
+        "message": "re:Watch — History is paused for this playlist. Click to activate tracking",
+        "description": "Tooltip when tracking is paused"
     }
 }

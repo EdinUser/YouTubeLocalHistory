@@ -42,7 +42,8 @@ const DEFAULT_SETTINGS = {
     overlayTitle: 'viewed',
     overlayColor: 'blue',
     overlayLabelSize: 'medium',
-    debug: false
+    debug: false,
+    pauseHistoryInPlaylists: false
 };
 
 // Get version from manifest
@@ -1282,10 +1283,18 @@ function displayPlaylistsPage() {
             detailsDiv.className = 'playlist-details';
             const dateSpan = document.createElement('span');
             dateSpan.className = 'playlist-date';
+            const ignoreLabel = document.createElement('span');
+            ignoreLabel.className = 'playlist-ignore-label';
+            ignoreLabel.style.cssText = 'padding:2px 6px;border:1px solid var(--border-color);border-radius:4px;';
+            const ignoreToggle = document.createElement('input');
+            ignoreToggle.type = 'checkbox';
+            ignoreToggle.title = chrome.i18n.getMessage('playlists_ignore_toggle_tooltip') || 'Ignore videos in this playlist';
             const deleteButton = document.createElement('button');
             deleteButton.className = 'delete-button';
             deleteButton.textContent = chrome.i18n.getMessage('delete_label');
             detailsDiv.appendChild(dateSpan);
+            detailsDiv.appendChild(ignoreLabel);
+            detailsDiv.appendChild(ignoreToggle);
             detailsDiv.appendChild(deleteButton);
             contentDiv.appendChild(detailsDiv);
             cell.appendChild(contentDiv);
@@ -1295,10 +1304,25 @@ function displayPlaylistsPage() {
         const link = cell.querySelector('.video-link');
         const date = cell.querySelector('.playlist-date');
         const deleteButton = cell.querySelector('.delete-button');
+        const ignoreToggle = cell.querySelector('input[type="checkbox"]');
+        const ignoreLabel = cell.querySelector('.playlist-ignore-label');
 
         link.href = record.url;
         link.textContent = record.title || 'Unknown Playlist';
         date.textContent = formatDate(record.timestamp);
+        ignoreLabel.textContent = chrome.i18n.getMessage('playlists_ignore_toggle_label') || 'Ignore';
+        ignoreToggle.checked = !!record.ignoreVideos;
+        ignoreToggle.onchange = async () => {
+            try {
+                const existing = await ytStorage.getPlaylist(record.playlistId);
+                const updated = { ...(existing || {}), ignoreVideos: ignoreToggle.checked, lastUpdated: Date.now() };
+                await ytStorage.setPlaylist(record.playlistId, updated);
+                showMessage(ignoreToggle.checked ? (chrome.i18n.getMessage('playlists_ignore_enabled') || 'Playlist will be ignored') : (chrome.i18n.getMessage('playlists_ignore_disabled') || 'Playlist will be tracked'));
+            } catch (e) {
+                showMessage(chrome.i18n.getMessage('message_unknown_error') || 'Error', 'error');
+                ignoreToggle.checked = !!record.ignoreVideos; // revert
+            }
+        };
         deleteButton.onclick = () => deletePlaylist(record.playlistId);
     });
 
@@ -1476,6 +1500,8 @@ function updateSettingsUI(settings) {
     document.getElementById('ytvhtOverlayColor').value = settings.overlayColor;
     document.getElementById('ytvhtOverlayLabelSize').value = settings.overlayLabelSize;
     document.getElementById('ytvhtDebugMode').checked = settings.debug;
+    const pauseChk = document.getElementById('ytvhtPauseHistoryInPlaylists');
+    if (pauseChk) pauseChk.checked = !!settings.pauseHistoryInPlaylists;
     document.getElementById('ytvhtVersion').textContent = EXTENSION_VERSION;
     updateColorPreview(settings.overlayColor);
 }
@@ -1588,6 +1614,22 @@ async function initSettingsTab() {
         });
     } else {
         log('Error: Debug mode element not found');
+    }
+
+    // Pause history in playlists
+    const pauseInPlaylists = document.getElementById('ytvhtPauseHistoryInPlaylists');
+    if (pauseInPlaylists) {
+        pauseInPlaylists.checked = settings.pauseHistoryInPlaylists || false;
+        pauseInPlaylists.addEventListener('change', async function () {
+            const s = await loadSettings();
+            s.pauseHistoryInPlaylists = this.checked;
+            await saveSettings(s);
+            const enabledMsg = chrome.i18n.getMessage('message_pause_in_playlists_enabled') || 'Paused history in playlists enabled';
+            const disabledMsg = chrome.i18n.getMessage('message_pause_in_playlists_disabled') || 'Paused history in playlists disabled';
+            showMessage(this.checked ? enabledMsg : disabledMsg);
+        });
+    } else {
+        log('Error: Pause history in playlists element not found');
     }
 
     // Version display
