@@ -261,6 +261,37 @@
                 z-index: 9999 !important;
                 pointer-events: none !important;
             }
+            .ytvht-remove-button {
+                position: absolute !important;
+                bottom: 10px !important;
+                right: 10px !important;
+                width: 26px !important;
+                height: 26px !important;
+                line-height: 26px !important;
+                text-align: center !important;
+                font-size: 18px !important;
+                font-weight: 700 !important;
+                color: #fff !important;
+                background: #4285f4 !important;
+                border: none !important;
+                border-radius: 50% !important;
+                cursor: pointer !important;
+                z-index: 10000 !important;
+                pointer-events: auto !important;
+                opacity: 0 !important;
+                transition: opacity 0.15s ease-in-out !important;
+                user-select: none !important;
+            }
+            ytd-thumbnail:hover .ytvht-remove-button,
+            a#thumbnail:hover .ytvht-remove-button,
+            ytd-playlist-video-renderer:hover .ytvht-remove-button,
+            ytd-playlist-panel-video-renderer:hover .ytvht-remove-button,
+            yt-lockup-view-model:hover .ytvht-remove-button,
+            ytd-video-renderer:hover .ytvht-remove-button,
+            ytd-rich-item-renderer:hover .ytvht-remove-button,
+            ytd-grid-video-renderer:hover .ytvht-remove-button {
+                opacity: 0.95 !important;
+            }
             .ytvht-info {
                 position: absolute !important;
                 top: -120px !important;
@@ -333,6 +364,9 @@
             .ytvht-progress-bar {
                 height: ${size.bar}px !important;
                 background-color: ${color} !important;
+            }
+            .ytvht-remove-button {
+                background: ${color} !important;
             }
         `;
     }
@@ -1134,6 +1168,7 @@
 
         let label = targetElement.querySelector('.ytvht-viewed-label');
         let progress = targetElement.querySelector('.ytvht-progress-bar');
+        let removeBtn = targetElement.querySelector('.ytvht-remove-button');
 
         ytStorage.getVideo(videoId).then(record => {
             if (record) {
@@ -1162,9 +1197,30 @@
                 if (progress.style.width !== newWidth) {
                     progress.style.width = newWidth;
                 }
+
+                if (!removeBtn) {
+                    removeBtn = document.createElement('button');
+                    removeBtn.className = 'ytvht-remove-button';
+                    removeBtn.setAttribute('type', 'button');
+                    removeBtn.setAttribute('title', 'Remove from YT re:Watch history');
+                    removeBtn.textContent = '×';
+                    removeBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        ytStorage.removeVideo(videoId).then(() => {
+                            label?.remove();
+                            progress?.remove();
+                            removeBtn?.remove();
+                        }).catch(() => {
+                            // no-op: silent fail
+                        });
+                    }, { once: false });
+                    targetElement.appendChild(removeBtn);
+                }
             } else {
                 label?.remove();
                 progress?.remove();
+                removeBtn?.remove();
             }
         }).catch(error => {
             log('[Error] Failed to process thumbnail', { videoId, error });
