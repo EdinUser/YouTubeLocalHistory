@@ -112,6 +112,9 @@ Check the extension popup - your history should still be there.
 ### Q: Can I delete individual videos from my history?
 **A:** Yes, click the "Delete" button next to any video to remove it from your history.
 
+### Q: Can I remove a video directly from a YouTube thumbnail?
+**A:** Yes. Hover a thumbnail to reveal the **"Remove from history"** button added by the extension. Clicking it removes that video from your local history immediately.
+
 ### Q: Will deleted videos stay deleted?
 **A:** YES! We've implemented a robust deletion system:
 - **Deleted videos stay deleted** across all your devices
@@ -205,6 +208,14 @@ This solves the common problem where deleted videos would reappear after syncing
 
 ### Q: Can I sync my history across devices?
 **A:** Yes, if you're using Firefox! Enable Firefox Sync in your browser settings, then enable sync in the extension's Settings tab.
+
+### Q: How often does sync run by default?
+**A:** By default, the automatic sync interval is approximately every 10 minutes. Immediate sync on updates is disabled by default to reduce resource usage. You can still trigger manual sync from the Settings tab (Firefox only).
+
+### Q: Can I stop saving progress when watching inside playlists?
+**A:** Yes. There are two options:
+- **Global:** Enable "Pause history in playlists" in Settings to stop tracking progress during any playlist session.
+- **Per‑playlist:** Use the playlist's **"Ignore videos"** toggle in the Playlists tab to exclude just that playlist.
 
 ### Q: Does sync work with Chrome?
 **A:** Not yet, but we're working on it! For now, you can use the export/import feature to transfer your history between devices.
