@@ -46,6 +46,7 @@
         overlayColor: 'blue',
         overlayLabelSize: 'medium',
         debug: false, // Add debug setting
+        pauseHistoryInPlaylists: false,
         version: EXTENSION_VERSION // Add version to settings
     };
     const OVERLAY_COLORS = {
@@ -342,6 +343,36 @@
             .ytvht-close:hover {
                 opacity: 1 !important;
             }
+            .ytvht-ignore-toggle {
+                position: absolute !important;
+                top: 8px !important;
+                right: 8px !important;
+                background: #4285f4 !important;
+                color: #fff !important;
+                border: none !important;
+                border-radius: 14px !important;
+                font-size: 12px !important;
+                line-height: 1 !important;
+                padding: 6px 10px !important;
+                cursor: pointer !important;
+                z-index: 10001 !important;
+                opacity: 0.9 !important;
+            }
+            .ytvht-ignore-toggle[aria-pressed="true"] {
+                background: #666 !important;
+            }
+            .ytvht-ignore-row {
+                margin-top: 8px !important;
+            }
+            .ytvht-ignore-toggle.header {
+                position: static !important;
+                display: inline-flex !important;
+            }
+            .ytvht-ignore-toggle.action {
+                position: static !important;
+                display: inline-flex !important;
+                margin-left: 8px !important;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -366,6 +397,9 @@
                 background-color: ${color} !important;
             }
             .ytvht-remove-button {
+                background: ${color} !important;
+            }
+            .ytvht-ignore-toggle {
                 background: ${color} !important;
             }
         `;
@@ -445,7 +479,11 @@
             '#secondary-inner ytd-playlist-panel-renderer .title',
             'ytd-playlist-header-renderer h1.ytd-playlist-header-renderer',
             '.playlist-title yt-formatted-string',
-            '.ytd-playlist-panel-renderer .index-message + .title'
+            '.ytd-playlist-panel-renderer .index-message + .title',
+            // New page header-based layouts
+            'yt-page-header-view-model h1.dynamicTextViewModelH1 span',
+            'yt-page-header-view-model .yt-page-header-view-model__page-header-title h1 span',
+            'yt-dynamic-text-view-model h1.dynamicTextViewModelH1 span'
         ];
 
         let playlistTitle = null;
@@ -477,7 +515,7 @@
         return playlistInfo;
     }
 
-    // Save playlist info
+    // Save playlist info (merge with existing to preserve flags)
     async function savePlaylistInfo(playlistInfo = null) {
         const info = playlistInfo || getPlaylistInfo();
         if (!info) return;
@@ -485,8 +523,15 @@
         log('Saving playlist info:', info);
 
         try {
-            await ytStorage.setPlaylist(info.playlistId, info);
-            log('Playlist info saved successfully:', info);
+            const existing = await ytStorage.getPlaylist(info.playlistId);
+            const merged = {
+                ...(existing || {}),
+                ...info,
+                lastUpdated: Date.now()
+            };
+            // Ensure we don't drop custom flags like ignoreVideos from existing
+            await ytStorage.setPlaylist(info.playlistId, merged);
+            log('Playlist info saved successfully:', merged);
         } catch (error) {
             log('Error saving playlist info:', error);
         }
@@ -607,6 +652,29 @@
         const video = document.querySelector('video');
         if (!video) return;
 
+        // Playlist-aware pause/ignore logic
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const playlistId = urlParams.get('list');
+            if (playlistId) {
+                if (currentSettings?.pauseHistoryInPlaylists) {
+                    log('Global pause enabled for playlist context; skipping save.');
+                    return;
+                }
+                try {
+                    const playlistRecord = await ytStorage.getPlaylist(playlistId);
+                    if (playlistRecord?.ignoreVideos) {
+                        log('Per-playlist ignore enabled; skipping save.', { playlistId });
+                        return;
+                    }
+                } catch (e) {
+                    // ignore read errors, proceed with save
+                }
+            }
+        } catch (e) {
+            // ignore URL parsing errors
+        }
+
         let currentTime = video.currentTime;
         const duration = video.duration;
         const videoId = getVideoId();
@@ -682,6 +750,29 @@
         if (!video) {
             log('No video element found for Shorts.');
             return;
+        }
+
+        // Playlist-aware pause/ignore logic for Shorts
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const playlistId = urlParams.get('list');
+            if (playlistId) {
+                if (currentSettings?.pauseHistoryInPlaylists) {
+                    log('Global pause enabled for playlist context (Shorts); skipping save.');
+                    return;
+                }
+                try {
+                    const playlistRecord = await ytStorage.getPlaylist(playlistId);
+                    if (playlistRecord?.ignoreVideos) {
+                        log('Per-playlist ignore enabled (Shorts); skipping save.', { playlistId });
+                        return;
+                    }
+                } catch (e) {
+                    // ignore read errors
+                }
+            }
+        } catch (e) {
+            // ignore URL parsing errors
         }
 
         let currentTime = video.currentTime;
@@ -979,6 +1070,8 @@
         if (playlistInfo) {
             log('Playlist info found, saving...');
             savePlaylistInfo(playlistInfo);
+            // Attach UI toggle if possible
+            attachPlaylistIgnoreToggles();
         } else if (retries > 0) {
             // Only retry if we have a playlist ID but couldn't get the title
             // This means the UI probably hasn't loaded yet
@@ -992,6 +1085,7 @@
                 const currentPlaylistId = new URLSearchParams(window.location.search).get('list');
                 if (currentPlaylistId === playlistId) {
                     tryToSavePlaylist(retries - 1);
+                    attachPlaylistIgnoreToggles();
                 } else {
                     log('Playlist ID changed, stopping retry attempts');
                 }
@@ -1007,9 +1101,244 @@
                     timestamp: Date.now()
                 };
                 savePlaylistInfo(defaultInfo);
+                attachPlaylistIgnoreToggles();
             } else {
                 log('Failed to save playlist after all retries');
             }
+        }
+    }
+
+    // Attach playlist ignore toggle in playlist header and sidebar panel
+    async function attachPlaylistIgnoreToggles() {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const playlistId = urlParams.get('list');
+            if (!playlistId) return;
+
+            const playlistRecord = await ytStorage.getPlaylist(playlistId);
+            const isIgnored = !!playlistRecord?.ignoreVideos;
+            log('[Toggle] Preparing toggles for playlist', { playlistId, isIgnored });
+
+            const headerSelectors = [
+                'ytd-playlist-header-renderer',
+                'ytd-playlist-metadata-header-renderer',
+                'yt-page-header-view-model'
+            ];
+            const panelSelector = 'ytd-playlist-panel-renderer';
+
+            // Utility: search inside possible shadow hosts
+            const queryDeep = (root, selector) => {
+                try {
+                    const el = root.querySelector(selector);
+                    if (el) return el;
+                } catch (_) {}
+                return null;
+            };
+
+            const findActionsRow = () => {
+                // 1) Try in document
+                let row = document.querySelector('.ytFlexibleActionsViewModelActionRow');
+                if (row) return row;
+
+                // 2) Try in yt-flexible-actions-view-model shadow
+                const flexHost = document.querySelector('yt-flexible-actions-view-model');
+                if (flexHost && flexHost.shadowRoot) {
+                    row = queryDeep(flexHost.shadowRoot, '.ytFlexibleActionsViewModelActionRow');
+                    if (row) return row;
+                }
+
+                // 3) Try under yt-page-header-view-model shadow
+                const headerHost = document.querySelector('yt-page-header-view-model');
+                if (headerHost && headerHost.shadowRoot) {
+                    row = queryDeep(headerHost.shadowRoot, '.ytFlexibleActionsViewModelActionRow');
+                    if (row) return row;
+                }
+
+                return null;
+            };
+
+            // Helper to create or update a toggle inside a container
+            const ensureToggleIn = (container) => {
+                if (!container) return;
+                try {
+                    // Make container positioned so absolute child works
+                    const stylePos = window.getComputedStyle(container).position;
+                    if (stylePos === 'static') {
+                        container.style.position = 'relative';
+                    }
+                    log('[Toggle] ensureToggleIn container matched', container.tagName || 'node');
+                    let btn = container.querySelector('.ytvht-ignore-toggle');
+                    if (!btn) {
+                        btn = document.createElement('button');
+                        btn.className = 'ytvht-ignore-toggle';
+                        btn.type = 'button';
+                        container.appendChild(btn);
+                        log('[Toggle] Inserted sidebar/context button');
+                    }
+                    const setBtnState = (pressed) => {
+                        btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+                        btn.textContent = pressed ? (chrome.i18n?.getMessage('content_toggle_paused') || 're:Watch — History paused. Click to activate') : (chrome.i18n?.getMessage('content_toggle_pause') || 're:Watch — Click to pause history');
+                        btn.title = pressed ? (chrome.i18n?.getMessage('content_toggle_paused_title') || 're:Watch — History is paused for this playlist. Click to activate tracking') : (chrome.i18n?.getMessage('content_toggle_pause_title') || 're:Watch — Click to pause history for this playlist');
+                    };
+                    setBtnState(isIgnored);
+
+                    btn.onclick = async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try {
+                            const existing = await ytStorage.getPlaylist(playlistId);
+                            const toggled = !(existing?.ignoreVideos);
+                            const merged = {
+                                ...(existing || {}),
+                                playlistId,
+                                url: `https://www.youtube.com/playlist?list=${playlistId}`,
+                                ignoreVideos: toggled,
+                                lastUpdated: Date.now(),
+                                timestamp: existing?.timestamp || Date.now()
+                            };
+                            await ytStorage.setPlaylist(playlistId, merged);
+                            setBtnState(toggled);
+                        } catch (err) {
+                            // no-op on failure
+                        }
+                    };
+                } catch (err) {
+                    // silent
+                }
+            };
+
+            // Helper to create/update a header-row toggle placed under YT buttons
+            const ensureHeaderToggle = (headerEl) => {
+                if (!headerEl) return;
+                try {
+                    // Prefer placing after actions row if we can find it
+                    let actionsEl = findActionsRow();
+                    if (!actionsEl) {
+                        // Fallback selectors in light DOM
+                        const actionSelectors = [
+                            '#primary-actions',
+                            '#actions',
+                            '#top-level-buttons-computed',
+                            '.actions'
+                        ];
+                        for (const sel of actionSelectors) {
+                            const el = headerEl.querySelector(sel);
+                            if (el) { actionsEl = el; log('[Toggle] Actions row matched selector', sel); break; }
+                        }
+                    }
+
+                    let btn;
+                    if (actionsEl) {
+                        // Place on its own line AFTER the actions row
+                        let row = actionsEl.parentNode?.querySelector('.ytvht-ignore-row');
+                        if (!row) {
+                            row = document.createElement('div');
+                            row.className = 'ytvht-ignore-row';
+                            if (actionsEl.parentNode) {
+                                actionsEl.parentNode.insertBefore(row, actionsEl.nextSibling);
+                            } else {
+                                headerEl.appendChild(row);
+                            }
+                            log('[Toggle] Inserted header row after actions');
+                        }
+                        btn = row.querySelector('.ytvht-ignore-toggle');
+                        if (!btn) {
+                            btn = document.createElement('button');
+                            btn.className = 'ytvht-ignore-toggle header';
+                            btn.type = 'button';
+                            row.appendChild(btn);
+                            log('[Toggle] Inserted header button in its own row');
+                        }
+                    } else {
+                        // Fallback: dedicated row below actions
+                        let row = headerEl.querySelector('.ytvht-ignore-row');
+                        if (!row) {
+                            row = document.createElement('div');
+                            row.className = 'ytvht-ignore-row';
+                            headerEl.appendChild(row);
+                            log('[Toggle] Inserted header row at end of header (no actions found)');
+                        }
+                        btn = row.querySelector('.ytvht-ignore-toggle');
+                        if (!btn) {
+                            btn = document.createElement('button');
+                            btn.className = 'ytvht-ignore-toggle header';
+                            btn.type = 'button';
+                            row.appendChild(btn);
+                            log('[Toggle] Inserted header button in fallback row');
+                        }
+                    }
+
+                    const setBtnState = (pressed) => {
+                        btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+                        btn.textContent = pressed ? (chrome.i18n?.getMessage('content_toggle_paused') || 're:Watch — History paused. Click to activate') : (chrome.i18n?.getMessage('content_toggle_pause') || 're:Watch — Click to pause history');
+                        btn.title = pressed ? (chrome.i18n?.getMessage('content_toggle_paused_title') || 're:Watch — History is paused for this playlist. Click to activate tracking') : (chrome.i18n?.getMessage('content_toggle_pause_title') || 're:Watch — Click to pause history for this playlist');
+                    };
+                    setBtnState(isIgnored);
+
+                    btn.onclick = async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try {
+                            const existing = await ytStorage.getPlaylist(playlistId);
+                            const toggled = !(existing?.ignoreVideos);
+                            const merged = {
+                                ...(existing || {}),
+                                playlistId,
+                                url: `https://www.youtube.com/playlist?list=${playlistId}`,
+                                ignoreVideos: toggled,
+                                lastUpdated: Date.now(),
+                                timestamp: existing?.timestamp || Date.now()
+                            };
+                            await ytStorage.setPlaylist(playlistId, merged);
+                            setBtnState(toggled);
+                        } catch (err) {
+                            // silent
+                        }
+                    };
+                } catch (err) {
+                    // silent
+                }
+            };
+
+            // Playlist page header(s) — place below the action buttons
+            for (const sel of headerSelectors) {
+                const header = document.querySelector(sel);
+                if (header) { log('[Toggle] Header matched selector', sel); ensureHeaderToggle(header); }
+            }
+
+            // Right sidebar playlist panel on watch page
+            const panel = document.querySelector(panelSelector);
+            if (panel) { log('[Toggle] Sidebar panel found'); ensureToggleIn(panel); }
+
+            // If still no header toggle, try absolute insertion into yt-page-header-view-model content
+            const pageHeader = document.querySelector('yt-page-header-view-model');
+            if (pageHeader && !pageHeader.querySelector('.ytvht-ignore-toggle')) {
+                log('[Toggle] Fallback inserting into page header');
+                ensureHeaderToggle(pageHeader);
+            }
+        } catch (_) {
+            // silent
+        }
+    }
+
+    // Ensure toggles exist on playlist pages (where no video element may exist)
+    function ensurePlaylistIgnoreToggles(retries = 12) {
+        try {
+            const hasList = new URLSearchParams(window.location.search).get('list');
+            if (!hasList) return;
+
+            attachPlaylistIgnoreToggles();
+
+            if (retries > 0) {
+                const header = document.querySelector('yt-page-header-view-model, ytd-playlist-header-renderer, ytd-playlist-metadata-header-renderer');
+                const headerToggle = header ? header.querySelector('.ytvht-ignore-toggle') : null;
+                if (!headerToggle) {
+                    const delay = 500;
+                    setTimeout(() => ensurePlaylistIgnoreToggles(retries - 1), delay);
+                }
+            }
+        } catch (e) {
+            // silent
         }
     }
 
@@ -1680,6 +2009,9 @@
 
     // Listen for YouTube's own navigation events to handle SPA changes.
     window.addEventListener('yt-navigate-finish', handleSpaNavigation);
+
+    // Also ensure playlist toggles on direct playlist pages
+    ensurePlaylistIgnoreToggles();
 
     // Update the storage change listener to use the improved thumbnail processing
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {

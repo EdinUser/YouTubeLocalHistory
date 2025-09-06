@@ -142,5 +142,45 @@
   "history_no_history_found": {
     "message": "Kein Verlauf gefunden. Beginnen Sie mit dem Ansehen von Videos!",
     "description": "Message when no history is found"
+  },
+  "message_pause_in_playlists_enabled": {
+    "message": "Pausierter Verlauf in Playlists aktiviert",
+    "description": "Toast when global pause in playlists is enabled"
+  },
+  "message_pause_in_playlists_disabled": {
+    "message": "Pausierter Verlauf in Playlists deaktiviert",
+    "description": "Toast when global pause in playlists is disabled"
+  },
+  "playlists_ignore_toggle_label": {
+    "message": "Ignorieren",
+    "description": "Label next to playlist ignore checkbox"
+  },
+  "playlists_ignore_toggle_tooltip": {
+    "message": "Videos in dieser Playlist ignorieren",
+    "description": "Tooltip for playlist ignore checkbox"
+  },
+  "playlists_ignore_enabled": {
+    "message": "Playlist wird ignoriert",
+    "description": "Toast when ignore is enabled"
+  },
+  "playlists_ignore_disabled": {
+    "message": "Playlist wird verfolgt",
+    "description": "Toast when ignore is disabled"
+  },
+  "content_toggle_pause": {
+    "message": "re:Watch — Klicken, um Verlauf zu pausieren",
+    "description": "Button text when tracking is active"
+  },
+  "content_toggle_paused": {
+    "message": "re:Watch — Verlauf pausiert. Klicken zum Aktivieren",
+    "description": "Button text when tracking is paused"
+  },
+  "content_toggle_pause_title": {
+    "message": "re:Watch — Klicken, um den Verlauf für diese Playlist zu pausieren",
+    "description": "Tooltip when tracking is active"
+  },
+  "content_toggle_paused_title": {
+    "message": "re:Watch — Verlauf für diese Playlist pausiert. Klicken zum Aktivieren",
+    "description": "Tooltip when tracking is paused"
   }
 } 

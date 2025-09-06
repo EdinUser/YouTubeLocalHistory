@@ -144,5 +144,45 @@
   "history_no_history_found" : {
       "message": "Не е намерена история. Започнете да гледате видеа, за да се появи тук!",
       "description": "Message when no history is found"
+  },
+  "message_pause_in_playlists_enabled": {
+      "message": "Пауза на историята в плейлисти е включена",
+      "description": "Toast when global pause in playlists is enabled"
+  },
+  "message_pause_in_playlists_disabled": {
+      "message": "Пауза на историята в плейлисти е изключена",
+      "description": "Toast when global pause in playlists is disabled"
+  },
+  "playlists_ignore_toggle_label": {
+      "message": "Игнорирай",
+      "description": "Label next to playlist ignore checkbox"
+  },
+  "playlists_ignore_toggle_tooltip": {
+      "message": "Игнорирай видеата в този плейлист",
+      "description": "Tooltip for playlist ignore checkbox"
+  },
+  "playlists_ignore_enabled": {
+      "message": "Плейлистът ще бъде игнориран",
+      "description": "Toast when ignore is enabled"
+  },
+  "playlists_ignore_disabled": {
+      "message": "Плейлистът ще бъде проследяван",
+      "description": "Toast when ignore is disabled"
+  },
+  "content_toggle_pause": {
+      "message": "re:Watch — Кликнете за пауза на историята",
+      "description": "Button text when tracking is active"
+  },
+  "content_toggle_paused": {
+      "message": "re:Watch — Историята е на пауза. Кликнете за активиране",
+      "description": "Button text when tracking is paused"
+  },
+  "content_toggle_pause_title": {
+      "message": "re:Watch — Кликнете за пауза на историята за този плейлист",
+      "description": "Tooltip when tracking is active"
+  },
+  "content_toggle_paused_title": {
+      "message": "re:Watch — Историята е на пауза за този плейлист. Кликнете за активиране",
+      "description": "Tooltip when tracking is paused"
   }
 }

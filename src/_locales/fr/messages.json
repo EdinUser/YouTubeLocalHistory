@@ -142,5 +142,45 @@
   "history_no_history_found": {
     "message": "Aucun historique trouvé. Commencez à regarder des vidéos !",
     "description": "Message when no history is found"
+  },
+  "message_pause_in_playlists_enabled": {
+    "message": "Pause de l'historique dans les playlists activée",
+    "description": "Toast when global pause in playlists is enabled"
+  },
+  "message_pause_in_playlists_disabled": {
+    "message": "Pause de l'historique dans les playlists désactivée",
+    "description": "Toast when global pause in playlists is disabled"
+  },
+  "playlists_ignore_toggle_label": {
+    "message": "Ignorer",
+    "description": "Label next to playlist ignore checkbox"
+  },
+  "playlists_ignore_toggle_tooltip": {
+    "message": "Ignorer les vidéos de cette playlist",
+    "description": "Tooltip for playlist ignore checkbox"
+  },
+  "playlists_ignore_enabled": {
+    "message": "La playlist sera ignorée",
+    "description": "Toast when ignore is enabled"
+  },
+  "playlists_ignore_disabled": {
+    "message": "La playlist sera suivie",
+    "description": "Toast when ignore is disabled"
+  },
+  "content_toggle_pause": {
+    "message": "re:Watch — Cliquez pour mettre l'historique en pause",
+    "description": "Button text when tracking is active"
+  },
+  "content_toggle_paused": {
+    "message": "re:Watch — Historique en pause. Cliquez pour activer",
+    "description": "Button text when tracking is paused"
+  },
+  "content_toggle_pause_title": {
+    "message": "re:Watch — Cliquez pour mettre l'historique en pause pour cette playlist",
+    "description": "Tooltip when tracking is active"
+  },
+  "content_toggle_paused_title": {
+    "message": "re:Watch — L'historique est en pause pour cette playlist. Cliquez pour activer",
+    "description": "Tooltip when tracking is paused"
   }
 } 

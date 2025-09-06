@@ -47,6 +47,14 @@
     "message": "Données & Synchronisation",
     "description": "Settings section title for data and sync"
   },
+  "settings_pause_in_playlists_label": {
+    "message": "Mettre l'historique en pause dans les playlists",
+    "description": "Label for pause-in-playlists setting"
+  },
+  "settings_pause_in_playlists_help": {
+    "message": "Lors de la lecture depuis une playlist, ne pas enregistrer la progression",
+    "description": "Help text for pause-in-playlists setting"
+  },
   "settings_data_management_label": {
     "message": "Gestion des données",
     "description": "Label for data management section"

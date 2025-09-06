@@ -47,6 +47,14 @@
     "message": "Daten & Synchronisierung",
     "description": "Settings section title for data and sync"
   },
+  "settings_pause_in_playlists_label": {
+    "message": "Verlauf in Playlists pausieren",
+    "description": "Label for pause-in-playlists setting"
+  },
+  "settings_pause_in_playlists_help": {
+    "message": "Beim Abspielen aus einer Playlist den Video-Fortschritt nicht speichern",
+    "description": "Help text for pause-in-playlists setting"
+  },
   "settings_data_management_label": {
     "message": "Datenverwaltung",
     "description": "Label for data management section"
