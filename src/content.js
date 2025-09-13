@@ -730,7 +730,16 @@
         };
 
         try {
+            // Compute delta against previous saved time to update stats
+            let previous = null;
+            try { previous = await ytStorage.getVideo(videoId); } catch (_) {}
+            const prevTime = previous && typeof previous.time === 'number' ? previous.time : 0;
+            const delta = Math.max(0, Math.floor(record.time - prevTime));
+
             await ytStorage.setVideo(videoId, record);
+            if (delta > 0 && typeof ytStorage.updateStats === 'function') {
+                await ytStorage.updateStats(delta, record.timestamp);
+            }
             broadcastVideoUpdate(record);
             log('[Critical] Timestamp saved', { videoId, time: currentTime });
         } catch (error) {
@@ -828,7 +837,16 @@
         };
 
         try {
+            // Compute delta against previous saved time to update stats
+            let previous = null;
+            try { previous = await ytStorage.getVideo(videoId); } catch (_) {}
+            const prevTime = previous && typeof previous.time === 'number' ? previous.time : 0;
+            const delta = Math.max(0, Math.floor(record.time - prevTime));
+
             await ytStorage.setVideo(videoId, record);
+            if (delta > 0 && typeof ytStorage.updateStats === 'function') {
+                await ytStorage.updateStats(delta, record.timestamp);
+            }
             // Broadcast update after successful save
             broadcastVideoUpdate(record);
             log(`Shorts timestamp successfully saved for video ID ${videoId}: ${currentTime}`);

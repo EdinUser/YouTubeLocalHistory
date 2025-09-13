@@ -285,6 +285,83 @@
             }
         }
 
+        /**
+         * Get persistent aggregated watch-time statistics.
+         * Structure:
+         *   {
+         *     totalWatchSeconds: number,
+         *     daily: { [YYYY-MM-DD]: number },
+         *     hourly: number[24],
+         *     lastUpdated: number
+         *   }
+         * @returns {Promise<Object>} stats object (with defaults if missing)
+         */
+        async getStats() {
+            await this.ensureMigrated();
+            const result = await storage.get(['stats']);
+            const defaults = {
+                totalWatchSeconds: 0,
+                daily: {},
+                hourly: new Array(24).fill(0),
+                lastUpdated: 0
+            };
+            const stats = result.stats || {};
+            // Normalize to ensure arrays/objects are present
+            stats.totalWatchSeconds = Number(stats.totalWatchSeconds || 0);
+            stats.daily = stats.daily && typeof stats.daily === 'object' ? stats.daily : {};
+            stats.hourly = Array.isArray(stats.hourly) && stats.hourly.length === 24 ? stats.hourly : new Array(24).fill(0);
+            stats.lastUpdated = Number(stats.lastUpdated || 0);
+            return Object.assign({}, defaults, stats);
+        }
+
+        /**
+         * Persist the provided statistics object.
+         * @param {Object} stats - statistics object as returned by getStats
+         * @returns {Promise<void>}
+         */
+        async setStats(stats) {
+            await this.ensureMigrated();
+            await storage.set({ 'stats': stats });
+        }
+
+        /**
+         * Increment persistent statistics using a delta in seconds.
+         * Safely ignores non-positive or NaN deltas.
+         * Also updates the appropriate daily (YYYY-MM-DD) bucket and the hourly bucket 0-23.
+         * Triggers background sync afterwards.
+         *
+         * @param {number} deltaSeconds - positive number of seconds to add
+         * @param {number} whenTimestamp - JS timestamp (ms) for attribution (defaults to now)
+         * @returns {Promise<void>}
+         */
+        async updateStats(deltaSeconds, whenTimestamp = Date.now()) {
+            await this.ensureMigrated();
+            const delta = Number(deltaSeconds);
+            if (!delta || !isFinite(delta) || delta <= 0) {
+                return;
+            }
+
+            const stats = await this.getStats();
+            const when = new Date(whenTimestamp);
+            const dayKey = new Date(when.getFullYear(), when.getMonth(), when.getDate())
+                .toISOString()
+                .slice(0, 10); // YYYY-MM-DD
+            const hour = when.getHours();
+
+            stats.totalWatchSeconds = Math.max(0, Math.floor(stats.totalWatchSeconds + delta));
+            stats.daily[dayKey] = Math.max(0, Math.floor((stats.daily[dayKey] || 0) + delta));
+            if (!Array.isArray(stats.hourly) || stats.hourly.length !== 24) {
+                stats.hourly = new Array(24).fill(0);
+            }
+            stats.hourly[hour] = Math.max(0, Math.floor((stats.hourly[hour] || 0) + delta));
+            stats.lastUpdated = Date.now();
+
+            await storage.set({ 'stats': stats });
+
+            // Attempt to sync stats as part of regular sync flow
+            this.triggerSync();
+        }
+
         // Helper method to trigger sync if available
         triggerSync(videoId = null) {
             // Reduce delay for more immediate syncing
