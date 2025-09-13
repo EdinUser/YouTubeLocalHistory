@@ -797,9 +797,9 @@
         let currentTime = video.currentTime;
         const duration = video.duration;
 
-        // Do not update record if timestamp is 0 or duration is not available
-        if (!currentTime || currentTime === 0 || !duration || duration === 0) {
-            log(`Invalid timestamp (${currentTime}) or duration (${duration}) for Shorts ID ${videoId}, skipping update.`);
+        // Do not update record if timestamp is 0. Allow duration to be unavailable for Shorts.
+        if (!currentTime || currentTime === 0) {
+            log(`Invalid timestamp (${currentTime}) for Shorts ID ${videoId}, skipping update.`);
             return;
         }
 
@@ -981,7 +981,8 @@
         });
         addTrackedEventListener(video, 'timeupdate', () => {
             const currentTime = Math.floor(video.currentTime);
-            if (currentTime % 15 === 0) debouncedSave();
+            const interval = window.location.pathname.startsWith('/shorts/') ? 5 : 15;
+            if (currentTime > 0 && currentTime % interval === 0) debouncedSave();
         });
         addTrackedEventListener(video, 'seeking', () => {
             if (saveIntervalId) {

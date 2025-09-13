@@ -2,6 +2,38 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [3.1.0] - 2025-09-06
+
+### ✨ New Features
+- Per-playlist "Ignore videos" toggle with UI controls in the Playlists tab
+- Global setting: "Pause history in playlists" to stop tracking while browsing playlists
+
+### 🧭 Behavior Changes
+- Playlist-aware logic skips saving progress when a playlist is ignored or when playlist history is paused
+
+### 🌐 i18n & UI
+- Added new locale strings across all supported languages
+- Updated popup UI to expose new playlist controls and settings
+
+### 📦 Build & Manifests
+- Version bump to 3.1.0 in Chrome and Firefox manifests
+
+---
+
+## [3.0.4] - 2025-09-06
+
+### ✨ New
+- "Remove from history" button on YouTube thumbnails (hover action) for quick deletion
+
+### 🧪 Stability
+- Sync cadence: reduced default frequency from 5 minutes to 10 minutes
+- Immediate sync on updates is disabled by default (can be enabled explicitly)
+
+### 📦 Build & Manifests
+- Version bump to 3.0.4 in Chrome and Firefox manifests
+
+---
+
 ## [3.0.3] - 2025-08-29
 
 ### 🐛 Fixes

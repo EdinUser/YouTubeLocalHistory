@@ -90,6 +90,7 @@ The extension implements a robust system for processing video thumbnails and app
   - Data migration and versioning
   - Efficient batch operations
   - Storage quota management
+  - Playlist-aware persistence that respects per‑playlist ignore and global playlist pause settings
 
 #### 5. **Sync Service** (`sync-service.js`)
 - **Purpose**: Firefox Sync integration (not available in Chrome)
@@ -104,6 +105,7 @@ The extension implements a robust system for processing video thumbnails and app
   - Tombstone-based deletion system with 30-day retention
   - Stale device protection for devices offline 29+ days
   - Prevents deleted content from reappearing in UI or sync operations
+  - Default auto-sync interval ≈ 10 minutes; immediate sync on updates disabled by default
 
 #### 6. **Tombstone Deletion System**
 - **Purpose**: Ensures deleted videos stay deleted across all devices
@@ -333,6 +335,7 @@ await syncService.fullSync();
 2. **Background Script** detects settings change
 3. **Background Script** broadcasts to all **Content Scripts**
 4. **Content Scripts** update overlay appearance
+5. Playlist context is considered by the storage layer to skip persistence when playlist ignore/pause flags are active
 
 ---
 
