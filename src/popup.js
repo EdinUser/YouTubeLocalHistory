@@ -512,7 +512,7 @@ function buildStatsFromHistory() {
         total += time;
         if (rec.timestamp) {
             const d = new Date(rec.timestamp);
-            const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10);
+            const dayKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
             daily[dayKey] = Math.max(0, Math.floor((daily[dayKey] || 0) + time));
             const h = d.getHours();
             hourly[h] = Math.max(0, Math.floor((hourly[h] || 0) + time));
@@ -534,6 +534,18 @@ async function updateAnalytics() {
         storedStats = await ytStorage.getStats();
     } catch (e) {
         storedStats = null;
+    }
+
+    // Ensure playlists are loaded so count isn't 0 when opening Analytics directly
+    try {
+        const playlistsObj = await ytStorage.getAllPlaylists();
+        if (playlistsObj && typeof playlistsObj === 'object') {
+            allPlaylists = Object.values(playlistsObj);
+        } else {
+            allPlaylists = [];
+        }
+    } catch (_) {
+        allPlaylists = [];
     }
 
     // One-time converter: if stats are empty but we have history, seed from calculated data
@@ -672,7 +684,7 @@ function updateActivityChart() {
     const days = Array.from({length: 7}, (_, i) => {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
-        return date.toISOString().split('T')[0];
+        return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
     }).reverse();
 
     let activity = [];
