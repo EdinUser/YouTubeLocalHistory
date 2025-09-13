@@ -64,6 +64,11 @@
             this.statusCallbacks = [];
             this.syncInterval = null;
             this.syncStorageListener = null;
+            // Throttling to avoid self-triggered sync loops and excessive flashing
+            this.lastLocalSyncWriteTime = 0; // ms when we last wrote to storage.sync
+            this.lastListenerTriggerTime = 0; // ms when listener last triggered a sync
+            this.listenerMinIntervalMs = 5 * 60 * 1000; // 5 minutes between listener-triggered syncs
+            this.ignoreSelfWriteWindowMs = 20 * 1000; // ignore sync changes within 20s of our own write
             this.init();
         }
 
@@ -703,6 +708,9 @@
             for (const chunk of chunks) {
                 await syncStorage.set(chunk);
             }
+
+            // Mark last local write time to avoid immediate re-sync from our own changes
+            this.lastLocalSyncWriteTime = Date.now();
         }
 
         chunkData(data, maxSize = 8000) { // Firefox sync has ~8KB per item limit
@@ -738,7 +746,7 @@
             // Set sync interval to 10 minutes - less frequent to reduce resource usage
             this.syncInterval = setInterval(() => {
                 this.performInitialSync();
-            }, 10 * 60 * 1000); // 10 minutes
+            }, 5 * 60 * 1000); // 10 minutes
 
             // Add Firefox Sync storage change listener for real-time remote updates
             this.setupSyncStorageListener();
@@ -802,14 +810,29 @@
                     );
 
                     if (relevantChanges.length > 0) {
+                        const now = Date.now();
+                        const sinceLocalWrite = now - this.lastLocalSyncWriteTime;
+                        const sinceLastTrigger = now - this.lastListenerTriggerTime;
+
+                        // Ignore our own writes and throttle listener-triggered syncs
+                        if (sinceLocalWrite < this.ignoreSelfWriteWindowMs) {
+                            log('⏳ Ignoring sync.onChanged (likely self-write,', sinceLocalWrite + 'ms ago)');
+                            return;
+                        }
+                        if (sinceLastTrigger < this.listenerMinIntervalMs) {
+                            log('⏳ Throttling sync listener trigger (last', sinceLastTrigger + 'ms ago)');
+                            return;
+                        }
+
                         log('🔥 Remote sync changes detected:', relevantChanges.length, 'items');
-                        // Trigger immediate sync to pull remote changes
+                        this.lastListenerTriggerTime = now;
+                        // Trigger delayed sync to pull remote changes
                         setTimeout(() => {
                             if (!this.syncInProgress) {
-                                log('🔥 Triggering immediate sync due to remote changes');
+                                log('🔥 Triggering sync due to remote changes (throttled)');
                                 this.performInitialSync();
                             }
-                        }, 1000); // Small delay to let Firefox finish the sync operation
+                        }, 1500); // small delay to let Firefox finish its sync operation
                     }
                 }
             };

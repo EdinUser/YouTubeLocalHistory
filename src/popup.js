@@ -34,6 +34,9 @@ let allPlaylists = [];
 let currentPlaylistPage = 1;
 let playlistPageSize = 20;
 
+// Stored aggregated stats cache (from persistent storage)
+let storedStats = null;
+
 // Default settings
 const DEFAULT_SETTINGS = {
     autoCleanPeriod: 90, // days
@@ -469,7 +472,9 @@ function formatAnalyticsDuration(seconds) {
 
 // Calculate analytics data
 function calculateAnalytics(records) {
-    const totalSeconds = records.reduce((sum, record) => sum + (record.time || 0), 0);
+    const totalSeconds = (storedStats && typeof storedStats.totalWatchSeconds === 'number')
+        ? storedStats.totalWatchSeconds
+        : records.reduce((sum, record) => sum + (record.time || 0), 0);
     const totalDuration = records.reduce((sum, record) => sum + (record.duration || 0), 0);
     const completedVideos = records.filter(record =>
         record.time && record.duration && (record.time / record.duration) >= 0.9
@@ -485,8 +490,75 @@ function calculateAnalytics(records) {
     };
 }
 
+// Determine if stats are effectively empty (no totals/daily/hourly data)
+function isStatsEmpty(stats) {
+    if (!stats) return true;
+    const totalEmpty = !stats.totalWatchSeconds || stats.totalWatchSeconds <= 0;
+    const dailyEmpty = !stats.daily || Object.keys(stats.daily).length === 0;
+    const hourlyEmpty = !Array.isArray(stats.hourly) || stats.hourly.length !== 24 || stats.hourly.every(v => !v || v <= 0);
+    return totalEmpty && dailyEmpty && hourlyEmpty;
+}
+
+// Build initial stats snapshot from existing history records
+function buildStatsFromHistory() {
+    const all = [...allHistoryRecords, ...allShortsRecords];
+    const daily = {};
+    const hourly = new Array(24).fill(0);
+    let total = 0;
+
+    all.forEach(rec => {
+        const time = Math.max(0, Math.floor(rec?.time || 0));
+        if (!time) return;
+        total += time;
+        if (rec.timestamp) {
+            const d = new Date(rec.timestamp);
+            const dayKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            daily[dayKey] = Math.max(0, Math.floor((daily[dayKey] || 0) + time));
+            const h = d.getHours();
+            hourly[h] = Math.max(0, Math.floor((hourly[h] || 0) + time));
+        }
+    });
+
+    return {
+        totalWatchSeconds: Math.max(0, Math.floor(total)),
+        daily,
+        hourly,
+        lastUpdated: Date.now()
+    };
+}
+
 // Update analytics display
-function updateAnalytics() {
+async function updateAnalytics() {
+    // Load stored stats for cards/charts (ignore errors, fallback below)
+    try {
+        storedStats = await ytStorage.getStats();
+    } catch (e) {
+        storedStats = null;
+    }
+
+    // Ensure playlists are loaded so count isn't 0 when opening Analytics directly
+    try {
+        const playlistsObj = await ytStorage.getAllPlaylists();
+        if (playlistsObj && typeof playlistsObj === 'object') {
+            allPlaylists = Object.values(playlistsObj);
+        } else {
+            allPlaylists = [];
+        }
+    } catch (_) {
+        allPlaylists = [];
+    }
+
+    // One-time converter: if stats are empty but we have history, seed from calculated data
+    try {
+        const haveHistory = (allHistoryRecords && allHistoryRecords.length) || (allShortsRecords && allShortsRecords.length);
+        if (haveHistory && isStatsEmpty(storedStats)) {
+            const seeded = buildStatsFromHistory();
+            if (seeded.totalWatchSeconds > 0) {
+                await ytStorage.setStats(seeded);
+                storedStats = seeded;
+            }
+        }
+    } catch (_) {}
     const stats = calculateAnalytics(allHistoryRecords);
 
     document.getElementById('totalWatchTime').textContent = stats.totalWatchTime;
@@ -607,20 +679,30 @@ function updateActivityChart() {
     // Clear previous chart
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Get last 7 days of activity
+    // Get last 7 days of activity (prefer stored daily totals if present)
     const now = new Date();
     const days = Array.from({length: 7}, (_, i) => {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
-        return date.toISOString().split('T')[0];
+        return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
     }).reverse();
 
-    const activity = days.map(day => {
-        return allHistoryRecords.filter(record => {
-            const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-            return recordDate === day;
-        }).length;
-    });
+    let activity = [];
+    if (storedStats && storedStats.daily && typeof storedStats.daily === 'object') {
+        // Use daily seconds converted to approximate counts; fallback to 0 if missing
+        activity = days.map(day => {
+            const seconds = Number(storedStats.daily[day] || 0);
+            // Approximate number of videos as seconds/300 (5 minutes) for scaling; minimum 0
+            return Math.max(0, Math.round(seconds / 300));
+        });
+    } else {
+        activity = days.map(day => {
+            return allHistoryRecords.filter(record => {
+                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                return recordDate === day;
+            }).length;
+        });
+    }
 
     // Draw chart
     const maxActivity = Math.max(...activity, 1);
@@ -683,18 +765,20 @@ function updateWatchTimeByHourChart() {
     // Clear previous chart
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate watch time by hour
-    const hourlyData = new Array(24).fill(0);
-
-    // Combine regular videos and shorts
-    const allVideos = [...allHistoryRecords, ...allShortsRecords];
-
-    allVideos.forEach(record => {
-        if (record.timestamp) {
-            const hour = new Date(record.timestamp).getHours();
-            hourlyData[hour] += record.time || 0;
-        }
-    });
+    // Calculate watch time by hour (prefer stored stats)
+    let hourlyData = new Array(24).fill(0);
+    if (storedStats && Array.isArray(storedStats.hourly) && storedStats.hourly.length === 24) {
+        hourlyData = storedStats.hourly.slice();
+    } else {
+        // Fallback to computing from current records
+        const allVideos = [...allHistoryRecords, ...allShortsRecords];
+        allVideos.forEach(record => {
+            if (record.timestamp) {
+                const hour = new Date(record.timestamp).getHours();
+                hourlyData[hour] += record.time || 0;
+            }
+        });
+    }
 
     // Convert seconds to minutes for better readability
     const hourlyMinutes = hourlyData.map(seconds => Math.round(seconds / 60));
@@ -833,6 +917,10 @@ function displayHistoryPage() {
             a.target = '_blank';
             titleDiv.appendChild(a);
             contentDiv.appendChild(titleDiv);
+            const channelDiv = document.createElement('div');
+            channelDiv.className = 'video-channel';
+            channelDiv.setAttribute('data-i18n', 'videos_channel_label');
+            contentDiv.appendChild(channelDiv);
             const detailsDiv = document.createElement('div');
             detailsDiv.className = 'video-details';
             const progressSpan = document.createElement('span');
@@ -855,6 +943,7 @@ function displayHistoryPage() {
         const progress = cell.querySelector('.video-progress');
         const date = cell.querySelector('.video-date');
         const deleteButton = cell.querySelector('.delete-button');
+        const channelDiv = cell.querySelector('.video-channel');
 
         thumbnail.src = `https://i.ytimg.com/vi/${record.videoId}/mqdefault.jpg`;
         thumbnail.alt = record.title || 'Video thumbnail';
@@ -864,6 +953,7 @@ function displayHistoryPage() {
 
         progress.textContent = formatProgress(record.time, record.duration);
         date.textContent = formatDate(record.timestamp);
+        channelDiv.textContent = sanitizeText(record.channelName || '');
 
         deleteButton.onclick = () => deleteRecord(record.videoId);
     });
@@ -914,9 +1004,10 @@ async function clearHistory() {
 
 async function exportHistory() {
     try {
-        const [videos, playlists] = await Promise.all([
+        const [videos, playlists, stats] = await Promise.all([
             ytStorage.getAllVideos(),
-            ytStorage.getAllPlaylists()
+            ytStorage.getAllPlaylists(),
+            (async ()=>{ try { return await ytStorage.getStats(); } catch(e){ return null; } })()
         ]);
 
         // Create export data with metadata
@@ -927,10 +1018,11 @@ async function exportHistory() {
                 totalVideos: videos.length,
                 totalPlaylists: playlists.length,
                 exportFormat: "json",
-                dataVersion: "1.0"
+                dataVersion: "1.1"
             },
             history: videos,  // Changed from 'videos' to 'history' to match import format
-            playlists: playlists
+            playlists: playlists,
+            stats: stats || undefined
         };
 
         const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
@@ -2061,9 +2153,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         exportButton.addEventListener('click', async () => {
             try {
-                const history = await ytStorage.getAllVideos();
-                const playlists = await ytStorage.getAllPlaylists();
-                const data = {history, playlists};
+                const [history, playlists, stats] = await Promise.all([
+                    ytStorage.getAllVideos(),
+                    ytStorage.getAllPlaylists(),
+                    (async ()=>{ try { return await ytStorage.getStats(); } catch(e){ return null; } })()
+                ]);
+                const data = {history, playlists, stats};
 
                 const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
                 const url = URL.createObjectURL(blob);

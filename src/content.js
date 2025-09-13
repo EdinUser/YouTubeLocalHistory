@@ -730,7 +730,26 @@
         };
 
         try {
+            // Compute delta against previous saved time to update stats
+            let previous = null;
+            try { previous = await ytStorage.getVideo(videoId); } catch (_) {}
+            const prevTime = previous && typeof previous.time === 'number' ? previous.time : 0;
+            const delta = Math.max(0, Math.floor(record.time - prevTime));
+
             await ytStorage.setVideo(videoId, record);
+            if (delta > 0 && typeof ytStorage.updateStats === 'function') {
+                const prevRatio = (previous && previous.duration) ? (previous.time || 0) / previous.duration : 0;
+                const newRatio = (record.duration ? record.time / record.duration : 0);
+                const crossedCompleted = record.duration && prevRatio < 0.9 && newRatio >= 0.9;
+                const isNewVideo = !previous || !previous.time;
+                const metadata = {
+                    isNewVideo: !!isNewVideo,
+                    isShorts: false,
+                    durationSeconds: isNewVideo && isFinite(record.duration) ? Math.floor(record.duration) : 0,
+                    crossedCompleted: !!crossedCompleted
+                };
+                await ytStorage.updateStats(delta, record.timestamp, metadata);
+            }
             broadcastVideoUpdate(record);
             log('[Critical] Timestamp saved', { videoId, time: currentTime });
         } catch (error) {
@@ -828,7 +847,26 @@
         };
 
         try {
+            // Compute delta against previous saved time to update stats
+            let previous = null;
+            try { previous = await ytStorage.getVideo(videoId); } catch (_) {}
+            const prevTime = previous && typeof previous.time === 'number' ? previous.time : 0;
+            const delta = Math.max(0, Math.floor(record.time - prevTime));
+
             await ytStorage.setVideo(videoId, record);
+            if (delta > 0 && typeof ytStorage.updateStats === 'function') {
+                const prevRatio = (previous && previous.duration) ? (previous.time || 0) / previous.duration : 0;
+                const newRatio = (record.duration ? record.time / record.duration : 0);
+                const crossedCompleted = record.duration && prevRatio < 0.9 && newRatio >= 0.9;
+                const isNewVideo = !previous || !previous.time;
+                const metadata = {
+                    isNewVideo: !!isNewVideo,
+                    isShorts: true,
+                    durationSeconds: isNewVideo && isFinite(record.duration) ? Math.floor(record.duration) : 0,
+                    crossedCompleted: !!crossedCompleted
+                };
+                await ytStorage.updateStats(delta, record.timestamp, metadata);
+            }
             // Broadcast update after successful save
             broadcastVideoUpdate(record);
             log(`Shorts timestamp successfully saved for video ID ${videoId}: ${currentTime}`);
