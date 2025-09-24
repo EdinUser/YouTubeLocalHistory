@@ -105,7 +105,8 @@ The extension implements a robust system for processing video thumbnails and app
   - Tombstone-based deletion system with 30-day retention
   - Stale device protection for devices offline 29+ days
   - Prevents deleted content from reappearing in UI or sync operations
-  - Default auto-sync interval ≈ 10 minutes; immediate sync on updates disabled by default
+  - Default auto-sync interval ≈ 5 minutes; immediate sync on updates disabled by default
+  - Listener throttling: ignores self-writes for ~20s and enforces ≥5 minutes between listener-triggered syncs to prevent loops
 
 #### 6. **Tombstone Deletion System**
 - **Purpose**: Ensures deleted videos stay deleted across all devices
@@ -132,6 +133,7 @@ The extension implements a robust system for processing video thumbnails and app
   - **Watch activity (last 7 days):** Bar chart of videos watched per day.
   - **Watch time by hour:** Bar chart of when you watch the most content.
 - All analytics are calculated locally for privacy.
+- Internally the popup prefers a persisted stats snapshot for performance and accuracy; it falls back to aggregating from history records when needed. Daily keys are local dates (YYYY-MM-DD), hourly is an array of 24 buckets (0–23).
 
 ---
 
@@ -193,6 +195,24 @@ const playlists = await ytStorage.getAllPlaylists();
 const settings = await ytStorage.getSettings();
 await ytStorage.setSettings(newSettings);
 ```
+ 
+#### Statistics API
+
+```javascript
+// Get persistent stats snapshot
+const stats = await ytStorage.getStats();
+
+// Persist a full stats object (as returned by getStats)
+await ytStorage.setStats(stats);
+
+// Increment stats using a delta and optional metadata
+await ytStorage.updateStats(deltaSeconds, Date.now(), {
+  isNewVideo: true,     // increments counters.videos (and counters.shorts if isShorts)
+  isShorts: false,      // mark if the item is a Shorts
+  durationSeconds: 600, // optional, used for counters.totalDurationSeconds
+  crossedCompleted: true // increments counters.completed if a video passes ~90% watched
+});
+```
 
 #### Data Structure
 
@@ -228,6 +248,25 @@ await ytStorage.setSettings(newSettings);
 ```json5
 {
   deletedAt: 1640995200000  // Unix timestamp when video was deleted
+}
+```
+
+**Stats Snapshot:**
+```json5
+{
+  totalWatchSeconds: 12345,
+  daily: {
+    "2025-09-20": 3600,
+    "2025-09-21": 7200
+  },
+  hourly: [120, 0, 0, /* ... 24 items total ... */],
+  lastUpdated: 1695520000000,
+  counters: {
+    videos: 250,
+    shorts: 80,
+    totalDurationSeconds: 540000,
+    completed: 120
+  }
 }
 ```
 
