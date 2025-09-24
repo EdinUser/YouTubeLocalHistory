@@ -316,7 +316,13 @@ Check out our [Contributing Guide](./CONTRIBUTING.md) for more details.
 ## 📊 Analytics & Statistics
 
 ### Q: What's new in the Analytics tab?
-**A:** The Analytics tab now features summary cards, longest unfinished videos, top watched/skipped channels, a completion bar chart, and new activity charts. All analytics are calculated locally and never leave your device.
+**A:** The Analytics tab now features summary cards, longest unfinished videos, top watched/skipped channels, a completion bar chart, and new activity charts. All analytics are calculated locally and never leave your device. For accuracy and performance, Analytics prefers a small, locally persisted stats snapshot (total, last 7 daily totals using local days, and 24 hourly totals). It falls back to aggregating from history when needed.
+
+### Q: Why do I see channel names under titles in my history?
+**A:** The history list now displays the channel name under each video title to make scanning your history faster and clearer.
+
+### Q: Did the export format change?
+**A:** Yes. Starting with dataVersion 1.1, exports include a `stats` object containing your aggregated watch‑time snapshot used for Analytics. This is optional data used solely to speed up and stabilize charts. Imports accept files with or without `stats`.
 
 ### Q: How do I interpret the completion bar chart?
 **A:** It shows the number of long videos you skipped, partially watched, or completed. The legend explains each category. 

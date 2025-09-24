@@ -80,11 +80,15 @@ After watching videos, you'll notice:
 
 ![Videos tab interface](./images/ytrw_videos.jpg)
 *The Videos tab shows your complete YouTube watch history, with progress, search, and delete options.*
+  
+Your history list shows the channel name under each video title to help you scan quickly.
 
 ### 🎬 Shorts Tab (YouTube Shorts)
 
 ![Shorts tab interface](./images/ytrw_shorts.jpg)
 *The Shorts tab tracks your YouTube Shorts viewing separately, helping you understand your short-form content habits.*
+  
+Shorts saves are now more reliable: the save cadence is 5 seconds and duration checks are relaxed to avoid missed saves.
 
 ### 📝 Playlists Tab
 
@@ -127,6 +131,8 @@ After watching videos, you'll notice:
 
 ![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
 *Watch activity by day and by hour in the Analytics tab.*
+  
+These charts now prefer locally persisted, privacy‑preserving statistics for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets.
 
 ### ⚙️ Settings Tab (Customization)
 
@@ -164,6 +170,7 @@ After watching videos, you'll notice:
   - Videos deleted from history won't reappear after sync
   - 30-day protection period ensures deletions persist across all devices
   - Automatic cleanup of deletion markers after 30 days
+ - **Persistent Statistics**: Analytics use a local stats snapshot (total, last 7 daily totals, 24 hourly totals). Seeded from your existing history after upgrade.
 
 **Sync Settings (Firefox Only):**
 - **Enable Sync**: Toggle Firefox Sync integration
@@ -322,6 +329,7 @@ The export file contains:
 - **Video History**: All your watched videos with timestamps
 - **Playlists**: All saved playlists
 - **Settings**: Your customization preferences
+ - **Stats**: Aggregated watch‑time snapshot powering Analytics (from dataVersion 1.1)
 
 ---
 

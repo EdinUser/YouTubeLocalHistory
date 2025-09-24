@@ -28,6 +28,12 @@ Welcome! Find the right guide for you:
 - All features explained
 - Customization options
 
+### 🆕 What's New in 3.1.2
+- Persistent, privacy‑preserving watch‑time statistics stored locally for faster Analytics
+- History list shows channel names beneath titles
+- Shorts tracking reliability improvements (save cadence, duration handling)
+- Export now includes `stats` (schema `dataVersion: 1.1`)
+
 ### 🔧 **Developer or Contributor?**
 **[→ Technical Documentation](./TECHNICAL.md)**
 - Architecture details

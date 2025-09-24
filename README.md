@@ -103,6 +103,8 @@ The extension adds smart visual indicators directly on YouTube:
 - **Adjustable size** - Small, medium, large, or extra-large labels
 - **Works everywhere** - Video listings, search results, recommendations
 
+Additionally, the history list now shows the video’s channel name beneath the title for quicker scanning.
+
 ### 🎛️ **Extension Interface**
 Click the extension icon to access:
 - **Videos Tab** - Your main viewing history with progress tracking
@@ -135,6 +137,8 @@ Click the extension icon to access:
 - **Top Skipped Channels**: See your top 5 channels where you most often skip long videos (with links)
 - **Completion Bar Chart**: Visualize your completion rate for long videos (skipped, partial, completed) with a bar chart and legend
 - **Weekly Activity**: Visualize your YouTube usage patterns
+
+Analytics now prefer locally persisted, privacy-preserving statistics for better accuracy and performance.
 
 ### 🔄 **Cross-Device Sync (Firefox)**
 - **Firefox Sync**: Automatic cross-device synchronization
@@ -192,6 +196,14 @@ Click the extension icon to access:
 
 This extension uses `chrome.storage.local` (Chrome) or `browser.storage.local` (Firefox) for secure data storage instead of IndexedDB. This provides better security as the data cannot be easily accessed through browser developer tools.
 
+### Persistent Statistics
+For faster and more consistent Analytics, the extension maintains a small, local statistics snapshot:
+- `totalWatchSeconds`: cumulative seconds watched
+- `daily`: last 7 days of totals keyed by local date `YYYY-MM-DD`
+- `hourly`: array of 24 totals for each hour of day
+
+These stats are calculated and stored locally only. On first upgrade, they are seeded from your existing history when possible.
+
 ### Migration from IndexedDB
 
 If you're updating from a previous version that used IndexedDB, the extension will automatically migrate your existing data to the new storage system on first run. The migration process:
@@ -207,6 +219,7 @@ The extension stores three types of data:
 - **Video History**: Video IDs, timestamps, progress, titles, and URLs
 - **Playlist History**: Playlist IDs, titles, and URLs
 - **Settings**: User preferences for overlay appearance, cleanup, and theme preferences
+ - **Statistics**: Aggregated watch‑time summaries used for analytics (local only)
 
 ## Usage
 

@@ -116,6 +116,8 @@ The extension adds helpful visual indicators directly on YouTube:
 ### 🎛️ **Extension Interface**
 **Videos Tab** - Your main viewing history:
 ![Videos tab interface](./images/ytrw_videos.jpg)
+  
+Your history list shows the channel name under each video title to help you scan quickly.
 
 **Shorts Tab** - Separate tracking for YouTube Shorts:
 ![Shorts tab interface](./images/ytrw_shorts.jpg)
@@ -129,6 +131,8 @@ The extension adds helpful visual indicators directly on YouTube:
 
 ![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
 *Watch activity by day and by hour in the Analytics tab*
+  
+These charts now prefer locally persisted, privacy‑preserving statistics for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets.
 
 - **Longest Unfinished Videos**: Resume long videos you haven't finished (shows channel, time left, and link)
 - **Top Watched Channels**: Your top 5 channels by videos watched (with links)

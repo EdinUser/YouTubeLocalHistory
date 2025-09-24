@@ -2,6 +2,43 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [3.1.2] - 2025-09-24
+
+### ✨ New Features
+- Persistent, privacy‑preserving watch‑time statistics stored locally (`totalWatchSeconds`, last 7 days `daily`, 24‑slot `hourly`)
+- History list now shows the video channel name beneath the title
+
+### 🧭 Behavior Changes
+- Shorts tracking: save interval aligned to 5s and relaxed duration checks to avoid missed saves
+- Initial stats seeding from existing history for accurate analytics on upgrade
+
+### 📊 Analytics
+- Summary cards and charts now prefer persistent stats for accuracy and performance
+- Activity (last 7 days) and "Watch time by hour" use stored stats with local‑day keys
+
+### 🔄 Sync & Performance (Firefox)
+- Throttled `storage.sync` change listener to prevent self‑triggered loops; ignores self‑writes for 20s and enforces a 5‑minute minimum between listener‑triggered syncs
+- Stats updates are debounced to the background cadence (default ~10 minutes) unless immediate sync is explicitly enabled
+
+### 🗄️ Export/Import
+- Export schema bumped to `dataVersion: "1.1"` and now includes a `stats` object
+
+### 📦 Build & Manifests
+- Version bump to 3.1.2 in Chrome and Firefox manifests
+
+---
+
+## [3.1.1]
+
+### 🐛 Fixes
+- Improved timestamp validation and optimized `timeupdate` handling to reliably record progress
+- Shorts tracking no longer skips saves when duration is unavailable
+
+### 📦 Build & Manifests
+- Version bump to 3.1.1 in Chrome and Firefox manifests
+
+---
+
 ## [3.1.0] - 2025-09-06
 
 ### ✨ New Features
