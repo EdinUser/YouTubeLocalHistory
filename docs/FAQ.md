@@ -316,7 +316,11 @@ Check out our [Contributing Guide](./CONTRIBUTING.md) for more details.
 ## 📊 Analytics & Statistics
 
 ### Q: What's new in the Analytics tab?
-**A:** The Analytics tab now features summary cards, longest unfinished videos, top watched/skipped channels, a completion bar chart, and new activity charts. All analytics are calculated locally and never leave your device. For accuracy and performance, Analytics prefers a small, locally persisted stats snapshot (total, last 7 daily totals using local days, and 24 hourly totals). It falls back to aggregating from history when needed.
+**A:** The Analytics tab now features summary cards, longest unfinished videos, top watched/skipped channels, a completion bar chart, and new activity charts. All analytics are calculated locally and never leave your device.
+
+For accuracy and responsiveness:
+- Short-window charts (Activity last 7 days, Watch Time by Hour) are computed on-the-fly from local history when you open the tab.
+- Totals are maintained as a small local snapshot (`totalWatchSeconds`, 24-hour buckets, and counters), and included in exports. Daily keys use local dates.
 
 ### Q: Why do I see channel names under titles in my history?
 **A:** The history list now displays the channel name under each video title to make scanning your history faster and clearer.

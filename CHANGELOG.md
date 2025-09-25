@@ -2,6 +2,13 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [3.1.3] - 2025-09-25
+
+### 🐛 Fixes
+- Issue with daily statistics
+
+---
+
 ## [3.1.2] - 2025-09-24
 
 ### ✨ New Features

@@ -536,6 +536,11 @@ async function updateAnalytics() {
         storedStats = null;
     }
 
+    // Ensure latest history is loaded so on-the-fly charts are accurate
+    try {
+        await loadHistory(false);
+    } catch (_) {}
+
     // Ensure playlists are loaded so count isn't 0 when opening Analytics directly
     try {
         const playlistsObj = await ytStorage.getAllPlaylists();
@@ -547,6 +552,51 @@ async function updateAnalytics() {
     } catch (_) {
         allPlaylists = [];
     }
+
+    // Migrate stats if daily/hourly appear empty due to previous key format
+    try {
+        const haveHistory = (allHistoryRecords && allHistoryRecords.length) || (allShortsRecords && allShortsRecords.length);
+        if (haveHistory) {
+            // Build last 7 local day keys
+            const now = new Date();
+            const last7 = Array.from({length: 7}, (_, i) => {
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            });
+
+            let needsDailySeed = false;
+            if (!storedStats || !storedStats.daily || typeof storedStats.daily !== 'object') {
+                needsDailySeed = true;
+            } else {
+                const anyInWindow = last7.some(k => Number(storedStats.daily[k] || 0) > 0);
+                // If no daily entries in current 7-day window but we have history, seed
+                if (!anyInWindow) needsDailySeed = true;
+            }
+
+            let needsHourlySeed = false;
+            if (!storedStats || !Array.isArray(storedStats.hourly) || storedStats.hourly.length !== 24) {
+                needsHourlySeed = true;
+            } else {
+                const sumHour = storedStats.hourly.reduce((a,b)=>a+Number(b||0),0);
+                if (sumHour === 0) needsHourlySeed = true;
+            }
+
+            if (needsDailySeed || needsHourlySeed) {
+                const seeded = buildStatsFromHistory();
+                if (!storedStats) storedStats = {};
+                // Prune seeded daily to last 7 keys only
+                const daily = {};
+                last7.reverse().forEach(k => { // oldest to newest
+                    if (seeded.daily[k]) daily[k] = seeded.daily[k];
+                });
+                if (needsDailySeed) storedStats.daily = daily;
+                if (needsHourlySeed) storedStats.hourly = seeded.hourly;
+                storedStats.lastUpdated = Date.now();
+                await ytStorage.setStats(storedStats);
+            }
+        }
+    } catch (_) {}
 
     // One-time converter: if stats are empty but we have history, seed from calculated data
     try {
@@ -687,22 +737,28 @@ function updateActivityChart() {
         return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
     }).reverse();
 
-    let activity = [];
-    if (storedStats && storedStats.daily && typeof storedStats.daily === 'object') {
-        // Use daily seconds converted to approximate counts; fallback to 0 if missing
-        activity = days.map(day => {
-            const seconds = Number(storedStats.daily[day] || 0);
-            // Approximate number of videos as seconds/300 (5 minutes) for scaling; minimum 0
-            return Math.max(0, Math.round(seconds / 300));
-        });
-    } else {
-        activity = days.map(day => {
-            return allHistoryRecords.filter(record => {
-                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                return recordDate === day;
-            }).length;
-        });
-    }
+    const allVideosForDaily = [...allHistoryRecords, ...allShortsRecords];
+    const activity = days.map(day => {
+        return allVideosForDaily.filter(record => {
+            const d = new Date(record.timestamp);
+            const recordDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            return recordDate === day;
+        }).length;
+    });
+
+    // Also compute total minutes per day
+    const minutesPerDay = days.map(day => {
+        const seconds = allVideosForDaily.reduce((sum, record) => {
+            if (!record.timestamp) return sum;
+            const d = new Date(record.timestamp);
+            const recordDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            if (recordDate === day) {
+                return sum + (record.time || 0);
+            }
+            return sum;
+        }, 0);
+        return Math.round(seconds / 60);
+    });
 
     // Draw chart
     const maxActivity = Math.max(...activity, 1);
@@ -745,8 +801,10 @@ function updateActivityChart() {
         const dateLabel = days[i].slice(5).replace('-', '/');
         ctx.fillText(dateLabel, x + (barWidth - barSpacing) / 2, canvas.height - 5);
 
-        // Draw count label
-        ctx.fillText(count.toString(), x + (barWidth - barSpacing) / 2, y - 5);
+        // Draw label: number of videos / total minutes (e.g., 3/42m)
+        const minutes = minutesPerDay[i];
+        const label = `${count}/${minutes}m`;
+        ctx.fillText(label, x + (barWidth - barSpacing) / 2, y - 5);
     });
 }
 
@@ -765,20 +823,15 @@ function updateWatchTimeByHourChart() {
     // Clear previous chart
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate watch time by hour (prefer stored stats)
-    let hourlyData = new Array(24).fill(0);
-    if (storedStats && Array.isArray(storedStats.hourly) && storedStats.hourly.length === 24) {
-        hourlyData = storedStats.hourly.slice();
-    } else {
-        // Fallback to computing from current records
-        const allVideos = [...allHistoryRecords, ...allShortsRecords];
-        allVideos.forEach(record => {
-            if (record.timestamp) {
-                const hour = new Date(record.timestamp).getHours();
-                hourlyData[hour] += record.time || 0;
-            }
-        });
-    }
+    // Calculate watch time by hour on the fly from current records
+    const hourlyData = new Array(24).fill(0);
+    const allVideos = [...allHistoryRecords, ...allShortsRecords];
+    allVideos.forEach(record => {
+        if (record.timestamp) {
+            const hour = new Date(record.timestamp).getHours();
+            hourlyData[hour] += record.time || 0;
+        }
+    });
 
     // Convert seconds to minutes for better readability
     const hourlyMinutes = hourlyData.map(seconds => Math.round(seconds / 60));

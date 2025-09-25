@@ -133,7 +133,9 @@ The extension implements a robust system for processing video thumbnails and app
   - **Watch activity (last 7 days):** Bar chart of videos watched per day.
   - **Watch time by hour:** Bar chart of when you watch the most content.
 - All analytics are calculated locally for privacy.
-- Internally the popup prefers a persisted stats snapshot for performance and accuracy; it falls back to aggregating from history records when needed. Daily keys are local dates (YYYY-MM-DD), hourly is an array of 24 buckets (0–23).
+- For performance, a small persisted stats snapshot is maintained for totals (`totalWatchSeconds`, `hourly[24]`, `counters`).
+- Short-window charts (Activity last 7 days and Watch Time by Hour) are computed on-the-fly from local history each time the Analytics tab is opened. No sync is required for these charts.
+- Daily keys are local dates (YYYY-MM-DD); `daily` is pruned to the last 7 days. Hourly uses 24 buckets (0–23).
 
 ---
 
