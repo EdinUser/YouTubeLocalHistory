@@ -3,8 +3,8 @@
 # Use environment variables with fallbacks for security (paths not exposed in git)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Clean build directories
-rm -rf "$PROJECT_ROOT/build/chrome/*" "$PROJECT_ROOT/build/firefox/*"
+# Clean build directories - FIX: Remove quotes around globs to allow expansion
+rm -rf $PROJECT_ROOT/build/chrome/* $PROJECT_ROOT/build/firefox/*
 
 # Create dist directory if it doesn't exist
 mkdir -p "$PROJECT_ROOT/dist"
@@ -12,8 +12,8 @@ mkdir -p "$PROJECT_ROOT/dist"
 # Get current version from manifest
 VERSION=$(grep '"version"' "$PROJECT_ROOT/src/manifest.chrome.json" | cut -d'"' -f4)
 
-# Merge locale files before copying
-node merge_locales.js
+# Merge locale files before copying - FIX: Use absolute path
+node "$PROJECT_ROOT/merge_locales.js"
 
 # Function to copy common files
 copy_common_files() {
@@ -55,7 +55,7 @@ cd ../..
 # Build Firefox extension
 echo "Building Firefox extension..."
 copy_common_files "$PROJECT_ROOT/build/firefox"
-cp src/manifest.firefox.json "$PROJECT_ROOT/build/firefox/manifest.json"
+cp "$PROJECT_ROOT/src/manifest.firefox.json" "$PROJECT_ROOT/build/firefox/manifest.json"
 cd "$PROJECT_ROOT/build/firefox"
 # For Firefox, we need to zip the files directly, not the directory
 zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js popup.html popup.js storage.js sync-service.js icon*.png -x ".*"
