@@ -651,7 +651,7 @@ describe('Video Tracking Integration', () => {
         }
 
         const currentTimeAfterMetadata = video.currentTime || 0;
-        if (currentTimeAfterMetadata < savedTime - tolerance) {
+        if (Math.abs(currentTimeAfterMetadata - savedTime) > tolerance) {
           video.currentTime = savedTime;
         }
 
@@ -757,9 +757,27 @@ describe('Video Tracking Integration', () => {
       expect(video.currentTime).toBe(28); // Should remain unchanged
     });
 
-    test('should restore when outside tolerance window', async () => {
+    test('should restore when outside tolerance window (behind)', async () => {
       const video = mockVideoElement;
       video.currentTime = 25; // Outside 2-second tolerance of saved time (30)
+      video.readyState = 1;
+
+      // Mock getVideo to return saved timestamp
+      mockYtStorage.getVideo.mockResolvedValue({
+        videoId: 'testVideoId',
+        time: 30,
+        duration: 100
+      });
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockEnsureVideoReady).toHaveBeenCalledWith(video);
+      expect(video.currentTime).toBe(30); // Should be restored to saved time
+    });
+
+    test('should restore when outside tolerance window (ahead)', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 35; // Ahead of saved time (30) by more than 2 seconds
       video.readyState = 1;
 
       // Mock getVideo to return saved timestamp

@@ -991,7 +991,7 @@
 
                 // Double-check after metadata is loaded
                 const currentTimeAfterMetadata = video.currentTime || 0;
-                if (currentTimeAfterMetadata < savedTime - tolerance) {
+                if (Math.abs(currentTimeAfterMetadata - savedTime) > tolerance) {
                     log(`Restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
                     video.currentTime = savedTime;
                 } else {
