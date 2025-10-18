@@ -923,6 +923,24 @@
         };
     }
 
+    // Helper function for waiting for events with timeout
+    function waitForEvent(target, event, timeout = 1000) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                target.removeEventListener(event, onEvent);
+                reject(new Error(`Timeout waiting for ${event}`));
+            }, timeout);
+
+            function onEvent() {
+                clearTimeout(timer);
+                target.removeEventListener(event, onEvent);
+                resolve();
+            }
+
+            target.addEventListener(event, onEvent, { once: true });
+        });
+    }
+
     // Set up video tracking
     function setupVideoTracking(video) {
         if (trackedVideos.has(video)) return;
@@ -942,27 +960,51 @@
         const ensureVideoReady = async () => {
             if (timestampLoaded) return;
 
-            if (video.readyState < 1) {
-                await new Promise(resolve => {
-                    video.addEventListener('loadedmetadata', resolve, { once: true });
-                });
-            }
+            const videoId = getVideoId();
+            if (!video || !videoId) return;
 
-            // A short delay to allow YouTube's scripts to restore video state first
-            await new Promise(resolve => setTimeout(resolve, 250));
+            try {
+                // Get saved record using existing storage wrapper
+                const record = await ytStorage.getVideo(videoId);
+                if (!record || !record.time || record.time <= 0) return;
 
-            // If currentTime is already set, we are likely in a mode-change
-            // and YouTube has already restored the time. Don't interfere.
-            if (video.currentTime > 1) {
-                log('Video already in progress, skipping timestamp load to avoid interruption.');
-            } else {
-                await loadTimestamp();
-            }
+                const currentTime = video.currentTime || 0;
+                const savedTime = record.time;
 
-            timestampLoaded = true;
+                // Enhanced debug logging using existing log function
+                log(`[ensureVideoReady] videoId=${videoId} | current=${currentTime.toFixed(2)}s | saved=${savedTime.toFixed(2)}s`);
 
-            if (!video.paused) {
-                startSaveInterval();
+                const tolerance = 2; // 2-second tolerance window
+
+                // CASE 1: YouTube already restored correctly (within tolerance)
+                if (Math.abs(currentTime - savedTime) <= tolerance) {
+                    log(`YouTube already restored timestamp correctly (diff=${(currentTime - savedTime).toFixed(2)}s)`);
+                    timestampLoaded = true;
+                    return;
+                }
+
+                // CASE 2: YouTube did not restore or restored incorrectly
+                // Wait until metadata is fully loaded to safely set currentTime
+                if (video.readyState < 1) {
+                    await waitForEvent(video, "loadedmetadata", 1000);
+                }
+
+                // Double-check after metadata is loaded
+                const currentTimeAfterMetadata = video.currentTime || 0;
+                if (Math.abs(currentTimeAfterMetadata - savedTime) > tolerance) {
+                    log(`Restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
+                    video.currentTime = savedTime;
+                } else {
+                    log(`Skipping manual restore; already near target position.`);
+                }
+
+                timestampLoaded = true;
+
+                if (!video.paused) {
+                    startSaveInterval();
+                }
+            } catch (err) {
+                log(`[ensureVideoReady] Error:`, err);
             }
         };
 

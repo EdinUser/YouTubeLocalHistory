@@ -1,3 +1,9 @@
+# 🎉 What's New in 3.1.4
+
+- 🐛 **Fixed video timestamp restoration** in YouTube's new player interface - Videos now properly resume playback when loading inside already loaded pages (SAP)
+- 🔧 **Improved timestamp comparison logic** - More robust detection of YouTube's restoration vs manual restoration needed
+- 🛠️ **Enhanced error handling** - Better recovery when YouTube's restoration mechanism fails
+
 # 🎉 What's New in 3.1.0
 
 - 📝 Per-playlist "Ignore videos" toggle in Playlists tab
@@ -198,6 +204,7 @@ Because we store everything locally:
 
 ## 📈 What's New
 
+- **v3.1.4**: Enhanced compatibility with YouTube's new player interface and improved timestamp restoration
 - **v2.6.4**: Improved sync stability and better error handling
 - **v2.6.1**: Enhanced UI with modern card-based layout
 - **v2.4.0**: Added comprehensive analytics dashboard

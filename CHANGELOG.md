@@ -2,6 +2,15 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [3.1.4] - 2025-10-18
+
+### 🐛 Fixes
+- **Fixed video timestamp restoration in YouTube's new player interface** - Videos now properly resume playback when loading inside already loaded pages (SAP)
+- **Improved timestamp comparison logic** - More robust detection of YouTube's restoration vs manual restoration needed
+- **Enhanced error handling** - Better recovery when YouTube's restoration mechanism fails
+
+---
+
 ## [3.1.3] - 2025-09-25
 
 ### 🐛 Fixes
