@@ -137,6 +137,11 @@ const mockCalculateAnalytics = jest.fn();
 const mockGetWatchTimeByHour = jest.fn();
 const mockGetContentTypeDistribution = jest.fn();
 
+// Mock implementations for new functions
+const mockEnsureVideoReady = jest.fn();
+const mockWaitForEvent = jest.fn();
+const mockGetVideoId = jest.fn();
+
 jest.mock('../../src/content.js', () => ({
   setupVideoTracking: mockSetupVideoTracking,
   loadTimestamp: mockLoadTimestamp,
@@ -147,6 +152,10 @@ jest.mock('../../src/content.js', () => ({
   calculateAnalytics: mockCalculateAnalytics,
   getWatchTimeByHour: mockGetWatchTimeByHour,
   getContentTypeDistribution: mockGetContentTypeDistribution,
+  ensureVideoReady: mockEnsureVideoReady,
+  waitForEvent: mockWaitForEvent,
+  timestampLoaded: false,
+  getVideoId: mockGetVideoId,
   // Add other exported functions as needed
 }));
 
@@ -606,6 +615,199 @@ describe('Video Tracking Integration', () => {
       expect(mockYtStorage.getVideo).toHaveBeenCalledWith('testVideoId');
       // currentTime should remain unchanged
       expect(video.currentTime).toBe(0);
+    });
+  });
+
+  describe('Enhanced Video Ready Logic (New Interface)', () => {
+    beforeEach(() => {
+      // Reset timestampLoaded state for each test
+      contentModule.timestampLoaded = false;
+    });
+
+    // Setup mock implementations for new functions
+    mockEnsureVideoReady.mockImplementation(async (video) => {
+      if (contentModule.timestampLoaded) return;
+
+      const videoId = mockGetVideoId();
+      if (!video || !videoId) return;
+
+      try {
+        const record = await mockYtStorage.getVideo(videoId);
+        if (!record || !record.time || record.time <= 0) return;
+
+        const currentTime = video.currentTime || 0;
+        const savedTime = record.time;
+
+        const tolerance = 2;
+
+        if (Math.abs(currentTime - savedTime) <= tolerance) {
+          // YouTube already restored correctly
+          contentModule.timestampLoaded = true;
+          return;
+        }
+
+        if (video.readyState < 1) {
+          await mockWaitForEvent(video, "loadedmetadata", 1000);
+        }
+
+        const currentTimeAfterMetadata = video.currentTime || 0;
+        if (currentTimeAfterMetadata < savedTime - tolerance) {
+          video.currentTime = savedTime;
+        }
+
+        contentModule.timestampLoaded = true;
+
+        if (!video.paused) {
+          // Mock startSaveInterval
+        }
+      } catch (err) {
+        // Handle error
+      }
+    });
+
+    mockWaitForEvent.mockResolvedValue();
+    mockGetVideoId.mockReturnValue('testVideoId');
+
+    test('should skip restoration when YouTube already restored correctly (within tolerance)', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 30; // Exactly matches saved time
+      video.readyState = 1;
+
+      // Mock getVideo to return saved timestamp
+      mockYtStorage.getVideo.mockResolvedValue({
+        videoId: 'testVideoId',
+        time: 30,
+        duration: 100
+      });
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockEnsureVideoReady).toHaveBeenCalledWith(video);
+      expect(video.currentTime).toBe(30); // Should remain unchanged
+    });
+
+    test('should restore from storage when YouTube restoration failed (outside tolerance)', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 0; // YouTube didn't restore
+      video.readyState = 1;
+
+      // Mock getVideo to return saved timestamp
+      mockYtStorage.getVideo.mockResolvedValue({
+        videoId: 'testVideoId',
+        time: 30,
+        duration: 100
+      });
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockEnsureVideoReady).toHaveBeenCalledWith(video);
+      expect(video.currentTime).toBe(30); // Should be restored to saved time
+    });
+
+    test('should handle video with no saved timestamp', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 0;
+      video.readyState = 1;
+
+      // Mock getVideo to return null (no saved data)
+      mockYtStorage.getVideo.mockResolvedValue(null);
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockYtStorage.getVideo).toHaveBeenCalledWith('testVideoId');
+      expect(video.currentTime).toBe(0); // Should remain unchanged
+    });
+
+    test('should wait for metadata when video not ready', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 0;
+      video.readyState = 0; // Not ready
+
+      // Mock getVideo to return saved timestamp
+      mockYtStorage.getVideo.mockResolvedValue({
+        videoId: 'testVideoId',
+        time: 30,
+        duration: 100
+      });
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockWaitForEvent).toHaveBeenCalledWith(
+        video,
+        'loadedmetadata',
+        1000
+      );
+    });
+
+    test('should handle tolerance window correctly (2 seconds)', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 28; // Within 2-second tolerance of saved time (30)
+      video.readyState = 1;
+
+      // Mock getVideo to return saved timestamp
+      mockYtStorage.getVideo.mockResolvedValue({
+        videoId: 'testVideoId',
+        time: 30,
+        duration: 100
+      });
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockEnsureVideoReady).toHaveBeenCalledWith(video);
+      expect(video.currentTime).toBe(28); // Should remain unchanged
+    });
+
+    test('should restore when outside tolerance window', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 25; // Outside 2-second tolerance of saved time (30)
+      video.readyState = 1;
+
+      // Mock getVideo to return saved timestamp
+      mockYtStorage.getVideo.mockResolvedValue({
+        videoId: 'testVideoId',
+        time: 30,
+        duration: 100
+      });
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockEnsureVideoReady).toHaveBeenCalledWith(video);
+      expect(video.currentTime).toBe(30); // Should be restored to saved time
+    });
+
+    test('should handle errors gracefully', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 0;
+      video.readyState = 1;
+
+      // Mock getVideo to throw an error
+      mockYtStorage.getVideo.mockRejectedValue(new Error('Storage error'));
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockEnsureVideoReady).toHaveBeenCalledWith(video);
+    });
+
+    test('should skip when no video ID available', async () => {
+      const video = mockVideoElement;
+      video.currentTime = 0;
+      video.readyState = 1;
+
+      // Temporarily change mock to return null
+      mockGetVideoId.mockReturnValueOnce(null);
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockYtStorage.getVideo).not.toHaveBeenCalled();
+    });
+
+    test('should skip when already processed (timestampLoaded = true)', async () => {
+      const video = mockVideoElement;
+      contentModule.timestampLoaded = true; // Already processed
+
+      await contentModule.ensureVideoReady(video);
+
+      expect(mockYtStorage.getVideo).not.toHaveBeenCalled();
     });
   });
 

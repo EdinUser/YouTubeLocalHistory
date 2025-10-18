@@ -49,6 +49,49 @@ src/
   - SPA navigation handling
   - YouTube API interaction
   - Thumbnail processing and overlay management
+  - Enhanced video position restoration with SAP compatibility
+
+## 🎬 Enhanced Video Position Restoration
+
+### SAP (Single Page Application) Compatibility
+
+The extension implements advanced logic to handle YouTube's new player interface when loading videos inside already loaded pages:
+
+#### Key Improvements
+- **Smart Timestamp Comparison**: Compares YouTube's current playback position with saved timestamp using a 2-second tolerance window
+- **Robust Event Waiting**: Uses `waitForEvent()` helper with timeout protection for metadata loading
+- **Fallback Restoration**: Automatically restores from storage if YouTube's restoration is incomplete or delayed
+- **Enhanced Debugging**: Comprehensive logging for troubleshooting restoration issues
+
+#### Implementation Details
+```javascript
+// Helper function for waiting for events with timeout
+function waitForEvent(target, event, timeout = 1000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            target.removeEventListener(event, onEvent);
+            reject(new Error(`Timeout waiting for ${event}`));
+        }, timeout);
+
+        function onEvent() {
+            clearTimeout(timer);
+            target.removeEventListener(event, onEvent);
+            resolve();
+        }
+
+        target.addEventListener(event, onEvent, { once: true });
+    });
+}
+```
+
+#### Restoration Logic
+1. **Check saved timestamp** for current video ID
+2. **Compare with YouTube's current position** using tolerance window
+3. **Wait for metadata** if video isn't ready
+4. **Restore from storage** if YouTube's restoration failed
+5. **Enhanced logging** for debugging restoration issues
+
+This ensures reliable timestamp restoration across all YouTube interface variations while maintaining compatibility with existing functionality.
 
 #### Thumbnail Processing System
 
