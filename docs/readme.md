@@ -11,26 +11,26 @@ Welcome! Find the right guide for you:
 ## 🎯 **Choose Your Guide**
 
 ### 🙋‍♀️ **New User?**
-**[→ Start Here: Quick Setup Guide](./INDEX.md)**
+**[→ Start Here: Quick Setup Guide](./index.md)**
 - Same history across ALL YouTube accounts
 - Get the extension working in 5 minutes  
 - YouTube history privacy from Google tracking
 
 ### ❓ **Have Questions?**
-**[→ Frequently Asked Questions](./FAQ.md)**
+**[→ Frequently Asked Questions](./faq.md)**
 - Common problems & solutions
 - Privacy explanations
 - Feature questions
 
 ### 📖 **Want Complete Instructions?**
-**[→ Detailed User Guide](./DETAILED_GUIDE.md)**
+**[→ Detailed User Guide](./detailed_guide.md)**
 - Step-by-step walkthrough
 - All features explained
 - Customization options
 
 
 ### 🔧 **Developer or Contributor?**
-**[→ Technical Documentation](./TECHNICAL.md)**
+**[→ Technical Documentation](./technical.md)**
 - Architecture details
 - API references
 - Build instructions
@@ -41,10 +41,10 @@ Welcome! Find the right guide for you:
 
 | Guide | Best For | What You'll Learn |
 |-------|----------|-------------------|
-| **[INDEX.md](./INDEX.md)** | Multi-account users & newcomers | Account independence + privacy benefits |
-| **[FAQ.md](./FAQ.md)** | Anyone with questions | Account switching, privacy details |
-| **[DETAILED_GUIDE.md](./DETAILED_GUIDE.md)** | Power users | Complete feature walkthrough |
-| **[TECHNICAL.md](./TECHNICAL.md)** | Developers | Code structure, APIs |
+| **[index.md](./index.md)** | Multi-account users & newcomers | Account independence + privacy benefits |
+| **[faq.md](./faq.md)** | Anyone with questions | Account switching, privacy details |
+| **[detailed_guide.md](./detailed_guide.md)** | Power users | Complete feature walkthrough |
+| **[technical.md](./technical.md)** | Developers | Code structure, APIs |
 
 ---
 
@@ -55,8 +55,8 @@ Welcome! Find the right guide for you:
 
 ---
 
-*Most people start with the **[Quick Setup Guide](./INDEX.md)** →*
+*Most people start with the **[Quick Setup Guide](./index.md)** →*
 
 ## Multilanguage Support
 
-This extension is available in several languages. See the main [README](../README.md) and [TECHNICAL.md](./TECHNICAL.md) for details on translation and contributing improvements. 
+This extension is available in several languages. See the main [README](../README.md) and [technical.md](./technical.md) for details on translation and contributing improvements. 
