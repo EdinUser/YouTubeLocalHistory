@@ -1,0 +1,31 @@
+# docs/_config.yml
+
+# Site settings
+title: YT re:Watch Documentation
+description: Complete documentation for YT re:Watch - YouTube history extension for multiple accounts and privacy. User guides, developer docs, and troubleshooting.
+url: "https://edinuser.github.io"       # your GitHub Pages site domain (no trailing slash)
+baseurl: "/YouTubeLocalHistory"        # the repository name (project page) — will be prepended to links
+
+# Theme
+remote_theme: pages-themes/dinky@v0.2.0
+plugins:
+- jekyll-remote-theme
+
+# Optional: Google Analytics
+# google_analytics: UA-XXXXXXXXX-X
+
+# Optional: show download link (specific to Dinky theme)
+show_downloads: true
+
+# Any other custom configurations
+# e.g., exclude, include, collections, etc.
+# exclude:
+#   - Gemfile
+#   - Gemfile.lock
+
+# Build style customizing (assets/css/style.scss will import theme)
+# If you want to add custom styles, create assets/css/style.scss with:
+# ---
+# ---
+# @import "{{ site.theme }}";
+# [your custom CSS below]

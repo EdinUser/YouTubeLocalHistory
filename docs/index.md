@@ -1,24 +1,3 @@
-# 🎉 What's New in 3.1.4
-
-- 🐛 **Fixed video timestamp restoration** in YouTube's new player interface - Videos now properly resume playback when loading inside already loaded pages (SAP)
-- 🔧 **Improved timestamp comparison logic** - More robust detection of YouTube's restoration vs manual restoration needed
-- 🛠️ **Enhanced error handling** - Better recovery when YouTube's restoration mechanism fails
-
-# 🎉 What's New in 3.1.0
-
-- 📝 Per-playlist "Ignore videos" toggle in Playlists tab
-- ⏸️ Global "Pause history in playlists" setting
-
-# 🎉 What's New in 3.0.4
-
-- 🗑️ "Remove from history" button on YouTube thumbnails (hover to reveal)
-
-# 🎉 What's New in 3.0.0
-
-- 🌐 Full multilanguage support (English, German, Spanish, French, Bulgarian)
-- 📊 Major analytics/statistics dashboard redesign with new charts and insights
-- All non-English translations are machine-generated—help us improve them!
-
 # 🎬 YT re:Watch - Never Lose Your Place in YouTube Videos Again!
 
 <div align="center">
