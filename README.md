@@ -4,14 +4,14 @@
 [![Release](https://img.shields.io/github/v/release/EdinUser/YouTubeLocalHistory)](https://github.com/EdinUser/YouTubeLocalHistory/releases)
 [![Telegram Channel](https://img.shields.io/badge/Community-Telegram-2AABEE?logo=telegram&logoColor=white)](https://t.me/+eFftKWGVvSpiZjZk)
 
-# 📚 **[→ New User? Start Here! User-Friendly Guide](./docs/INDEX.md) ←**
+# 📚 **[→ New User? Start Here! User-Friendly Guide](./docs/index.md) ←**
 
 <div align="center">
   <strong>🔄 YouTube Account Switching Made Easy! Same history across ALL accounts + YouTube history privacy!</strong>
   <br>
   <em>🔄 Multi-account extension • 📊 History privacy • ✨ No login required • 🎯 Progress tracking</em>
   <br>
-  <em>📖 <a href="./docs/FAQ.md">FAQ</a> | 📚 <a href="./docs/DETAILED_GUIDE.md">Complete Guide</a> | 🔧 <a href="./docs/TECHNICAL.md">Developer Docs</a></em>
+  <em>📖 <a href="./docs/faq.md">FAQ</a> | 📚 <a href="./docs/detailed_guide.md">Complete Guide</a> | 🔧 <a href="./docs/technical.md">Developer Docs</a></em>
 </div>
 
 ---
@@ -23,6 +23,12 @@
   [![Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
   
   *YouTube progress tracking without account limitations - Your viewing history stays private*
+</div>
+
+<div align="center">
+  <img src="./docs/images/hero.jpg" alt="YT re:Watch Extension Interface" width="800" style="border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+  <br>
+  <em>Main extension interface showing video history, analytics, and settings</em>
 </div>
 
 ---
@@ -158,7 +164,7 @@ Analytics now prefer locally persisted, privacy-preserving statistics for better
 ## 🤝 Community & Support
 
 - 💬 **[Join our Telegram community](https://t.me/+eFftKWGVvSpiZjZk)** - Get help, share tips, and connect with other users
-- 📖 **[Read our documentation](./docs/INDEX.md)** - Complete guides for all skill levels
+- 📖 **[Read our documentation](./docs/index.md)** - Complete guides for all skill levels
 - 🐛 **[Report bugs on GitHub](https://github.com/EdinUser/YouTubeLocalHistory/issues)** - Help improve the extension
 - ⭐ **[Rate us on browser stores](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)** - Support the project
 

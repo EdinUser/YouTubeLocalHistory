@@ -281,7 +281,7 @@ This solves the common problem where deleted videos would reappear after syncing
 ### Q: I have a question not listed here
 **A:** 
 - **💬 Join our community**: [Telegram group](https://t.me/+eFftKWGVvSpiZjZk) - Get help from other users
-- **📖 Read the detailed guide**: [Detailed Guide](./DETAILED_GUIDE.md) - Complete walkthrough
+- **📖 Read the detailed guide**: [Detailed Guide](./detailed_guide.md) - Complete walkthrough
 - **🐛 Report issues**: [GitHub Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues) - Found a bug?
 
 ### Q: How do I report a bug?
@@ -299,7 +299,7 @@ This solves the common problem where deleted videos would reappear after syncing
 - Documentation improvements
 - Translations
 
-Check out our [Contributing Guide](./CONTRIBUTING.md) for more details.
+Check out our [Contributing Guide](./contributing.md) for more details.
 
 ---
 

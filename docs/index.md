@@ -117,7 +117,7 @@ The extension adds helpful visual indicators directly on YouTube:
 - **Text**: Change "viewed" to any word you prefer (max 12 characters)
 - **Colors**: Choose from blue, red, green, purple, or orange
 - **Size**: Small, medium, large, or extra large labels
-- **Learn more**: [Complete customization guide](./DETAILED_GUIDE.md#overlay-customization)
+- **Learn more**: [Complete customization guide](./detailed_guide.md#overlay-customization)
 
 ### 🎛️ **Extension Interface**
 **Videos Tab** - Your main viewing history:
@@ -137,6 +137,9 @@ Your history list shows the channel name under each video title to help you scan
 
 ![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
 *Watch activity by day and by hour in the Analytics tab*
+
+![Analytics detailed view](./images/ytrw_stats4.jpg)
+*Additional analytics showing watch time patterns and channel statistics*
   
 These charts now prefer locally persisted, privacy‑preserving statistics for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets.
 
@@ -147,6 +150,9 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 **Settings Tab** - Customize everything:
 ![Settings customization](./images/ytrw_settings.jpg)
+
+![Settings advanced options](./images/ytrw_settings2.jpg)
+*Additional settings for sync, privacy, and advanced features*
 
 ## 🔐 Account Independence + History Privacy = Perfect Combination
 
@@ -197,8 +203,8 @@ Because we store everything locally:
 - **Missing videos?** Check if you're on youtube.com (not youtube.tv or mobile)
 
 ### Get Support
-- 📖 **[Detailed Guide](./DETAILED_GUIDE.md)** - Step-by-step instructions
-- ❓ **[FAQ](./FAQ.md)** - Common questions and answers
+- 📖 **[Detailed Guide](./detailed_guide.md)** - Step-by-step instructions
+- ❓ **[FAQ](./faq.md)** - Common questions and answers
 - 💬 **[Community Chat](https://t.me/+eFftKWGVvSpiZjZk)** - Join our Telegram community
 - 🐛 **[Report Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues)** - Found a bug?
 
@@ -221,14 +227,14 @@ Because we store everything locally:
 ## 📚 Complete Documentation
 
 ### 👥 For All Users
-- **[FAQ](./FAQ.md)** - Frequently asked questions
-- **[Detailed User Guide](./DETAILED_GUIDE.md)** - Complete feature walkthrough
-- **[Troubleshooting Guide](./TROUBLESHOOTING.md)** - Solve common problems
+- **[FAQ](./faq.md)** - Frequently asked questions
+- **[Detailed User Guide](./detailed_guide.md)** - Complete feature walkthrough
+- **[Troubleshooting Guide](./troubleshooting.md)** - Solve common problems
 
 ### 🔧 For Developers
-- **[Technical Documentation](./TECHNICAL.md)** - Architecture and APIs
-- **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute
-- **[Build Instructions](./BUILD.md)** - Development setup
+- **[Technical Documentation](./technical.md)** - Architecture and APIs
+- **[Contributing Guide](./contributing.md)** - How to contribute
+- **[Build Instructions](./build.md)** - Development setup
 
 ---
 

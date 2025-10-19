@@ -131,6 +131,9 @@ Shorts saves are now more reliable: the save cadence is 5 seconds and duration c
 
 ![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
 *Watch activity by day and by hour in the Analytics tab.*
+
+![Analytics detailed view](./images/ytrw_stats4.jpg)
+*Additional analytics showing watch time patterns and channel statistics*
   
 These charts now prefer locally persisted, privacy‑preserving statistics for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets.
 
@@ -184,6 +187,9 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 ![Settings tab interface](./images/ytrw_settings.jpg)
 *Customize your experience in the Settings tab, including theme, overlays, and data management.*
+
+![Settings advanced options](./images/ytrw_settings2.jpg)
+*Additional settings for sync, privacy, and advanced features*
 
 **Playlist Settings:**
 - **Pause history in playlists (global):** When enabled, the extension does not save watch progress for videos played while you are browsing within any playlist. Use this if you generally don't want playlist sessions to affect your history.
@@ -376,7 +382,7 @@ The export file contains:
 
 **Self-Service:**
 1. Check this guide first
-2. Review the [FAQ](./FAQ.md)
+2. Review the [FAQ](./faq.md)
 3. Try the troubleshooting steps above
 
 **Community Support:**
@@ -432,10 +438,10 @@ YT re:Watch is available in English, German, Spanish, French, and Bulgarian. All
 ## 📞 Still Need Help?
 
 **Quick Links:**
-- 📖 [FAQ](./FAQ.md) - Common questions and answers
+- 📖 [FAQ](./faq.md) - Common questions and answers
 - 💬 [Telegram Community](https://t.me/+eFftKWGVvSpiZjZk) - Chat with other users
 - 🐛 [Report Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues) - Bug reports and feature requests
-- 🔧 [Technical Docs](./TECHNICAL.md) - For developers and advanced users
+- 🔧 [Technical Docs](./technical.md) - For developers and advanced users
 
 **What to Include When Asking for Help:**
 - Your browser and version
