@@ -30,7 +30,7 @@
     "@babel/core": "^7.24.0",
     "@babel/preset-env": "^7.28.0",
     "@babel/preset-react": "^7.27.1",
-    "@playwright/test": "^1.42.1",
+    "@playwright/test": "^1.56.1",
     "@types/jest": "^29.5.12",
     "babel-jest": "^29.7.0",
     "eslint": "^9.15.0",
