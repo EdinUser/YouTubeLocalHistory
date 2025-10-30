@@ -1344,7 +1344,7 @@ function createMockVideoElement() {
   return video;
 }
 
-  describe('Enhanced Navigation Detection (v3.1.5)', () => {
+  describe('Enhanced Navigation Detection', () => {
     beforeEach(() => {
       // Reset URL tracking
       contentModule.lastUrl = window.location.href;
@@ -1383,7 +1383,6 @@ function createMockVideoElement() {
       expect(contentModule.lastUrl).toBe('https://youtube.com/watch?v=newVideo');
     });
   });
-
 
 /**
  * Creates a mock thumbnail element for testing

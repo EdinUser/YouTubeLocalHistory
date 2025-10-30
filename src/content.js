@@ -74,12 +74,17 @@
     // Track event listeners for cleanup
     const videoEventListeners = new WeakMap();
 
+    // Track MutationObservers for cleanup
+    const videoObservers = new WeakMap();
+
     // Cleanup tracking
     let thumbnailObserver = null;
     let shortsVideoObserver = null;
     let initChecker = null;
     let playlistRetryTimeout = null;
     let messageListener = null;
+    let urlCheckIntervalId = null;
+    let historyApiTimeout = null;
 
     // Track thumbnail processing state
     let isProcessingThumbnails = false;
@@ -180,6 +185,14 @@
             clearInterval(saveIntervalId);
             saveIntervalId = null;
         }
+        if (urlCheckIntervalId) {
+            clearInterval(urlCheckIntervalId);
+            urlCheckIntervalId = null;
+        }
+        if (historyApiTimeout) {
+            clearTimeout(historyApiTimeout);
+            historyApiTimeout = null;
+        }
         if (messageListener) {
             // During page unload, the runtime might be disconnected.
             // Check if it's still available before trying to remove the listener.
@@ -225,9 +238,23 @@
                 }
             });
             videoEventListeners.delete(video);
-            trackedVideos.delete(video);
-            log('Cleaned up event listeners for video:', video);
         }
+
+        // Clean up MutationObservers
+        if (videoObservers.has(video)) {
+            const observers = videoObservers.get(video);
+            observers.forEach(observer => {
+                try {
+                    observer.disconnect();
+                } catch (error) {
+                    log('Error disconnecting observer:', error);
+                }
+            });
+            videoObservers.delete(video);
+        }
+
+        trackedVideos.delete(video);
+        log('Cleaned up event listeners and observers for video:', video);
     }
 
     // Helper function to add tracked event listeners
@@ -237,6 +264,14 @@
         }
         videoEventListeners.get(video).push({ event, handler });
         video.addEventListener(event, handler);
+    }
+
+    // Helper function to add tracked observers
+    function addTrackedObserver(video, observer) {
+        if (!videoObservers.has(video)) {
+            videoObservers.set(video, []);
+        }
+        videoObservers.get(video).push(observer);
     }
 
     // Use 'pagehide' for reliable cleanup on page unload
@@ -1126,6 +1161,7 @@
             });
         });
         dryRunSrcObserver.observe(video, { attributes: true, attributeFilter: ['src'] });
+        addTrackedObserver(video, dryRunSrcObserver);
 
         // FIX: Start save interval immediately if video is already playing
         // This handles SPA navigation where video auto-starts before listeners are attached
@@ -2212,13 +2248,22 @@
     });
 
     // Periodic URL checking as fallback (every 500ms)
-    setInterval(checkUrlChange, 500);
+    urlCheckIntervalId = setInterval(checkUrlChange, 500);
 
     // Try additional YouTube navigation events
     window.addEventListener('yt-page-data-updated', () => {
         log('[NAVIGATION] yt-page-data-updated event detected');
         checkUrlChange();
     });
+
+    // Debounced URL check for history API changes
+    function debouncedUrlCheck() {
+        if (historyApiTimeout) clearTimeout(historyApiTimeout);
+        historyApiTimeout = setTimeout(() => {
+            checkUrlChange();
+            historyApiTimeout = null;
+        }, 10);
+    }
 
     // Listen for history API changes
     const originalPushState = history.pushState;
@@ -2227,13 +2272,13 @@
     history.pushState = function(...args) {
         originalPushState.apply(this, args);
         log('[NAVIGATION] pushState detected');
-        setTimeout(checkUrlChange, 10); // Small delay to let URL update
+        debouncedUrlCheck();
     };
 
     history.replaceState = function(...args) {
         originalReplaceState.apply(this, args);
         log('[NAVIGATION] replaceState detected');
-        setTimeout(checkUrlChange, 10); // Small delay to let URL update
+        debouncedUrlCheck();
     };
 
     // Also ensure playlist toggles on direct playlist pages
