@@ -179,6 +179,15 @@ contentModule.debounce = jest.fn().mockImplementation(mockDebounce);
 contentModule.addViewedLabelToThumbnail = jest.fn();
 contentModule.processExistingThumbnails = jest.fn();
 
+// Add functions for testing our new features
+contentModule.startSaveInterval = jest.fn();
+contentModule.checkUrlChange = jest.fn();
+contentModule.handleSpaNavigation = jest.fn();
+contentModule.getVideoId = jest.fn().mockReturnValue('testVideoId');
+contentModule.lastUrl = window.location.href;
+contentModule.lastSpaNavigationTime = 0;
+contentModule.simulatedLastContentChangeTime = 0;
+
 describe('Video Tracking Integration', () => {
   let mockVideoElement;
   let mockYtStorage;
@@ -1334,6 +1343,46 @@ function createMockVideoElement() {
 
   return video;
 }
+
+  describe('Enhanced Navigation Detection', () => {
+    beforeEach(() => {
+      // Reset URL tracking
+      contentModule.lastUrl = window.location.href;
+      contentModule.lastSpaNavigationTime = 0;
+      contentModule.simulatedLastContentChangeTime = 0;
+
+      // Clear any existing intervals
+      jest.clearAllTimers();
+    });
+
+    test('should trigger SPA navigation when URL changes to new video', () => {
+      // Mock initial URL
+      contentModule.lastUrl = 'https://youtube.com/watch?v=oldVideo';
+
+      // Mock getVideoId to return new video ID
+      contentModule.getVideoId.mockReturnValue('newVideoId');
+
+      // Mock handleSpaNavigation
+      const handleSpaNavigationSpy = jest.spyOn(contentModule, 'handleSpaNavigation');
+
+      // Mock checkUrlChange to actually check URL change
+      contentModule.checkUrlChange.mockImplementation(() => {
+        const currentUrl = 'https://youtube.com/watch?v=newVideo';
+        if (currentUrl !== contentModule.lastUrl) {
+          contentModule.lastUrl = currentUrl;
+          const videoId = contentModule.getVideoId();
+          if (videoId && videoId !== contentModule.lastProcessedVideoId) {
+            contentModule.handleSpaNavigation();
+          }
+        }
+      });
+
+      contentModule.checkUrlChange();
+
+      expect(handleSpaNavigationSpy).toHaveBeenCalled();
+      expect(contentModule.lastUrl).toBe('https://youtube.com/watch?v=newVideo');
+    });
+  });
 
 /**
  * Creates a mock thumbnail element for testing

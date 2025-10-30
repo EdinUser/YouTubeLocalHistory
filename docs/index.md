@@ -189,10 +189,7 @@ Because we store everything locally:
 
 ## 📈 What's New
 
-- **v3.1.4**: Enhanced compatibility with YouTube's new player interface and improved timestamp restoration
-- **v2.6.4**: Improved sync stability and better error handling
-- **v2.6.1**: Enhanced UI with modern card-based layout
-- **v2.4.0**: Added comprehensive analytics dashboard
+- **v3.1.5**: Enhanced navigation detection, improved timestamp restoration for all YouTube navigation patterns, and intelligent save interval management
 - **See all updates**: [CHANGELOG.md](../CHANGELOG.md)
 
 ## 🌟 Love YT re:Watch?

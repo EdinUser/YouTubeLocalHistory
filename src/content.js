@@ -74,12 +74,17 @@
     // Track event listeners for cleanup
     const videoEventListeners = new WeakMap();
 
+    // Track MutationObservers for cleanup
+    const videoObservers = new WeakMap();
+
     // Cleanup tracking
     let thumbnailObserver = null;
     let shortsVideoObserver = null;
     let initChecker = null;
     let playlistRetryTimeout = null;
     let messageListener = null;
+    let urlCheckIntervalId = null;
+    let historyApiTimeout = null;
 
     // Track thumbnail processing state
     let isProcessingThumbnails = false;
@@ -95,6 +100,15 @@
 
     // Track the last processed video ID to handle SPA navigation
     let lastProcessedVideoId = null;
+
+    // Track the last time SPA navigation occurred
+    let lastSpaNavigationTime = 0;
+
+    // Track current URL for navigation detection
+    let lastUrl = window.location.href;
+
+    // DRY-RUN LOGGING: Event-driven content change detection
+    let simulatedLastContentChangeTime = 0;
 
     // Track video changes in YouTube's SPA
     let videoObserver = new MutationObserver((mutations) => {
@@ -171,6 +185,14 @@
             clearInterval(saveIntervalId);
             saveIntervalId = null;
         }
+        if (urlCheckIntervalId) {
+            clearInterval(urlCheckIntervalId);
+            urlCheckIntervalId = null;
+        }
+        if (historyApiTimeout) {
+            clearTimeout(historyApiTimeout);
+            historyApiTimeout = null;
+        }
         if (messageListener) {
             // During page unload, the runtime might be disconnected.
             // Check if it's still available before trying to remove the listener.
@@ -216,9 +238,23 @@
                 }
             });
             videoEventListeners.delete(video);
-            trackedVideos.delete(video);
-            log('Cleaned up event listeners for video:', video);
         }
+
+        // Clean up MutationObservers
+        if (videoObservers.has(video)) {
+            const observers = videoObservers.get(video);
+            observers.forEach(observer => {
+                try {
+                    observer.disconnect();
+                } catch (error) {
+                    log('Error disconnecting observer:', error);
+                }
+            });
+            videoObservers.delete(video);
+        }
+
+        trackedVideos.delete(video);
+        log('Cleaned up event listeners and observers for video:', video);
     }
 
     // Helper function to add tracked event listeners
@@ -228,6 +264,14 @@
         }
         videoEventListeners.get(video).push({ event, handler });
         video.addEventListener(event, handler);
+    }
+
+    // Helper function to add tracked observers
+    function addTrackedObserver(video, observer) {
+        if (!videoObservers.has(video)) {
+            videoObservers.set(video, []);
+        }
+        videoObservers.get(video).push(observer);
     }
 
     // Use 'pagehide' for reliable cleanup on page unload
@@ -991,11 +1035,44 @@
 
                 // Double-check after metadata is loaded
                 const currentTimeAfterMetadata = video.currentTime || 0;
+
+                // Check if we're within a short time window of SPA navigation
+                const timeSinceSpaNavigation = Date.now() - lastSpaNavigationTime;
+                const isRecentSpaNavigation = timeSinceSpaNavigation < 2000; // 2 seconds
+
+                // DRY-RUN: Simulate event-driven content change detection
+                const timeSinceSimulatedContentChange = Date.now() - simulatedLastContentChangeTime;
+                const isRecentSimulatedContentChange = timeSinceSimulatedContentChange < 1000; // 1 second for events
+
+                // Enhanced logging for analysis
+                log(`[DRY-RUN] Video state: paused=${video.paused}, currentTime=${currentTimeAfterMetadata.toFixed(2)}s, savedTime=${savedTime.toFixed(2)}s`);
+                log(`[DRY-RUN] Time windows: SPA=${timeSinceSpaNavigation}ms ago (${isRecentSpaNavigation ? 'RECENT' : 'OLD'}), ContentChange=${timeSinceSimulatedContentChange}ms ago (${isRecentSimulatedContentChange ? 'RECENT' : 'OLD'})`);
+
                 if (Math.abs(currentTimeAfterMetadata - savedTime) > tolerance) {
-                    log(`Restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
-                    video.currentTime = savedTime;
+                    // CURRENT LOGIC (time-based SPA navigation)
+                    if (isRecentSpaNavigation) {
+                        log(`[CURRENT] Recent SPA navigation (${timeSinceSpaNavigation}ms ago), restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
+                        video.currentTime = savedTime;
+                    } else {
+                        // Not recent SPA navigation - check if it's a mode change
+                        if (!video.paused && currentTimeAfterMetadata > savedTime) {
+                            log(`[CURRENT] Video is playing and ahead of saved time, likely mode change - skipping restore`);
+                        } else {
+                            log(`[CURRENT] Restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
+                            video.currentTime = savedTime;
+                        }
+                    }
+
+                    // PROPOSED LOGIC (event-driven content change)
+                    if (isRecentSimulatedContentChange) {
+                        log(`[PROPOSED] Recent content change (${timeSinceSimulatedContentChange}ms ago), would restore → ${savedTime.toFixed(2)}s`);
+                    } else if (!video.paused && currentTimeAfterMetadata > savedTime) {
+                        log(`[PROPOSED] Video playing and ahead, likely mode change - would skip restore`);
+                    } else {
+                        log(`[PROPOSED] Would restore from storage → ${savedTime.toFixed(2)}s`);
+                    }
                 } else {
-                    log(`Skipping manual restore; already near target position.`);
+                    log(`[BOTH] Skipping manual restore; already near target position (diff=${(currentTimeAfterMetadata - savedTime).toFixed(2)}s)`);
                 }
 
                 timestampLoaded = true;
@@ -1013,7 +1090,33 @@
         });
 
         // Event handlers with minimal logging
-        addTrackedEventListener(video, 'play', () => startSaveInterval());
+        addTrackedEventListener(video, 'play', async () => {
+            // Start save interval as usual
+            startSaveInterval();
+            
+            // Fallback restoration check: if video started playing from near beginning
+            // but we have a saved timestamp much higher, force restoration
+            const videoId = getVideoId();
+            if (videoId) {
+                const record = await ytStorage.getVideo(videoId);
+                if (record && record.time > 10) { // Only if saved time is significant (>10s)
+                    const currentTime = video.currentTime;
+                    const savedTime = record.time;
+                    
+                    // If playing from near beginning (0-5s) but saved time is much higher
+                    if (currentTime < 5 && savedTime > 30) {
+                        log(`[FALLBACK] Video playing from ${currentTime.toFixed(1)}s but saved time is ${savedTime.toFixed(1)}s, forcing restoration`);
+                        // Small delay to avoid interrupting YouTube's own restoration
+                        setTimeout(() => {
+                            if (video.currentTime < 5) { // Double-check it wasn't restored
+                                video.currentTime = savedTime;
+                                log(`[FALLBACK] Restored to ${savedTime.toFixed(1)}s`);
+                            }
+                        }, 500);
+                    }
+                }
+            }
+        });
         addTrackedEventListener(video, 'pause', () => {
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
@@ -1036,6 +1139,52 @@
             debouncedSave();
             if (!video.paused) startSaveInterval();
         });
+
+        // DRY-RUN LOGGING: Add event listeners for content change detection
+        addTrackedEventListener(video, 'loadstart', () => {
+            simulatedLastContentChangeTime = Date.now();
+            log(`[DRY-RUN] Video loadstart detected - content change at ${simulatedLastContentChangeTime}`);
+        });
+
+        addTrackedEventListener(video, 'emptied', () => {
+            simulatedLastContentChangeTime = Date.now();
+            log(`[DRY-RUN] Video emptied detected - content change at ${simulatedLastContentChangeTime}`);
+        });
+
+        // Add src attribute observer for dry-run logging
+        const dryRunSrcObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'src') {
+                    simulatedLastContentChangeTime = Date.now();
+                    log(`[DRY-RUN] Video src changed - content change at ${simulatedLastContentChangeTime}`);
+                }
+            });
+        });
+        dryRunSrcObserver.observe(video, { attributes: true, attributeFilter: ['src'] });
+        addTrackedObserver(video, dryRunSrcObserver);
+
+        // FIX: Start save interval immediately if video is already playing
+        // This handles SPA navigation where video auto-starts before listeners are attached
+        if (!video.paused && !saveIntervalId) {
+            log('[SPA] Video already playing during setup, starting save interval immediately');
+            startSaveInterval();
+        }
+    }
+
+    // Check for URL changes (fallback for navigation that doesn't trigger yt-navigate-finish)
+    function checkUrlChange() {
+        const currentUrl = window.location.href;
+        if (currentUrl !== lastUrl) {
+            log(`[URL-CHANGE] URL changed from ${lastUrl} to ${currentUrl}`);
+            lastUrl = currentUrl;
+
+            // Check if this is a video page navigation
+            const videoId = getVideoId();
+            if (videoId && videoId !== lastProcessedVideoId) {
+                log(`[URL-CHANGE] Triggering SPA navigation for video: ${videoId}`);
+                handleSpaNavigation();
+            }
+        }
     }
 
     // This function is called when YouTube's SPA navigation is complete.
@@ -1048,6 +1197,7 @@
         }
         log(`[SPA] Navigation to new video detected: ${videoId}`);
         lastProcessedVideoId = videoId;
+        lastSpaNavigationTime = Date.now(); // Track when navigation occurred
 
         // Reset the main initialization flag to allow re-initialization for the new page.
         isInitialized = false;
@@ -2090,6 +2240,46 @@
 
     // Listen for YouTube's own navigation events to handle SPA changes.
     window.addEventListener('yt-navigate-finish', handleSpaNavigation);
+
+    // Additional navigation detection for channel page clicks and other navigation methods
+    window.addEventListener('popstate', () => {
+        log('[NAVIGATION] popstate event detected');
+        checkUrlChange();
+    });
+
+    // Periodic URL checking as fallback (every 500ms)
+    urlCheckIntervalId = setInterval(checkUrlChange, 500);
+
+    // Try additional YouTube navigation events
+    window.addEventListener('yt-page-data-updated', () => {
+        log('[NAVIGATION] yt-page-data-updated event detected');
+        checkUrlChange();
+    });
+
+    // Debounced URL check for history API changes
+    function debouncedUrlCheck() {
+        if (historyApiTimeout) clearTimeout(historyApiTimeout);
+        historyApiTimeout = setTimeout(() => {
+            checkUrlChange();
+            historyApiTimeout = null;
+        }, 10);
+    }
+
+    // Listen for history API changes
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+
+    history.pushState = function(...args) {
+        originalPushState.apply(this, args);
+        log('[NAVIGATION] pushState detected');
+        debouncedUrlCheck();
+    };
+
+    history.replaceState = function(...args) {
+        originalReplaceState.apply(this, args);
+        log('[NAVIGATION] replaceState detected');
+        debouncedUrlCheck();
+    };
 
     // Also ensure playlist toggles on direct playlist pages
     ensurePlaylistIgnoreToggles();
