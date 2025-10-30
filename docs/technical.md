@@ -93,6 +93,41 @@ function waitForEvent(target, event, timeout = 1000) {
 
 This ensures reliable timestamp restoration across all YouTube interface variations while maintaining compatibility with existing functionality. The bidirectional tolerance check handles cases where videos are incorrectly positioned ahead of or behind the saved timestamp.
 
+### Advanced Navigation Detection
+
+The extension implements multi-layered navigation detection to handle YouTube's various navigation patterns and ensure proper initialization regardless of how users navigate between videos:
+
+#### Navigation Detection Methods
+1. **Primary**: `yt-navigate-finish` event (YouTube's standard SPA navigation)
+2. **Fallback 1**: URL change monitoring with periodic checks
+3. **Fallback 2**: History API interception (`pushState`, `replaceState`)
+4. **Fallback 3**: Page visibility events for cross-tab navigation
+5. **Fallback 4**: `yt-page-data-updated` and `popstate` events
+
+#### Intelligent Save Interval Management
+- **Immediate State Check**: After attaching event listeners, immediately checks if video is already playing
+- **Fallback Restoration**: Detects when videos start from beginning despite having saved timestamps
+- **Channel Page Handling**: Special logic for navigation from channel pages where YouTube may not restore timestamps
+
+#### Implementation Details
+```javascript
+// Multi-method navigation detection
+window.addEventListener('yt-navigate-finish', handleSpaNavigation);
+// + URL monitoring, history API interception, visibility events
+
+// Intelligent save interval initialization
+if (!video.paused && !saveIntervalId) {
+    startSaveInterval(); // Prevent missed saves for auto-playing videos
+}
+
+// Fallback restoration for failed YouTube restoration
+if (currentTime < 5 && savedTime > 30) {
+    video.currentTime = savedTime; // Force restore when clear mismatch detected
+}
+```
+
+This multi-layered approach ensures the extension works reliably across all YouTube navigation patterns, including channel page clicks that may bypass standard SPA events.
+
 #### Thumbnail Processing System
 
 The extension implements a robust system for processing video thumbnails and applying overlays to indicate watched status. Key components:

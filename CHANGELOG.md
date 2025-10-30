@@ -2,6 +2,21 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [3.1.5] - 2025-10-30
+
+### 🐛 Fixes
+- **Fixed SPA navigation saving issues** - Videos that auto-start before save interval initialization now properly track progress
+- **Enhanced navigation detection** - Added multiple fallback methods to catch channel page clicks and other navigation types that bypass standard SPA events
+- **Fallback timestamp restoration** - Added intelligent restoration when YouTube fails to restore timestamps for certain navigation paths
+- **Improved channel page compatibility** - Videos clicked from channel pages now properly resume from saved positions
+
+### 🔧 Technical Improvements
+- **Multi-method navigation detection** - Uses `yt-navigate-finish`, URL monitoring, history API interception, and page visibility events
+- **Smart save interval initialization** - Checks video state immediately after event listener setup to prevent missed saves
+- **Event-driven content change logging** - Added comprehensive logging for debugging navigation and content loading issues
+
+---
+
 ## [3.1.4] - 2025-10-18
 
 ### 🐛 Fixes

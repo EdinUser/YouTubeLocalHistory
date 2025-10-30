@@ -65,6 +65,25 @@ This fixes 90% of all issues by clearing cached content and reloading the extens
 3. **Wait for sync**: Progress bars appear after video is saved to history
 4. **Clear browser data**: Old cached thumbnails can cause display issues
 
+#### Videos Not Resuming from Saved Position
+**Symptoms**: Clicking videos from channel pages or certain navigation paths starts from beginning instead of saved timestamp
+
+**Solutions**:
+1. **Refresh the video page**: Sometimes YouTube's restoration catches up after a refresh
+2. **Check extension version**: Ensure you have the latest version (3.1.5+) with enhanced navigation detection
+3. **Try different navigation**: Videos from suggested videos or search results may work better than channel page clicks
+4. **Wait a moment**: The extension has fallback restoration that activates when video starts playing
+5. **Disable ad blockers temporarily**: Some ad blockers interfere with YouTube's restoration mechanisms
+
+#### Videos Not Being Saved During Playback
+**Symptoms**: Video plays but progress isn't saved, requiring manual pause/play to start tracking
+
+**Solutions**:
+1. **Refresh YouTube page**: Reload to reinitialize extension properly
+2. **Check for conflicts**: Disable other YouTube-related extensions temporarily
+3. **Browser restart**: Complete browser restart can resolve initialization issues
+4. **Update extension**: Ensure you have version 3.1.5+ with improved save interval management
+
 ### History Display Problems
 
 #### History Tab Empty or Missing Videos
