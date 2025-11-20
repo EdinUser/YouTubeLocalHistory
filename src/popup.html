@@ -446,6 +446,17 @@
             opacity: 0.6;
         }
 
+        /* Global search container */
+        .global-search-container {
+            margin: 15px 10px 5px 10px;
+            padding: 0;
+            position: relative;
+        }
+
+        .global-search-container .search-input {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
         /* Video cell layout */
         .video-cell {
             display: flex;
@@ -453,6 +464,247 @@
             padding: 8px 0;
             max-width: 100%;
             border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Responsive tab layout */
+        .tab-bar {
+            display: flex;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .tab-bar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Content density styles */
+        body.density-low .video-cell {
+            padding: 12px;
+        }
+
+        body.density-low .video-thumbnail {
+            width: 140px;
+            height: 79px;
+        }
+
+        body.density-normal .video-cell {
+            padding: 10px;
+        }
+
+        body.density-normal .video-thumbnail {
+            width: 120px;
+            height: 68px;
+        }
+
+        body.density-medium .video-cell {
+            padding: 8px;
+        }
+
+        body.density-medium .video-thumbnail {
+            width: 100px;
+            height: 56px;
+        }
+
+        body.density-high .video-cell {
+            padding: 6px;
+        }
+
+        body.density-high .video-thumbnail {
+            width: 80px;
+            height: 45px;
+        }
+
+        body.density-high .video-title {
+            font-size: 12px;
+            line-height: 1.2;
+        }
+
+        body.density-high .video-channel,
+        body.density-high .video-date {
+            font-size: 11px;
+        }
+
+        /* Loading skeleton */
+        body.loading-skeleton .video-cell {
+            background: var(--card-bg);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        body.loading-skeleton .video-thumbnail {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Responsive breakpoints */
+        /* Smart search suggestions */
+        .search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .search-section {
+            padding: 8px 0;
+        }
+
+        .search-section h4 {
+            margin: 0 16px 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .suggestion-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background: var(--button-bg);
+        }
+
+        .suggestion-thumbnail {
+            width: 40px;
+            height: 30px;
+            object-fit: cover;
+            border-radius: 3px;
+            margin-right: 12px;
+        }
+
+        .suggestion-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .suggestion-title {
+            font-size: 14px;
+            color: var(--text-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .suggestion-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .category-item {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .category-item:last-child {
+            border-bottom: none;
+        }
+
+        .category-icon {
+            font-size: 16px;
+            margin-right: 12px;
+            width: 40px;
+            text-align: center;
+        }
+
+        /* Contextual empty states */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.7;
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0 0 8px 0;
+        }
+
+        .empty-subtitle {
+            font-size: 14px;
+            margin: 0 0 24px 0;
+            line-height: 1.4;
+        }
+
+        .empty-action-btn {
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .empty-action-btn:hover {
+            background: var(--button-hover-bg, var(--button-bg));
+        }
+
+        /* Responsive breakpoints */
+        @media (max-width: 500px) {
+            .tab-button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .density-low .video-thumbnail {
+                width: 120px;
+                height: 68px;
+            }
+
+            .density-normal .video-thumbnail {
+                width: 100px;
+                height: 56px;
+            }
+
+            .search-suggestions {
+                max-height: 200px;
+            }
+
+            .suggestion-item {
+                padding: 6px 12px;
+            }
+
+            .empty-state {
+                padding: 30px 15px;
+            }
+
+            .empty-icon {
+                font-size: 36px;
+            }
+
+            .empty-title {
+                font-size: 16px;
+            }
+
+            .empty-subtitle {
+                font-size: 13px;
+            }
         }
 
         .video-thumbnail {
@@ -761,6 +1013,11 @@
     </div>
     <div id="ytvhtMessage" class="message"></div>
 
+    <!-- Global Search Container -->
+    <div class="global-search-container">
+        <input type="text" id="ytvhtGlobalSearchInput" class="search-input" data-i18n-placeholder="global_search_placeholder" placeholder="Search all content..." />
+    </div>
+
     <div class="tab-bar">
         <button id="ytvhtTabVideos" class="tab" data-i18n="tab_videos">Videos</button>
         <button id="ytvhtTabShorts" class="tab" data-i18n="tab_shorts">Shorts</button>
@@ -838,9 +1095,6 @@
 
     <!-- Videos Tab Container -->
     <div id="ytvhtVideosContainer">
-        <div class="search-container">
-            <input type="text" id="ytvhtSearchInput" class="search-input" data-i18n-placeholder="videos_search_placeholder" placeholder="Search videos by title..." />
-        </div>
         <table class="history-table" id="ytvhtVideosTable">
             <tbody id="ytvhtHistoryTable">
                 <!-- History items will be inserted here -->
@@ -865,9 +1119,6 @@
 
     <!-- Shorts Tab Container -->
     <div id="ytvhtShortsContainer" style="display:none;">
-        <div class="search-container">
-            <input type="text" id="ytvhtShortsSearchInput" class="search-input" data-i18n-placeholder="shorts_search_placeholder" placeholder="Search shorts by title..." />
-        </div>
         <table class="history-table" id="ytvhtShortsTable">
             <tbody id="ytvhtShortsBody">
                 <!-- Shorts items will be inserted here -->
@@ -978,9 +1229,14 @@
                         <div class="help-text" data-i18n="settings_export_help">Export your history data (Import coming soon)</div>
                     </div>
                     <div class="settings-group">
-                        <label for="ytvhtAutoCleanPeriod" data-i18n="settings_auto_clean_label">Auto-clean Period (days)</label>
-                        <input type="number" id="ytvhtAutoCleanPeriod" min="1" max="180" value="90">
-                        <div class="help-text" data-i18n="settings_auto_clean_help">Automatically remove history older than this many days</div>
+                        <label for="ytvhtAutoCleanPeriod" data-i18n="settings_auto_clean_label">Auto-clean Period</label>
+                        <select id="ytvhtAutoCleanPeriod">
+                            <option value="30">30 days</option>
+                            <option value="90" selected>90 days</option>
+                            <option value="180">180 days</option>
+                            <option value="forever">Keep forever</option>
+                        </select>
+                        <div class="help-text" data-i18n="settings_auto_clean_help">Automatically remove history older than selected period</div>
                     </div>
                     <div class="settings-group">
                         <label for="ytvhtSyncEnabled" data-i18n="settings_sync_label">Firefox Sync</label>

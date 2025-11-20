@@ -451,17 +451,236 @@ async function loadHistory(isInitialLoad = false) {
     }
 }
 
-// Search functionality
+// Smart search functionality
 let searchQuery = '';
-const searchInput = document.getElementById('ytvhtSearchInput');
+let globalSearchInput = null; // Will be set in DOMContentLoaded
 
-searchInput?.addEventListener('input', (e) => {
-    searchQuery = e.target.value.toLowerCase();
-    currentPage = 1; // Reset to first page when searching
-    currentShortsPage = 1; // Reset shorts page too
-    currentPlaylistPage = 1; // Reset playlists page too
-    loadHistory();
-});
+// Search history system
+let searchHistory = {}; // {query: frequency}
+let searchTimeout = null;
+const SEARCH_DEBOUNCE_DELAY = 1000; // 1 second
+
+function recordSearch(query) {
+    if (!query || query.trim().length < 2) return;
+
+    const trimmed = query.trim().toLowerCase();
+    searchHistory[trimmed] = (searchHistory[trimmed] || 0) + 1;
+
+    // Keep only top 100 searches to prevent memory issues
+    const entries = Object.entries(searchHistory);
+    if (entries.length > 100) {
+        // Sort by frequency and keep top 100
+        entries.sort((a, b) => b[1] - a[1]);
+        searchHistory = Object.fromEntries(entries.slice(0, 100));
+    }
+
+    // Save to storage
+    try {
+        chrome.storage.local.set({ 'ytvht_search_history': searchHistory });
+    } catch (e) {
+        console.warn('[Search] Failed to save search history:', e);
+    }
+}
+
+function getTopSearches(limit = 5) {
+    return Object.entries(searchHistory)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([query]) => query);
+}
+
+function getAllSearches() {
+    return Object.keys(searchHistory);
+}
+
+// Load search history on initialization
+async function loadSearchHistory() {
+    try {
+        const result = await chrome.storage.local.get(['ytvht_search_history']);
+        searchHistory = result.ytvht_search_history || {};
+    } catch (e) {
+        console.warn('[Search] Failed to load search history:', e);
+        searchHistory = {};
+    }
+}
+
+// Smart search suggestions and filtering
+async function smartSearch(query) {
+    const trimmedQuery = query.trim();
+    console.log('[Search] smartSearch called with:', query, 'trimmed:', trimmedQuery);
+
+    // Clear existing timeout
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+
+    if (trimmedQuery.length === 0) {
+        console.log('[Search] Showing recent searches');
+        return showRecentSearches();
+    } else if (trimmedQuery.length < 3) {
+        console.log('[Search] Showing autocomplete suggestions');
+        return showAutocompleteSuggestions(trimmedQuery);
+    } else {
+        // For 3+ characters, show full search and schedule recording
+        console.log('[Search] Showing full search results and scheduling recording');
+        searchTimeout = setTimeout(() => recordSearch(trimmedQuery), SEARCH_DEBOUNCE_DELAY);
+        return await showFullSearchResults(trimmedQuery);
+    }
+}
+
+function showRecentSearches() {
+    const recentContainer = document.getElementById('ytvhtSearchSuggestions') ||
+                           createSearchSuggestionsContainer();
+
+    const topSearches = getTopSearches(5);
+
+    recentContainer.innerHTML = `
+        <div class="search-section">
+            <h4>Recent Searches</h4>
+            ${topSearches.map(search => `
+                <div class="suggestion-item recent-search-item" data-search="${search.replace(/"/g, '&quot;')}">
+                    <div class="suggestion-text">
+                        <div class="suggestion-title">${search}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    // Add event listeners to avoid CSP issues
+    recentContainer.querySelectorAll('.recent-search-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const searchQuery = this.getAttribute('data-search');
+            applyRecentSearch(searchQuery);
+        });
+    });
+
+    recentContainer.style.display = 'block';
+}
+
+function showAutocompleteSuggestions(query) {
+    const suggestionsContainer = document.getElementById('ytvhtSearchSuggestions') ||
+                                createSearchSuggestionsContainer();
+
+    const allSearches = getAllSearches();
+    const matchingSearches = allSearches
+        .filter(search => search.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 8); // Limit to 8 suggestions
+
+    suggestionsContainer.innerHTML = `
+        <div class="search-section">
+            <h4>Search Suggestions</h4>
+            ${matchingSearches.map(search => `
+                <div class="suggestion-item autocomplete-item" data-search="${search.replace(/"/g, '&quot;')}">
+                    <div class="suggestion-text">
+                        <div class="suggestion-title">${search}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    // Add event listeners to avoid CSP issues
+    suggestionsContainer.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const searchQuery = this.getAttribute('data-search');
+            applyRecentSearch(searchQuery);
+        });
+    });
+
+    suggestionsContainer.style.display = 'block';
+}
+
+function applyRecentSearch(searchQuery) {
+    if (globalSearchInput) {
+        globalSearchInput.value = searchQuery;
+        showFullSearchResults(searchQuery);
+    }
+}
+
+
+async function showFullSearchResults(query) {
+    console.log('[Search] showFullSearchResults called with:', query);
+
+    // Hide suggestions and proceed with normal search
+    const suggestionsContainer = document.getElementById('ytvhtSearchSuggestions');
+    if (suggestionsContainer) {
+        suggestionsContainer.style.display = 'none';
+    }
+
+    // Proceed with normal search flow
+    searchQuery = query.toLowerCase();
+    currentPage = 1;
+    currentShortsPage = 1;
+    currentPlaylistPage = 1;
+
+    console.log('[Search] Set searchQuery to:', searchQuery);
+
+    // Load filtered data for all tabs
+    await loadCurrentPages();
+    console.log('[Search] loadCurrentPages completed');
+
+    // Explicitly refresh the current tab's display
+    const activeTab = document.querySelector('.tab-bar .tab.active');
+    console.log('[Search] Active tab element:', activeTab);
+
+    if (activeTab) {
+        const tabName = activeTab.id.replace('ytvhtTab', '').toLowerCase();
+        console.log('[Search] Active tab name:', tabName);
+
+        switch (tabName) {
+            case 'videos':
+                console.log('[Search] Calling displayHistoryPage');
+                displayHistoryPage();
+                break;
+            case 'shorts':
+                console.log('[Search] Calling displayShortsPage');
+                displayShortsPage();
+                break;
+            case 'playlists':
+                console.log('[Search] Calling displayPlaylistsPage');
+                displayPlaylistsPage();
+                break;
+        }
+    } else {
+        console.log('[Search] No active tab found!');
+    }
+}
+
+function createSearchSuggestionsContainer() {
+    const container = document.createElement('div');
+    container.id = 'ytvhtSearchSuggestions';
+    container.className = 'search-suggestions';
+
+    // Insert after the global search input
+    const globalSearchContainer = document.querySelector('.global-search-container');
+    if (globalSearchContainer) {
+        globalSearchContainer.appendChild(container);
+    }
+
+    return container;
+}
+
+
+// Quick actions for suggestions
+function quickSelectVideo(videoId) {
+    // Find and highlight the video in current view
+    const videoElement = document.querySelector(`[data-video-id="${videoId}"]`);
+    if (videoElement) {
+        videoElement.scrollIntoView({ behavior: 'smooth' });
+        videoElement.style.backgroundColor = 'var(--button-bg)';
+        setTimeout(() => {
+            videoElement.style.backgroundColor = '';
+        }, 2000);
+    }
+
+    // Hide suggestions
+    const suggestions = document.getElementById('ytvhtSearchSuggestions');
+    if (suggestions) {
+        suggestions.style.display = 'none';
+    }
+}
+
 
 // Lazy loading functions for pagination
 async function loadHistoryPage(options = {}) {
@@ -557,7 +776,7 @@ async function loadPlaylistsPage(options = {}) {
 // Unified lazy loading function for all data types
 async function loadCurrentPages() {
     try {
-        log('Loading current pages for all data types');
+        console.log('[Search] loadCurrentPages called with searchQuery:', searchQuery);
 
         // Load all current pages in parallel
         const [videosResult, shortsResult, playlistsResult] = await Promise.all([
@@ -566,18 +785,31 @@ async function loadCurrentPages() {
             loadPlaylistsPage({ page: currentPlaylistPage })
         ]);
 
+        console.log('[Search] Data loaded:', {
+            videos: videosResult.records?.length || 0,
+            shorts: shortsResult.records?.length || 0,
+            playlists: playlistsResult.records?.length || 0
+        });
+
         // Update display for current active tab
-        const activeTab = document.querySelector('#ytvhtTabContainer .tab.active');
+        const activeTab = document.querySelector('.tab-bar .tab.active');
+        console.log('[Search] loadCurrentPages active tab:', activeTab);
+
         if (activeTab) {
             const tabName = activeTab.id.replace('ytvhtTab', '').toLowerCase();
+            console.log('[Search] loadCurrentPages tab name:', tabName);
+
             switch (tabName) {
                 case 'videos':
+                    console.log('[Search] loadCurrentPages calling displayHistoryPage');
                     displayHistoryPage();
                     break;
                 case 'shorts':
+                    console.log('[Search] loadCurrentPages calling displayShortsPage');
                     displayShortsPage();
                     break;
                 case 'playlists':
+                    console.log('[Search] loadCurrentPages calling displayPlaylistsPage');
                     displayPlaylistsPage();
                     break;
             }
@@ -588,6 +820,54 @@ async function loadCurrentPages() {
         console.error('Error loading current pages:', error);
         throw error;
     }
+}
+
+// Content density adaptation based on record count
+function adjustContentDensity(records) {
+    const container = document.body || document.documentElement;
+
+    // Remove existing density classes
+    container.className = container.className.replace(/density-\w+/g, '').trim();
+
+    // Add appropriate density class
+    let densityClass = '';
+    if (records.length > 100) {
+        densityClass = 'density-high';
+    } else if (records.length > 50) {
+        densityClass = 'density-medium';
+    } else if (records.length > 10) {
+        densityClass = 'density-normal';
+    } else {
+        densityClass = 'density-low';
+    }
+
+    container.className += ' ' + densityClass;
+    log(`Applied density class: ${densityClass} for ${records.length} records`);
+}
+
+// Progressive content loading
+async function progressiveContentLoading() {
+    const container = document.body || document.documentElement;
+    log('Starting progressive content loading');
+
+    // Phase 1: Show skeleton/structure immediately
+    container.className += ' loading-skeleton';
+    log('Applied loading-skeleton class');
+
+    // Phase 2: Load critical data (first page) - already handled by loadCurrentPages()
+
+    // Phase 3: Load secondary data (stats, etc.) in background
+    setTimeout(async () => {
+        try {
+            // Load analytics data in background
+            const stats = await ytStorage.getStats();
+            updateAnalytics(stats);
+            container.className = container.className.replace(' loading-skeleton', '');
+        } catch (error) {
+            console.log('Background data loading failed:', error);
+            container.className = container.className.replace(' loading-skeleton', '');
+        }
+    }, 100);
 }
 
 // Filter records based on search query
@@ -1038,6 +1318,8 @@ function updateWatchTimeByHourChart() {
 
 // Update displayHistoryPage to use new layout
 function displayHistoryPage() {
+    console.log('[Display] displayHistoryPage called, allHistoryRecords length:', allHistoryRecords.length);
+
     const historyTable = document.getElementById('ytvhtHistoryTable');
     const noHistory = document.getElementById('ytvhtNoHistory');
     const paginationDiv = document.getElementById('ytvhtPagination');
@@ -1045,13 +1327,15 @@ function displayHistoryPage() {
     // allHistoryRecords already contains the current page data (filtered and paginated)
     const pageRecords = allHistoryRecords;
 
+    // Apply content density adaptation
+    adjustContentDensity(pageRecords);
+
     // Clear only if we have new content to show
     if (!pageRecords.length) {
         historyTable.innerHTML = '';
         noHistory.style.display = 'block';
-        noHistory.textContent = searchQuery
-            ? chrome.i18n.getMessage('search_no_videos_found')
-            : chrome.i18n.getMessage('history_no_history_found');
+        const emptyState = getContextualEmptyState('videos', searchQuery);
+        renderEmptyState(noHistory, emptyState);
         paginationDiv.style.display = 'none';
         return;
     }
@@ -1379,34 +1663,46 @@ async function goToPage(page) {
     }
 }
 
-function updatePaginationUI(current, total) {
-    document.getElementById('ytvhtPageInfo').textContent = chrome.i18n.getMessage('pagination_page_info', [current, total]);
+function updateVideosPaginationUI(current, total) {
+    // Defensive: Only update if all required elements exist
+    const pageInfo = document.getElementById('ytvhtPageInfo');
+    const firstBtn = document.getElementById('ytvhtFirstPage');
+    const prevBtn = document.getElementById('ytvhtPrevPage');
+    const nextBtn = document.getElementById('ytvhtNextPage');
+    const lastBtn = document.getElementById('ytvhtLastPage');
+    const pageInput = document.getElementById('ytvhtPageInput');
+    const pageNumbers = document.getElementById('ytvhtPageNumbers');
+
+    if (!pageInfo || !firstBtn || !prevBtn || !nextBtn || !lastBtn || !pageInput || !pageNumbers) {
+        // One or more elements are missing, do not proceed
+        return;
+    }
+
+    pageInfo.textContent = chrome.i18n.getMessage('pagination_page_info', [current, total]);
 
     // Update button states
-    document.getElementById('ytvhtFirstPage').disabled = current === 1;
-    document.getElementById('ytvhtPrevPage').disabled = current === 1;
-    document.getElementById('ytvhtNextPage').disabled = current === total;
-    document.getElementById('ytvhtLastPage').disabled = current === total;
+    firstBtn.disabled = current === 1;
+    prevBtn.disabled = current === 1;
+    nextBtn.disabled = current === total;
+    lastBtn.disabled = current === total;
 
     // Update page input
-    const pageInput = document.getElementById('ytvhtPageInput');
     pageInput.max = total;
 
     // Generate page numbers (smart pagination)
-    const pageNumbers = document.getElementById('ytvhtPageNumbers');
     pageNumbers.innerHTML = '';
 
     if (total <= 7) {
         // Show all pages if 7 or fewer
         for (let i = 1; i <= total; i++) {
-            addPageButton(i, current);
+            addVideosPageButton(i, current);
         }
     } else {
         // Smart pagination for many pages
-        addPageButton(1, current); // Always show first page
+        addVideosPageButton(1, current); // Always show first page
 
         if (current > 3) {
-            addEllipsis(); // Add ... if current is far from start
+            addVideosEllipsis(); // Add ... if current is far from start
         }
 
         // Show current page and neighbors (1 before and 1 after)
@@ -1415,20 +1711,192 @@ function updatePaginationUI(current, total) {
 
         for (let i = start; i <= end; i++) {
             if (i !== 1 && i !== total) { // Don't duplicate first/last page
-                addPageButton(i, current);
+                addVideosPageButton(i, current);
             }
         }
 
         if (current < total - 2) {
-            addEllipsis(); // Add ... if current is far from end
+            addVideosEllipsis(); // Add ... if current is far from end
         }
 
         if (total > 1) {
-            addPageButton(total, current); // Always show last page
+            addVideosPageButton(total, current); // Always show last page
         }
     }
+}
 
 
+function addVideosPageButton(pageNum, currentPage) {
+    const button = document.createElement('button');
+    button.textContent = pageNum;
+    button.className = pageNum === currentPage ? 'active' : '';
+    button.style.cssText = `
+        min-width: 30px;
+        padding: 5px 8px;
+        border: 1px solid #ccc;
+        background: ${pageNum === currentPage ? '#007cba' : '#f9f9f9'};
+        color: ${pageNum === currentPage ? 'white' : '#333'};
+        cursor: pointer;
+        border-radius: 3px;
+    `;
+    button.addEventListener('click', () => goToPage(pageNum));
+    document.getElementById('ytvhtPageNumbers').appendChild(button);
+}
+
+function addVideosEllipsis() {
+    const span = document.createElement('span');
+    span.innerHTML = '&hellip;';  // HTML entity for ellipsis
+    span.style.cssText = `
+        padding: 5px 10px;
+        color: var(--text-color);
+        opacity: 0.7;
+        font-weight: bold;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        font-size: 16px;
+        letter-spacing: 2px;
+    `;
+    document.getElementById('ytvhtPageNumbers').appendChild(span);
+}
+
+function updatePaginationUI(current, total) {
+    // Use simple pagination for videos tab
+    updateVideosPaginationUI(current, total);
+}
+
+// Contextual empty states based on tab and search context
+function getContextualEmptyState(tab, searchQuery) {
+    if (searchQuery && searchQuery.trim()) {
+        // Search-specific empty states
+        return {
+            icon: '⊘',
+            title: chrome.i18n.getMessage('search_no_results_title', 'No results found'),
+            subtitle: chrome.i18n.getMessage('search_no_results_subtitle', 'Try different keywords or clear the search'),
+            action: chrome.i18n.getMessage('search_clear_button', 'Clear search'),
+            actionCallback: () => {
+                if (globalSearchInput) {
+                    globalSearchInput.value = '';
+                    searchQuery = '';
+                    loadCurrentPages();
+                }
+            }
+        };
+    }
+
+    // Tab-specific empty states
+    switch (tab) {
+        case 'videos':
+            return {
+                icon: '▶',
+                title: chrome.i18n.getMessage('videos_empty_title', 'No videos yet'),
+                subtitle: chrome.i18n.getMessage('videos_empty_subtitle', 'Watch some YouTube videos to see your history here'),
+                action: chrome.i18n.getMessage('videos_empty_action', 'Browse YouTube'),
+                actionCallback: () => {
+                    chrome.tabs.create({ url: 'https://www.youtube.com' });
+                }
+            };
+
+        case 'shorts':
+            return {
+                icon: '⚡',
+                title: chrome.i18n.getMessage('shorts_empty_title', 'No shorts watched'),
+                subtitle: chrome.i18n.getMessage('shorts_empty_subtitle', 'Short videos you watch will appear here'),
+                action: chrome.i18n.getMessage('shorts_empty_action', 'Explore shorts'),
+                actionCallback: () => {
+                    chrome.tabs.create({ url: 'https://www.youtube.com/shorts' });
+                }
+            };
+
+        case 'playlists':
+            return {
+                icon: '≡',
+                title: chrome.i18n.getMessage('playlists_empty_title', 'No playlists found'),
+                subtitle: chrome.i18n.getMessage('playlists_empty_subtitle', 'Saved playlists will appear here'),
+                action: chrome.i18n.getMessage('playlists_empty_action', 'Browse playlists'),
+                actionCallback: () => {
+                    chrome.tabs.create({ url: 'https://www.youtube.com/playlists' });
+                }
+            };
+
+        default:
+            return {
+                icon: '📭',
+                title: chrome.i18n.getMessage('generic_empty_title', 'Nothing here'),
+                subtitle: chrome.i18n.getMessage('generic_empty_subtitle', 'Check back later'),
+                action: null
+            };
+    }
+}
+
+function renderEmptyState(container, emptyState) {
+    container.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-icon">${emptyState.icon}</div>
+            <h3 class="empty-title">${emptyState.title}</h3>
+            <p class="empty-subtitle">${emptyState.subtitle}</p>
+            ${emptyState.action ? `
+                <button class="empty-action-btn" onclick="(${emptyState.actionCallback.toString()})()">
+                    ${emptyState.action}
+                </button>
+            ` : ''}
+        </div>
+    `;
+}
+
+// Responsive table column management
+function makeTableResponsive(table) {
+    if (!table) return;
+
+    const tableWidth = table.offsetWidth;
+    const headers = table.querySelectorAll('thead th');
+    const rows = table.querySelectorAll('tbody tr');
+
+    // Define responsive breakpoints
+    const isNarrow = tableWidth < 600;
+    const isVeryNarrow = tableWidth < 400;
+
+    // Hide/show columns based on width
+    headers.forEach((header, index) => {
+        const columnClass = header.className || `col-${index}`;
+
+        // Duration column (usually index 1)
+        if (columnClass.includes('duration') || header.textContent.toLowerCase().includes('duration')) {
+            header.style.display = isNarrow ? 'none' : '';
+            rows.forEach(row => {
+                const cell = row.cells[index];
+                if (cell) cell.style.display = isNarrow ? 'none' : '';
+            });
+        }
+
+        // Date column on very narrow screens
+        if (isVeryNarrow && (columnClass.includes('date') || header.textContent.toLowerCase().includes('date'))) {
+            header.style.display = 'none';
+            rows.forEach(row => {
+                const cell = row.cells[index];
+                if (cell) cell.style.display = 'none';
+            });
+        }
+    });
+}
+
+// Watch for table size changes
+function setupResponsiveTables() {
+    const tables = ['ytvhtShortsTable', 'ytvhtPlaylistsTable'];
+
+    tables.forEach(tableId => {
+        const table = document.getElementById(tableId);
+        if (table) {
+            // Initial responsive check
+            makeTableResponsive(table);
+
+            // Watch for resize events
+            const resizeObserver = new ResizeObserver(() => {
+                makeTableResponsive(table);
+            });
+            resizeObserver.observe(table);
+        }
+    });
 }
 
 function addPageButton(pageNum, currentPage) {
@@ -1446,23 +1914,6 @@ function addPageButton(pageNum, currentPage) {
     `;
     button.addEventListener('click', () => goToPage(pageNum));
     document.getElementById('ytvhtPageNumbers').appendChild(button);
-}
-
-function addEllipsis() {
-    const span = document.createElement('span');
-    span.innerHTML = '&hellip;';  // HTML entity for ellipsis
-    span.style.cssText = `
-        padding: 5px 10px;
-        color: var(--text-color);
-        opacity: 0.7;
-        font-weight: bold;
-        user-select: none;
-        display: flex;
-        align-items: center;
-        font-size: 16px;
-        letter-spacing: 2px;
-    `;
-    document.getElementById('ytvhtPageNumbers').appendChild(span);
 }
 
 async function loadPlaylists(showMessages = true) {
@@ -1495,6 +1946,8 @@ async function loadPlaylists(showMessages = true) {
 }
 
 function displayPlaylistsPage() {
+    console.log('[Display] displayPlaylistsPage called, allPlaylists length:', allPlaylists.length);
+
     const playlistsTable = document.getElementById('ytvhtPlaylistsTable');
     const noPlaylists = document.getElementById('ytvhtNoPlaylists');
     const paginationDiv = document.getElementById('ytvhtPlaylistsPagination');
@@ -1504,9 +1957,14 @@ function displayPlaylistsPage() {
     // allPlaylists already contains the current page data
     const pageRecords = allPlaylists;
 
+    // Apply content density adaptation
+    adjustContentDensity(pageRecords);
+
     if (!pageRecords.length) {
-        noPlaylists.style.display = 'block';
         playlistsTable.style.display = 'none';
+        noPlaylists.style.display = 'block';
+        const emptyState = getContextualEmptyState('playlists', searchQuery);
+        renderEmptyState(noPlaylists, emptyState);
         paginationDiv.style.display = 'none';
         return;
     }
@@ -1772,7 +2230,19 @@ async function saveSettings(settings) {
 
 // Update settings UI with current values
 function updateSettingsUI(settings) {
-    document.getElementById('ytvhtAutoCleanPeriod').value = settings.autoCleanPeriod;
+    const autoCleanSelect = document.getElementById('ytvhtAutoCleanPeriod');
+    if (settings.autoCleanPeriod === 'forever') {
+        autoCleanSelect.value = 'forever';
+    } else {
+        // For numeric values, select the closest available option or the value itself
+        const numericValue = parseInt(settings.autoCleanPeriod) || 90;
+        if (['30', '90', '180'].includes(numericValue.toString())) {
+            autoCleanSelect.value = numericValue.toString();
+        } else {
+            // If it's a custom value, default to 90
+            autoCleanSelect.value = '90';
+        }
+    }
     document.getElementById('ytvhtPaginationCount').value = settings.paginationCount;
     document.getElementById('ytvhtOverlayTitle').value = settings.overlayTitle;
     document.getElementById('ytvhtOverlayColor').value = settings.overlayColor;
@@ -1804,9 +2274,10 @@ async function initSettingsTab() {
     if (autoCleanPeriod) {
         autoCleanPeriod.addEventListener('change', async function () {
             const settings = await loadSettings();
-            settings.autoCleanPeriod = parseInt(this.value);
+            const value = this.value;
+            settings.autoCleanPeriod = value === 'forever' ? 'forever' : parseInt(value);
             await saveSettings(settings);
-            showMessage(chrome.i18n.getMessage('message_overlay_color_updated'));
+            showMessage(chrome.i18n.getMessage('message_auto_clean_updated'));
         });
     } else {
         log('Error: Auto-clean period element not found');
@@ -2261,6 +2732,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Initialize settings tab
         initSettingsTab();
 
+        // Load search history
+        await loadSearchHistory();
+
         log('Theme and UI initialization complete');
 
         const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -2427,6 +2901,34 @@ document.addEventListener('DOMContentLoaded', async function () {
             console.error('Settings tab button not found');
         }
 
+        // Initialize global search
+        globalSearchInput = document.getElementById('ytvhtGlobalSearchInput');
+        if (globalSearchInput) {
+            globalSearchInput.addEventListener('input', async (e) => {
+                const query = e.target.value;
+                console.log('[Search] Input event:', query);
+                await smartSearch(query);
+            });
+
+            globalSearchInput.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    console.log('[Search] Enter pressed with:', e.target.value);
+                    await showFullSearchResults(e.target.value);
+                } else if (e.key === 'Escape') {
+                    // Clear search and suggestions
+                    e.target.value = '';
+                    searchQuery = '';
+                    const suggestions = document.getElementById('ytvhtSearchSuggestions');
+                    if (suggestions) {
+                        suggestions.style.display = 'none';
+                    }
+                    await loadCurrentPages();
+                }
+            });
+        } else {
+            console.error('Global search input not found');
+        }
+
         // Playlist pagination
         prevPlaylistBtn.addEventListener('click', goToPrevPlaylistPage);
         nextPlaylistBtn.addEventListener('click', goToNextPlaylistPage);
@@ -2459,6 +2961,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Initialize sync functionality
         initSyncIntegration();
+
+        // Enable progressive content loading
+        progressiveContentLoading();
+
+        // Set up responsive table handling
+        setupResponsiveTables();
 
         log('Initialization complete');
     } catch (error) {
@@ -2624,6 +3132,8 @@ function addShortsEllipsis() {
 
 // Update displayShortsPage to use pagination
 function displayShortsPage() {
+    console.log('[Display] displayShortsPage called, allShortsRecords length:', allShortsRecords.length);
+
     const shortsTable = document.getElementById('ytvhtShortsTable');
     const noShorts = document.getElementById('ytvhtNoShorts');
     const paginationDiv = document.getElementById('ytvhtShortsPagination');
@@ -2633,9 +3143,17 @@ function displayShortsPage() {
     // allShortsRecords already contains the current page data
     const pageRecords = allShortsRecords;
 
+    // Apply content density adaptation
+    adjustContentDensity(pageRecords);
+
+    // Apply responsive table columns
+    makeTableResponsive(shortsTable);
+
     if (!pageRecords.length) {
-        noShorts.style.display = 'block';
         shortsTable.style.display = 'none';
+        noShorts.style.display = 'block';
+        const emptyState = getContextualEmptyState('shorts', searchQuery);
+        renderEmptyState(noShorts, emptyState);
         if (paginationDiv) paginationDiv.style.display = 'none';
         return;
     }

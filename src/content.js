@@ -930,6 +930,12 @@
     // Update cleanupOldRecords to use currentSettings.autoCleanPeriod
     async function cleanupOldRecords() {
         try {
+            // Skip cleanup if set to "forever"
+            if (currentSettings.autoCleanPeriod === 'forever') {
+                log('Auto-clean disabled - keeping all records forever');
+                return;
+            }
+
             const cutoffTime = Date.now() - (currentSettings.autoCleanPeriod * 24 * 60 * 60 * 1000);
             const allVideos = await ytStorage.getAllVideos();
 

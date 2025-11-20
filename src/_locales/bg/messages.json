@@ -184,5 +184,9 @@
   "content_toggle_paused_title": {
       "message": "re:Watch — Историята е на пауза за този плейлист. Кликнете за активиране",
       "description": "Tooltip when tracking is paused"
+  },
+  "global_search_placeholder": {
+      "message": "Търсене във всички съдържание...",
+      "description": "Placeholder text for the global search input"
   }
 }
