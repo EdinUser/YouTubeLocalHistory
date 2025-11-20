@@ -265,6 +265,99 @@
             return playlists;
         }
 
+        // Get paginated records (videos, shorts, or playlists)
+        async getRecordsPage(options = {}) {
+            const {
+                type = 'videos', // 'videos', 'shorts', 'playlists'
+                page = 1,
+                pageSize = 10,
+                searchQuery = '',
+                sortBy = 'timestamp',
+                sortOrder = 'desc'
+            } = options;
+
+            await this.ensureMigrated();
+            const allData = await storage.get(null);
+            let recordKeys = [];
+            let prefix = '';
+
+            // Determine which records to fetch
+            switch (type) {
+                case 'videos':
+                    recordKeys = Object.keys(allData).filter(key =>
+                        key.startsWith('video_') && !allData[key]?.isShorts
+                    );
+                    prefix = 'video_';
+                    break;
+                case 'shorts':
+                    recordKeys = Object.keys(allData).filter(key =>
+                        key.startsWith('video_') && allData[key]?.isShorts
+                    );
+                    prefix = 'video_';
+                    break;
+                case 'playlists':
+                    recordKeys = Object.keys(allData).filter(key =>
+                        key.startsWith('playlist_')
+                    );
+                    prefix = 'playlist_';
+                    break;
+                default:
+                    throw new Error(`Unknown record type: ${type}`);
+            }
+
+            // Apply search filter
+            let records = recordKeys.map(key => ({
+                id: key.replace(prefix, ''),
+                ...allData[key]
+            }));
+
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                records = records.filter(record =>
+                    record.title?.toLowerCase().includes(query)
+                );
+            }
+
+            // Sort records
+            records.sort((a, b) => {
+                const aVal = a[sortBy] || 0;
+                const bVal = b[sortBy] || 0;
+                return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
+            });
+
+            // Paginate
+            const totalRecords = records.length;
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            const startIndex = (page - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const pageRecords = records.slice(startIndex, endIndex);
+
+            return {
+                records: pageRecords,
+                pagination: {
+                    currentPage: page,
+                    totalPages,
+                    totalRecords,
+                    pageSize,
+                    hasNextPage: page < totalPages,
+                    hasPrevPage: page > 1
+                }
+            };
+        }
+
+        // Convenience methods for specific record types
+        async getVideosPage(options) {
+            return this.getRecordsPage({ ...options, type: 'videos' });
+        }
+
+        async getShortsPage(options) {
+            return this.getRecordsPage({ ...options, type: 'shorts' });
+        }
+
+        async getPlaylistsPage(options) {
+            return this.getRecordsPage({ ...options, type: 'playlists' });
+        }
+
         // Get settings
         async getSettings() {
             await this.ensureMigrated();

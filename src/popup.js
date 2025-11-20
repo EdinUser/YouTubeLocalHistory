@@ -21,6 +21,8 @@ let allHistoryRecords = [];
 let allShortsRecords = [];
 let currentPage = 1;
 let pageSize = 20;
+let totalPages = 1;
+let totalHistoryRecords = 0;
 
 // Sync state tracking to prevent race conditions
 let syncInProgress = false;
@@ -28,11 +30,15 @@ let syncInProgress = false;
 // Shorts Pagination state
 let currentShortsPage = 1;
 let shortsPageSize = 20;
+let totalShortsPages = 1;
+let totalShortsRecords = 0;
 
 // --- Playlists Tab State ---
 let allPlaylists = [];
 let currentPlaylistPage = 1;
 let playlistPageSize = 20;
+let totalPlaylistPages = 1;
+let totalPlaylistRecords = 0;
 
 // Stored aggregated stats cache (from persistent storage)
 let storedStats = null;
@@ -203,7 +209,7 @@ async function initStorage() {
         await ytStorage.ensureMigrated();
 
         // Load initial data
-        await loadHistory(true);
+        await loadCurrentPages();
 
         // Set up message listener for updates
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -452,8 +458,137 @@ const searchInput = document.getElementById('ytvhtSearchInput');
 searchInput?.addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
     currentPage = 1; // Reset to first page when searching
-    displayHistoryPage();
+    currentShortsPage = 1; // Reset shorts page too
+    currentPlaylistPage = 1; // Reset playlists page too
+    loadHistory();
 });
+
+// Lazy loading functions for pagination
+async function loadHistoryPage(options = {}) {
+    const { page = currentPage, pageSize: pageSizeParam = pageSize, searchQuery: query = searchQuery } = options;
+
+    try {
+        log(`Loading history page ${page} with search: "${query}"`);
+        const result = await ytStorage.getVideosPage({
+            page,
+            pageSize: pageSizeParam,
+            searchQuery: query
+        });
+
+        // Update global arrays with just the current page data
+        allHistoryRecords = result.records;
+
+        // Update pagination metadata
+        totalPages = result.pagination.totalPages;
+        totalHistoryRecords = result.pagination.totalRecords;
+
+        log(`Loaded page ${page}/${totalPages} with ${result.records.length} records (total: ${totalHistoryRecords})`);
+
+        return result;
+    } catch (error) {
+        console.error('Error loading history page:', error);
+        allHistoryRecords = [];
+        totalPages = 1;
+        totalHistoryRecords = 0;
+        throw error;
+    }
+}
+
+async function loadShortsPage(options = {}) {
+    const { page = currentShortsPage, pageSize: pageSizeParam = shortsPageSize, searchQuery: query = searchQuery } = options;
+
+    try {
+        log(`Loading shorts page ${page} with search: "${query}"`);
+        const result = await ytStorage.getShortsPage({
+            page,
+            pageSize: pageSizeParam,
+            searchQuery: query
+        });
+
+        // Update global arrays with just the current page data
+        allShortsRecords = result.records;
+
+        // Update pagination metadata
+        totalShortsPages = result.pagination.totalPages;
+        totalShortsRecords = result.pagination.totalRecords;
+
+        log(`Loaded shorts page ${page}/${totalShortsPages} with ${result.records.length} records (total: ${totalShortsRecords})`);
+
+        return result;
+    } catch (error) {
+        console.error('Error loading shorts page:', error);
+        allShortsRecords = [];
+        totalShortsPages = 1;
+        totalShortsRecords = 0;
+        throw error;
+    }
+}
+
+async function loadPlaylistsPage(options = {}) {
+    const { page = currentPlaylistPage, pageSize: pageSizeParam = playlistPageSize, searchQuery: query = searchQuery } = options;
+
+    try {
+        log(`Loading playlists page ${page} with search: "${query}"`);
+        const result = await ytStorage.getPlaylistsPage({
+            page,
+            pageSize: pageSizeParam,
+            searchQuery: query
+        });
+
+        // Update global arrays with just the current page data
+        allPlaylists = result.records;
+
+        // Update pagination metadata
+        totalPlaylistPages = result.pagination.totalPages;
+        totalPlaylistRecords = result.pagination.totalRecords;
+
+        log(`Loaded playlists page ${page}/${totalPlaylistPages} with ${result.records.length} records (total: ${totalPlaylistRecords})`);
+
+        return result;
+    } catch (error) {
+        console.error('Error loading playlists page:', error);
+        allPlaylists = [];
+        totalPlaylistPages = 1;
+        totalPlaylistRecords = 0;
+        throw error;
+    }
+}
+
+// Unified lazy loading function for all data types
+async function loadCurrentPages() {
+    try {
+        log('Loading current pages for all data types');
+
+        // Load all current pages in parallel
+        const [videosResult, shortsResult, playlistsResult] = await Promise.all([
+            loadHistoryPage({ page: currentPage }),
+            loadShortsPage({ page: currentShortsPage }),
+            loadPlaylistsPage({ page: currentPlaylistPage })
+        ]);
+
+        // Update display for current active tab
+        const activeTab = document.querySelector('#ytvhtTabContainer .tab.active');
+        if (activeTab) {
+            const tabName = activeTab.id.replace('ytvhtTab', '').toLowerCase();
+            switch (tabName) {
+                case 'videos':
+                    displayHistoryPage();
+                    break;
+                case 'shorts':
+                    displayShortsPage();
+                    break;
+                case 'playlists':
+                    displayPlaylistsPage();
+                    break;
+            }
+        }
+
+        return { videosResult, shortsResult, playlistsResult };
+    } catch (error) {
+        console.error('Error loading current pages:', error);
+        throw error;
+    }
+}
 
 // Filter records based on search query
 function filterRecords(records) {
@@ -538,7 +673,7 @@ async function updateAnalytics() {
 
     // Ensure latest history is loaded so on-the-fly charts are accurate
     try {
-        await loadHistory(false);
+        await loadCurrentPages();
     } catch (_) {}
 
     // Ensure playlists are loaded so count isn't 0 when opening Analytics directly
@@ -907,11 +1042,11 @@ function displayHistoryPage() {
     const noHistory = document.getElementById('ytvhtNoHistory');
     const paginationDiv = document.getElementById('ytvhtPagination');
 
-    // Filter records based on search
-    const filteredRecords = filterRecords(allHistoryRecords);
+    // allHistoryRecords already contains the current page data (filtered and paginated)
+    const pageRecords = allHistoryRecords;
 
     // Clear only if we have new content to show
-    if (!filteredRecords.length) {
+    if (!pageRecords.length) {
         historyTable.innerHTML = '';
         noHistory.style.display = 'block';
         noHistory.textContent = searchQuery
@@ -924,13 +1059,9 @@ function displayHistoryPage() {
     noHistory.style.display = 'none';
     paginationDiv.style.display = 'flex';
 
-    const totalPages = Math.ceil(filteredRecords.length / pageSize);
+    // Pagination bounds checking (totalPages is now set by loadHistoryPage)
     if (currentPage > totalPages) currentPage = totalPages;
     if (currentPage < 1) currentPage = 1;
-
-    const startIdx = (currentPage - 1) * pageSize;
-    const endIdx = Math.min(startIdx + pageSize, filteredRecords.length);
-    const pageRecords = filteredRecords.slice(startIdx, endIdx);
 
     // Reuse existing rows when possible
     while (historyTable.rows.length > pageRecords.length) {
@@ -1141,7 +1272,7 @@ async function importHistory() {
                     await ytStorage.setVideo(video.videoId, video);
                 }
                 showMessage(chrome.i18n.getMessage('message_import_success', ['replaced', videos.length, playlists.length]));
-                loadHistory();
+                loadCurrentPages();
                 return;
             }
 
@@ -1177,7 +1308,7 @@ async function importHistory() {
 
             const mode = mergeMode ? 'merged' : 'replaced';
             showMessage(chrome.i18n.getMessage('message_import_success', [mode, importedVideos, importedPlaylists]));
-            loadHistory();
+            loadCurrentPages();
 
         } catch (error) {
             console.error('Import error:', error);
@@ -1208,40 +1339,42 @@ function extractRegularVideoRecords(historyObj) {
     );
 }
 
-function goToPrevPage() {
+async function goToPrevPage() {
     if (currentPage > 1) {
         currentPage--;
+        await loadHistoryPage({ page: currentPage });
         displayHistoryPage();
     }
 }
 
-function goToNextPage() {
-    const totalPages = Math.ceil(allHistoryRecords.length / pageSize);
+async function goToNextPage() {
     if (currentPage < totalPages) {
         currentPage++;
+        await loadHistoryPage({ page: currentPage });
         displayHistoryPage();
     }
 }
 
-function goToFirstPage() {
+async function goToFirstPage() {
     if (currentPage !== 1) {
         currentPage = 1;
+        await loadHistoryPage({ page: currentPage });
         displayHistoryPage();
     }
 }
 
-function goToLastPage() {
-    const totalPages = Math.ceil(allHistoryRecords.length / pageSize);
+async function goToLastPage() {
     if (currentPage !== totalPages) {
         currentPage = totalPages;
+        await loadHistoryPage({ page: currentPage });
         displayHistoryPage();
     }
 }
 
-function goToPage(page) {
-    const totalPages = Math.ceil(allHistoryRecords.length / pageSize);
+async function goToPage(page) {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
         currentPage = page;
+        await loadHistoryPage({ page: currentPage });
         displayHistoryPage();
     }
 }
@@ -1368,7 +1501,10 @@ function displayPlaylistsPage() {
     const body = document.getElementById('ytvhtPlaylistsBody');
     body.innerHTML = '';
 
-    if (!allPlaylists.length) {
+    // allPlaylists already contains the current page data
+    const pageRecords = allPlaylists;
+
+    if (!pageRecords.length) {
         noPlaylists.style.display = 'block';
         playlistsTable.style.display = 'none';
         paginationDiv.style.display = 'none';
@@ -1379,13 +1515,9 @@ function displayPlaylistsPage() {
     playlistsTable.style.display = '';
     paginationDiv.style.display = 'flex';
 
-    const totalPages = Math.ceil(allPlaylists.length / playlistPageSize);
-    if (currentPlaylistPage > totalPages) currentPlaylistPage = totalPages;
+    // Pagination bounds checking (totalPlaylistPages is now set by loadPlaylistsPage)
+    if (currentPlaylistPage > totalPlaylistPages) currentPlaylistPage = totalPlaylistPages;
     if (currentPlaylistPage < 1) currentPlaylistPage = 1;
-
-    const startIdx = (currentPlaylistPage - 1) * playlistPageSize;
-    const endIdx = Math.min(startIdx + playlistPageSize, allPlaylists.length);
-    const pageRecords = allPlaylists.slice(startIdx, endIdx);
 
     // Reuse existing rows when possible
     while (body.rows.length > pageRecords.length) {
@@ -1472,28 +1604,29 @@ function displayPlaylistsPage() {
     });
 
     // Update pagination info and controls
-    updatePlaylistPaginationUI(currentPlaylistPage, totalPages);
+    updatePlaylistPaginationUI(currentPlaylistPage, totalPlaylistPages);
 }
 
-function goToFirstPlaylistPage() {
+async function goToFirstPlaylistPage() {
     if (currentPlaylistPage !== 1) {
         currentPlaylistPage = 1;
+        await loadPlaylistsPage({ page: currentPlaylistPage });
         displayPlaylistsPage();
     }
 }
 
-function goToLastPlaylistPage() {
-    const totalPages = Math.ceil(allPlaylists.length / playlistPageSize);
-    if (currentPlaylistPage !== totalPages) {
-        currentPlaylistPage = totalPages;
+async function goToLastPlaylistPage() {
+    if (currentPlaylistPage !== totalPlaylistPages) {
+        currentPlaylistPage = totalPlaylistPages;
+        await loadPlaylistsPage({ page: currentPlaylistPage });
         displayPlaylistsPage();
     }
 }
 
-function goToPlaylistPage(page) {
-    const totalPages = Math.ceil(allPlaylists.length / playlistPageSize);
-    if (page >= 1 && page <= totalPages && page !== currentPlaylistPage) {
+async function goToPlaylistPage(page) {
+    if (page >= 1 && page <= totalPlaylistPages && page !== currentPlaylistPage) {
         currentPlaylistPage = page;
+        await loadPlaylistsPage({ page: currentPlaylistPage });
         displayPlaylistsPage();
     }
 }
@@ -1686,6 +1819,15 @@ async function initSettingsTab() {
             const settings = await loadSettings();
             settings.paginationCount = parseInt(this.value);
             await saveSettings(settings);
+
+            // Update page size variables
+            pageSize = settings.paginationCount;
+            shortsPageSize = settings.paginationCount;
+            playlistPageSize = settings.paginationCount;
+
+            // Reload current pages with new page size
+            await loadCurrentPages();
+
             showMessage(chrome.i18n.getMessage('message_pagination_count_updated'));
         });
     } else {
@@ -1820,9 +1962,15 @@ function switchTab(tab) {
         } else if (tab === 'settings') {
             // Initialize settings tab
             initSettingsTab();
+        } else if (tab === 'videos') {
+            // Display videos when switching to videos tab
+            displayHistoryPage();
         } else if (tab === 'playlists') {
             // Load playlists when switching to playlists tab
-            loadPlaylists(true);
+            if (allPlaylists.length === 0) {
+                loadPlaylistsPage({ page: currentPlaylistPage });
+            }
+            displayPlaylistsPage();
         } else if (tab === 'shorts') {
             // Display shorts when switching to shorts tab
             displayShortsPage();
@@ -2052,7 +2200,14 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Load settings first
         const settings = await loadSettings();
         debugEnabled = settings.debug || false;
+
+        // Update page size variables from settings
+        pageSize = settings.paginationCount || 20;
+        shortsPageSize = settings.paginationCount || 20;
+        playlistPageSize = settings.paginationCount || 20;
+
         log('Initial settings:', settings);
+        log('Page sizes set to:', { pageSize, shortsPageSize, playlistPageSize });
 
         // Function to handle theme changes
         async function handleThemeChange() {
@@ -2243,14 +2398,21 @@ document.addEventListener('DOMContentLoaded', async function () {
         log('Current extension tab:', currentTab);
         switchTab(currentTab);
         // Tabs
-        videosTab.addEventListener('click', () => switchTab('videos'));
+        videosTab.addEventListener('click', () => {
+            switchTab('videos');
+            displayHistoryPage();
+        });
         shortsTab.addEventListener('click', () => {
             switchTab('shorts');
             displayShortsPage();
         });
         playlistsTab.addEventListener('click', () => {
             switchTab('playlists');
-            loadPlaylists(true);
+            // Load playlists if not already loaded
+            if (allPlaylists.length === 0) {
+                loadPlaylistsPage({ page: currentPlaylistPage });
+            }
+            displayPlaylistsPage();
         });
         analyticsTab.addEventListener('click', () => {
             switchTab('analytics');
@@ -2290,10 +2452,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         // Load initial data
-        await loadHistory(true);
+        await loadCurrentPages();
 
-        // Load playlists for analytics (don't show messages)
-        await loadPlaylists(false);
+        // Playlists are already loaded by loadCurrentPages() above
+        // Analytics can access allPlaylists (current page) or load more if needed
 
         // Initialize sync functionality
         initSyncIntegration();
@@ -2305,56 +2467,59 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 });
 
-function goToPrevPlaylistPage() {
+async function goToPrevPlaylistPage() {
     if (currentPlaylistPage > 1) {
         currentPlaylistPage--;
+        await loadPlaylistsPage({ page: currentPlaylistPage });
         displayPlaylistsPage();
     }
 }
 
-function goToNextPlaylistPage() {
-    const totalPages = Math.ceil(allPlaylists.length / playlistPageSize);
-    if (currentPlaylistPage < totalPages) {
+async function goToNextPlaylistPage() {
+    if (currentPlaylistPage < totalPlaylistPages) {
         currentPlaylistPage++;
+        await loadPlaylistsPage({ page: currentPlaylistPage });
         displayPlaylistsPage();
     }
 }
 
 // Shorts pagination controls
-function goToPrevShortsPage() {
+async function goToPrevShortsPage() {
     if (currentShortsPage > 1) {
         currentShortsPage--;
+        await loadShortsPage({ page: currentShortsPage });
         displayShortsPage();
     }
 }
 
-function goToNextShortsPage() {
-    const totalPages = Math.ceil(allShortsRecords.length / shortsPageSize);
-    if (currentShortsPage < totalPages) {
+async function goToNextShortsPage() {
+    if (currentShortsPage < totalShortsPages) {
         currentShortsPage++;
+        await loadShortsPage({ page: currentShortsPage });
         displayShortsPage();
     }
 }
 
-function goToFirstShortsPage() {
+async function goToFirstShortsPage() {
     if (currentShortsPage !== 1) {
         currentShortsPage = 1;
+        await loadShortsPage({ page: currentShortsPage });
         displayShortsPage();
     }
 }
 
-function goToLastShortsPage() {
-    const totalPages = Math.ceil(allShortsRecords.length / shortsPageSize);
-    if (currentShortsPage !== totalPages) {
-        currentShortsPage = totalPages;
+async function goToLastShortsPage() {
+    if (currentShortsPage !== totalShortsPages) {
+        currentShortsPage = totalShortsPages;
+        await loadShortsPage({ page: currentShortsPage });
         displayShortsPage();
     }
 }
 
-function goToShortsPage(page) {
-    const totalPages = Math.ceil(allShortsRecords.length / shortsPageSize);
-    if (page >= 1 && page <= totalPages && page !== currentShortsPage) {
+async function goToShortsPage(page) {
+    if (page >= 1 && page <= totalShortsPages && page !== currentShortsPage) {
         currentShortsPage = page;
+        await loadShortsPage({ page: currentShortsPage });
         displayShortsPage();
     }
 }
@@ -2465,7 +2630,10 @@ function displayShortsPage() {
     const tbody = document.getElementById('ytvhtShortsBody');
     tbody.innerHTML = '';
 
-    if (!allShortsRecords.length) {
+    // allShortsRecords already contains the current page data
+    const pageRecords = allShortsRecords;
+
+    if (!pageRecords.length) {
         noShorts.style.display = 'block';
         shortsTable.style.display = 'none';
         if (paginationDiv) paginationDiv.style.display = 'none';
@@ -2475,12 +2643,9 @@ function displayShortsPage() {
     shortsTable.style.display = '';
     if (paginationDiv) paginationDiv.style.display = 'flex';
 
-    const totalPages = Math.ceil(allShortsRecords.length / shortsPageSize);
-    if (currentShortsPage > totalPages) currentShortsPage = totalPages;
+    // Pagination bounds checking (totalShortsPages is now set by loadShortsPage)
+    if (currentShortsPage > totalShortsPages) currentShortsPage = totalShortsPages;
     if (currentShortsPage < 1) currentShortsPage = 1;
-    const startIdx = (currentShortsPage - 1) * shortsPageSize;
-    const endIdx = Math.min(startIdx + shortsPageSize, allShortsRecords.length);
-    const pageRecords = allShortsRecords.slice(startIdx, endIdx);
 
     pageRecords.forEach(record => {
         const row = document.createElement('tr');
@@ -2517,7 +2682,7 @@ function displayShortsPage() {
     });
 
 
-    updateShortsPaginationUI(currentShortsPage, totalPages);
+    updateShortsPaginationUI(currentShortsPage, totalShortsPages);
 }
 
 // ========== SYNC INTEGRATION ==========
@@ -2575,14 +2740,14 @@ function initSyncIntegration() {
 
             // Force complete refresh after full sync
             setTimeout(async () => {
-                await loadHistory(false);
+                await loadCurrentPages();
             }, 200);
         } else if (message.type === 'regularSyncComplete') {
             syncInProgress = false; // Ensure flag is cleared
 
             // Force complete refresh after regular sync
             setTimeout(async () => {
-                await loadHistory(false);
+                await loadCurrentPages();
             }, 200);
         }
     });
