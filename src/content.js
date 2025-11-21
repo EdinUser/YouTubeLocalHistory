@@ -13,22 +13,62 @@
 
     const storage = {
         async get(keys) {
-            if (isFirefox) {
-                return await browser.storage.local.get(keys);
-            } else {
-                return new Promise((resolve) => {
-                    chrome.storage.local.get(keys, resolve);
-                });
+            try {
+                if (isFirefox) {
+                    return await browser.storage.local.get(keys);
+                } else {
+                    return new Promise((resolve, reject) => {
+                        chrome.storage.local.get(keys, (result) => {
+                            if (chrome.runtime.lastError) {
+                                // Handle extension context invalidated error
+                                if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
+                                    log('[STORAGE] Extension context invalidated during get operation, returning empty result');
+                                    resolve({});
+                                } else {
+                                    reject(chrome.runtime.lastError);
+                                }
+                            } else {
+                                resolve(result);
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                if (error.message && error.message.includes('Extension context invalidated')) {
+                    log('[STORAGE] Extension context invalidated during get operation, returning empty result');
+                    return {};
+                }
+                throw error;
             }
         },
 
         async set(data) {
-            if (isFirefox) {
-                return await browser.storage.local.set(data);
-            } else {
-                return new Promise((resolve) => {
-                    chrome.storage.local.set(data, resolve);
-                });
+            try {
+                if (isFirefox) {
+                    return await browser.storage.local.set(data);
+                } else {
+                    return new Promise((resolve, reject) => {
+                        chrome.storage.local.set(data, () => {
+                            if (chrome.runtime.lastError) {
+                                // Handle extension context invalidated error
+                                if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
+                                    log('[STORAGE] Extension context invalidated during set operation, ignoring');
+                                    resolve();
+                                } else {
+                                    reject(chrome.runtime.lastError);
+                                }
+                            } else {
+                                resolve();
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                if (error.message && error.message.includes('Extension context invalidated')) {
+                    log('[STORAGE] Extension context invalidated during set operation, ignoring');
+                    return;
+                }
+                throw error;
             }
         }
     };
@@ -1208,23 +1248,91 @@
         // Reset the main initialization flag to allow re-initialization for the new page.
         isInitialized = false;
 
-        // Stop any existing initialization interval, as we are starting a new one.
+        // Stop any existing initialization interval
         if (initChecker) {
             clearInterval(initChecker);
             initChecker = null;
         }
 
-        // Re-run the initialization logic, which will find the video and set up tracking.
-        // The logic includes retries in case the video element is not immediately available.
-        initializeIfNeeded();
+        // Create dedicated SPA video observer for immediate detection
+        let spaVideoObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const videos = [
+                            ...(node.tagName === 'VIDEO' ? [node] : []),
+                            ...node.querySelectorAll('video')
+                        ];
+
+                        videos.forEach(video => {
+                            if (!trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
+                                log('[SPA] Video element detected immediately by observer, initializing...');
+
+                                // Disconnect the SPA observer since we found the video
+                                spaVideoObserver.disconnect();
+                                spaVideoObserver = null;
+
+                                // Stop any existing timeout checker
+                                if (initChecker) {
+                                    clearInterval(initChecker);
+                                    initChecker = null;
+                                }
+
+                                // Initialize immediately
+                                initializeWithVideo(video);
+                            }
+                        });
+                    }
+                });
+            });
+        });
+
+        // Start observing immediately for the new video
+        spaVideoObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: false // We only care about new elements, not attribute changes
+        });
+
+        // Fallback timeout-based checking (reduced frequency since observer is primary)
+        let spaCheckCount = 0;
+        const maxSpaChecks = 3; // Reduced from 5 since observer is primary
+
         initChecker = setInterval(() => {
-            log('Checking for video element after SPA navigation...');
+            spaCheckCount++;
+            log(`[SPA] Fallback check for video element (${spaCheckCount}/${maxSpaChecks})...`);
+
             if (initializeIfNeeded()) {
-                log('Initialization successful after SPA navigation. Stopping checker.');
+                log('Fallback initialization successful after SPA navigation.');
+                cleanupSpaObserver();
+            } else if (spaCheckCount >= maxSpaChecks) {
+                log('SPA video detection timeout reached.');
+                cleanupSpaObserver();
+            }
+        }, 1500); // Less frequent since observer is primary
+
+        function cleanupSpaObserver() {
+            if (spaVideoObserver) {
+                spaVideoObserver.disconnect();
+                spaVideoObserver = null;
+            }
+            if (initChecker) {
                 clearInterval(initChecker);
                 initChecker = null;
             }
-        }, 1000);
+        }
+
+        // Add video dimensions check to avoid false positives on invisible/placeholder videos
+        function initializeWithVideo(video) {
+            // Ensure video is actually visible and loaded
+            if (video.readyState >= 1 || video.offsetWidth > 0) {
+                // Re-run the initialization logic with the found video
+                initializeIfNeeded();
+            } else {
+                // Video exists but not ready, wait a bit then initialize
+                setTimeout(() => initializeIfNeeded(), 200);
+            }
+        }
     }
 
     // Initialize and set up event listeners

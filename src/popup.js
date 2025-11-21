@@ -298,7 +298,13 @@ function handleStorageUpdates(changes) {
 async function checkTombstoneAndUpdateVideo(videoId, videoRecord) {
     try {
         // Get all storage data to check for tombstone
-        const allData = await chrome.storage.local.get(null);
+        const allData = await chrome.storage.local.get(null).catch(error => {
+            if (error.message && error.message.includes('Extension context invalidated')) {
+                console.log('[Popup] Extension context invalidated during tombstone check');
+                return {};
+            }
+            throw error;
+        });
         const tombstoneKey = `deleted_video_${videoId}`;
 
         if (allData[tombstoneKey]) {
@@ -370,7 +376,13 @@ function updateVideoRecord(record) {
 async function loadHistory(isInitialLoad = false) {
     try {
         log('Loading history from storage...');
-        const allData = await chrome.storage.local.get(null);
+        const allData = await chrome.storage.local.get(null).catch(error => {
+            if (error.message && error.message.includes('Extension context invalidated')) {
+                console.log('[Popup] Extension context invalidated during history load');
+                return {};
+            }
+            throw error;
+        });
 
         // Extract videos and tombstones
         const videos = {};
@@ -461,7 +473,7 @@ let searchTimeout = null;
 const SEARCH_DEBOUNCE_DELAY = 1000; // 1 second
 
 function recordSearch(query) {
-    if (!query || query.trim().length < 2) return;
+    if (!query || query.trim().length <= 3) return; // Don't save searches 3 characters or shorter
 
     const trimmed = query.trim().toLowerCase();
     searchHistory[trimmed] = (searchHistory[trimmed] || 0) + 1;
@@ -476,9 +488,21 @@ function recordSearch(query) {
 
     // Save to storage
     try {
-        chrome.storage.local.set({ 'ytvht_search_history': searchHistory });
+        chrome.storage.local.set({ 'ytvht_search_history': searchHistory }, () => {
+            if (chrome.runtime.lastError) {
+                if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
+                    console.log('[Search] Extension context invalidated during search history save');
+                } else {
+                    console.warn('[Search] Failed to save search history:', chrome.runtime.lastError);
+                }
+            }
+        });
     } catch (e) {
-        console.warn('[Search] Failed to save search history:', e);
+        if (e.message && e.message.includes('Extension context invalidated')) {
+            console.log('[Search] Extension context invalidated during search history save');
+        } else {
+            console.warn('[Search] Failed to save search history:', e);
+        }
     }
 }
 
@@ -496,11 +520,38 @@ function getAllSearches() {
 // Load search history on initialization
 async function loadSearchHistory() {
     try {
-        const result = await chrome.storage.local.get(['ytvht_search_history']);
+        const result = await chrome.storage.local.get(['ytvht_search_history']).catch(error => {
+            if (error.message && error.message.includes('Extension context invalidated')) {
+                console.log('[Search] Extension context invalidated during search history load');
+                return {};
+            }
+            throw error;
+        });
         searchHistory = result.ytvht_search_history || {};
     } catch (e) {
-        console.warn('[Search] Failed to load search history:', e);
-        searchHistory = {};
+        if (e.message && e.message.includes('Extension context invalidated')) {
+            console.log('[Search] Extension context invalidated during search history load');
+            searchHistory = {};
+        } else {
+            console.warn('[Search] Failed to load search history:', e);
+            searchHistory = {};
+        }
+    }
+}
+
+// Toggle clear button visibility
+function toggleClearButton(show) {
+    const searchClearBtn = document.getElementById('ytvhtSearchClear');
+    if (searchClearBtn) {
+        searchClearBtn.style.display = show ? 'flex' : 'none';
+    }
+}
+
+// Hide search suggestions
+function hideSearchSuggestions() {
+    const suggestions = document.getElementById('ytvhtSearchSuggestions');
+    if (suggestions) {
+        suggestions.style.display = 'none';
     }
 }
 
@@ -1770,7 +1821,7 @@ function getContextualEmptyState(tab, searchQuery) {
     if (searchQuery && searchQuery.trim()) {
         // Search-specific empty states
         return {
-            icon: '⊘',
+            icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>',
             title: chrome.i18n.getMessage('search_no_results_title', 'No results found'),
             subtitle: chrome.i18n.getMessage('search_no_results_subtitle', 'Try different keywords or clear the search'),
             action: chrome.i18n.getMessage('search_clear_button', 'Clear search'),
@@ -1788,7 +1839,7 @@ function getContextualEmptyState(tab, searchQuery) {
     switch (tab) {
         case 'videos':
             return {
-                icon: '▶',
+                icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
                 title: chrome.i18n.getMessage('videos_empty_title', 'No videos yet'),
                 subtitle: chrome.i18n.getMessage('videos_empty_subtitle', 'Watch some YouTube videos to see your history here'),
                 action: chrome.i18n.getMessage('videos_empty_action', 'Browse YouTube'),
@@ -1799,7 +1850,7 @@ function getContextualEmptyState(tab, searchQuery) {
 
         case 'shorts':
             return {
-                icon: '⚡',
+                icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M11.71 15.29l2.59-2.59a1.5 1.5 0 0 0-2.12-2.12l-2.59 2.59a1.5 1.5 0 0 0 2.12 2.12z"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>',
                 title: chrome.i18n.getMessage('shorts_empty_title', 'No shorts watched'),
                 subtitle: chrome.i18n.getMessage('shorts_empty_subtitle', 'Short videos you watch will appear here'),
                 action: chrome.i18n.getMessage('shorts_empty_action', 'Explore shorts'),
@@ -1810,7 +1861,7 @@ function getContextualEmptyState(tab, searchQuery) {
 
         case 'playlists':
             return {
-                icon: '≡',
+                icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>',
                 title: chrome.i18n.getMessage('playlists_empty_title', 'No playlists found'),
                 subtitle: chrome.i18n.getMessage('playlists_empty_subtitle', 'Saved playlists will appear here'),
                 action: chrome.i18n.getMessage('playlists_empty_action', 'Browse playlists'),
@@ -1832,16 +1883,24 @@ function getContextualEmptyState(tab, searchQuery) {
 function renderEmptyState(container, emptyState) {
     container.innerHTML = `
         <div class="empty-state">
-            <div class="empty-icon">${emptyState.icon}</div>
+            <div class="empty-state-icon">${emptyState.icon}</div>
             <h3 class="empty-title">${emptyState.title}</h3>
             <p class="empty-subtitle">${emptyState.subtitle}</p>
             ${emptyState.action ? `
-                <button class="empty-action-btn" onclick="(${emptyState.actionCallback.toString()})()">
+                <button class="empty-action-btn" data-empty-action="true">
                     ${emptyState.action}
                 </button>
             ` : ''}
         </div>
     `;
+
+    // Add event listener for empty action button (CSP compliant)
+    if (emptyState.action && emptyState.actionCallback) {
+        const actionBtn = container.querySelector('.empty-action-btn');
+        if (actionBtn) {
+            actionBtn.addEventListener('click', emptyState.actionCallback);
+        }
+    }
 }
 
 // Responsive table column management
@@ -2903,11 +2962,16 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Initialize global search
         globalSearchInput = document.getElementById('ytvhtGlobalSearchInput');
+        const searchClearBtn = document.getElementById('ytvhtSearchClear');
+
         if (globalSearchInput) {
             globalSearchInput.addEventListener('input', async (e) => {
                 const query = e.target.value;
                 console.log('[Search] Input event:', query);
                 await smartSearch(query);
+
+                // Toggle clear button visibility
+                toggleClearButton(query.length > 0);
             });
 
             globalSearchInput.addEventListener('keydown', async (e) => {
@@ -2918,15 +2982,39 @@ document.addEventListener('DOMContentLoaded', async function () {
                     // Clear search and suggestions
                     e.target.value = '';
                     searchQuery = '';
-                    const suggestions = document.getElementById('ytvhtSearchSuggestions');
-                    if (suggestions) {
-                        suggestions.style.display = 'none';
-                    }
+                    toggleClearButton(false);
+                    hideSearchSuggestions();
                     await loadCurrentPages();
+                }
+            });
+
+            // Add click outside to close suggestions
+            document.addEventListener('click', (e) => {
+                const searchContainer = document.querySelector('.global-search-container');
+                const suggestions = document.getElementById('ytvhtSearchSuggestions');
+
+                if (searchContainer && suggestions &&
+                    !searchContainer.contains(e.target) &&
+                    suggestions.style.display !== 'none') {
+                    hideSearchSuggestions();
                 }
             });
         } else {
             console.error('Global search input not found');
+        }
+
+        // Clear button functionality
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', async () => {
+                if (globalSearchInput) {
+                    globalSearchInput.value = '';
+                    globalSearchInput.focus();
+                    searchQuery = '';
+                    toggleClearButton(false);
+                    hideSearchSuggestions();
+                    await loadCurrentPages();
+                }
+            });
         }
 
         // Playlist pagination
@@ -2955,6 +3043,11 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Load initial data
         await loadCurrentPages();
+
+        // Pre-render all first pages immediately for instant tab switching
+        displayHistoryPage();
+        displayShortsPage();
+        displayPlaylistsPage();
 
         // Playlists are already loaded by loadCurrentPages() above
         // Analytics can access allPlaylists (current page) or load more if needed

@@ -457,6 +457,52 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .global-search-container .search-input {
+            padding-right: 35px; /* Make room for clear button */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .search-clear-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-color);
+            opacity: 0.6;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            padding: 2px;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s, background-color 0.2s;
+        }
+
+        .search-clear-btn:hover {
+            opacity: 1;
+            background-color: rgba(0,0,0,0.1);
+        }
+
+        /* Empty state icons */
+        .empty-state-icon svg {
+            width: 48px;
+            height: 48px;
+            opacity: 0.7;
+            margin-bottom: 16px;
+        }
+
         /* Video cell layout */
         .video-cell {
             display: flex;
@@ -1015,7 +1061,10 @@
 
     <!-- Global Search Container -->
     <div class="global-search-container">
-        <input type="text" id="ytvhtGlobalSearchInput" class="search-input" data-i18n-placeholder="global_search_placeholder" placeholder="Search all content..." />
+        <div class="search-input-wrapper">
+            <input type="text" id="ytvhtGlobalSearchInput" class="search-input" data-i18n-placeholder="global_search_placeholder" placeholder="Search all content..." />
+            <button id="ytvhtSearchClear" class="search-clear-btn" style="display: none;" title="Clear search">&times;</button>
+        </div>
     </div>
 
     <div class="tab-bar">
