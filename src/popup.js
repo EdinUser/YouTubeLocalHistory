@@ -1523,24 +1523,36 @@ async function clearHistory() {
 
 async function exportHistory() {
     try {
-        const [videos, playlists, stats] = await Promise.all([
+        const [videosObj, playlistsObj, stats] = await Promise.all([
             ytStorage.getAllVideos(),
             ytStorage.getAllPlaylists(),
             (async ()=>{ try { return await ytStorage.getStats(); } catch(e){ return null; } })()
         ]);
+
+        // Convert objects to arrays (getAllVideos/getAllPlaylists return objects keyed by ID)
+        const videos = Object.values(videosObj || {});
+        const playlists = Object.values(playlistsObj || {});
+
+        // Validate exported records (required fields)
+        const validVideos = videos.filter(v => 
+            v && typeof v.videoId === 'string' && typeof v.timestamp === 'number' && typeof v.time === 'number'
+        );
+        const validPlaylists = playlists.filter(p => 
+            p && typeof p.playlistId === 'string'
+        );
 
         // Create export data with metadata
         const exportData = {
             _metadata: {
                 exportDate: new Date().toISOString(),
                 extensionVersion: EXTENSION_VERSION,
-                totalVideos: videos.length,
-                totalPlaylists: playlists.length,
+                totalVideos: validVideos.length,
+                totalPlaylists: validPlaylists.length,
                 exportFormat: "json",
                 dataVersion: "1.1"
             },
-            history: videos,  // Changed from 'videos' to 'history' to match import format
-            playlists: playlists,
+            history: validVideos,  // Array of video records
+            playlists: validPlaylists,  // Array of playlist records
             stats: stats || undefined
         };
 
@@ -1553,105 +1565,36 @@ async function exportHistory() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showMessage(chrome.i18n.getMessage('message_export_success', [videos.length, playlists.length]));
+        showMessage(chrome.i18n.getMessage('message_export_success', [validVideos.length, validPlaylists.length]));
     } catch (error) {
         console.error('Error exporting history:', error);
         showMessage(chrome.i18n.getMessage('message_error_exporting_history', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
     }
 }
 
-async function importHistory() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
+function openImportPage() {
+    if (!chrome || !chrome.tabs || !chrome.tabs.query) {
+        return;
+    }
 
-    input.onchange = async function (e) {
-        const file = e.target.files[0];
-        if (!file) return;
+    const targetHash = '#ytlh_import';
 
-        try {
-            const text = await file.text();
-            const data = JSON.parse(text);
-
-            let videos = [];
-            let playlists = [];
-            let isLegacyFormat = false;
-
-            // Handle both new format (with metadata) and legacy format (array of videos)
-            if (data.history && Array.isArray(data.history)) {
-                // New format with history and playlists
-                videos = data.history;
-                playlists = data.playlists || [];
-            } else if (Array.isArray(data)) {
-                // Legacy format - array of videos
-                videos = data;
-                isLegacyFormat = true;
-
-                // Validate that it looks like video data
-                if (videos.length > 0 && !videos[0].videoId) {
-                    throw new Error('Invalid file format: missing videoId in first record');
-                }
-            } else {
-                throw new Error('Invalid file format: expected an array of videos or an object with history/playlists');
+    // First, pause any playing video in the active tab (if it's YouTube)
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTab = tabs && tabs[0];
+        if (activeTab && activeTab.id && activeTab.url && activeTab.url.includes('://www.youtube.com/')) {
+            try {
+                chrome.tabs.sendMessage(activeTab.id, { type: 'pauseVideoForImport' }, () => {
+                    // Ignore errors here; pausing is best-effort only
+                });
+            } catch (e) {
+                // Ignore messaging errors
             }
-
-            if (videos.length === 0 && playlists.length === 0) {
-                showMessage(chrome.i18n.getMessage('message_no_data_in_import'), 'error');
-                return;
-            }
-
-            // For legacy format, always use replace mode
-            if (isLegacyFormat) {
-                await ytStorage.clear();
-                for (const video of videos) {
-                    await ytStorage.setVideo(video.videoId, video);
-                }
-                showMessage(chrome.i18n.getMessage('message_import_success', ['replaced', videos.length, playlists.length]));
-                loadCurrentPages();
-                return;
-            }
-
-            // For new format, ask for merge mode
-            const mergeMode = confirm(
-                `Import ${videos.length} videos and ${playlists.length} playlists.\n\n` +
-                'Choose import mode:\n' +
-                '• OK = Merge with existing data (keep both)\n' +
-                '• Cancel = Replace existing data (overwrite)'
-            );
-
-            if (!mergeMode) {
-                await ytStorage.clear();
-            }
-
-            // Import videos
-            let importedVideos = 0;
-            for (const video of videos) {
-                if (video.videoId) {
-                    await ytStorage.setVideo(video.videoId, video);
-                    importedVideos++;
-                }
-            }
-
-            // Import playlists
-            let importedPlaylists = 0;
-            for (const playlist of playlists) {
-                if (playlist.playlistId) {
-                    await ytStorage.setPlaylist(playlist.playlistId, playlist);
-                    importedPlaylists++;
-                }
-            }
-
-            const mode = mergeMode ? 'merged' : 'replaced';
-            showMessage(chrome.i18n.getMessage('message_import_success', [mode, importedVideos, importedPlaylists]));
-            loadCurrentPages();
-
-        } catch (error) {
-            console.error('Import error:', error);
-            showMessage(chrome.i18n.getMessage('message_error_importing_history', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
         }
-    };
 
-    input.click();
+        // Always open a dedicated import tab instead of reloading the current one
+        chrome.tabs.create({ url: `https://www.youtube.com/${targetHash}` });
+    });
 }
 
 // Extract all Shorts records from a history object (object of videoId -> record)
@@ -2915,7 +2858,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         });
 
-        importButton.addEventListener('click', () => importHistory());
+        importButton.addEventListener('click', () => openImportPage());
         closeButton.addEventListener('click', () => window.close());
 
         // Pagination controls

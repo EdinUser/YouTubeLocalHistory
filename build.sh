@@ -18,7 +18,14 @@ node "$PROJECT_ROOT/merge_locales.js"
 # Function to copy common files
 copy_common_files() {
     local target_dir=$1
-    cp "$PROJECT_ROOT/src/background.js" "$PROJECT_ROOT/src/content.js" "$PROJECT_ROOT/src/popup.html" "$PROJECT_ROOT/src/popup.js" "$PROJECT_ROOT/src/storage.js" "$PROJECT_ROOT/src/sync-service.js" "$target_dir/"
+    cp "$PROJECT_ROOT/src/background.js" \
+       "$PROJECT_ROOT/src/content.js" \
+       "$PROJECT_ROOT/src/popup.html" \
+       "$PROJECT_ROOT/src/popup.js" \
+       "$PROJECT_ROOT/src/storage.js" \
+       "$PROJECT_ROOT/src/sync-service.js" \
+       "$PROJECT_ROOT/src/indexeddb-storage.js" \
+       "$target_dir/"
     cp "$PROJECT_ROOT/src/icon"*.png "$target_dir/"
     # Removed copying of _locales directory
 }
@@ -58,7 +65,7 @@ copy_common_files "$PROJECT_ROOT/build/firefox"
 cp "$PROJECT_ROOT/src/manifest.firefox.json" "$PROJECT_ROOT/build/firefox/manifest.json"
 cd "$PROJECT_ROOT/build/firefox"
 # For Firefox, we need to zip the files directly, not the directory
-zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js popup.html popup.js storage.js sync-service.js icon*.png -x ".*"
+zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js popup.html popup.js storage.js sync-service.js indexeddb-storage.js icon*.png -x ".*"
 # Include _locales in the Firefox zip if it exists
 if [ -d _locales ]; then
     zip -r "../../dist/youtube-local-history-firefox-v$VERSION.zip" _locales -x ".*"

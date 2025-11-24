@@ -4,6 +4,23 @@
 (function () {
     'use strict';
 
+    // Global scope detection (works in service workers, popup, content scripts)
+    let globalScope;
+    try {
+        if (typeof globalThis !== 'undefined') {
+            globalScope = globalThis;
+        } else if (typeof self !== 'undefined') {
+            globalScope = self;
+        } else if (typeof window !== 'undefined') {
+            globalScope = window;
+        } else {
+            globalScope = this;
+        }
+    } catch (e) {
+        // Fallback to self (service worker) or this
+        globalScope = (typeof self !== 'undefined') ? self : this;
+    }
+
     // Browser detection - safer approach
     const isFirefox = (function () {
         try {
@@ -85,16 +102,21 @@
                 const result = await storage.get(['__migrated__']);
                 if (result.__migrated__) {
                     this.migrated = true;
+                    // Legacy migration complete, now check hybrid migration
+                    await this.ensureHybridMigration();
                     return;
                 }
 
-                // Try to migrate from IndexedDB
+                // Try to migrate from IndexedDB (legacy migration)
                 await this.migrateFromIndexedDB();
 
                 // Mark as migrated
                 await storage.set({'__migrated__': true});
                 this.migrated = true;
-                console.log('[Storage] Migration completed successfully');
+                console.log('[Storage] Legacy migration completed successfully');
+
+                // Now trigger hybrid migration (storage.local → IndexedDB)
+                await this.ensureHybridMigration();
             } catch (error) {
                 console.log('[Storage] Migration skipped or failed:', error.message);
                 this.migrated = true; // Don't try again
@@ -177,88 +199,747 @@
             });
         }
 
-        // Get video record
-        async getVideo(videoId) {
-            await this.ensureMigrated();
-            const result = await storage.get([`video_${videoId}`]);
-            return result[`video_${videoId}`] || null;
+        // ============================================================
+        // Hybrid Storage Migration (storage.local → IndexedDB)
+        // ============================================================
+
+        // Migration constants
+        get MIGRATION_BATCH_SIZE() { return 50; }
+        get RECENT_WINDOW_MS() { return 30 * 60 * 1000; } // 30 minutes
+
+        /**
+         * Get migration state for videos or playlists
+         * @param {string} type - 'videos' or 'playlists'
+         * @returns {Promise<Object>} Migration state object
+         */
+        async _getMigrationState(type) {
+            const key = type === 'videos' ? '__idbMigrationState__' : '__idbPlaylistMigrationState__';
+            const result = await storage.get([key]);
+            return result[key] || {
+                status: 'not_started',
+                migratedCount: 0,
+                errorCount: 0,
+                lastRunAt: null
+            };
         }
 
-        // Save video record
-        async setVideo(videoId, data) {
+        /**
+         * Set migration state for videos or playlists
+         * @param {string} type - 'videos' or 'playlists'
+         * @param {Object} state - Migration state object
+         */
+        async _setMigrationState(type, state) {
+            const key = type === 'videos' ? '__idbMigrationState__' : '__idbPlaylistMigrationState__';
+            await storage.set({ [key]: state });
+        }
+
+        /**
+         * Check if IndexedDB storage is available
+         * @returns {boolean}
+         */
+        _isIndexedDBAvailable() {
+            return typeof ytIndexedDBStorage !== 'undefined' && ytIndexedDBStorage !== null;
+        }
+
+        /**
+         * Check if sync is enabled
+         * @returns {Promise<boolean>}
+         */
+        async _isSyncEnabled() {
+            try {
+                const settings = await this.getSettings();
+                return settings && settings.syncEnabled === true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        /**
+         * Migrate videos from storage.local to IndexedDB
+         * Uses fail-safe sequence: upsert → verify → delete (only if verified)
+         */
+        async migrateVideosToIndexedDB() {
+            if (!this._isIndexedDBAvailable()) {
+                console.log('[Storage] IndexedDB not available, skipping video migration');
+                return;
+            }
+
+            const state = await this._getMigrationState('videos');
+            if (state.status === 'complete') {
+                console.log('[Storage] Video migration already complete');
+                return;
+            }
+
+            // Update state to in_progress
+            state.status = 'in_progress';
+            state.lastRunAt = Date.now();
+            await this._setMigrationState('videos', state);
+
+            try {
+                // Get all data from storage.local
+                const allData = await storage.get(null);
+                const videoKeys = Object.keys(allData).filter(key => key.startsWith('video_'));
+                
+                if (videoKeys.length === 0) {
+                    state.status = 'complete';
+                    await this._setMigrationState('videos', state);
+                    console.log('[Storage] No videos to migrate');
+                    return;
+                }
+
+                const syncEnabled = await this._isSyncEnabled();
+                const now = Date.now();
+                const recentCutoff = now - this.RECENT_WINDOW_MS;
+
+                // Process in batches
+                const batches = [];
+                for (let i = 0; i < videoKeys.length; i += this.MIGRATION_BATCH_SIZE) {
+                    batches.push(videoKeys.slice(i, i + this.MIGRATION_BATCH_SIZE));
+                }
+
+                console.log(`[Storage] Starting video migration: ${videoKeys.length} videos in ${batches.length} batches`);
+
+                for (const batch of batches) {
+                    for (const key of batch) {
+                        const videoId = key.replace('video_', '');
+                        const record = allData[key];
+
+                        if (!record || !record.videoId) {
+                            // Ensure videoId is present
+                            record.videoId = videoId;
+                        }
+
+                        try {
+                            // Step 1: Upsert to IndexedDB
+                            await ytIndexedDBStorage.putVideo(record);
+
+                            // Step 2: Verify by re-reading from IndexedDB
+                            const archived = await ytIndexedDBStorage.getVideo(videoId);
+                            if (!archived) {
+                                throw new Error('Verification failed: record not found in IndexedDB');
+                            }
+
+                            // Verify core fields match
+                            const timestampMatch = archived.timestamp === record.timestamp;
+                            const timeMatch = archived.time === record.time;
+                            const urlMatch = archived.url === record.url;
+
+                            if (!timestampMatch || !timeMatch || !urlMatch) {
+                                throw new Error('Verification failed: field mismatch');
+                            }
+
+                            // Step 3: Delete from storage.local (only if verified)
+                            // For sync-disabled: Delete older records (outside recent window)
+                            // For sync-enabled: Keep all records (sync source)
+                            if (!syncEnabled) {
+                                // Only delete if older than recent window
+                                if (record.timestamp < recentCutoff) {
+                                    await storage.remove([key]);
+                                    state.migratedCount++;
+                                }
+                            } else {
+                                // Sync-enabled: Archive but don't delete yet
+                                // (sync-aware cleanup will be handled separately)
+                                state.migratedCount++;
+                            }
+                        } catch (error) {
+                            console.error(`[Storage] Failed to migrate video ${videoId}:`, error);
+                            state.errorCount++;
+                            // Leave record in storage.local (never deleted on error)
+                        }
+                    }
+
+                    // Update state after each batch
+                    await this._setMigrationState('videos', state);
+                }
+
+                // Check if migration is complete (no more video_* keys)
+                const remainingData = await storage.get(null);
+                const remainingVideoKeys = Object.keys(remainingData).filter(key => key.startsWith('video_'));
+                
+                if (remainingVideoKeys.length === 0 || (!syncEnabled && remainingVideoKeys.every(key => {
+                    const rec = remainingData[key];
+                    return rec && rec.timestamp >= recentCutoff;
+                }))) {
+                    state.status = 'complete';
+                    await this._setMigrationState('videos', state);
+                    console.log(`[Storage] Video migration complete: ${state.migratedCount} migrated, ${state.errorCount} errors`);
+
+                    // Rebuild stats if needed
+                    await this.rebuildStatsFromIndexedDB();
+                } else {
+                    console.log(`[Storage] Video migration progress: ${state.migratedCount} migrated, ${remainingVideoKeys.length} remaining`);
+                }
+            } catch (error) {
+                console.error('[Storage] Video migration error:', error);
+                // State remains 'in_progress' so it can be retried
+            }
+        }
+
+        /**
+         * Migrate playlists from storage.local to IndexedDB
+         * Uses same fail-safe sequence as videos
+         */
+        async migratePlaylistsToIndexedDB() {
+            if (!this._isIndexedDBAvailable()) {
+                console.log('[Storage] IndexedDB not available, skipping playlist migration');
+                return;
+            }
+
+            const state = await this._getMigrationState('playlists');
+            if (state.status === 'complete') {
+                console.log('[Storage] Playlist migration already complete');
+                return;
+            }
+
+            state.status = 'in_progress';
+            state.lastRunAt = Date.now();
+            await this._setMigrationState('playlists', state);
+
+            try {
+                const allData = await storage.get(null);
+                const playlistKeys = Object.keys(allData).filter(key => key.startsWith('playlist_'));
+                
+                if (playlistKeys.length === 0) {
+                    state.status = 'complete';
+                    await this._setMigrationState('playlists', state);
+                    console.log('[Storage] No playlists to migrate');
+                    return;
+                }
+
+                const syncEnabled = await this._isSyncEnabled();
+                const now = Date.now();
+                const recentCutoff = now - this.RECENT_WINDOW_MS;
+
+                const batches = [];
+                for (let i = 0; i < playlistKeys.length; i += this.MIGRATION_BATCH_SIZE) {
+                    batches.push(playlistKeys.slice(i, i + this.MIGRATION_BATCH_SIZE));
+                }
+
+                console.log(`[Storage] Starting playlist migration: ${playlistKeys.length} playlists in ${batches.length} batches`);
+
+                for (const batch of batches) {
+                    for (const key of batch) {
+                        const playlistId = key.replace('playlist_', '');
+                        const record = allData[key];
+
+                        if (!record || !record.playlistId) {
+                            record.playlistId = playlistId;
+                        }
+
+                        try {
+                            // Upsert to IndexedDB
+                            await ytIndexedDBStorage.putPlaylist(record);
+
+                            // Verify
+                            const archived = await ytIndexedDBStorage.getPlaylist(playlistId);
+                            if (!archived) {
+                                throw new Error('Verification failed: record not found in IndexedDB');
+                            }
+
+                            const timestampMatch = archived.timestamp === record.timestamp;
+                            const playlistIdMatch = archived.playlistId === record.playlistId;
+                            const urlMatch = archived.url === record.url;
+
+                            if (!timestampMatch || !playlistIdMatch || !urlMatch) {
+                                throw new Error('Verification failed: field mismatch');
+                            }
+
+                            // Delete from storage.local (only if verified)
+                            if (!syncEnabled) {
+                                if (record.timestamp < recentCutoff) {
+                                    await storage.remove([key]);
+                                    state.migratedCount++;
+                                }
+                            } else {
+                                state.migratedCount++;
+                            }
+                        } catch (error) {
+                            console.error(`[Storage] Failed to migrate playlist ${playlistId}:`, error);
+                            state.errorCount++;
+                        }
+                    }
+
+                    await this._setMigrationState('playlists', state);
+                }
+
+                const remainingData = await storage.get(null);
+                const remainingPlaylistKeys = Object.keys(remainingData).filter(key => key.startsWith('playlist_'));
+                
+                if (remainingPlaylistKeys.length === 0 || (!syncEnabled && remainingPlaylistKeys.every(key => {
+                    const rec = remainingData[key];
+                    return rec && rec.timestamp >= recentCutoff;
+                }))) {
+                    state.status = 'complete';
+                    await this._setMigrationState('playlists', state);
+                    console.log(`[Storage] Playlist migration complete: ${state.migratedCount} migrated, ${state.errorCount} errors`);
+                } else {
+                    console.log(`[Storage] Playlist migration progress: ${state.migratedCount} migrated, ${remainingPlaylistKeys.length} remaining`);
+                }
+            } catch (error) {
+                console.error('[Storage] Playlist migration error:', error);
+            }
+        }
+
+        /**
+         * Rebuild stats from IndexedDB after migration completes
+         * Only runs if stats are missing or effectively empty
+         */
+        async rebuildStatsFromIndexedDB() {
+            if (!this._isIndexedDBAvailable()) {
+                return;
+            }
+
+            try {
+                const existingStats = await this.getStats();
+                // Only rebuild if stats are missing or effectively empty
+                if (existingStats.totalWatchSeconds > 0 || existingStats.counters.videos > 0) {
+                    console.log('[Storage] Stats already exist, skipping rebuild');
+                    return;
+                }
+
+                console.log('[Storage] Rebuilding stats from IndexedDB...');
+                const videos = await ytIndexedDBStorage.getAllVideos();
+
+                const stats = {
+                    totalWatchSeconds: 0,
+                    daily: {},
+                    hourly: new Array(24).fill(0),
+                    counters: {
+                        videos: 0,
+                        shorts: 0,
+                        totalDurationSeconds: 0,
+                        completed: 0
+                    },
+                    lastUpdated: Date.now()
+                };
+
+                for (const video of videos) {
+                    // Add watch time
+                    if (video.time && typeof video.time === 'number') {
+                        stats.totalWatchSeconds += video.time;
+
+                        // Add to daily bucket (local timezone)
+                        if (video.timestamp) {
+                            const date = new Date(video.timestamp);
+                            const dayKey = formatLocalDayKey(date);
+                            stats.daily[dayKey] = (stats.daily[dayKey] || 0) + video.time;
+
+                            // Add to hourly bucket
+                            const hour = date.getHours();
+                            stats.hourly[hour] = (stats.hourly[hour] || 0) + video.time;
+                        }
+                    }
+
+                    // Update counters
+                    if (video.isShorts === true) {
+                        stats.counters.shorts++;
+                    } else {
+                        stats.counters.videos++;
+                    }
+
+                    if (video.duration && typeof video.duration === 'number') {
+                        stats.counters.totalDurationSeconds += video.duration;
+
+                        // Check if completed (90% threshold)
+                        if (video.time && video.duration && video.time / video.duration >= 0.9) {
+                            stats.counters.completed++;
+                        }
+                    }
+                }
+
+                await this.setStats(stats);
+                console.log('[Storage] Stats rebuilt successfully');
+            } catch (error) {
+                console.error('[Storage] Failed to rebuild stats:', error);
+            }
+        }
+
+        /**
+         * Ensure hybrid migration (storage.local → IndexedDB) is complete
+         * Called after legacy migration (IndexedDB → storage.local)
+         */
+        async ensureHybridMigration() {
+            // Only run in extension context (background/popup)
+            // Content scripts will proxy to background
+            if (!this._isExtensionContext()) {
+                return;
+            }
+
+            if (!this._isIndexedDBAvailable()) {
+                return;
+            }
+
+            try {
+                // Run video migration
+                await this.migrateVideosToIndexedDB();
+                
+                // Run playlist migration
+                await this.migratePlaylistsToIndexedDB();
+            } catch (error) {
+                console.error('[Storage] Hybrid migration error:', error);
+            }
+        }
+
+        /**
+         * Check if we're in extension context (not content script)
+         * @returns {boolean}
+         */
+        _isExtensionContext() {
+            try {
+                // Check globalScope.location (works in popup, but not service worker)
+                if (globalScope.location && globalScope.location.origin) {
+                    const origin = globalScope.location.origin;
+                    return origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://');
+                }
+                // Service worker context (no location, but has importScripts)
+                if (typeof importScripts === 'function') {
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        /**
+         * Content Script RPC: Proxy storage calls to background script
+         * @param {string} method - Method name to call
+         * @param {Array} args - Arguments array
+         * @returns {Promise<any>} Result from background
+         */
+        async _callBackground(method, args = []) {
+            if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+                throw new Error('chrome.runtime.sendMessage not available');
+            }
+
+            return new Promise((resolve, reject) => {
+                try {
+                    chrome.runtime.sendMessage({
+                        type: 'ytStorageCall',
+                        method: method,
+                        args: args
+                    }, (response) => {
+                        // Check for runtime errors first
+                        if (chrome.runtime.lastError) {
+                            const errorMsg = chrome.runtime.lastError.message || 'Unknown error';
+                            console.error('[Storage] Background RPC error:', errorMsg);
+                            reject(new Error(`Background script error: ${errorMsg}`));
+                            return;
+                        }
+
+                        // Check for error in response
+                        if (response && response.error) {
+                            reject(new Error(response.error));
+                            return;
+                        }
+
+                        // Return result
+                        if (response && 'result' in response) {
+                            resolve(response.result);
+                        } else {
+                            resolve(response);
+                        }
+                    });
+                } catch (error) {
+                    console.error('[Storage] Error calling background:', error);
+                    reject(new Error(`Failed to call background: ${error.message}`));
+                }
+            });
+        }
+
+        // Get video record (Hybrid View: storage.local first, then IndexedDB)
+        async getVideo(videoId) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('getVideo', [videoId]);
+                } catch (error) {
+                    // Fallback: try direct storage.local read (last resort)
+                    const result = await storage.get([`video_${videoId}`]);
+                    return result[`video_${videoId}`] || null;
+                }
+            }
+
             await this.ensureMigrated();
-            // Always save to local storage first (priority 1)
+            
+            // Step 1: Check storage.local first (fast path, most reliable)
+            const result = await storage.get([`video_${videoId}`]);
+            if (result[`video_${videoId}`]) {
+                return result[`video_${videoId}`];
+            }
+
+            // Step 2: Check IndexedDB (archived records)
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    const archived = await ytIndexedDBStorage.getVideo(videoId);
+                    if (archived) {
+                        // CRITICAL: Return archived record with saved time to restore position
+                        // Does NOT write to storage.local (no hydration on read)
+                        return archived;
+                    }
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB read failed, continuing with storage.local only:', error);
+                }
+            }
+
+            return null;
+        }
+
+        // Save video record (Local-First: Always write to storage.local first)
+        async setVideo(videoId, data) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('setVideo', [videoId, data]);
+                } catch (error) {
+                    // Fallback: write directly to storage.local (last resort for core functionality)
+                    await storage.set({[`video_${videoId}`]: data});
+                    return;
+                }
+            }
+
+            await this.ensureMigrated();
+            
+            // CRITICAL: Always write to storage.local FIRST (most reliable, never blocks)
+            // storage.local is the primary store for writes - core functionality depends on this
             await storage.set({[`video_${videoId}`]: data});
+            
+            // Archival to IndexedDB happens in background migration batches (non-blocking)
+            // Never wait for IndexedDB write - if IndexedDB fails, storage.local still has the data
+            
             // Only trigger sync if immediateSyncOnUpdate is true
             if (this.immediateSyncOnUpdate) {
                 this.triggerSync(videoId);
             }
         }
 
-        // Remove video record
+        // Remove video record (Hybrid: Remove from both storage.local and IndexedDB)
         async removeVideo(videoId) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('removeVideo', [videoId]);
+                } catch (error) {
+                    // Fallback: remove from storage.local only
+                    await storage.remove([`video_${videoId}`]);
+                    const tombstoneKey = `deleted_video_${videoId}`;
+                    await storage.set({[tombstoneKey]: {deletedAt: Date.now()}});
+                    return;
+                }
+            }
+
             await this.ensureMigrated();
-            // Remove the video record
+            
+            // Remove from storage.local
             await storage.remove([`video_${videoId}`]);
-            // Create a tombstone with deletedAt timestamp
+            
+            // Remove from IndexedDB and create tombstone
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    await ytIndexedDBStorage.deleteVideo(videoId, { createTombstone: true });
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB deleteVideo failed:', error);
+                }
+            }
+            
+            // Create legacy tombstone in storage.local (for sync compatibility)
             const tombstoneKey = `deleted_video_${videoId}`;
             await storage.set({[tombstoneKey]: {deletedAt: Date.now()}});
+            
             // Only trigger sync if immediateSyncOnUpdate is true
             if (this.immediateSyncOnUpdate) {
                 this.triggerSync();
             }
         }
 
-        // Get all video records
+        // Get all video records (Hybrid View: IndexedDB base + storage.local overlay)
         async getAllVideos() {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('getAllVideos', []);
+                } catch (error) {
+                    // Fallback: return storage.local only
+                    const allData = await storage.get(null);
+                    const videos = {};
+                    Object.keys(allData).forEach(key => {
+                        if (key.startsWith('video_')) {
+                            const videoId = key.replace('video_', '');
+                            videos[videoId] = allData[key];
+                        }
+                    });
+                    return videos;
+                }
+            }
+
             await this.ensureMigrated();
-            const allData = await storage.get(null);
+
             const videos = {};
 
+            // Step 1: Load from IndexedDB (base dataset)
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    const indexedVideos = await ytIndexedDBStorage.getAllVideos();
+                    indexedVideos.forEach(video => {
+                        if (video && video.videoId) {
+                            videos[video.videoId] = video;
+                        }
+                    });
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB getAllVideos failed, continuing with storage.local only:', error);
+                }
+            }
+
+            // Step 2: Overlay with storage.local records (recent/in-progress)
+            const allData = await storage.get(null);
             Object.keys(allData).forEach(key => {
                 if (key.startsWith('video_')) {
                     const videoId = key.replace('video_', '');
-                    videos[videoId] = allData[key];
+                    const localRecord = allData[key];
+                    // Merge: local wins on conflicts (newer timestamp)
+                    if (!videos[videoId] || (localRecord.timestamp && localRecord.timestamp > (videos[videoId].timestamp || 0))) {
+                        videos[videoId] = localRecord;
+                    }
                 }
             });
 
             return videos;
         }
 
-        // Get playlist record
+        // Get playlist record (Hybrid View: storage.local first, then IndexedDB)
         async getPlaylist(playlistId) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('getPlaylist', [playlistId]);
+                } catch (error) {
+                    const result = await storage.get([`playlist_${playlistId}`]);
+                    return result[`playlist_${playlistId}`] || null;
+                }
+            }
+
             await this.ensureMigrated();
+            
+            // Check storage.local first
             const result = await storage.get([`playlist_${playlistId}`]);
-            return result[`playlist_${playlistId}`] || null;
+            if (result[`playlist_${playlistId}`]) {
+                return result[`playlist_${playlistId}`];
+            }
+
+            // Check IndexedDB
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    return await ytIndexedDBStorage.getPlaylist(playlistId);
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB getPlaylist failed:', error);
+                }
+            }
+
+            return null;
         }
 
-        // Save playlist record
+        // Save playlist record (Local-First: Always write to storage.local first)
         async setPlaylist(playlistId, data) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('setPlaylist', [playlistId, data]);
+                } catch (error) {
+                    // Fallback: write directly to storage.local
+                    await storage.set({[`playlist_${playlistId}`]: data});
+                    return;
+                }
+            }
+
             await this.ensureMigrated();
-            // Always save to local storage first (priority 1)
+            
+            // CRITICAL: Always write to storage.local FIRST (most reliable)
             await storage.set({[`playlist_${playlistId}`]: data});
+            
+            // Archival to IndexedDB happens in background migration batches (non-blocking)
+            
             // Then trigger sync if enabled
             this.triggerSync('playlist_' + playlistId);
         }
 
-        // Remove playlist record
+        // Remove playlist record (Hybrid: Remove from both storage.local and IndexedDB)
         async removePlaylist(playlistId) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('removePlaylist', [playlistId]);
+                } catch (error) {
+                    await storage.remove([`playlist_${playlistId}`]);
+                    return;
+                }
+            }
+
             await this.ensureMigrated();
+            
+            // Remove from storage.local
             await storage.remove([`playlist_${playlistId}`]);
+            
+            // Remove from IndexedDB
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    await ytIndexedDBStorage.deletePlaylist(playlistId);
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB deletePlaylist failed:', error);
+                }
+            }
+            
             // Trigger sync after removal
             this.triggerSync();
         }
 
-        // Get all playlist records
+        // Get all playlist records (Hybrid View: IndexedDB base + storage.local overlay)
         async getAllPlaylists() {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('getAllPlaylists', []);
+                } catch (error) {
+                    const allData = await storage.get(null);
+                    const playlists = {};
+                    Object.keys(allData).forEach(key => {
+                        if (key.startsWith('playlist_')) {
+                            const playlistId = key.replace('playlist_', '');
+                            playlists[playlistId] = allData[key];
+                        }
+                    });
+                    return playlists;
+                }
+            }
+
             await this.ensureMigrated();
-            const allData = await storage.get(null);
+
             const playlists = {};
 
+            // Load from IndexedDB (base dataset)
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    const indexedPlaylists = await ytIndexedDBStorage.getAllPlaylists();
+                    indexedPlaylists.forEach(playlist => {
+                        if (playlist && playlist.playlistId) {
+                            playlists[playlist.playlistId] = playlist;
+                        }
+                    });
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB getAllPlaylists failed:', error);
+                }
+            }
+
+            // Overlay with storage.local records
+            const allData = await storage.get(null);
             Object.keys(allData).forEach(key => {
                 if (key.startsWith('playlist_')) {
                     const playlistId = key.replace('playlist_', '');
-                    playlists[playlistId] = allData[key];
+                    const localRecord = allData[key];
+                    // Merge: local wins on conflicts (newer timestamp)
+                    if (!playlists[playlistId] || (localRecord.timestamp && localRecord.timestamp > (playlists[playlistId].timestamp || 0))) {
+                        playlists[playlistId] = localRecord;
+                    }
                 }
             });
 
@@ -266,7 +947,18 @@
         }
 
         // Get paginated records (videos, shorts, or playlists)
+        // Hybrid View: Merges IndexedDB + storage.local BEFORE pagination (prevents vanishing lists)
         async getRecordsPage(options = {}) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('getRecordsPage', [options]);
+                } catch (error) {
+                    // Fallback: use storage.local only
+                    return this._getRecordsPageFromLocal(options);
+                }
+            }
+
             const {
                 type = 'videos', // 'videos', 'shorts', 'playlists'
                 page = 1,
@@ -277,11 +969,43 @@
             } = options;
 
             await this.ensureMigrated();
-            const allData = await storage.get(null);
-            let recordKeys = [];
-            let prefix = '';
 
-            // Determine which records to fetch
+            let indexedRecords = [];
+            let localRecords = [];
+
+            // Step 1: Load matching records from IndexedDB (using indexes for efficiency)
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    if (type === 'videos' || type === 'shorts') {
+                        const isShorts = type === 'shorts';
+                        // Use IndexedDB queryVideos with filters
+                        const queryResult = await ytIndexedDBStorage.queryVideos({
+                            isShorts: isShorts,
+                            searchQuery: searchQuery,
+                            page: 1,
+                            pageSize: 10000, // Get all matching records (we'll paginate after merge)
+                            sortOrder: sortOrder
+                        });
+                        indexedRecords = queryResult.records || [];
+                    } else if (type === 'playlists') {
+                        const queryResult = await ytIndexedDBStorage.queryPlaylists({
+                            searchQuery: searchQuery,
+                            page: 1,
+                            pageSize: 10000,
+                            sortOrder: sortOrder
+                        });
+                        indexedRecords = queryResult.records || [];
+                    }
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB query failed, continuing with storage.local only:', error);
+                }
+            }
+
+            // Step 2: Load matching records from storage.local (apply same filters)
+            const allData = await storage.get(null);
+            let prefix = '';
+            let recordKeys = [];
+
             switch (type) {
                 case 'videos':
                     recordKeys = Object.keys(allData).filter(key =>
@@ -305,7 +1029,114 @@
                     throw new Error(`Unknown record type: ${type}`);
             }
 
-            // Apply search filter
+            localRecords = recordKeys.map(key => {
+                const id = key.replace(prefix, '');
+                return {
+                    ...allData[key],
+                    videoId: type !== 'playlists' ? id : undefined,
+                    playlistId: type === 'playlists' ? id : undefined
+                };
+            });
+
+            // Apply search filter to local records
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                localRecords = localRecords.filter(record =>
+                    record.title?.toLowerCase().includes(query)
+                );
+            }
+
+            // Step 3: Merge arrays (local wins on conflicts by timestamp)
+            const mergedMap = new Map();
+            
+            // Add IndexedDB records first
+            indexedRecords.forEach(record => {
+                const id = type === 'playlists' ? record.playlistId : record.videoId;
+                if (id) {
+                    mergedMap.set(id, record);
+                }
+            });
+
+            // Overlay with local records (local wins on conflicts)
+            localRecords.forEach(record => {
+                const id = type === 'playlists' ? record.playlistId : record.videoId;
+                if (id) {
+                    const existing = mergedMap.get(id);
+                    if (!existing || (record.timestamp && record.timestamp > (existing.timestamp || 0))) {
+                        mergedMap.set(id, record);
+                    }
+                }
+            });
+
+            // Convert map to array
+            let records = Array.from(mergedMap.values());
+
+            // Step 4: Sort merged array
+            records.sort((a, b) => {
+                const aVal = a[sortBy] || 0;
+                const bVal = b[sortBy] || 0;
+                return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
+            });
+
+            // Step 5: Paginate merged, sorted result
+            const totalRecords = records.length;
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            const startIndex = (page - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const pageRecords = records.slice(startIndex, endIndex);
+
+            return {
+                records: pageRecords,
+                pagination: {
+                    currentPage: page,
+                    totalPages,
+                    totalRecords,
+                    pageSize,
+                    hasNextPage: page < totalPages,
+                    hasPrevPage: page > 1
+                }
+            };
+        }
+
+        // Fallback method: getRecordsPage from storage.local only (for content scripts when background unavailable)
+        async _getRecordsPageFromLocal(options) {
+            const {
+                type = 'videos',
+                page = 1,
+                pageSize = 10,
+                searchQuery = '',
+                sortBy = 'timestamp',
+                sortOrder = 'desc'
+            } = options;
+
+            await this.ensureMigrated();
+            const allData = await storage.get(null);
+            let recordKeys = [];
+            let prefix = '';
+
+            switch (type) {
+                case 'videos':
+                    recordKeys = Object.keys(allData).filter(key =>
+                        key.startsWith('video_') && !allData[key]?.isShorts
+                    );
+                    prefix = 'video_';
+                    break;
+                case 'shorts':
+                    recordKeys = Object.keys(allData).filter(key =>
+                        key.startsWith('video_') && allData[key]?.isShorts
+                    );
+                    prefix = 'video_';
+                    break;
+                case 'playlists':
+                    recordKeys = Object.keys(allData).filter(key =>
+                        key.startsWith('playlist_')
+                    );
+                    prefix = 'playlist_';
+                    break;
+                default:
+                    throw new Error(`Unknown record type: ${type}`);
+            }
+
             let records = recordKeys.map(key => ({
                 id: key.replace(prefix, ''),
                 ...allData[key]
@@ -318,14 +1149,12 @@
                 );
             }
 
-            // Sort records
             records.sort((a, b) => {
                 const aVal = a[sortBy] || 0;
                 const bVal = b[sortBy] || 0;
                 return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
             });
 
-            // Paginate
             const totalRecords = records.length;
             const totalPages = Math.ceil(totalRecords / pageSize);
             const startIndex = (page - 1) * pageSize;
@@ -378,15 +1207,166 @@
         }
 
         // Clear only videos and playlists (not settings or migration flags)
+        // Hybrid: Clears both IndexedDB and storage.local
         async clearHistoryOnly() {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('clearHistoryOnly', []);
+                } catch (error) {
+                    // Fallback: clear storage.local only
+                    const allData = await storage.get(null);
+                    const keysToRemove = Object.keys(allData).filter(key => key.startsWith('video_') || key.startsWith('playlist_'));
+                    if (keysToRemove.length > 0) {
+                        await storage.remove(keysToRemove);
+                    }
+                    return;
+                }
+            }
+
             await this.ensureMigrated();
+            
+            // Clear IndexedDB (videos, playlists, deletions)
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    await ytIndexedDBStorage.clearAll();
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB clearAll failed:', error);
+                }
+            }
+            
+            // Remove video_* and playlist_* keys from storage.local
             const allData = await storage.get(null);
             const keysToRemove = Object.keys(allData).filter(key => key.startsWith('video_') || key.startsWith('playlist_'));
             if (keysToRemove.length > 0) {
                 await storage.remove(keysToRemove);
-                // Trigger sync after clearing
-                this.triggerSync();
             }
+            
+            // Trigger sync after clearing
+            this.triggerSync();
+        }
+
+        /**
+         * Import records (videos and playlists) into hybrid storage
+         * Writes to IndexedDB only (not storage.local) - imported records are archived
+         * @param {Array} records - Array of video records
+         * @param {Array} playlists - Array of playlist records
+         * @param {boolean} mergeMode - If true, merge with existing data; if false, replace
+         * @returns {Promise<Object>} { status: 'success', importedVideos: number, importedPlaylists: number }
+         */
+        async importRecords(records = [], playlists = [], mergeMode = false) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('importRecords', [records, playlists, mergeMode]);
+                } catch (error) {
+                    console.error('[Storage] Import RPC failed:', error);
+                    throw new Error(`Import failed: ${error.message}`);
+                }
+            }
+
+            await this.ensureMigrated();
+            
+            // Ensure IndexedDB is available
+            if (!this._isIndexedDBAvailable()) {
+                throw new Error('IndexedDB storage is not available. Please reload the extension.');
+            }
+
+            // Normalize inputs to arrays
+            const videoRecords = Array.isArray(records) ? records : [];
+            const playlistRecords = Array.isArray(playlists) ? playlists : [];
+
+            // Validate required fields
+            const validVideos = videoRecords.filter(v => 
+                v && typeof v.videoId === 'string' && typeof v.timestamp === 'number' && typeof v.time === 'number'
+            );
+            const validPlaylists = playlistRecords.filter(p => 
+                p && typeof p.playlistId === 'string'
+            );
+
+            if (validVideos.length === 0 && validPlaylists.length === 0) {
+                throw new Error('No valid records to import');
+            }
+
+            // Replace mode: Clear existing history first
+            if (!mergeMode) {
+                await this.clearHistoryOnly();
+            }
+
+            let importedVideos = 0;
+            let importedPlaylists = 0;
+
+            if (mergeMode) {
+                // Merge mode: Load existing data and merge
+                const existingVideos = await this.getAllVideos();
+                const existingPlaylists = await this.getAllPlaylists();
+
+                const mergedVideos = { ...existingVideos };
+                const mergedPlaylists = { ...existingPlaylists };
+
+                // Merge videos (newer timestamp wins)
+                for (const video of validVideos) {
+                    const existing = mergedVideos[video.videoId];
+                    if (!existing || (video.timestamp && video.timestamp > (existing.timestamp || 0))) {
+                        mergedVideos[video.videoId] = video;
+                        importedVideos++;
+                    }
+                }
+
+                // Merge playlists (newer timestamp wins)
+                for (const playlist of validPlaylists) {
+                    const existing = mergedPlaylists[playlist.playlistId];
+                    if (!existing || (playlist.timestamp && playlist.timestamp > (existing.timestamp || 0))) {
+                        mergedPlaylists[playlist.playlistId] = playlist;
+                        importedPlaylists++;
+                    }
+                }
+
+                // Write merged data to IndexedDB only
+                if (this._isIndexedDBAvailable()) {
+                    try {
+                        for (const video of Object.values(mergedVideos)) {
+                            await ytIndexedDBStorage.putVideo(video);
+                        }
+                        for (const playlist of Object.values(mergedPlaylists)) {
+                            await ytIndexedDBStorage.putPlaylist(playlist);
+                        }
+                    } catch (error) {
+                        console.error('[Storage] IndexedDB import failed:', error);
+                        throw new Error(`Import failed: ${error.message}`);
+                    }
+                } else {
+                    throw new Error('IndexedDB not available for import');
+                }
+            } else {
+                // Replace mode: Write directly to IndexedDB
+                if (!this._isIndexedDBAvailable()) {
+                    throw new Error('IndexedDB storage is not available. Please reload the extension.');
+                }
+                
+                try {
+                    for (const video of validVideos) {
+                        await ytIndexedDBStorage.putVideo(video);
+                        importedVideos++;
+                    }
+                    for (const playlist of validPlaylists) {
+                        await ytIndexedDBStorage.putPlaylist(playlist);
+                        importedPlaylists++;
+                    }
+                } catch (error) {
+                    console.error('[Storage] IndexedDB import failed:', error);
+                    throw new Error(`Import failed: ${error.message || 'Unknown error'}`);
+                }
+            }
+
+            // Rebuild stats from IndexedDB after import
+            await this.rebuildStatsFromIndexedDB();
+
+            return {
+                status: 'success',
+                importedVideos,
+                importedPlaylists
+            };
         }
 
         /**
@@ -536,10 +1516,10 @@
                 let syncTriggered = false;
 
                 // First try: Check if we're in background script context (has direct access to sync service)
-                if (window.ytSyncService && window.ytSyncService.syncEnabled) {
+                if (globalScope.ytSyncService && globalScope.ytSyncService.syncEnabled) {
                     if (videoId) {
                         // Use efficient upload for specific video
-                        window.ytSyncService.uploadNewData(videoId).then(success => {
+                        globalScope.ytSyncService.uploadNewData(videoId).then(success => {
                             if (success) {
                                 console.log('[Storage] ✅ Direct video upload triggered successfully');
                                 syncTriggered = true;
@@ -549,7 +1529,7 @@
                         });
                     } else {
                         // Fall back to full sync
-                        window.ytSyncService.triggerSync().then(success => {
+                        globalScope.ytSyncService.triggerSync().then(success => {
                             if (success) {
                                 console.log('[Storage] ✅ Direct sync trigger successful');
                                 syncTriggered = true;
@@ -592,9 +1572,41 @@
             }, 50); // Reduced from 100ms to 50ms for faster triggering
         }
 
-        // Clean up tombstones older than 30 days (default)
+        // Clean up tombstones older than retention period (default 30 days)
+        // Hybrid: Cleans both IndexedDB and storage.local tombstones
         async cleanupTombstones(retentionMs = 30 * 24 * 60 * 60 * 1000) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('cleanupTombstones', [retentionMs]);
+                } catch (error) {
+                    // Fallback: clean storage.local only
+                    const allData = await storage.get(null);
+                    const now = Date.now();
+                    const tombstoneKeys = Object.keys(allData).filter(key => key.startsWith('deleted_video_'));
+                    const oldTombstones = tombstoneKeys.filter(key => {
+                        const tomb = allData[key];
+                        return tomb && tomb.deletedAt && (now - tomb.deletedAt > retentionMs);
+                    });
+                    if (oldTombstones.length > 0) {
+                        await storage.remove(oldTombstones);
+                    }
+                    return;
+                }
+            }
+
             await this.ensureMigrated();
+            
+            // Clean IndexedDB tombstones using deletedAt index
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    await ytIndexedDBStorage.cleanupTombstones(retentionMs);
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB cleanupTombstones failed:', error);
+                }
+            }
+            
+            // Clean legacy deleted_video_* keys from storage.local
             const allData = await storage.get(null);
             const now = Date.now();
             const tombstoneKeys = Object.keys(allData).filter(key => key.startsWith('deleted_video_'));
@@ -608,7 +1620,7 @@
         }
     }
 
-    // Create global storage instance
-    window.ytStorage = new SimpleStorage();
+    // Create global storage instance (works in service workers, popup, content scripts)
+    globalScope.ytStorage = new SimpleStorage();
 
 })();

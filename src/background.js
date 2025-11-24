@@ -3,9 +3,16 @@ console.log('YouTube Video History Tracker background script running.');
 // Import required scripts for Chrome service worker
 if (typeof importScripts === 'function') {
     try {
-        importScripts('storage.js', 'sync-service.js');
+        importScripts('indexeddb-storage.js', 'storage.js', 'sync-service.js');
+        // Verify critical globals are available
+        if (typeof ytIndexedDBStorage === 'undefined') {
+            console.error('[Background] ytIndexedDBStorage not available after import');
+        }
+        if (typeof ytStorage === 'undefined') {
+            console.error('[Background] ytStorage not available after import');
+        }
     } catch (e) {
-        console.log('Background: Failed to import scripts (expected in Firefox):', e.message);
+        console.error('Background: Failed to import scripts:', e.message);
     }
 }
 
@@ -232,6 +239,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 console.log('[Background] ❌ ytSyncService not available for testSyncImprovements');
                 sendResponse({ success: false });
             }
+        }
+
+        // Handle content script storage RPC calls (ytStorageCall)
+        if (message.type === 'ytStorageCall') {
+            if (typeof ytStorage === 'undefined') {
+                console.error('[Background] ytStorage not available');
+                sendResponse({ error: 'ytStorage not available' });
+                return;
+            }
+
+            const { method, args } = message;
+            if (!method || typeof ytStorage[method] !== 'function') {
+                console.error(`[Background] Unknown method: ${method}`);
+                sendResponse({ error: `Unknown method: ${method}` });
+                return;
+            }
+
+            // For importRecords, ensure IndexedDB is available
+            if (method === 'importRecords') {
+                if (typeof ytIndexedDBStorage === 'undefined') {
+                    console.error('[Background] ytIndexedDBStorage not available for import');
+                    sendResponse({ error: 'IndexedDB storage not available. Please reload the extension.' });
+                    return;
+                }
+            }
+
+            // Call the method on ytStorage instance
+            Promise.resolve(ytStorage[method](...args))
+                .then(result => {
+                    sendResponse({ result: result });
+                })
+                .catch(error => {
+                    console.error(`[Background] ytStorageCall error for ${method}:`, error);
+                    const errorMessage = error && error.message ? error.message : String(error);
+                    sendResponse({ error: errorMessage });
+                });
+
+            return true; // Indicates async response
         }
 
     })();

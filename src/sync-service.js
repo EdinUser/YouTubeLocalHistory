@@ -3,6 +3,23 @@
 (function () {
     'use strict';
 
+    // Global scope detection (works in service workers, popup, content scripts)
+    let globalScope;
+    try {
+        if (typeof globalThis !== 'undefined') {
+            globalScope = globalThis;
+        } else if (typeof self !== 'undefined') {
+            globalScope = self;
+        } else if (typeof window !== 'undefined') {
+            globalScope = window;
+        } else {
+            globalScope = this;
+        }
+    } catch (e) {
+        // Fallback to self (service worker) or this
+        globalScope = (typeof self !== 'undefined') ? self : this;
+    }
+
     // Debug settings - will be loaded from storage
     let debugEnabled = false;
 
@@ -764,8 +781,8 @@
             // Clean up tombstones once per day
             this.tombstoneCleanupInterval = setInterval(async () => {
                 try {
-                    if (window.ytStorage && window.ytStorage.cleanupTombstones) {
-                        await window.ytStorage.cleanupTombstones();
+                    if (globalScope.ytStorage && globalScope.ytStorage.cleanupTombstones) {
+                        await globalScope.ytStorage.cleanupTombstones();
                         log('✅ Periodic tombstone cleanup completed');
                     }
                 } catch (error) {
@@ -776,8 +793,8 @@
             // Also run cleanup immediately on startup
             setTimeout(async () => {
                 try {
-                    if (window.ytStorage && window.ytStorage.cleanupTombstones) {
-                        await window.ytStorage.cleanupTombstones();
+                    if (globalScope.ytStorage && globalScope.ytStorage.cleanupTombstones) {
+                        await globalScope.ytStorage.cleanupTombstones();
                         log('✅ Initial tombstone cleanup completed');
                     }
                 } catch (error) {
@@ -1314,19 +1331,19 @@
     }
 
     // Create global sync service instance
-    window.ytSyncService = new SyncService();
-    window.SYNC_STATUS = SYNC_STATUS;
+    globalScope.ytSyncService = new SyncService();
+    globalScope.SYNC_STATUS = SYNC_STATUS;
 
     // Make loadDebugSetting available globally for settings updates
-    window.updateSyncDebug = async function () {
+    globalScope.updateSyncDebug = async function () {
         await loadDebugSetting();
     };
 
     // Make debug function available globally for manual testing
-    window.debugSync = async function () {
-        if (window.ytSyncService) {
+    globalScope.debugSync = async function () {
+        if (globalScope.ytSyncService) {
             log('🔍 Manual debug call...');
-            const result = await window.ytSyncService.debugSyncStorage();
+            const result = await globalScope.ytSyncService.debugSyncStorage();
             log('🔍 Manual debug result:', result);
             return result;
         } else {
