@@ -344,6 +344,19 @@
 
                 // Notify other parts of the extension that a full sync completed
                 this.notifyFullSyncComplete();
+
+                // Sync-aware cleanup: Remove synced records from storage.local
+                // (records that are archived in IndexedDB, synced, and older than 30 minutes)
+                try {
+                    if (globalScope.ytStorage && globalScope.ytStorage.cleanupSyncedRecords) {
+                        const cleanupResult = await globalScope.ytStorage.cleanupSyncedRecords(syncData, this.syncEnabled);
+                        if (cleanupResult.videosDeleted > 0 || cleanupResult.playlistsDeleted > 0) {
+                            log(`🧹 Sync-aware cleanup: Removed ${cleanupResult.videosDeleted} videos and ${cleanupResult.playlistsDeleted} playlists from storage.local`);
+                        }
+                    }
+                } catch (error) {
+                    logError('Sync-aware cleanup failed (non-critical):', error);
+                }
             } catch (error) {
                 logError('Full sync failed:', error);
                 this.updateStatus(SYNC_STATUS.ERROR);
@@ -582,6 +595,21 @@
             log('🌐 Updating sync storage with merged data...');
             await this.updateSyncStorage(mergedData);
             log('✅ Sync storage updated');
+
+            // Sync-aware cleanup: Remove synced records from storage.local
+            // (records that are archived in IndexedDB, synced, and older than 30 minutes)
+            try {
+                if (globalScope.ytStorage && globalScope.ytStorage.cleanupSyncedRecords) {
+                    // Get updated sync data after updateSyncStorage
+                    const updatedSyncData = await syncStorage.get(null);
+                    const cleanupResult = await globalScope.ytStorage.cleanupSyncedRecords(updatedSyncData, this.syncEnabled);
+                    if (cleanupResult.videosDeleted > 0 || cleanupResult.playlistsDeleted > 0) {
+                        log(`🧹 Sync-aware cleanup: Removed ${cleanupResult.videosDeleted} videos and ${cleanupResult.playlistsDeleted} playlists from storage.local`);
+                    }
+                }
+            } catch (error) {
+                logError('Sync-aware cleanup failed (non-critical):', error);
+            }
         }
 
         async mergeData(localData, syncData) {

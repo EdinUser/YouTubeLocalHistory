@@ -7,6 +7,93 @@ function log(...args) {
     }
 }
 
+/**
+ * Clean YouTube URL by removing timestamp and other parameters
+ * @param {string} url - YouTube URL
+ * @returns {string} Clean URL with only video ID
+ */
+function cleanVideoUrl(url) {
+    if (!url) return url;
+    
+    // Handle relative URLs by making them absolute
+    let absoluteUrl = url;
+    if (url.startsWith('/')) {
+        absoluteUrl = 'https://www.youtube.com' + url;
+    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        // If it's not absolute and not relative, assume it's a YouTube URL
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+            absoluteUrl = 'https://' + url.replace(/^https?:\/\//, '');
+        } else {
+            // Can't parse, return as-is
+            return url;
+        }
+    }
+    
+    try {
+        const urlObj = new URL(absoluteUrl);
+        const videoId = urlObj.searchParams.get('v') || 
+                       (urlObj.pathname.includes('/shorts/') ? urlObj.pathname.split('/shorts/')[1]?.split('/')[0] : null);
+        
+        if (!videoId) return url; // Return original if we can't extract video ID
+        
+        // Return clean URL
+        if (urlObj.pathname.includes('/shorts/')) {
+            return `https://www.youtube.com/shorts/${videoId}`;
+        } else {
+            return `https://www.youtube.com/watch?v=${videoId}`;
+        }
+    } catch (e) {
+        // If URL parsing fails, try to extract video ID manually
+        const videoIdMatch = absoluteUrl.match(/[?&]v=([^&]+)/) || absoluteUrl.match(/\/shorts\/([^\/\?]+)/);
+        if (videoIdMatch) {
+            const videoId = videoIdMatch[1];
+            if (absoluteUrl.includes('/shorts/')) {
+                return `https://www.youtube.com/shorts/${videoId}`;
+            } else {
+                return `https://www.youtube.com/watch?v=${videoId}`;
+            }
+        }
+        // If all else fails, return original URL
+        return url;
+    }
+}
+
+/**
+ * Add timestamp parameter to YouTube URL
+ * @param {string} url - YouTube URL
+ * @param {number} timeSeconds - Time in seconds
+ * @returns {string} URL with timestamp parameter
+ */
+function addTimestampToUrl(url, timeSeconds) {
+    if (!url || !timeSeconds || timeSeconds <= 0) return url;
+    
+    try {
+        // First clean the URL to remove any existing timestamp
+        const cleanUrl = cleanVideoUrl(url);
+        
+        // If cleaning failed or returned original, use original URL
+        const urlToUse = cleanUrl || url;
+        
+        try {
+            const urlObj = new URL(urlToUse);
+            // Add 't' parameter (YouTube accepts both 't=123' and 't=123s')
+            urlObj.searchParams.set('t', Math.floor(timeSeconds) + 's');
+            return urlObj.toString();
+        } catch (e) {
+            // If URL parsing fails, try simple string manipulation
+            if (urlToUse.includes('watch?v=') || urlToUse.includes('/shorts/')) {
+                const separator = urlToUse.includes('?') ? '&' : '?';
+                return `${urlToUse}${separator}t=${Math.floor(timeSeconds)}s`;
+            }
+            return urlToUse;
+        }
+    } catch (error) {
+        // If anything fails, return original URL without timestamp
+        console.warn('[Popup] Failed to add timestamp to URL:', error, url);
+        return url;
+    }
+}
+
 window.onerror = function (msg, url, lineNo, columnNo, error) {
     console.error('[ythdb-popup] Error: ' + msg + '\nURL: ' + url + '\nLine: ' + lineNo + '\nColumn: ' + columnNo + '\nError object: ' + JSON.stringify(error));
     return false;
@@ -354,7 +441,9 @@ function updateVideoRecord(record) {
 
                 if (link) {
                     link.textContent = record.title || 'Unknown Title';
-                    link.href = record.url;
+                    link.href = (record.time && record.time > 0) 
+                        ? addTimestampToUrl(record.url, record.time)
+                        : record.url;
                 }
 
                 if (progress) {
@@ -1120,7 +1209,9 @@ function renderUnfinishedVideos() {
         const div = document.createElement('div');
         div.style.marginBottom = '8px';
         const a = document.createElement('a');
-        a.href = record.url;
+        a.href = (record.time && record.time > 0) 
+            ? addTimestampToUrl(record.url, record.time)
+            : record.url;
         a.target = '_blank';
         a.style.fontWeight = '500';
         a.style.color = 'var(--button-bg)';
@@ -1467,7 +1558,10 @@ function displayHistoryPage() {
         thumbnail.src = `https://i.ytimg.com/vi/${record.videoId}/mqdefault.jpg`;
         thumbnail.alt = record.title || 'Video thumbnail';
 
-        link.href = record.url;
+        // Add timestamp to URL if video has saved progress
+        link.href = (record.time && record.time > 0) 
+            ? addTimestampToUrl(record.url, record.time)
+            : record.url;
         link.textContent = record.title || 'Unknown Title';
 
         progress.textContent = formatProgress(record.time, record.duration);
@@ -3206,7 +3300,10 @@ function displayShortsPage() {
         // Shorts title and link
         const titleCell = document.createElement('td');
         const link = document.createElement('a');
-        link.href = record.url || `https://www.youtube.com/shorts/${record.videoId}`;
+        const baseUrl = record.url || `https://www.youtube.com/shorts/${record.videoId}`;
+        link.href = (record.time && record.time > 0) 
+            ? addTimestampToUrl(baseUrl, record.time)
+            : baseUrl;
         link.className = 'video-link';
         link.textContent = record.title || record.videoId;
         link.target = '_blank';

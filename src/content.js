@@ -535,6 +535,146 @@
         return `https://www.youtube.com/watch?v=${videoId}`;
     }
 
+    /**
+     * Clean YouTube URL by removing timestamp and other parameters
+     * @param {string} url - YouTube URL
+     * @returns {string} Clean URL with only video ID
+     */
+    function cleanVideoUrl(url) {
+        if (!url) return url;
+        
+        // Handle relative URLs by making them absolute
+        let absoluteUrl = url;
+        if (url.startsWith('/')) {
+            absoluteUrl = 'https://www.youtube.com' + url;
+        } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            // If it's not absolute and not relative, assume it's a YouTube URL
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                absoluteUrl = 'https://' + url.replace(/^https?:\/\//, '');
+            } else {
+                // Can't parse, return as-is
+                return url;
+            }
+        }
+        
+        try {
+            const urlObj = new URL(absoluteUrl);
+            const videoId = urlObj.searchParams.get('v') || 
+                           (urlObj.pathname.includes('/shorts/') ? urlObj.pathname.split('/shorts/')[1]?.split('/')[0] : null);
+            
+            if (!videoId) return url; // Return original if we can't extract video ID
+            
+            // Return clean URL
+            if (urlObj.pathname.includes('/shorts/')) {
+                return `https://www.youtube.com/shorts/${videoId}`;
+            } else {
+                return `https://www.youtube.com/watch?v=${videoId}`;
+            }
+        } catch (e) {
+            // If URL parsing fails, try to extract video ID manually
+            const videoIdMatch = absoluteUrl.match(/[?&]v=([^&]+)/) || absoluteUrl.match(/\/shorts\/([^\/\?]+)/);
+            if (videoIdMatch) {
+                const videoId = videoIdMatch[1];
+                if (absoluteUrl.includes('/shorts/')) {
+                    return `https://www.youtube.com/shorts/${videoId}`;
+                } else {
+                    return `https://www.youtube.com/watch?v=${videoId}`;
+                }
+            }
+            // If all else fails, return original URL
+            return url;
+        }
+    }
+
+    /**
+     * Add timestamp parameter to YouTube URL
+     * @param {string} url - YouTube URL
+     * @param {number} timeSeconds - Time in seconds
+     * @returns {string} URL with timestamp parameter
+     */
+    function addTimestampToUrl(url, timeSeconds) {
+        if (!url || !timeSeconds || timeSeconds <= 0) return url;
+        
+        try {
+            // First clean the URL to remove any existing timestamp
+            const cleanUrl = cleanVideoUrl(url);
+            
+            // If cleaning failed or returned original, use original URL
+            const urlToUse = cleanUrl || url;
+            
+            try {
+                const urlObj = new URL(urlToUse);
+                // Add 't' parameter (YouTube accepts both 't=123' and 't=123s')
+                urlObj.searchParams.set('t', Math.floor(timeSeconds) + 's');
+                return urlObj.toString();
+            } catch (e) {
+                // If URL parsing fails, try simple string manipulation
+                if (urlToUse.includes('watch?v=') || urlToUse.includes('/shorts/')) {
+                    const separator = urlToUse.includes('?') ? '&' : '?';
+                    return `${urlToUse}${separator}t=${Math.floor(timeSeconds)}s`;
+                }
+                return urlToUse;
+            }
+        } catch (error) {
+            // If anything fails, return original URL without timestamp
+            log('[Content] Failed to add timestamp to URL:', error, url);
+            return url;
+        }
+    }
+
+    /**
+     * Add timestamp to a video link if we have saved progress
+     */
+    async function addTimestampToLink(anchor) {
+        const href = anchor.getAttribute('href');
+        if (!href) return;
+
+        // Extract video ID from URL
+        let videoId = null;
+        if (href.includes('watch?v=')) {
+            const match = href.match(/[?&]v=([^&]+)/);
+            videoId = match ? match[1] : null;
+        } else if (href.includes('/shorts/')) {
+            const match = href.match(/\/shorts\/([^\/\?]+)/);
+            videoId = match ? match[1] : null;
+        }
+
+        if (!videoId) return;
+
+        // Check if we have saved progress for this video
+        try {
+            const record = await ytStorage.getVideo(videoId);
+            if (record && record.time && record.time > 0) {
+                // Modify the href to include timestamp
+                const newUrl = addTimestampToUrl(href, record.time);
+                if (newUrl !== href) {
+                    anchor.setAttribute('href', newUrl);
+                    log(`[Link Intercept] Added timestamp ${record.time}s to video ${videoId}`);
+                }
+            }
+        } catch (error) {
+            // Silently fail - don't break navigation if storage check fails
+            log(`[Link Intercept] Failed to check video ${videoId}:`, error);
+        }
+    }
+
+    /**
+     * Intercept clicks on video links and add timestamp if we have saved progress
+     */
+    function interceptVideoLinkClicks() {
+        // Intercept clicks on video links
+        document.addEventListener('click', async (e) => {
+            // Find the closest anchor element
+            let anchor = e.target.closest('a[href*="watch?v="], a[href*="/shorts/"]');
+            if (!anchor) return;
+
+            await addTimestampToLink(anchor);
+        }, true); // Use capture phase to intercept before YouTube's handlers
+
+        // Also process links when thumbnails are processed (for dynamically loaded content)
+        // This is handled by the existing thumbnail processing logic
+    }
+
     // Get playlist info from URL with better title detection
     function getPlaylistInfo() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -808,6 +948,7 @@
             time: currentTime,
             duration,
             timestamp: Date.now(),
+            // Always use clean URL without timestamp parameter
             url: getCleanVideoUrl(),
             channelName,
             channelId
@@ -1055,8 +1196,30 @@
 
             try {
                 // Get saved record using existing storage wrapper
-                const record = await ytStorage.getVideo(videoId);
-                if (!record || !record.time || record.time <= 0) return;
+                // Retry logic: In Chrome, service worker might be sleeping, so retry a few times
+                let record = null;
+                let retries = 3;
+                let retryDelay = 200;
+                
+                for (let attempt = 0; attempt < retries; attempt++) {
+                    try {
+                        record = await ytStorage.getVideo(videoId);
+                        if (record && record.time && record.time > 0) {
+                            break; // Success, exit retry loop
+                        }
+                    } catch (error) {
+                        log(`[ensureVideoReady] getVideo attempt ${attempt + 1} failed:`, error.message);
+                        if (attempt < retries - 1) {
+                            // Wait before retry (exponential backoff)
+                            await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
+                        }
+                    }
+                }
+                
+                if (!record || !record.time || record.time <= 0) {
+                    log(`[ensureVideoReady] No valid record found for ${videoId} after ${retries} attempts`);
+                    return;
+                }
 
                 const currentTime = video.currentTime || 0;
                 const savedTime = record.time;
@@ -1128,11 +1291,45 @@
                 }
             } catch (err) {
                 log(`[ensureVideoReady] Error:`, err);
+                // Don't set timestampLoaded = true on error, so we can retry
             }
         };
 
+        // Initial attempt
         ensureVideoReady().catch(error => {
-            log('[Error] Video initialization failed', error);
+            log(`[setupVideoTracking] ensureVideoReady failed:`, error);
+        });
+        
+        // Fallback: If video starts playing from 0:00 but we have a saved time, restore it
+        // This handles cases where getVideo() failed initially but the video started playing
+        const fallbackRestore = async () => {
+            // Wait a bit for video to start playing
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check if we still haven't loaded the timestamp and video is at/near 0:00
+            if (!timestampLoaded && video.currentTime < 5 && video.readyState >= 1) {
+                try {
+                    const videoId = getVideoId();
+                    if (!videoId) return;
+                    
+                    log(`[fallbackRestore] Video playing from ${video.currentTime.toFixed(1)}s, attempting restore...`);
+                    const record = await ytStorage.getVideo(videoId);
+                    
+                    if (record && record.time && record.time > 30) {
+                        // Only restore if saved time is significant (>30s)
+                        log(`[fallbackRestore] Restoring to ${record.time.toFixed(1)}s`);
+                        video.currentTime = record.time;
+                        timestampLoaded = true;
+                    }
+                } catch (error) {
+                    log(`[fallbackRestore] Failed:`, error);
+                }
+            }
+        };
+        
+        // Start fallback restore check
+        fallbackRestore().catch(error => {
+            log(`[setupVideoTracking] fallbackRestore failed:`, error);
         });
 
         // Event handlers with minimal logging
@@ -1247,6 +1444,13 @@
 
         // Reset the main initialization flag to allow re-initialization for the new page.
         isInitialized = false;
+        
+        // Reset timestampLoaded flags for all tracked videos to allow restoration retry
+        // This is critical for SPA navigation where videos might load before getVideo() succeeds
+        trackedVideos.forEach(video => {
+            // Clear any existing timestampLoaded state by removing and re-adding to tracked set
+            // The flag is scoped per video in setupVideoTracking, so this ensures fresh state
+        });
 
         // Stop any existing initialization interval
         if (initChecker) {
@@ -2411,6 +2615,9 @@
                 // Set up a backup check for lazy-loaded content
                 setTimeout(processExistingThumbnails, 2000);
             }
+
+            // Intercept video link clicks to add timestamps
+            interceptVideoLinkClicks();
 
             isInitialized = true;
             

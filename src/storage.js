@@ -608,56 +608,134 @@
          * @param {Array} args - Arguments array
          * @returns {Promise<any>} Result from background
          */
-        async _callBackground(method, args = []) {
+        async _callBackground(method, args = [], retries = 4, delay = 200) {
+            // Both Chrome and Firefox use chrome.runtime.sendMessage for RPC
             if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
                 throw new Error('chrome.runtime.sendMessage not available');
             }
 
-            return new Promise((resolve, reject) => {
-                try {
-                    chrome.runtime.sendMessage({
-                        type: 'ytStorageCall',
-                        method: method,
-                        args: args
-                    }, (response) => {
-                        // Check for runtime errors first
-                        if (chrome.runtime.lastError) {
-                            const errorMsg = chrome.runtime.lastError.message || 'Unknown error';
-                            console.error('[Storage] Background RPC error:', errorMsg);
-                            reject(new Error(`Background script error: ${errorMsg}`));
-                            return;
+            const attemptCall = (withTimeout = true) => {
+                return new Promise((resolve, reject) => {
+                    let resolved = false;
+                    const timeout = withTimeout ? setTimeout(() => {
+                        if (!resolved) {
+                            resolved = true;
+                            reject(new Error('EXTENSION_CONTEXT_INVALIDATED')); // Timeout = service worker sleeping
                         }
+                    }, 3000) : null; // 3 second timeout
 
-                        // Check for error in response
-                        if (response && response.error) {
-                            reject(new Error(response.error));
-                            return;
-                        }
+                    try {
+                        chrome.runtime.sendMessage({
+                            type: 'ytStorageCall',
+                            method: method,
+                            args: args
+                        }, (response) => {
+                            if (resolved) return;
+                            resolved = true;
+                            if (timeout) clearTimeout(timeout);
 
-                        // Return result
-                        if (response && 'result' in response) {
-                            resolve(response.result);
+                            // Check for runtime errors first
+                            if (chrome.runtime.lastError) {
+                                const errorMsg = chrome.runtime.lastError.message || 'Unknown error';
+                                
+                                // Check if it's an "Extension context invalidated" error
+                                // This happens when the service worker is terminated
+                                if (errorMsg.includes('Extension context invalidated') || 
+                                    errorMsg.includes('message port closed') ||
+                                    errorMsg.includes('Could not establish connection')) {
+                                    reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
+                                    return;
+                                }
+                                
+                                console.error('[Storage] Background RPC error:', errorMsg);
+                                reject(new Error(`Background script error: ${errorMsg}`));
+                                return;
+                            }
+
+                            // Handle undefined response (service worker terminated)
+                            if (response === undefined) {
+                                reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
+                                return;
+                            }
+
+                            // Check for error in response
+                            if (response && response.error) {
+                                reject(new Error(response.error));
+                                return;
+                            }
+
+                            // Return result
+                            if (response && 'result' in response) {
+                                resolve(response.result);
+                            } else {
+                                resolve(response);
+                            }
+                        });
+                    } catch (error) {
+                        if (resolved) return;
+                        resolved = true;
+                        if (timeout) clearTimeout(timeout);
+                        
+                        // Check if it's a context invalidated error
+                        if (error.message && (error.message.includes('Extension context invalidated') || 
+                            error.message.includes('message port closed'))) {
+                            reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
                         } else {
-                            resolve(response);
+                            console.error('[Storage] Error calling background:', error);
+                            reject(new Error(`Failed to call background: ${error.message}`));
                         }
-                    });
+                    }
+                });
+            };
+
+            // Try with retries for extension context invalidated errors
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    // First attempt: try with timeout
+                    // Subsequent attempts: try without timeout (service worker should be awake)
+                    return await attemptCall(attempt === 0);
                 } catch (error) {
-                    console.error('[Storage] Error calling background:', error);
-                    reject(new Error(`Failed to call background: ${error.message}`));
+                    const isContextInvalidated = error.message === 'EXTENSION_CONTEXT_INVALIDATED';
+                    
+                    if (isContextInvalidated && attempt < retries) {
+                        // Service worker might be sleeping - wait and retry
+                        // Use longer delays for later attempts
+                        const waitTime = delay * Math.pow(2, attempt); // Exponential backoff: 200ms, 400ms, 800ms, 1600ms
+                        console.log(`[Storage] Extension context invalidated, retrying in ${waitTime}ms (attempt ${attempt + 1}/${retries + 1})`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        continue;
+                    }
+                    
+                    // Not retryable or out of retries
+                    throw error;
                 }
-            });
+            }
         }
 
         // Get video record (Hybrid View: storage.local first, then IndexedDB)
         async getVideo(videoId) {
             // Content scripts proxy to background
             if (!this._isExtensionContext()) {
+                // Check storage.local first (fast path, works even if service worker is sleeping)
                 try {
-                    return await this._callBackground('getVideo', [videoId]);
+                    const localResult = await storage.get([`video_${videoId}`]);
+                    if (localResult && localResult[`video_${videoId}`]) {
+                        return localResult[`video_${videoId}`];
+                    }
                 } catch (error) {
-                    // Fallback: try direct storage.local read (last resort)
-                    const result = await storage.get([`video_${videoId}`]);
-                    return result[`video_${videoId}`] || null;
+                    // Continue to RPC if local read fails
+                    console.warn('[Storage] storage.local read failed, trying RPC:', error.message);
+                }
+
+                // Try RPC with retries (handles service worker wake-up)
+                // This is needed for archived records in IndexedDB
+                try {
+                    return await this._callBackground('getVideo', [videoId], 4, 200);
+                } catch (error) {
+                    // If RPC fails after retries, we've already checked storage.local above
+                    // Archived records in IndexedDB won't be accessible if service worker is sleeping
+                    console.warn('[Storage] getVideo RPC failed after retries:', error.message);
+                    return null;
                 }
             }
 
@@ -674,8 +752,21 @@
                 try {
                     const archived = await ytIndexedDBStorage.getVideo(videoId);
                     if (archived) {
+                        // Optional hydration: If record is recent (within 30 min), hydrate to storage.local
+                        // This improves performance and resilience if service worker sleeps
+                        const recentCutoff = Date.now() - (30 * 60 * 1000); // 30 minutes ago
+                        if (archived.timestamp && archived.timestamp >= recentCutoff) {
+                            // Hydrate recent archived records to storage.local for faster access
+                            // This helps when service worker is sleeping and RPC calls fail
+                            try {
+                                await storage.set({[`video_${videoId}`]: archived});
+                            } catch (error) {
+                                // Non-critical: hydration failed, but we still return the archived record
+                                console.warn('[Storage] Failed to hydrate archived record to storage.local:', error);
+                            }
+                        }
+                        
                         // CRITICAL: Return archived record with saved time to restore position
-                        // Does NOT write to storage.local (no hydration on read)
                         return archived;
                     }
                 } catch (error) {
@@ -1617,6 +1708,124 @@
             if (oldTombstones.length > 0) {
                 await storage.remove(oldTombstones);
             }
+        }
+
+        /**
+         * Sync-aware cleanup: Remove records from storage.local that have been:
+         * 1. Archived to IndexedDB
+         * 2. Synced to sync storage
+         * 3. Older than recent window (30 minutes)
+         * 
+         * This is called after a successful sync to free up storage.local space
+         * while keeping recent records for fast access and sync source.
+         * 
+         * @param {Object} syncData - Sync storage data with ytrewatch_* prefixed keys
+         * @param {boolean} syncEnabled - Whether sync is enabled
+         * @returns {Promise<{videosDeleted: number, playlistsDeleted: number}>}
+         */
+        async cleanupSyncedRecords(syncData = {}, syncEnabled = false) {
+            // Content scripts proxy to background
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('cleanupSyncedRecords', [syncData, syncEnabled]);
+                } catch (error) {
+                    console.error('[Storage] CleanupSyncedRecords RPC failed:', error);
+                    return { videosDeleted: 0, playlistsDeleted: 0 };
+                }
+            }
+
+            // Only run if sync is enabled and IndexedDB is available
+            if (!syncEnabled || !this._isIndexedDBAvailable()) {
+                return { videosDeleted: 0, playlistsDeleted: 0 };
+            }
+
+            await this.ensureMigrated();
+
+            const recentCutoff = Date.now() - (30 * 60 * 1000); // 30 minutes ago
+            const sharedPrefix = 'ytrewatch_';
+            let videosDeleted = 0;
+            let playlistsDeleted = 0;
+
+            try {
+                // Get all local records
+                const localData = await storage.get(null);
+                const localVideoKeys = Object.keys(localData).filter(key => key.startsWith('video_'));
+                const localPlaylistKeys = Object.keys(localData).filter(key => key.startsWith('playlist_'));
+
+                // Find videos to delete: must be in IndexedDB, synced, and older than recent window
+                const videosToDelete = [];
+                for (const key of localVideoKeys) {
+                    const videoId = key.replace('video_', '');
+                    const record = localData[key];
+                    
+                    if (!record || !record.timestamp) continue;
+                    
+                    // Skip if within recent window (keep for fast access)
+                    if (record.timestamp >= recentCutoff) continue;
+
+                    // Check if synced (exists in sync storage with ytrewatch_ prefix)
+                    const syncKey = `${sharedPrefix}video_${videoId}`;
+                    if (!syncData[syncKey]) continue;
+
+                    // Check if archived in IndexedDB
+                    try {
+                        const idbRecord = await ytIndexedDBStorage.getVideo(videoId);
+                        if (!idbRecord) continue; // Not in IndexedDB, skip
+                    } catch (error) {
+                        // If IndexedDB check fails, skip this record (fail-safe)
+                        console.warn(`[Storage] IndexedDB check failed for ${videoId}:`, error);
+                        continue;
+                    }
+
+                    // All conditions met: archived, synced, and old
+                    videosToDelete.push(key);
+                }
+
+                // Find playlists to delete: same criteria
+                const playlistsToDelete = [];
+                for (const key of localPlaylistKeys) {
+                    const playlistId = key.replace('playlist_', '');
+                    const record = localData[key];
+                    
+                    if (!record || !record.timestamp) continue;
+                    
+                    // Skip if within recent window
+                    if (record.timestamp >= recentCutoff) continue;
+
+                    // Check if synced
+                    const syncKey = `${sharedPrefix}playlist_${playlistId}`;
+                    if (!syncData[syncKey]) continue;
+
+                    // Check if archived in IndexedDB
+                    try {
+                        const idbRecord = await ytIndexedDBStorage.getPlaylist(playlistId);
+                        if (!idbRecord) continue;
+                    } catch (error) {
+                        console.warn(`[Storage] IndexedDB check failed for playlist ${playlistId}:`, error);
+                        continue;
+                    }
+
+                    playlistsToDelete.push(key);
+                }
+
+                // Delete in batches
+                if (videosToDelete.length > 0) {
+                    await storage.remove(videosToDelete);
+                    videosDeleted = videosToDelete.length;
+                    console.log(`[Storage] Sync-aware cleanup: Deleted ${videosDeleted} synced videos from storage.local`);
+                }
+
+                if (playlistsToDelete.length > 0) {
+                    await storage.remove(playlistsToDelete);
+                    playlistsDeleted = playlistsToDelete.length;
+                    console.log(`[Storage] Sync-aware cleanup: Deleted ${playlistsDeleted} synced playlists from storage.local`);
+                }
+
+            } catch (error) {
+                console.error('[Storage] Sync-aware cleanup error:', error);
+            }
+
+            return { videosDeleted, playlistsDeleted };
         }
     }
 
