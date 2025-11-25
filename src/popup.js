@@ -2929,28 +2929,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         });
 
-        exportButton.addEventListener('click', async () => {
-            try {
-                const [history, playlists, stats] = await Promise.all([
-                    ytStorage.getAllVideos(),
-                    ytStorage.getAllPlaylists(),
-                    (async ()=>{ try { return await ytStorage.getStats(); } catch(e){ return null; } })()
-                ]);
-                const data = {history, playlists, stats};
-
-                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'youtube_history_backup.json';
-                a.click();
-                URL.revokeObjectURL(url);
-                showMessage(chrome.i18n.getMessage('message_export_success', [history.length, playlists.length]));
-            } catch (error) {
-                console.error('Error exporting history:', error);
-                showMessage(chrome.i18n.getMessage('message_error_exporting_history', [error.message || chrome.i18n.getMessage('message_unknown_error')]), 'error');
-            }
-        });
+        exportButton.addEventListener('click', exportHistory);
 
         importButton.addEventListener('click', () => openImportPage());
         closeButton.addEventListener('click', () => window.close());
