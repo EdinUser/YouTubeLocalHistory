@@ -117,21 +117,20 @@ Check the extension popup - your history should still be there.
 
 ### Q: Will deleted videos stay deleted?
 **A:** YES! We've implemented a robust deletion system:
-- **Deleted videos stay deleted** across all your devices
-- **Tombstone protection** ensures deletions are respected during sync
+- **Deleted videos stay deleted** in your local history, even after migrations or imports
+- **Tombstone protection** ensures deletions are respected locally and prevent reappearance from the archive
 - **30-day protection period** prevents accidentally restoring deleted videos
-- **Works across accounts** - deletions persist even when switching YouTube accounts
+- **Works across accounts** on the same browser profile – deletions persist even when switching YouTube accounts
 - **Automatic cleanup** removes old deletion markers after 30 days
 
-This solves the common problem where deleted videos would reappear after syncing between devices.
+This solves the common problem where deleted videos would reappear in searches.
 
 ### Q: What happens if I delete a video on one device?
-**A:** The deletion will be protected and synchronized:
+**A:** The deletion will be protected locally:
 1. Video is immediately removed from your history
 2. A deletion marker is created to protect the deletion
-3. When you sync to other devices, the video will be removed there too
-4. The video won't reappear even if you switch YouTube accounts
-5. Protection lasts for 30 days to ensure all your devices learn about the deletion
+3. The video won't reappear in searches or listings
+4. Protection lasts for 30 days to ensure consistency
 
 ---
 
@@ -204,36 +203,31 @@ This solves the common problem where deleted videos would reappear after syncing
 
 ---
 
-## 🔄 Sync & Multiple Devices
+## 🔄 Data Management & Multiple Devices
 
-### Q: Can I sync my history across devices?
-**A:** Yes, if you're using Firefox! Enable Firefox Sync in your browser settings, then enable sync in the extension's Settings tab.
+### Q: Can I transfer my history between devices?
+**A:** Yes! Use the export/import feature to manually transfer your history between devices. There is **no automatic cloud sync** – export/import is the official way to move your data:
+1. Go to Settings tab → Data Management → Export History
+2. Download the JSON file to your computer
+3. On the other device, go to Settings → Import History
+4. Select the JSON file and choose "Merge" or "Replace"
 
-### Q: How often does sync run by default?
-**A:** By default, the automatic sync interval is approximately every 10 minutes. Immediate sync on updates is disabled by default to reduce resource usage. You can still trigger manual sync from the Settings tab (Firefox only).
+### Q: How much data can the extension store?
+**A:** Unlimited! The hybrid storage system can handle 100,000+ videos and scale to GBs of data, unlike the previous ~50MB limit.
 
 ### Q: Can I stop saving progress when watching inside playlists?
 **A:** Yes. There are two options:
 - **Global:** Enable "Pause history in playlists" in Settings to stop tracking progress during any playlist session.
 - **Per‑playlist:** Use the playlist's **"Ignore videos"** toggle in the Playlists tab to exclude just that playlist.
 
-### Q: Does sync work with Chrome?
-**A:** Not yet, but we're working on it! For now, you can use the export/import feature to transfer your history between devices.
+### Q: What happens if I run out of storage space?
+**A:** The extension uses IndexedDB which scales automatically. However, if you have extremely large histories (millions of videos), you may want to use the auto-cleanup feature in Settings to remove old entries.
 
-### Q: How do I enable sync in Firefox?
-**A:** 
-1. Enable Firefox Sync in your browser settings
-2. Open the extension popup
-3. Go to Settings tab
-4. Toggle "Enable Sync" on
-5. Your history will automatically sync across your Firefox devices
-
-### Q: What happens if I don't use a device for a long time?
-**A:** We have a "stale device protection" system:
-- If a device hasn't synced for 29+ days, it's considered "stale"
-- When a stale device comes back online, it will get fresh data from your other devices
-- This prevents old devices from restoring videos you deleted on your active devices
-- Your viewing history stays consistent across all devices, even after long periods offline
+### Q: Is my data safe during the migration to hybrid storage?
+**A:** Yes! The migration process is fail-safe:
+- Data is never deleted until successfully archived in IndexedDB
+- Migration can be resumed if interrupted
+- You can always export your data as backup before updates
 
 ---
 

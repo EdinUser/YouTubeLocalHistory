@@ -57,7 +57,7 @@ YT re:Watch is the **YouTube history extension** that solves account switching p
 - ✅ **Local storage only** - Google doesn't get your viewing progress data
 - ✅ **No YouTube tracking** - replaces Google's built-in history system
 - ✅ **Private YouTube browsing** - watch without affecting recommendations
-- ✅ **Cross-device sync** (Firefox) - private history sync across devices
+- ✅ **Unlimited local storage** - GB-scale capacity with hybrid IndexedDB system
 
 ### ⚠️ **Privacy Transparency**
 **What this extension protects:** YouTube viewing history and video progress tracking only  
@@ -146,12 +146,12 @@ Click the extension icon to access:
 
 Analytics now prefer locally persisted, privacy-preserving statistics for better accuracy and performance.
 
-### 🔄 **Cross-Device Sync (Firefox)**
-- **Firefox Sync**: Automatic cross-device synchronization
-- **Conflict Resolution**: Smart handling of sync conflicts with deletion protection
-- **Manual Sync**: Trigger sync anytime from settings
-- **Status Indicator**: Visual sync progress tracking
-- **Stale Device Protection**: Automatic handling of devices offline for extended periods
+### 🔄 **Data Portability & Local Storage**
+- **Unlimited local storage**: GB-scale capacity with IndexedDB + localStorage hybrid system
+- **Manual export/import**: Transfer data between devices via JSON files
+- **Bulletproof reliability**: Core functionality works even if IndexedDB unavailable
+- **Privacy protection**: All data stays local, no cloud storage required
+- **Performance optimized**: Fast queries with indexed search and memory-efficient pagination
 
 ### 🎨 **User Experience**
 - **Modern Interface**: Clean, card-based layout
@@ -200,7 +200,12 @@ Analytics now prefer locally persisted, privacy-preserving statistics for better
 
 ## Storage System
 
-This extension uses `chrome.storage.local` (Chrome) or `browser.storage.local` (Firefox) for secure data storage instead of IndexedDB. This provides better security as the data cannot be easily accessed through browser developer tools.
+This extension uses a **hybrid storage architecture** combining IndexedDB and localStorage for optimal performance and unlimited capacity:
+
+- **IndexedDB**: Unlimited storage for complete video/playlists history with full metadata
+- **localStorage**: Fast overlay for recent/active content and lightweight configuration
+- **Merged reads**: Seamless access to complete history with local changes taking priority
+- **Extension-scoped**: IndexedDB is never created under YouTube origin for privacy protection
 
 ### Persistent Statistics
 For faster and more consistent Analytics, the extension maintains a small, local statistics snapshot:
@@ -210,13 +215,15 @@ For faster and more consistent Analytics, the extension maintains a small, local
 
 These stats are calculated and stored locally only. On first upgrade, they are seeded from your existing history when possible.
 
-### Migration from IndexedDB
+### Hybrid Storage Migration
 
-If you're updating from a previous version that used IndexedDB, the extension will automatically migrate your existing data to the new storage system on first run. The migration process:
+The extension automatically migrates from legacy storage to the new hybrid system on first run. The migration process:
 
-1. Reads all existing data from IndexedDB
-2. Transfers it to the new storage system
-3. Marks the migration as complete to avoid re-migration
+1. **Verified migration**: Each batch is written to IndexedDB and verified before cleanup
+2. **Fail-safe**: Local data is never deleted until IndexedDB archival is confirmed
+3. **Resumable**: Migration continues from last successful batch if interrupted
+4. **Stats rebuild**: Analytics statistics are recalculated from migrated data
+5. **Graceful fallback**: Extension continues working during migration process
 
 ### Data Structure
 
@@ -237,8 +244,8 @@ The extension stores three types of data:
    - **Shorts**: Dedicated interface for YouTube Shorts
    - **Playlists**: Saved playlists with metadata
    - **Analytics**: Interactive charts and viewing statistics
-   - **Settings**: Customize appearance, sync, and preferences
-5. **Enable Firefox Sync** (Firefox users) for cross-device synchronization with real-time status updates
+   - **Settings**: Customize appearance, data management, and preferences
+5. **Export/import data** anytime for backup and transfer between devices
 
 ### Settings
 
@@ -249,15 +256,15 @@ The extension stores three types of data:
 - **Overlay Label Size**: Size of the overlay label and progress bar (small, medium, large, extra large)
 
 #### 🗂️ Data Management  
-- **Auto-clean Period**: Automatically remove history entries older than specified days (1-180 days)
+- **Auto-clean Period**: Automatically remove history entries older than specified days (1–180 days), or choose **Forever** to disable auto-cleanup
 - **Items per Page**: Number of items to show per page in history view (5-20)
 - **Debug Mode**: Enable debug logging for troubleshooting
 
-#### 🔄 Sync Settings (Firefox)
-- **Enable/Disable Sync**: Toggle Firefox Sync integration
-- **Sync Status**: Real-time sync status with last sync time
-- **Manual Sync**: Trigger immediate sync or full sync with cleanup
-- **Sync Indicator**: Visual status indicator in popup interface
+#### 🔄 Data Management
+- **Export History**: Download complete history as JSON file for backup
+- **Import History**: Restore or merge data from backup files
+- **Data Portability**: Transfer history between devices manually
+- **Migration Status**: Monitor hybrid storage migration progress
 
 ### Theme System
 
@@ -327,12 +334,12 @@ The extension uses the browser's built-in storage API (`chrome.storage.local`/`b
 4. **Storage Check**: Verify extension has storage permissions
 5. **Improved Diagnostics**: Benefit from enhanced error messages and loading states
 
-### Sync Issues (Firefox)
-1. **Firefox Sync Status**: Check if Firefox Sync is enabled in your browser
-2. **Sync Indicator**: Look at the sync status indicator in the popup
-3. **Manual Sync**: Try triggering a manual sync from the settings tab
-4. **Full Sync**: Use "Full Sync" option to clean up and re-sync all data
-5. **Network Check**: Ensure stable internet connection for sync operations
+### Storage & Migration Issues
+1. **Migration Status**: Check popup for hybrid storage migration progress
+2. **Storage Space**: Ensure sufficient disk space for IndexedDB storage
+3. **Browser Storage**: Verify extension has storage permissions enabled
+4. **Fallback Mode**: Extension continues working if IndexedDB unavailable
+5. **Export Backup**: Always export data before major troubleshooting
 
 ### Migration Issues
 If you experience issues with data migration from older versions:
@@ -386,7 +393,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed release notes and version history.
 - Prefer **YouTube privacy** over Google's tracking
 - Want **consistent viewing history** regardless of account status
 
-**Key Search Terms:** YouTube multiple accounts, YouTube account switching, YouTube history extension, YouTube progress tracking, YouTube without login, YouTube privacy extension, YouTube progress bar, YouTube viewed videos, YouTube multi-account, YouTube history sync
+**Key Search Terms:** YouTube multiple accounts, YouTube account switching, YouTube history extension, YouTube progress tracking, YouTube without login, YouTube privacy extension, YouTube progress bar, YouTube viewed videos, YouTube multi-account, YouTube local storage
 
 **Perfect for:** Multi-account users, privacy-conscious users, students, researchers, content creators, families sharing computers, and anyone who wants reliable YouTube progress tracking without Google surveillance.
 

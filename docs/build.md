@@ -122,7 +122,7 @@ src/
 ├── content.js           # Content script for YouTube pages
 ├── popup.html/js        # Extension popup interface
 ├── storage.js           # Local storage management
-└── sync-service.js      # Firefox sync functionality
+└── indexeddb-storage.js # IndexedDB wrapper for unlimited storage
 ```
 
 ### Development Tips

@@ -23,10 +23,10 @@ images/
 │   ├── progress-bar.png
 │   ├── search-function.png
 │   ├── theme-switching.png
-│   └── sync-indicator.png
+│   └── sync-indicator.png   # Legacy asset from Firefox Sync era (4.0.0+ no longer uses sync)
 ├── troubleshooting/       # Problem-solving visuals
 │   ├── common-issues.png
-│   ├── sync-setup.png
+│   ├── sync-setup.png       # Legacy Firefox Sync configuration (kept for historical reference)
 │   └── browser-differences.png
 └── videos/               # Video content (if any)
     ├── quick-start.mp4

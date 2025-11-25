@@ -62,7 +62,7 @@ This fixes 90% of all issues by clearing cached content and reloading the extens
 **Solutions**:
 1. **Refresh YouTube page** after watching videos
 2. **Check overlay settings**: Ensure overlays are enabled in settings
-3. **Wait for sync**: Progress bars appear after video is saved to history
+3. **Allow time for saving**: Progress bars appear after video is saved to local storage
 4. **Clear browser data**: Old cached thumbnails can cause display issues
 
 #### Videos Not Resuming from Saved Position
@@ -102,29 +102,19 @@ This fixes 90% of all issues by clearing cached content and reloading the extens
 **Solutions**:
 1. **Check deletion**: Videos may have been manually deleted
 2. **Storage corruption**: Rare, but can happen with browser crashes
-3. **Sync issues (Firefox)**: Check sync settings if using multiple devices
+3. **Storage migration**: Check if hybrid storage migration is in progress
 4. **Browser update**: Updates can sometimes affect extension storage
 
-### Sync Problems (Firefox Only)
+### Storage & Migration Issues
 
-#### Sync Not Working
-**Symptoms**: History not syncing between Firefox devices
-
-**Solutions**:
-1. **Enable Firefox Sync**: Go to Firefox Settings > Sync > Enable
-2. **Enable extension sync**: In YT re:Watch settings, toggle "Enable Sync"
-3. **Check internet connection**: Sync requires stable internet
-4. **Wait for sync**: Automatic sync runs every 10 minutes
-5. **Manual sync**: Use "Sync Now" button in extension settings
-
-#### Sync Errors
-**Symptoms**: Red indicator in extension popup, sync failures
+#### Migration Problems
+**Symptoms**: Extension shows migration in progress, or data appears incomplete
 
 **Solutions**:
-1. **Check network**: Ensure stable internet connection
-2. **Restart browser**: Complete restart often fixes sync issues
-3. **Re-enable sync**: Turn off and on sync in extension settings
-4. **Check Firefox Sync**: Ensure Firefox account sync is working
+1. **Check migration status**: Open extension settings to see migration progress
+2. **Ensure stable connection**: Migration may pause during network issues
+3. **Restart browser**: Complete restart can resume stuck migrations
+4. **Wait for completion**: Migration may take time for large histories
 
 ### Performance Issues
 

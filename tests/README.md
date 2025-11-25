@@ -7,15 +7,18 @@ This directory contains comprehensive tests for the YT re:Watch extension.
 ```
 tests/
 ├── setup.js                    # Jest setup and mocks
-├── unit/                       # Unit tests for individual functions
-│   ├── utils.test.js          # Utility function tests
-│   └── storage.test.js        # Storage functionality tests
-├── integration/               # Integration tests
-│   └── video-tracking.test.js # Video tracking workflow tests
-├── memory/                    # Memory leak detection tests
-│   └── cleanup.test.js        # Cleanup and memory management tests
-└── e2e/                       # End-to-end tests (future)
-    └── extension.e2e.test.js  # Full browser automation tests
+├── unit/                       # Unit tests for individual modules
+│   ├── utils.test.js           # Utility function tests
+│   ├── storage.test.js         # Hybrid storage (ytStorage) tests
+│   ├── popup.test.js           # Popup UI logic, URLs, import/export
+│   ├── thumbnail-utils.test.js # Thumbnail utility tests
+│   └── thumbnail-overlay.test.js # Overlay behavior tests
+├── integration/                # Integration tests
+│   └── video-tracking.test.js  # Video tracking workflow tests
+├── memory/                     # Memory leak detection tests
+│   └── cleanup.test.js         # Cleanup and memory management tests
+└── e2e/                        # End-to-end tests (optional / future)
+    └── extension.e2e.test.js   # Full browser automation tests
 ```
 
 ## Running Tests
@@ -59,10 +62,11 @@ npm run test:e2e:ui  # Opens Playwright UI
 ### Unit Tests (`tests/unit/`)
 - **Purpose**: Test individual functions in isolation
 - **What they test**: 
-  - Video ID extraction from URLs
-  - Storage operations (get, set, remove)
-  - Utility functions
-  - Data validation
+  - Video ID extraction and utilities
+  - Hybrid storage operations (local-first writes, IndexedDB fallback, merged views)
+  - Popup behavior (history rendering, settings wiring, URL timestamp helpers)
+  - Import/export logic (export JSON structure, import flows)
+  - Data validation and error handling
 - **Tools**: Jest with jsdom
 - **Example**: Does `getVideoId()` correctly extract IDs from various YouTube URLs?
 
