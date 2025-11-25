@@ -1001,7 +1001,7 @@ async function progressiveContentLoading() {
         try {
             // Load analytics data in background
             const stats = await ytStorage.getStats();
-            updateAnalytics(stats);
+            updateAnalytics();
             container.className = container.className.replace(' loading-skeleton', '');
         } catch (error) {
             console.log('Background data loading failed:', error);
