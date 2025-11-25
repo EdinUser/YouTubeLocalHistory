@@ -617,7 +617,7 @@
             }
         } catch (error) {
             // If anything fails, return original URL without timestamp
-            log('[Content] Failed to add timestamp to URL:', error, url);
+            log(`[Content] Failed to add timestamp to URL: ${error} (${url})`);
             return url;
         }
     }
