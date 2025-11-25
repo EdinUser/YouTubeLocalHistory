@@ -111,8 +111,9 @@ let pageSize = 20;
 let totalPages = 1;
 let totalHistoryRecords = 0;
 
+// Firefox Sync disabled - redundant with hybrid storage architecture
 // Sync state tracking to prevent race conditions
-let syncInProgress = false;
+// let syncInProgress = false;
 
 // Shorts Pagination state
 let currentShortsPage = 1;
@@ -317,9 +318,10 @@ async function initStorage() {
             }
         });
 
-        // Set up storage change listener (but ignore changes during sync)
+        // Set up storage change listener
+        // Firefox Sync disabled - no need to ignore changes during sync
         chrome.storage.onChanged.addListener((changes, area) => {
-            if (area === 'local' && !syncInProgress) {
+            if (area === 'local') {
                 const videoChanges = Object.entries(changes).filter(([key]) =>
                     key.startsWith('video_') || key.startsWith('playlist_')
                 );
@@ -343,8 +345,6 @@ async function initStorage() {
                         }
                     });
                 }
-            } else if (syncInProgress) {
-                console.log('[Popup] Ignoring storage changes during sync (will refresh after sync completes)');
             }
         });
 
@@ -1690,6 +1690,11 @@ function openImportPage() {
         chrome.tabs.create({ url: `https://www.youtube.com/${targetHash}` });
     });
 }
+
+// Expose key helpers on window for testing and potential reuse
+window.addTimestampToUrl = addTimestampToUrl;
+window.exportHistory = exportHistory;
+window.openImportPage = openImportPage;
 
 // Extract all Shorts records from a history object (object of videoId -> record)
 // Fallback: treat as Shorts if isShorts === true, or if isShorts is missing and url contains '/shorts/'
@@ -3068,8 +3073,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Playlists are already loaded by loadCurrentPages() above
         // Analytics can access allPlaylists (current page) or load more if needed
 
+        // Firefox Sync disabled - redundant with hybrid storage architecture
         // Initialize sync functionality
-        initSyncIntegration();
+        // initSyncIntegration();
 
         // Enable progressive content loading
         progressiveContentLoading();
@@ -3335,6 +3341,8 @@ window.testSyncImprovements = function () {
     });
 };
 
+// Firefox Sync disabled - redundant with hybrid storage architecture
+/*
 function initSyncIntegration() {
     // Ensure sync indicator is visible by default
     const indicatorElement = document.getElementById('ytvhtSyncIndicator');
@@ -3353,292 +3361,9 @@ function initSyncIntegration() {
             updateSyncIndicator('not_available', null);
         }
     });
-
-    // Set up sync status updates from background
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.type === 'syncStatusUpdate') {
-            // Track sync status to prevent race conditions
-            if (message.status === 'syncing') {
-                syncInProgress = true;
-            } else if (message.status === 'success' || message.status === 'error') {
-                syncInProgress = false;
-            }
-            updateSyncIndicator(message.status, message.lastSyncTime);
-            updateSyncSettingsUI(message);
-        } else if (message.type === 'fullSyncComplete') {
-            syncInProgress = false; // Ensure flag is cleared
-
-            // Force complete refresh after full sync
-            setTimeout(async () => {
-                await loadCurrentPages();
-            }, 200);
-        } else if (message.type === 'regularSyncComplete') {
-            syncInProgress = false; // Ensure flag is cleared
-
-            // Force complete refresh after regular sync
-            setTimeout(async () => {
-                await loadCurrentPages();
-            }, 200);
-        }
-    });
-
-    // Set up sync indicator click handler
-    const syncIndicator = document.getElementById('ytvhtSyncIndicator');
-    if (syncIndicator) {
-        syncIndicator.addEventListener('click', handleSyncIndicatorClick);
-    }
-
-    // Set up settings sync controls
-    const syncEnabledCheckbox = document.getElementById('ytvhtSyncEnabled');
-    const triggerSyncButton = document.getElementById('ytvhtTriggerSync');
-    const triggerFullSyncButton = document.getElementById('ytvhtTriggerFullSync');
-
-    if (syncEnabledCheckbox) {
-        syncEnabledCheckbox.addEventListener('change', handleSyncToggle);
-    }
-
-    if (triggerSyncButton) {
-        triggerSyncButton.addEventListener('click', handleManualSync);
-    }
-
-    if (triggerFullSyncButton) {
-        triggerFullSyncButton.addEventListener('click', handleManualFullSync);
-    }
 }
+*/
 
-// Store timeout reference for proper cleanup
-let syncStatusTimeout = null;
-
-function updateSyncIndicator(status, lastSyncTime) {
-    const indicator = document.getElementById('ytvhtSyncIndicator');
-    if (!indicator) return;
-
-    // Remove all status classes
-    indicator.className = 'sync-indicator';
-
-    // Add current status class
-    indicator.classList.add('sync-' + status);
-
-    // Update text and tooltip
-    const textElement = indicator.querySelector('.sync-text');
-
-    // Get or create a single status element (remove any duplicates first)
-    const existingElements = indicator.parentNode.querySelectorAll('.sync-status');
-    existingElements.forEach((el, index) => {
-        if (index > 0) el.remove(); // Remove duplicates, keep only first
-    });
-
-    let statusElement = existingElements[0];
-    if (!statusElement) {
-        statusElement = createSyncStatusElement(indicator);
-    }
-
-    const tooltips = {
-        'disabled': 'Sync disabled - Click to enable',
-        'not_available': 'Sync not available - Firefox Sync required',
-        'initializing': 'Initializing sync...',
-        'syncing': 'Syncing data...',
-        'success': lastSyncTime ? `Last sync: ${formatSyncTime(lastSyncTime)}` : 'Sync ready',
-        'error': 'Sync error - Click to retry'
-    };
-
-    const statusText = {
-        'disabled': 'Off',
-        'not_available': 'N/A',
-        'initializing': 'Init',
-        'syncing': 'Sync',
-        'success': 'On',
-        'error': 'Error'
-    };
-
-    if (textElement) {
-        textElement.textContent = statusText[status] || 'Sync';
-    }
-
-    // Clear any existing timeout to prevent conflicts
-    if (syncStatusTimeout) {
-        clearTimeout(syncStatusTimeout);
-        syncStatusTimeout = null;
-    }
-
-    // Update status text next to sync button (simplified - no Unicode symbols)
-    if (statusElement) {
-        if (status === 'syncing') {
-            statusElement.textContent = 'Syncing...';
-            statusElement.style.color = '#007cba';
-        } else if (status === 'success' && lastSyncTime && (Date.now() - lastSyncTime) < 5000) {
-            // Show "synced" for 3 seconds after successful sync
-            statusElement.textContent = 'Synced';
-            statusElement.style.color = '#34a853';
-            syncStatusTimeout = setTimeout(() => {
-                // Clear the specific element we set the text on
-                if (statusElement && statusElement.parentNode && syncStatusTimeout) {
-                    statusElement.textContent = '';
-                }
-                syncStatusTimeout = null;
-            }, 3000);
-        } else {
-            statusElement.textContent = '';
-        }
-    }
-
-    indicator.title = tooltips[status] || 'Sync status';
-}
-
-function createSyncStatusElement(indicator) {
-    const statusElement = document.createElement('span');
-    statusElement.className = 'sync-status';
-    statusElement.style.cssText = `
-        margin-left: 8px;
-        font-size: 12px;
-        font-weight: 500;
-    `;
-
-    indicator.parentNode.insertBefore(statusElement, indicator.nextSibling);
-    return statusElement;
-}
-
-function formatSyncTime(timestamp) {
-    if (!timestamp) return 'Never';
-
-    const now = Date.now();
-    const diff = now - timestamp;
-
-    if (diff < 60000) { // Less than 1 minute
-        return 'Just now';
-    } else if (diff < 3600000) { // Less than 1 hour
-        const minutes = Math.floor(diff / 60000);
-        return `${minutes}m ago`;
-    } else if (diff < 86400000) { // Less than 1 day
-        const hours = Math.floor(diff / 3600000);
-        return `${hours}h ago`;
-    } else {
-        const days = Math.floor(diff / 86400000);
-        return `${days}d ago`;
-    }
-}
-
-async function handleSyncIndicatorClick() {
-    chrome.runtime.sendMessage({type: 'getSyncStatus'}, (response) => {
-        if (!response) return;
-
-        if (response.status === 'not_available') {
-            showMessage(chrome.i18n.getMessage('message_firefox_sync_not_available'), 'error');
-            return;
-        }
-
-        if (response.status === 'disabled') {
-            // Enable sync
-            chrome.runtime.sendMessage({type: 'enableSync'}, (result) => {
-                if (!result || !result.success) {
-                    showMessage(chrome.i18n.getMessage('message_failed_to_enable_sync'), 'error');
-                }
-                // Sync indicator will show success status
-            });
-        } else if (response.status === 'error') {
-            // Retry sync
-            chrome.runtime.sendMessage({type: 'triggerSync'}, (result) => {
-                if (!result || !result.success) {
-                    showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
-                }
-            });
-        } else if (response.enabled) {
-            // Manual sync trigger
-            chrome.runtime.sendMessage({type: 'triggerSync'}, (result) => {
-                if (!result || !result.success) {
-                    showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
-                }
-            });
-        }
-    });
-}
-
-async function handleSyncToggle(event) {
-    const enabled = event.target.checked;
-
-    if (enabled) {
-        chrome.runtime.sendMessage({type: 'enableSync'}, (result) => {
-            if (!result || !result.success) {
-                event.target.checked = false;
-                showMessage(chrome.i18n.getMessage('message_failed_to_enable_sync'), 'error');
-            }
-            // Removed success message - sync indicator shows status
-        });
-    } else {
-        chrome.runtime.sendMessage({type: 'disableSync'}, (result) => {
-            if (!result || !result.success) {
-                event.target.checked = true;
-                showMessage(chrome.i18n.getMessage('message_failed_to_disable_sync'), 'error');
-            }
-            // Removed success message - sync indicator shows status
-        });
-    }
-}
-
-async function handleManualSync() {
-    chrome.runtime.sendMessage({type: 'triggerSync'}, (result) => {
-        if (!result || !result.success) {
-            showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
-        }
-        // Removed sync initiated message - sync indicator shows status
-    });
-}
-
-async function handleManualFullSync() {
-    if (!confirm(chrome.i18n.getMessage('message_confirm_full_sync'))) {
-        return;
-    }
-
-    console.log('[Popup] 🚀 Full sync button clicked');
-    chrome.runtime.sendMessage({type: 'triggerFullSync'}, (result) => {
-        console.log('[Popup] 🚀 triggerFullSync response:', result);
-        if (result && result.success) {
-            showMessage(chrome.i18n.getMessage('message_full_sync_initiated'));
-        } else {
-            showMessage(chrome.i18n.getMessage('message_sync_currently_disabled'), 'error');
-        }
-    });
-}
-
-function updateSyncSettingsUI(syncStatus) {
-    if (!syncStatus) {
-        // Get status from background if not provided
-        chrome.runtime.sendMessage({type: 'getSyncStatus'}, (response) => {
-            if (response) {
-                updateSyncSettingsUI(response);
-            }
-        });
-        return;
-    }
-
-    // Update checkbox
-    const syncEnabledCheckbox = document.getElementById('ytvhtSyncEnabled');
-    if (syncEnabledCheckbox) {
-        syncEnabledCheckbox.checked = syncStatus.enabled;
-        syncEnabledCheckbox.disabled = !syncStatus.available;
-    }
-
-    // Update last sync time
-    const lastSyncElement = document.getElementById('ytvhtLastSyncTime');
-    if (lastSyncElement) {
-        lastSyncElement.textContent = syncStatus.lastSyncTime ?
-            formatSyncTime(syncStatus.lastSyncTime) : 'Never';
-    }
-
-    // Update sync now button
-    const triggerSyncButton = document.getElementById('ytvhtTriggerSync');
-    if (triggerSyncButton) {
-        triggerSyncButton.disabled = !syncStatus.enabled || syncStatus.status === 'syncing';
-        triggerSyncButton.textContent = syncStatus.status === 'syncing' ? 'Syncing...' : 'Sync Now';
-    }
-
-    // Update full sync button
-    const triggerFullSyncButton = document.getElementById('ytvhtTriggerFullSync');
-    if (triggerFullSyncButton) {
-        triggerFullSyncButton.disabled = !syncStatus.enabled || syncStatus.status === 'syncing';
-        triggerFullSyncButton.textContent = syncStatus.status === 'syncing' ? 'Syncing...' : 'Full Sync';
-    }
-}
 
 // Render the top 5 watched channels
 function renderTopChannels() {

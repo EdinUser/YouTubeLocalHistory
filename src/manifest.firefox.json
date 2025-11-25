@@ -23,7 +23,6 @@
         "scripts": [
             "indexeddb-storage.js",
             "storage.js",
-            "sync-service.js",
             "background.js"
         ]
     },

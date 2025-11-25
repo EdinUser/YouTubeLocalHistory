@@ -241,10 +241,9 @@
             return typeof ytIndexedDBStorage !== 'undefined' && ytIndexedDBStorage !== null;
         }
 
-        /**
-         * Check if sync is enabled
-         * @returns {Promise<boolean>}
-         */
+        // Firefox Sync disabled - redundant with hybrid storage architecture
+        /*
+
         async _isSyncEnabled() {
             try {
                 const settings = await this.getSettings();
@@ -253,6 +252,7 @@
                 return false;
             }
         }
+        */
 
         /**
          * Migrate videos from storage.local to IndexedDB
@@ -287,7 +287,9 @@
                     return;
                 }
 
-                const syncEnabled = await this._isSyncEnabled();
+                // Firefox Sync disabled - redundant with hybrid storage architecture
+                // const syncEnabled = await this._isSyncEnabled();
+                const syncEnabled = false; // Always false since sync is disabled
                 const now = Date.now();
                 const recentCutoff = now - this.RECENT_WINDOW_MS;
 
@@ -329,17 +331,10 @@
                             }
 
                             // Step 3: Delete from storage.local (only if verified)
-                            // For sync-disabled: Delete older records (outside recent window)
-                            // For sync-enabled: Keep all records (sync source)
-                            if (!syncEnabled) {
-                                // Only delete if older than recent window
-                                if (record.timestamp < recentCutoff) {
-                                    await storage.remove([key]);
-                                    state.migratedCount++;
-                                }
-                            } else {
-                                // Sync-enabled: Archive but don't delete yet
-                                // (sync-aware cleanup will be handled separately)
+                            // Firefox Sync disabled - always delete older records (outside recent window)
+                            // Only delete if older than recent window
+                            if (record.timestamp < recentCutoff) {
+                                await storage.remove([key]);
                                 state.migratedCount++;
                             }
                         } catch (error) {
@@ -407,7 +402,9 @@
                     return;
                 }
 
-                const syncEnabled = await this._isSyncEnabled();
+                // Firefox Sync disabled - redundant with hybrid storage architecture
+                // const syncEnabled = await this._isSyncEnabled();
+                const syncEnabled = false; // Always false since sync is disabled
                 const now = Date.now();
                 const recentCutoff = now - this.RECENT_WINDOW_MS;
 
@@ -446,12 +443,9 @@
                             }
 
                             // Delete from storage.local (only if verified)
-                            if (!syncEnabled) {
-                                if (record.timestamp < recentCutoff) {
-                                    await storage.remove([key]);
-                                    state.migratedCount++;
-                                }
-                            } else {
+                            // Firefox Sync disabled - always delete older records (outside recent window)
+                            if (record.timestamp < recentCutoff) {
+                                await storage.remove([key]);
                                 state.migratedCount++;
                             }
                         } catch (error) {
@@ -1606,8 +1600,9 @@
                 // Try multiple approaches to ensure sync is triggered
                 let syncTriggered = false;
 
+                // Firefox Sync disabled - redundant with hybrid storage architecture
                 // First try: Check if we're in background script context (has direct access to sync service)
-                if (globalScope.ytSyncService && globalScope.ytSyncService.syncEnabled) {
+                /* if (globalScope.ytSyncService && globalScope.ytSyncService.syncEnabled) {
                     if (videoId) {
                         // Use efficient upload for specific video
                         globalScope.ytSyncService.uploadNewData(videoId).then(success => {
@@ -1630,7 +1625,8 @@
                         });
                     }
                     return; // Exit early if direct sync service is available
-                }
+                // }
+                */
 
                 // Second try: Send message to background script
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
@@ -1710,123 +1706,6 @@
             }
         }
 
-        /**
-         * Sync-aware cleanup: Remove records from storage.local that have been:
-         * 1. Archived to IndexedDB
-         * 2. Synced to sync storage
-         * 3. Older than recent window (30 minutes)
-         * 
-         * This is called after a successful sync to free up storage.local space
-         * while keeping recent records for fast access and sync source.
-         * 
-         * @param {Object} syncData - Sync storage data with ytrewatch_* prefixed keys
-         * @param {boolean} syncEnabled - Whether sync is enabled
-         * @returns {Promise<{videosDeleted: number, playlistsDeleted: number}>}
-         */
-        async cleanupSyncedRecords(syncData = {}, syncEnabled = false) {
-            // Content scripts proxy to background
-            if (!this._isExtensionContext()) {
-                try {
-                    return await this._callBackground('cleanupSyncedRecords', [syncData, syncEnabled]);
-                } catch (error) {
-                    console.error('[Storage] CleanupSyncedRecords RPC failed:', error);
-                    return { videosDeleted: 0, playlistsDeleted: 0 };
-                }
-            }
-
-            // Only run if sync is enabled and IndexedDB is available
-            if (!syncEnabled || !this._isIndexedDBAvailable()) {
-                return { videosDeleted: 0, playlistsDeleted: 0 };
-            }
-
-            await this.ensureMigrated();
-
-            const recentCutoff = Date.now() - (30 * 60 * 1000); // 30 minutes ago
-            const sharedPrefix = 'ytrewatch_';
-            let videosDeleted = 0;
-            let playlistsDeleted = 0;
-
-            try {
-                // Get all local records
-                const localData = await storage.get(null);
-                const localVideoKeys = Object.keys(localData).filter(key => key.startsWith('video_'));
-                const localPlaylistKeys = Object.keys(localData).filter(key => key.startsWith('playlist_'));
-
-                // Find videos to delete: must be in IndexedDB, synced, and older than recent window
-                const videosToDelete = [];
-                for (const key of localVideoKeys) {
-                    const videoId = key.replace('video_', '');
-                    const record = localData[key];
-                    
-                    if (!record || !record.timestamp) continue;
-                    
-                    // Skip if within recent window (keep for fast access)
-                    if (record.timestamp >= recentCutoff) continue;
-
-                    // Check if synced (exists in sync storage with ytrewatch_ prefix)
-                    const syncKey = `${sharedPrefix}video_${videoId}`;
-                    if (!syncData[syncKey]) continue;
-
-                    // Check if archived in IndexedDB
-                    try {
-                        const idbRecord = await ytIndexedDBStorage.getVideo(videoId);
-                        if (!idbRecord) continue; // Not in IndexedDB, skip
-                    } catch (error) {
-                        // If IndexedDB check fails, skip this record (fail-safe)
-                        console.warn(`[Storage] IndexedDB check failed for ${videoId}:`, error);
-                        continue;
-                    }
-
-                    // All conditions met: archived, synced, and old
-                    videosToDelete.push(key);
-                }
-
-                // Find playlists to delete: same criteria
-                const playlistsToDelete = [];
-                for (const key of localPlaylistKeys) {
-                    const playlistId = key.replace('playlist_', '');
-                    const record = localData[key];
-                    
-                    if (!record || !record.timestamp) continue;
-                    
-                    // Skip if within recent window
-                    if (record.timestamp >= recentCutoff) continue;
-
-                    // Check if synced
-                    const syncKey = `${sharedPrefix}playlist_${playlistId}`;
-                    if (!syncData[syncKey]) continue;
-
-                    // Check if archived in IndexedDB
-                    try {
-                        const idbRecord = await ytIndexedDBStorage.getPlaylist(playlistId);
-                        if (!idbRecord) continue;
-                    } catch (error) {
-                        console.warn(`[Storage] IndexedDB check failed for playlist ${playlistId}:`, error);
-                        continue;
-                    }
-
-                    playlistsToDelete.push(key);
-                }
-
-                // Delete in batches
-                if (videosToDelete.length > 0) {
-                    await storage.remove(videosToDelete);
-                    videosDeleted = videosToDelete.length;
-                    console.log(`[Storage] Sync-aware cleanup: Deleted ${videosDeleted} synced videos from storage.local`);
-                }
-
-                if (playlistsToDelete.length > 0) {
-                    await storage.remove(playlistsToDelete);
-                    playlistsDeleted = playlistsToDelete.length;
-                    console.log(`[Storage] Sync-aware cleanup: Deleted ${playlistsDeleted} synced playlists from storage.local`);
-                }
-
-            } catch (error) {
-                console.error('[Storage] Sync-aware cleanup error:', error);
-            }
-
-            return { videosDeleted, playlistsDeleted };
-        }
     }
 
     // Create global storage instance (works in service workers, popup, content scripts)

@@ -1050,10 +1050,11 @@
             <button id="ytvhtClearHistory" class="compact-button danger-button" data-i18n-title="clear_tooltip" data-i18n="clear_label">Clear</button>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-            <div id="ytvhtSyncIndicator" class="sync-indicator sync-disabled" data-i18n-title="sync_status_tooltip">
+            <!-- Firefox Sync disabled - redundant with hybrid storage architecture -->
+            <!-- <div id="ytvhtSyncIndicator" class="sync-indicator sync-disabled" data-i18n-title="sync_status_tooltip">
                 <div class="sync-icon"></div>
                 <span class="sync-text" data-i18n="sync_status">Sync</span>
-            </div>
+            </div> -->
             <button id="ytvhtClosePopup" class="compact-button" data-i18n="close_label">Close</button>
         </div>
     </div>
@@ -1287,7 +1288,8 @@
                         </select>
                         <div class="help-text" data-i18n="settings_auto_clean_help">Automatically remove history older than selected period</div>
                     </div>
-                    <div class="settings-group">
+                    <!-- Firefox Sync disabled - redundant with hybrid storage architecture -->
+                    <!-- <div class="settings-group">
                         <label for="ytvhtSyncEnabled" data-i18n="settings_sync_label">Firefox Sync</label>
                         <input type="checkbox" id="ytvhtSyncEnabled">
                         <div class="help-text" data-i18n="settings_sync_help">Sync your data across browser instances (Firefox only)</div>
@@ -1300,7 +1302,7 @@
                             <button id="ytvhtTriggerFullSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; background-color: #007bff;" disabled data-i18n="settings_full_sync">Full Sync</button>
                             <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;" data-i18n="settings_full_sync_help">Full Sync cleans old data and re-syncs everything</div>
                         </div>
-                    </div>
+                    </div> -->
                     <div class="settings-group">
                         <label for="ytvhtDebugMode" data-i18n="settings_debug_label">Debug Mode</label>
                         <input type="checkbox" id="ytvhtDebugMode">
