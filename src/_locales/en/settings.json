@@ -72,11 +72,11 @@
         "description": "Help text for export/import"
     },
     "settings_auto_clean_label": {
-        "message": "Auto-clean Period (days)",
+        "message": "Auto-clean Period",
         "description": "Label for auto-clean period in settings"
     },
     "settings_auto_clean_help": {
-        "message": "Automatically remove history older than this many days",
+        "message": "Automatically remove history older than selected period",
         "description": "Help text for auto-clean period"
     },
     "settings_sync_label": {

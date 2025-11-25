@@ -18,8 +18,8 @@ This command will run all test suites, including unit, integration, memory, and 
 
 ## 🛠️ Frameworks
 
-- **[Vitest](https://vitest.dev/)**: Used as the primary framework for unit, integration, and memory tests. It provides a fast, modern testing experience with a Jest-compatible API.
-- **[Playwright](https://playwright.dev/)**: Used for end-to-end (E2E) testing. It allows for testing the extension in a real browser environment (Chromium) to simulate user interactions accurately.
+- **[Jest](https://jestjs.io/)**: Primary framework for unit, integration, and memory tests. Uses the `jsdom` environment with custom browser/extension mocks.
+- **[Playwright](https://playwright.dev/)**: Used for end-to-end (E2E) testing. It allows for testing the extension in a real browser environment (Chromium/Firefox/WebKit) to simulate user interactions accurately.
 
 ---
 
@@ -46,27 +46,23 @@ Integration tests focus on the interactions between different components of the 
 
 Unit tests verify the functionality of individual modules or components in isolation.
 
-- **`storage.test.js`**:
-  - **Purpose**: Tests the `storage.js` abstraction layer.
-  - **Key Scenarios**:
-    - CRUD (Create, Read, Update, Delete) operations for video and playlist records.
-    - **Tombstone Deletion**: Verifies that deleting a video creates a tombstone, and that the cleanup logic correctly removes old tombstones while preserving recent ones.
-    - Data migration logic between different database versions.
-
 - **`popup.test.js`**:
   - **Purpose**: Tests the UI logic in `popup.js`.
   - **Key Scenarios**:
     - **Internationalization (i18n)**: Ensures the UI correctly displays translated strings by mocking the `chrome.i18n.getMessage` API.
-    - Rendering of video history, playlists, and statistics.
-    - User interactions like searching, sorting, and pagination.
-    - Settings are loaded and saved correctly.
+    - Basic popup layout (button ordering, initial sync indicator state).
+    - Clear history UX (confirmation, use of `clearHistoryOnly`, UI refresh).
+    - URL helpers like `addTimestampToUrl` used when opening videos from the popup.
+    - Import/export flows (`exportHistory`, `openImportPage`) including JSON structure and browser integration (blob download, YouTube `#ytlh_import` tab).
+    - Storage change listener behavior and sync status message handling.
 
-- **`sync-service.test.js`**:
-  - **Purpose**: Tests the Firefox Sync integration logic in `sync-service.js`.
+- **`storage.test.js`**:
+  - **Purpose**: Tests the hybrid storage system (`SimpleStorage` / `ytStorage`) and how it interacts with `chrome.storage.local` and IndexedDB.
   - **Key Scenarios**:
-    - Conflict resolution between local and remote data.
-    - Incremental sync and full sync operations.
-    - Handling of tombstones to ensure deletions are propagated across devices.
+    - Local-first writes for videos (`setVideo`) and playlists.
+    - Hybrid reads: `getVideo` preferring `storage.local`, then falling back to IndexedDB.
+    - Hybrid deletion: `removeVideo` removing from local storage, calling IndexedDB delete with tombstone creation, and writing legacy `deleted_video_*` markers.
+    - Merged views: `getAllVideos` combining IndexedDB base data with a local overlay where local wins on newer timestamps.
 
 - **`utils.test.js`**:
   - **Purpose**: Tests various utility and helper functions.

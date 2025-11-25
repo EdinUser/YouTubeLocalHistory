@@ -182,5 +182,9 @@
   "content_toggle_paused_title": {
     "message": "re:Watch — L'historique est en pause pour cette playlist. Cliquez pour activer",
     "description": "Tooltip when tracking is paused"
+  },
+  "global_search_placeholder": {
+    "message": "Rechercher dans tout le contenu...",
+    "description": "Placeholder text for the global search input"
   }
 } 

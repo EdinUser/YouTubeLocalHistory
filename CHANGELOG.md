@@ -2,6 +2,62 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [4.0.0] - 2025-11-25
+
+### ✨ Major New Features
+
+#### 🔄 **Hybrid Storage Architecture - Unlimited Local Storage**
+- **Complete removal of Firefox Sync** - Eliminated cross-device synchronization complexity
+- **IndexedDB + localStorage hybrid system** - Unlimited local storage capacity (GBs scale vs previous ~50MB limit)
+- **Manual export/import for data portability** - Transfer data between devices via JSON files instead of sync
+- **Enhanced performance** - Fast local queries, memory-efficient pagination, no sync overhead
+- **Bulletproof reliability** - Core functionality (getVideo/setVideo) never depends on IndexedDB availability
+
+#### 🗄️ **Storage System Overhaul**
+- **Layer 1: IndexedDB** - Complete video/playlists history with full metadata (unlimited capacity)
+- **Layer 2: localStorage** - Fast overlay for recent/active content and lightweight config
+- **Merged view reads** - Seamless access to complete history with local changes taking priority
+- **Fail-safe migration** - Verified batch migration from old storage with comprehensive error handling
+- **Context-aware access** - Extension origin owns IndexedDB, content scripts use RPC for privacy
+
+### 🧭 Behavior Changes
+- **No cross-device sync** - All storage is local-only, eliminating sync conflicts and bandwidth usage
+- **Export/import workflow** - Manual data portability replaces automatic sync
+- **Local-only architecture** - No network dependencies, works completely offline
+- **Simplified complexity** - Removed ~1300 lines of sync-related code
+
+### 📊 Performance Improvements
+- **Unlimited storage scaling** - Handle 100,000+ videos without performance degradation
+- **Memory efficiency** - Load only current page into memory, not entire dataset
+- **Fast queries** - IndexedDB indexes for timestamp, isShorts, and title search
+- **No sync overhead** - Eliminated background sync operations and quota limits
+
+### 🔒 Privacy & Security
+- **Extension-scoped IndexedDB** - Database never created under YouTube origin
+- **No cloud storage** - All data stays local, no external servers involved
+- **No sync tracking** - Eliminated potential sync metadata collection
+- **Enhanced local encryption** - Browser's built-in storage security applies
+
+### 🚀 Core Stability
+- **Bulletproof core functionality** - Reading/saving video times always works
+- **Failsafe strategy** - localStorage primary, IndexedDB non-blocking archive
+- **Graceful degradation** - Continues working if IndexedDB unavailable
+- **Verified migration** - Each migration batch verified before cleanup
+
+### 💔 Breaking Changes
+- **Firefox Sync completely removed** - No longer available in any form
+- **Cross-device workflow changed** - Manual export/import replaces sync
+- **Storage architecture rewritten** - Hybrid system replaces layered sync
+- **API simplification** - Removed all sync-related methods and interfaces
+
+### 🔄 Migration Notes
+- **Automatic migration** - Existing data seamlessly moved to hybrid storage
+- **Data preservation** - No data loss during architectural transition
+- **Backward compatibility** - Export format remains compatible
+- **Performance improvement** - Immediate benefits after migration completes
+
+---
+
 ## [3.1.5] - 2025-10-30
 
 ### 🐛 Fixes
@@ -180,6 +236,8 @@ All notable changes to YT re:Watch will be documented in this file.
 ---
 
 ## [2.6.4]
+
+> **Note:** All Firefox Sync–related functionality introduced in the 2.6.x series has been **removed in 4.0.0**. The extension now uses a pure local hybrid storage + manual export/import model for data portability.
 
 ### ✨ Major New Features
 

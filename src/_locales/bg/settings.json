@@ -72,11 +72,11 @@
     "description": "Help text for export/import"
   },
   "settings_auto_clean_label": {
-    "message": "Автоматично почистване (дни)",
+    "message": "Автоматично почистване",
     "description": "Label for auto-clean period in settings"
   },
   "settings_auto_clean_help": {
-    "message": "Автоматично премахва история по-стара от този брой дни",
+    "message": "Автоматично премахва история след избрания период",
     "description": "Help text for auto-clean period"
   },
   "settings_sync_label": {

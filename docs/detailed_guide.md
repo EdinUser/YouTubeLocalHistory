@@ -161,25 +161,25 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 **Data Management:**
 - **Auto-clean Period**: Automatically remove old history
-  - Range: 1-180 days
+  - Range: 1–180 days, or **Forever** to keep all history without age-based cleanup
   - Default: 90 days
-  - Helps keep your history manageable
+  - Helps keep your history manageable while still allowing "forever history" if desired
 - **Items per Page**: How many videos to show per page
   - Range: 5-20 items
   - Larger numbers = less scrolling, smaller numbers = faster loading
-- **Export History**: Back up your data to a file
-- **Import History**: Restore or merge data from a backup
-- **Robust Deletion System**: Deleted videos stay deleted with tombstone protection
-  - Videos deleted from history won't reappear after sync
-  - 30-day protection period ensures deletions persist across all devices
+-- **Export History**: Back up your data to a file
+-- **Import History**: Restore or merge data from a backup
+-- **Robust Deletion System**: Deleted videos stay deleted with tombstone protection
+  - Videos deleted from history use tombstone protection so they don't reappear from archives or imports
+  - 30-day protection period ensures deletions persist across migrations and imports
   - Automatic cleanup of deletion markers after 30 days
  - **Persistent Statistics**: Analytics use a local stats snapshot (total, last 7 daily totals, 24 hourly totals). Seeded from your existing history after upgrade.
 
-**Sync Settings (Firefox Only):**
-- **Enable Sync**: Toggle Firefox Sync integration
-- **Sync Status**: Shows current sync state (green = synced, blue = syncing, red = error, gray = disabled)
-- **Manual Sync**: Force an immediate sync
-- **Full Sync**: Complete data cleanup and re-sync
+**Data Management:**
+- **Export History**: Download complete history as JSON backup
+- **Import History**: Restore data from backup files (Merge or Replace modes)
+- **Migration Status**: Monitor hybrid storage migration progress
+- **Cross-device usage**: There is **no automatic sync** – use Export/Import to move history between browsers or devices manually
 
 **Advanced Settings:**
 - **Debug Mode**: Enable detailed logging for troubleshooting
@@ -189,7 +189,7 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 *Customize your experience in the Settings tab, including theme, overlays, and data management.*
 
 ![Settings advanced options](./images/ytrw_settings2.jpg)
-*Additional settings for sync, privacy, and advanced features*
+*Additional settings for data management, privacy, and advanced features*
 
 **Playlist Settings:**
 - **Pause history in playlists (global):** When enabled, the extension does not save watch progress for videos played while you are browsing within any playlist. Use this if you generally don't want playlist sessions to affect your history.
@@ -201,46 +201,30 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 ---
 
-## 🔄 Sync Setup (Firefox Users)
+## 🔄 Data Management & Transfer
 
-### Prerequisites
-1. **Firefox Account**: You need a Firefox account
-2. **Firefox Sync Enabled**: Must be enabled in Firefox settings
-3. **Multiple Devices**: At least 2 devices with Firefox and the extension
+### Exporting Your History
+1. **Open Settings**: Click the Settings tab in the extension popup
+2. **Data Management**: Scroll to the "Data Management" section
+3. **Export History**: Click the "Export History" button
+4. **Download**: Your complete history will download as a JSON file
+5. **Storage**: The file includes videos, playlists, and analytics data
 
-### Step-by-Step Setup
+### Importing History to Another Device
+1. **Transfer File**: Move the exported JSON file to your other device
+2. **Open Settings**: In the extension on the target device
+3. **Import History**: Click "Import History" and select the JSON file
+4. **Choose Mode**:
+   - **Merge**: Combines with existing data (recommended)
+   - **Replace**: Completely replaces existing history
+5. **Confirm**: The import process will show progress and completion
 
-**Step 1: Enable Firefox Sync**
-1. Open Firefox Settings (Menu > Settings)
-2. Click "Sync" in the left sidebar
-3. Sign in with your Firefox account
-4. Make sure "Add-ons" is checked in sync preferences
-
-**Step 2: Enable Sync in Extension**
-1. Install YT re:Watch on all your devices
-2. Open the extension popup
-3. Go to Settings tab
-4. Toggle "Enable Sync" on
-5. You'll see a sync indicator in the popup header
-
-**Step 3: Verify Sync is Working**
-1. Watch a video on one device
-2. Check the sync indicator (should show "Syncing" then "Synced")
-3. Open the extension on another device
-4. Your history should appear automatically
-
-### Understanding Sync Status
-- **Green indicator**: Sync is working properly
-- **Blue indicator**: Currently syncing
-- **Red indicator**: Sync error occurred
-- **Gray indicator**: Sync is disabled
-
-### Troubleshooting Sync
-- **Manual Sync**: Click "Sync Now" in Settings
-- **Full Sync**: Use "Full Sync" to resolve conflicts
-- **Check Firefox Sync**: Ensure it's working in Firefox settings
-- **Network Issues**: Make sure you have a stable internet connection
-- **Stale Device Protection**: Devices offline for 29+ days automatically get fresh data to prevent conflicts
+### Understanding Hybrid Storage
+- **IndexedDB**: Stores your complete history (unlimited capacity)
+- **localStorage**: Keeps recent videos fast-accessible
+- **Migration**: Automatic conversion from old storage systems
+- **Performance**: Fast searches with indexed queries
+- **Reliability**: Works even if IndexedDB is unavailable
 
 ---
 
@@ -360,11 +344,11 @@ The export file contains:
 - Check if you're logged into the same browser profile
 - Try exporting and importing your data
 
-**Issue: Sync not working (Firefox)**
-- Verify Firefox Sync is enabled and working
-- Check internet connection
-- Try manual sync from Settings tab
-- Use "Full Sync" to resolve conflicts
+**Issue: Storage migration problems**
+- Check Settings for migration progress status
+- Ensure sufficient disk space for IndexedDB storage
+- Restart browser if migration seems stuck
+- Export data as backup before troubleshooting
 
 ### Performance Issues
 
@@ -409,12 +393,12 @@ The export file contains:
 
 **Privacy Tips:**
 - Enable auto-cleanup for sensitive viewing habits
-- Use export instead of sync for maximum privacy
+- Export provides maximum privacy and control over your data
 - Remember: all data stays on your device
 
 **Productivity Tips:**
 - Use Analytics tab to understand your viewing patterns
-- Set up sync to seamlessly switch between devices
+- Use export/import to transfer history between devices
 - Use the completion rate to see which videos you actually finish
 
 ### Advanced Usage
@@ -426,7 +410,7 @@ The export file contains:
 
 **Cross-Browser Usage:**
 - Use export/import to transfer data between browsers
-- Firefox users can use sync for automatic transfer
+- Use export/import for manual data transfer between browsers
 - Chrome users can use manual export/import
 
 ---

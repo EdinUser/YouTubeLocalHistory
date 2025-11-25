@@ -14,7 +14,7 @@ src/
 ├── popup.js               # Popup interface logic
 ├── popup.html             # Popup HTML structure
 ├── storage.js             # Storage abstraction layer
-├── sync-service.js        # Firefox Sync integration
+├── indexeddb-storage.js   # IndexedDB wrapper for unlimited storage
 ├── manifest.chrome.json   # Chrome extension manifest
 ├── manifest.firefox.json  # Firefox extension manifest
 ├── _locales/              # Multilanguage (i18n) support
@@ -39,7 +39,7 @@ src/
   - **State Management**: Uses `chrome.storage.session` to reliably manage state (like the active popup window ID and last video update) across service worker restarts in Chrome. This prevents data loss when the service worker becomes inactive. For Firefox, it uses in-memory variables.
   - **Message Routing**: Manages communication between the content scripts, the popup, and other extension components.
   - **Popup Handling**: Ensures only one popup window is open at a time, focusing the existing window if the action is triggered again.
-  - **Sync Coordination**: Manages and triggers the Firefox Sync service.
+  - **Storage RPC**: Handles storage requests from content scripts via message passing.
 
 #### 2. **Content Script** (`content.js`)
 - **Purpose**: Injected into YouTube pages for video tracking
@@ -170,30 +170,23 @@ The extension implements a robust system for processing video thumbnails and app
   - Storage quota management
   - Playlist-aware persistence that respects per‑playlist ignore and global playlist pause settings
 
-#### 5. **Sync Service** (`sync-service.js`)
-- **Purpose**: Firefox Sync integration (not available in Chrome)
+#### 5. **IndexedDB Storage** (`indexeddb-storage.js`)
+- **Purpose**: Unlimited local storage with fast indexed queries
 - **Key Functions**:
-  - Conflict resolution
-  - Incremental sync
-  - Cross-device synchronization (Firefox only)
-  - Sync status tracking
-  - Manual/auto sync controls (Firefox only)
-  - Debug and test utilities for sync (Firefox only)
-  - Sync is opt-in and disabled by default
-  - Tombstone-based deletion system with 30-day retention
-  - Stale device protection for devices offline 29+ days
-  - Prevents deleted content from reappearing in UI or sync operations
-  - Default auto-sync interval ≈ 5 minutes; immediate sync on updates disabled by default
-  - Listener throttling: ignores self-writes for ~20s and enforces ≥5 minutes between listener-triggered syncs to prevent loops
+  - Database management (`YTLH_HybridDB`) scoped to extension origin
+  - CRUD operations for videos and playlists with indexed fields
+  - Connection pooling and graceful error handling
+  - Version change management and migration support
+  - Indexed queries for timestamp, isShorts, and titleLower fields
+  - Memory-efficient cursors for large dataset operations
 
 #### 6. **Tombstone Deletion System**
-- **Purpose**: Ensures deleted videos stay deleted across all devices
+- **Purpose**: Ensures deleted videos stay deleted with local protection
 - **Key Functions**:
-  - Creates deletion markers (`deleted_video_<id>`) when videos are removed
-  - 30-day tombstone retention with automatic cleanup
-  - Cross-device deletion propagation via sync
-  - Stale device fail-safe for devices offline 29+ days
-  - Prevents deleted content from reappearing in UI or sync operations
+  - Creates deletion markers in IndexedDB `deletions` store
+  - 30-day tombstone retention with automatic cleanup using `deletedAt` index
+  - Local consistency protection (no cross-device sync complexity)
+  - Prevents deleted content from reappearing in searches or listings
 
 ### Analytics & Statistics Dashboard
 - The popup's Analytics tab aggregates and visualizes user viewing data:
@@ -354,20 +347,20 @@ await ytStorage.updateStats(deltaSeconds, Date.now(), {
 
 **When a video is deleted:**
 1. The video record (`video_<id>`) is removed from storage
-2. A tombstone marker (`deleted_video_<id>`) is created with deletion timestamp
-3. Sync is triggered to propagate the deletion across devices
+2. A tombstone marker is created in IndexedDB `deletions` store
+3. UI immediately filters out the deleted video from all views
 4. UI immediately filters out the deleted video
 
-**During sync operations:**
-- Tombstones are synchronized across all devices
-- If a tombstone exists and is newer than a video record, the video is not restored
-- Videos are removed from both local and sync storage when tombstones are present
+**During deletion operations:**
+- Tombstones are stored in IndexedDB `deletions` store with `deletedAt` index
+- If a tombstone exists for a video ID, the video is filtered from results
+- Videos are removed from IndexedDB when tombstone cleanup runs
 - Tombstones older than 30 days are automatically cleaned up
 
-**Stale device protection:**
-- If a device hasn't synced for 29+ days, all local data is discarded
-- Remote (sync) data completely replaces local data
-- This prevents old devices from resurrecting deleted videos
+**Local consistency protection:**
+- Tombstones prevent deleted videos from reappearing in searches
+- Local storage operations respect deletion markers
+- This ensures consistent behavior across all local operations
 
 ### Message API
 
@@ -412,23 +405,18 @@ chrome.tabs.sendMessage(tabId, {
 });
 ```
 
-### Sync API (Firefox Only)
+### Hybrid Storage API
 
 ```javascript
-// Enable sync
-await syncService.enable();
+// IndexedDB operations (extension context only)
+await ytIndexedDBStorage.putVideo(videoData);
+await ytIndexedDBStorage.getVideo(videoId);
+await ytIndexedDBStorage.getRecordsPage(query, page, pageSize);
 
-// Disable sync
-await syncService.disable();
-
-// Get sync status
-const status = await syncService.getStatus();
-
-// Trigger manual sync
-await syncService.triggerSync();
-
-// Full sync with cleanup
-await syncService.fullSync();
+// Merged storage access (context-aware)
+await ytStorage.getVideo(videoId); // Checks localStorage first, then IndexedDB
+await ytStorage.setVideo(videoId, data); // Writes to localStorage, queues for IndexedDB
+await ytStorage.getAllVideos(); // Returns merged view
 ```
 
 ---
@@ -442,12 +430,12 @@ await syncService.fullSync();
 4. **Background Script** notifies **Popup** of updates (if open)
 5. **Popup** updates UI with new data
 
-### Sync Flow (Firefox)
-1. **Sync Service** monitors storage changes
-2. **Sync Service** uploads changes to Firefox Sync
-3. **Sync Service** downloads changes from other devices
-4. **Sync Service** resolves conflicts using timestamp priority
-5. **Sync Service** updates local storage with merged data
+### Hybrid Storage Flow
+1. **Content Script** calls `ytStorage.getVideo()` via RPC
+2. **Background Script** receives message and calls storage method
+3. **Storage Layer** checks `localStorage` first (fast, recent data)
+4. **Fallback**: If not found, queries IndexedDB (archived data)
+5. **Return**: Merged result prioritizing localStorage (newer data wins)
 
 ### Settings Flow
 1. **Popup** updates settings via **Storage API**
@@ -544,10 +532,10 @@ console.log('[ythdb-content]', 'Content message', data);
 - Verify permissions: Check manifest permissions
 - Monitor storage changes: `chrome.storage.onChanged`
 
-**Sync Issues (Firefox):**
-- Check Firefox Sync status: `about:sync-log`
-- Verify addon sync enabled: Firefox preferences
-- Monitor sync events: Enable debug logging
+**Storage Issues:**
+- Check migration status: Settings tab shows hybrid storage progress
+- Verify IndexedDB access: Extension must run from extension origin
+- Monitor storage events: Enable debug logging for storage operations
 
 ---
 
@@ -565,11 +553,11 @@ console.log('[ythdb-content]', 'Content message', data);
 - Implement proper cleanup on tab close
 - Avoid memory leaks in popup
 
-### Network Optimization (Sync)
-- Implement incremental sync
-- Use compression for large payloads
-- Implement retry logic with exponential backoff
-- Batch multiple changes into single sync operation
+### Storage Optimization
+- Use IndexedDB indexes for fast queries (timestamp, titleLower, isShorts)
+- Implement batch operations for migration and bulk imports
+- Memory-efficient pagination prevents loading entire datasets
+- Connection pooling prevents IndexedDB connection exhaustion
 
 ---
 
@@ -638,7 +626,7 @@ This extension only handles the **application-level history data**. Google/YouTu
 ### Integration Tests
 - Content script ↔ Background communication
 - Storage operations
-- Sync functionality
+- Hybrid storage migration
 - Cross-browser compatibility
 
 ### End-to-End Tests
@@ -656,7 +644,7 @@ tests/
 │   └── utils.test.js
 ├── integration/
 │   ├── video-tracking.test.js
-│   └── sync.test.js
+│   └── storage.test.js
 ├── e2e/
 │   ├── extension.e2e.test.js
 │   └── user-flows.test.js
@@ -723,8 +711,9 @@ async function migrateV1ToV2() {
 - [chrome.storage](https://developer.chrome.com/docs/extensions/reference/storage/)
 - [browser.storage](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage)
 
-### Sync APIs
-- [Firefox Sync](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync)
+### Storage APIs
+- [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
+- [Chrome Storage](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage)
 
 ### Testing Frameworks
 - [Jest](https://jestjs.io/) - Unit testing
@@ -772,9 +761,9 @@ async function migrateV1ToV2() {
 | Analytics/statistics dashboard |   ✅   |   ✅    |
 | Multilanguage (i18n) support   |   ✅   |   ✅    |
 | Export/import history          |   ✅   |   ✅    |
-| Sync across devices            |   ❌   |   ✅    |
-| Manual/auto sync controls      |   ❌   |   ✅    |
-| Debug sync tools               |   ❌   |   ✅    |
+| Unlimited local storage        |   ✅   |   ✅    |
+| Hybrid IndexedDB + localStorage|   ✅   |   ✅    |
+| Fast indexed queries           |   ✅   |   ✅    |
 
 ---
 

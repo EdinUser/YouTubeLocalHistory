@@ -13,22 +13,62 @@
 
     const storage = {
         async get(keys) {
-            if (isFirefox) {
-                return await browser.storage.local.get(keys);
-            } else {
-                return new Promise((resolve) => {
-                    chrome.storage.local.get(keys, resolve);
-                });
+            try {
+                if (isFirefox) {
+                    return await browser.storage.local.get(keys);
+                } else {
+                    return new Promise((resolve, reject) => {
+                        chrome.storage.local.get(keys, (result) => {
+                            if (chrome.runtime.lastError) {
+                                // Handle extension context invalidated error
+                                if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
+                                    log('[STORAGE] Extension context invalidated during get operation, returning empty result');
+                                    resolve({});
+                                } else {
+                                    reject(chrome.runtime.lastError);
+                                }
+                            } else {
+                                resolve(result);
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                if (error.message && error.message.includes('Extension context invalidated')) {
+                    log('[STORAGE] Extension context invalidated during get operation, returning empty result');
+                    return {};
+                }
+                throw error;
             }
         },
 
         async set(data) {
-            if (isFirefox) {
-                return await browser.storage.local.set(data);
-            } else {
-                return new Promise((resolve) => {
-                    chrome.storage.local.set(data, resolve);
-                });
+            try {
+                if (isFirefox) {
+                    return await browser.storage.local.set(data);
+                } else {
+                    return new Promise((resolve, reject) => {
+                        chrome.storage.local.set(data, () => {
+                            if (chrome.runtime.lastError) {
+                                // Handle extension context invalidated error
+                                if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
+                                    log('[STORAGE] Extension context invalidated during set operation, ignoring');
+                                    resolve();
+                                } else {
+                                    reject(chrome.runtime.lastError);
+                                }
+                            } else {
+                                resolve();
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                if (error.message && error.message.includes('Extension context invalidated')) {
+                    log('[STORAGE] Extension context invalidated during set operation, ignoring');
+                    return;
+                }
+                throw error;
             }
         }
     };
@@ -495,6 +535,146 @@
         return `https://www.youtube.com/watch?v=${videoId}`;
     }
 
+    /**
+     * Clean YouTube URL by removing timestamp and other parameters
+     * @param {string} url - YouTube URL
+     * @returns {string} Clean URL with only video ID
+     */
+    function cleanVideoUrl(url) {
+        if (!url) return url;
+        
+        // Handle relative URLs by making them absolute
+        let absoluteUrl = url;
+        if (url.startsWith('/')) {
+            absoluteUrl = 'https://www.youtube.com' + url;
+        } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            // If it's not absolute and not relative, assume it's a YouTube URL
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                absoluteUrl = 'https://' + url.replace(/^https?:\/\//, '');
+            } else {
+                // Can't parse, return as-is
+                return url;
+            }
+        }
+        
+        try {
+            const urlObj = new URL(absoluteUrl);
+            const videoId = urlObj.searchParams.get('v') || 
+                           (urlObj.pathname.includes('/shorts/') ? urlObj.pathname.split('/shorts/')[1]?.split('/')[0] : null);
+            
+            if (!videoId) return url; // Return original if we can't extract video ID
+            
+            // Return clean URL
+            if (urlObj.pathname.includes('/shorts/')) {
+                return `https://www.youtube.com/shorts/${videoId}`;
+            } else {
+                return `https://www.youtube.com/watch?v=${videoId}`;
+            }
+        } catch (e) {
+            // If URL parsing fails, try to extract video ID manually
+            const videoIdMatch = absoluteUrl.match(/[?&]v=([^&]+)/) || absoluteUrl.match(/\/shorts\/([^\/\?]+)/);
+            if (videoIdMatch) {
+                const videoId = videoIdMatch[1];
+                if (absoluteUrl.includes('/shorts/')) {
+                    return `https://www.youtube.com/shorts/${videoId}`;
+                } else {
+                    return `https://www.youtube.com/watch?v=${videoId}`;
+                }
+            }
+            // If all else fails, return original URL
+            return url;
+        }
+    }
+
+    /**
+     * Add timestamp parameter to YouTube URL
+     * @param {string} url - YouTube URL
+     * @param {number} timeSeconds - Time in seconds
+     * @returns {string} URL with timestamp parameter
+     */
+    function addTimestampToUrl(url, timeSeconds) {
+        if (!url || !timeSeconds || timeSeconds <= 0) return url;
+        
+        try {
+            // First clean the URL to remove any existing timestamp
+            const cleanUrl = cleanVideoUrl(url);
+            
+            // If cleaning failed or returned original, use original URL
+            const urlToUse = cleanUrl || url;
+            
+            try {
+                const urlObj = new URL(urlToUse);
+                // Add 't' parameter (YouTube accepts both 't=123' and 't=123s')
+                urlObj.searchParams.set('t', Math.floor(timeSeconds) + 's');
+                return urlObj.toString();
+            } catch (e) {
+                // If URL parsing fails, try simple string manipulation
+                if (urlToUse.includes('watch?v=') || urlToUse.includes('/shorts/')) {
+                    const separator = urlToUse.includes('?') ? '&' : '?';
+                    return `${urlToUse}${separator}t=${Math.floor(timeSeconds)}s`;
+                }
+                return urlToUse;
+            }
+        } catch (error) {
+            // If anything fails, return original URL without timestamp
+            log(`[Content] Failed to add timestamp to URL: ${error} (${url})`);
+            return url;
+        }
+    }
+
+    /**
+     * Add timestamp to a video link if we have saved progress
+     */
+    async function addTimestampToLink(anchor) {
+        const href = anchor.getAttribute('href');
+        if (!href) return;
+
+        // Extract video ID from URL
+        let videoId = null;
+        if (href.includes('watch?v=')) {
+            const match = href.match(/[?&]v=([^&]+)/);
+            videoId = match ? match[1] : null;
+        } else if (href.includes('/shorts/')) {
+            const match = href.match(/\/shorts\/([^\/\?]+)/);
+            videoId = match ? match[1] : null;
+        }
+
+        if (!videoId) return;
+
+        // Check if we have saved progress for this video
+        try {
+            const record = await ytStorage.getVideo(videoId);
+            if (record && record.time && record.time > 0) {
+                // Modify the href to include timestamp
+                const newUrl = addTimestampToUrl(href, record.time);
+                if (newUrl !== href) {
+                    anchor.setAttribute('href', newUrl);
+                    log(`[Link Intercept] Added timestamp ${record.time}s to video ${videoId}`);
+                }
+            }
+        } catch (error) {
+            // Silently fail - don't break navigation if storage check fails
+            log(`[Link Intercept] Failed to check video ${videoId}:`, error);
+        }
+    }
+
+    /**
+     * Intercept clicks on video links and add timestamp if we have saved progress
+     */
+    function interceptVideoLinkClicks() {
+        // Intercept clicks on video links
+        document.addEventListener('click', async (e) => {
+            // Find the closest anchor element
+            let anchor = e.target.closest('a[href*="watch?v="], a[href*="/shorts/"]');
+            if (!anchor) return;
+
+            await addTimestampToLink(anchor);
+        }, true); // Use capture phase to intercept before YouTube's handlers
+
+        // Also process links when thumbnails are processed (for dynamically loaded content)
+        // This is handled by the existing thumbnail processing logic
+    }
+
     // Get playlist info from URL with better title detection
     function getPlaylistInfo() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -768,6 +948,7 @@
             time: currentTime,
             duration,
             timestamp: Date.now(),
+            // Always use clean URL without timestamp parameter
             url: getCleanVideoUrl(),
             channelName,
             channelId
@@ -930,6 +1111,12 @@
     // Update cleanupOldRecords to use currentSettings.autoCleanPeriod
     async function cleanupOldRecords() {
         try {
+            // Skip cleanup if set to "forever"
+            if (currentSettings.autoCleanPeriod === 'forever') {
+                log('Auto-clean disabled - keeping all records forever');
+                return;
+            }
+
             const cutoffTime = Date.now() - (currentSettings.autoCleanPeriod * 24 * 60 * 60 * 1000);
             const allVideos = await ytStorage.getAllVideos();
 
@@ -1009,8 +1196,30 @@
 
             try {
                 // Get saved record using existing storage wrapper
-                const record = await ytStorage.getVideo(videoId);
-                if (!record || !record.time || record.time <= 0) return;
+                // Retry logic: In Chrome, service worker might be sleeping, so retry a few times
+                let record = null;
+                let retries = 3;
+                let retryDelay = 200;
+                
+                for (let attempt = 0; attempt < retries; attempt++) {
+                    try {
+                        record = await ytStorage.getVideo(videoId);
+                        if (record && record.time && record.time > 0) {
+                            break; // Success, exit retry loop
+                        }
+                    } catch (error) {
+                        log(`[ensureVideoReady] getVideo attempt ${attempt + 1} failed:`, error.message);
+                        if (attempt < retries - 1) {
+                            // Wait before retry (exponential backoff)
+                            await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
+                        }
+                    }
+                }
+                
+                if (!record || !record.time || record.time <= 0) {
+                    log(`[ensureVideoReady] No valid record found for ${videoId} after ${retries} attempts`);
+                    return;
+                }
 
                 const currentTime = video.currentTime || 0;
                 const savedTime = record.time;
@@ -1082,11 +1291,45 @@
                 }
             } catch (err) {
                 log(`[ensureVideoReady] Error:`, err);
+                // Don't set timestampLoaded = true on error, so we can retry
             }
         };
 
+        // Initial attempt
         ensureVideoReady().catch(error => {
-            log('[Error] Video initialization failed', error);
+            log(`[setupVideoTracking] ensureVideoReady failed:`, error);
+        });
+        
+        // Fallback: If video starts playing from 0:00 but we have a saved time, restore it
+        // This handles cases where getVideo() failed initially but the video started playing
+        const fallbackRestore = async () => {
+            // Wait a bit for video to start playing
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check if we still haven't loaded the timestamp and video is at/near 0:00
+            if (!timestampLoaded && video.currentTime < 5 && video.readyState >= 1) {
+                try {
+                    const videoId = getVideoId();
+                    if (!videoId) return;
+                    
+                    log(`[fallbackRestore] Video playing from ${video.currentTime.toFixed(1)}s, attempting restore...`);
+                    const record = await ytStorage.getVideo(videoId);
+                    
+                    if (record && record.time && record.time > 30) {
+                        // Only restore if saved time is significant (>30s)
+                        log(`[fallbackRestore] Restoring to ${record.time.toFixed(1)}s`);
+                        video.currentTime = record.time;
+                        timestampLoaded = true;
+                    }
+                } catch (error) {
+                    log(`[fallbackRestore] Failed:`, error);
+                }
+            }
+        };
+        
+        // Start fallback restore check
+        fallbackRestore().catch(error => {
+            log(`[setupVideoTracking] fallbackRestore failed:`, error);
         });
 
         // Event handlers with minimal logging
@@ -1201,24 +1444,99 @@
 
         // Reset the main initialization flag to allow re-initialization for the new page.
         isInitialized = false;
+        
+        // Reset timestampLoaded flags for all tracked videos to allow restoration retry
+        // This is critical for SPA navigation where videos might load before getVideo() succeeds
+        trackedVideos.forEach(video => {
+            // Clear any existing timestampLoaded state by removing and re-adding to tracked set
+            // The flag is scoped per video in setupVideoTracking, so this ensures fresh state
+        });
 
-        // Stop any existing initialization interval, as we are starting a new one.
+        // Stop any existing initialization interval
         if (initChecker) {
             clearInterval(initChecker);
             initChecker = null;
         }
 
-        // Re-run the initialization logic, which will find the video and set up tracking.
-        // The logic includes retries in case the video element is not immediately available.
-        initializeIfNeeded();
+        // Create dedicated SPA video observer for immediate detection
+        let spaVideoObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const videos = [
+                            ...(node.tagName === 'VIDEO' ? [node] : []),
+                            ...node.querySelectorAll('video')
+                        ];
+
+                        videos.forEach(video => {
+                            if (!trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
+                                log('[SPA] Video element detected immediately by observer, initializing...');
+
+                                // Disconnect the SPA observer since we found the video
+                                spaVideoObserver.disconnect();
+                                spaVideoObserver = null;
+
+                                // Stop any existing timeout checker
+                                if (initChecker) {
+                                    clearInterval(initChecker);
+                                    initChecker = null;
+                                }
+
+                                // Initialize immediately
+                                initializeWithVideo(video);
+                            }
+                        });
+                    }
+                });
+            });
+        });
+
+        // Start observing immediately for the new video
+        spaVideoObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: false // We only care about new elements, not attribute changes
+        });
+
+        // Fallback timeout-based checking (reduced frequency since observer is primary)
+        let spaCheckCount = 0;
+        const maxSpaChecks = 3; // Reduced from 5 since observer is primary
+
         initChecker = setInterval(() => {
-            log('Checking for video element after SPA navigation...');
+            spaCheckCount++;
+            log(`[SPA] Fallback check for video element (${spaCheckCount}/${maxSpaChecks})...`);
+
             if (initializeIfNeeded()) {
-                log('Initialization successful after SPA navigation. Stopping checker.');
+                log('Fallback initialization successful after SPA navigation.');
+                cleanupSpaObserver();
+            } else if (spaCheckCount >= maxSpaChecks) {
+                log('SPA video detection timeout reached.');
+                cleanupSpaObserver();
+            }
+        }, 1500); // Less frequent since observer is primary
+
+        function cleanupSpaObserver() {
+            if (spaVideoObserver) {
+                spaVideoObserver.disconnect();
+                spaVideoObserver = null;
+            }
+            if (initChecker) {
                 clearInterval(initChecker);
                 initChecker = null;
             }
-        }, 1000);
+        }
+
+        // Add video dimensions check to avoid false positives on invisible/placeholder videos
+        function initializeWithVideo(video) {
+            // Ensure video is actually visible and loaded
+            if (video.readyState >= 1 || video.offsetWidth > 0) {
+                // Re-run the initialization logic with the found video
+                initializeIfNeeded();
+            } else {
+                // Video exists but not ready, wait a bit then initialize
+                setTimeout(() => initializeIfNeeded(), 200);
+            }
+        }
     }
 
     // Initialize and set up event listeners
@@ -1973,97 +2291,17 @@
                 sendResponse({history: [], playlists: []});
             });
             return true;
-        } else if (message.type === 'importHistory') {
-            const records = message.records || [];
-            const playlists = message.playlists || [];
-            const mergeMode = message.mergeMode || false;
-
-            log(`Importing ${records.length} videos and ${playlists.length} playlists (merge: ${mergeMode})`);
-
-            if (mergeMode) {
-                // Merge mode: combine with existing data
-                Promise.all([
-                    ytStorage.getAllVideos(),
-                    ytStorage.getAllPlaylists()
-                ]).then(([existingVideos, existingPlaylists]) => {
-                    let importedVideos = 0;
-                    let importedPlaylists = 0;
-
-                    // Merge videos (keep newest timestamp if duplicate)
-                    const mergedVideos = { ...existingVideos };
-                    records.forEach(record => {
-                        const existing = mergedVideos[record.videoId];
-                        if (!existing || record.timestamp > existing.timestamp) {
-                            mergedVideos[record.videoId] = record;
-                            importedVideos++;
-                        }
-                    });
-
-                    // Merge playlists (keep newest timestamp if duplicate)
-                    const mergedPlaylists = { ...existingPlaylists };
-                    playlists.forEach(playlist => {
-                        const existing = mergedPlaylists[playlist.playlistId];
-                        if (!existing || playlist.timestamp > existing.timestamp) {
-                            mergedPlaylists[playlist.playlistId] = playlist;
-                            importedPlaylists++;
-                        }
-                    });
-
-                    // Save merged data
-                    const savePromises = [];
-                    Object.values(mergedVideos).forEach(video => {
-                        savePromises.push(ytStorage.setVideo(video.videoId, video));
-                    });
-                    Object.values(mergedPlaylists).forEach(playlist => {
-                        savePromises.push(ytStorage.setPlaylist(playlist.playlistId, playlist));
-                    });
-
-                    Promise.all(savePromises).then(() => {
-                        log(`Merge completed: ${importedVideos} videos, ${importedPlaylists} playlists`);
-                        sendResponse({
-                            status: 'success',
-                            importedVideos: importedVideos,
-                            importedPlaylists: importedPlaylists
-                        });
-                    }).catch(error => {
-                        log('Error saving merged data:', error);
-                        sendResponse({status: 'error'});
-                    });
-                }).catch(error => {
-                    log('Error getting existing data for merge:', error);
-                    sendResponse({status: 'error'});
-                });
-            } else {
-                // Replace mode: clear existing and import new
-                ytStorage.clear().then(() => {
-                    let importedVideos = 0;
-                    let importedPlaylists = 0;
-
-                    const savePromises = [];
-                    records.forEach(record => {
-                        savePromises.push(ytStorage.setVideo(record.videoId, record));
-                        importedVideos++;
-                    });
-                    playlists.forEach(playlist => {
-                        savePromises.push(ytStorage.setPlaylist(playlist.playlistId, playlist));
-                        importedPlaylists++;
-                    });
-
-                    Promise.all(savePromises).then(() => {
-                        log(`Import completed: ${importedVideos} videos, ${importedPlaylists} playlists`);
-                        sendResponse({
-                            status: 'success',
-                            importedVideos: importedVideos,
-                            importedPlaylists: importedPlaylists
-                        });
-                    }).catch(error => {
-                        log('Error saving imported data:', error);
-                        sendResponse({status: 'error'});
-                    });
-                }).catch(error => {
-                    log('Error clearing existing data:', error);
-                    sendResponse({status: 'error'});
-                });
+        } else if (message.type === 'pauseVideoForImport') {
+            try {
+                const video = document.querySelector('video');
+                if (video && !video.paused) {
+                    video.pause();
+                    log('Paused video for import flow');
+                }
+                sendResponse({ status: 'success' });
+            } catch (error) {
+                log('Error pausing video for import:', error);
+                sendResponse({ status: 'error', error: error && error.message ? error.message : String(error) });
             }
             return true;
         } else if (message.type === 'clearHistory') {
@@ -2188,6 +2426,158 @@
         });
     }
 
+    // Import overlay functionality
+    async function runImport(records, playlists, mergeMode) {
+        return ytStorage.importRecords(records || [], playlists || [], !!mergeMode);
+    }
+
+    function maybeShowImportOverlayFromHash() {
+        if (window.location.hash === '#ytlh_import') {
+            showImportOverlay();
+        }
+    }
+
+    function showImportOverlay() {
+        if (document.getElementById('ytvhtImportOverlay')) {
+            return;
+        }
+        if (!document.body) {
+            return;
+        }
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ytvhtImportOverlay';
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.background = 'rgba(0,0,0,0.4)';
+        overlay.style.zIndex = '999999';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+
+        const modal = document.createElement('div');
+        modal.style.background = '#222';
+        modal.style.color = '#fff';
+        modal.style.padding = '20px';
+        modal.style.borderRadius = '8px';
+        modal.style.minWidth = '360px';
+        modal.style.maxWidth = '480px';
+        modal.style.boxShadow = '0 4px 16px rgba(0,0,0,0.5)';
+
+        modal.innerHTML = `
+            <h3 style="margin-top:0;margin-bottom:12px;">Choose a file to import:</h3>
+            <input id="ytvhtImportFile" type="file" accept=".json" style="margin: 10px 0; width: 100%;">
+            <div style="margin: 10px 0; font-size: 13px;">
+                <label style="margin-right:12px;">
+                    <input id="ytvhtImportMerge" type="radio" name="ytvhtImportMode" checked>
+                    Merge with existing data
+                </label>
+                <label>
+                    <input id="ytvhtImportReplace" type="radio" name="ytvhtImportMode">
+                    Replace existing data
+                </label>
+            </div>
+            <div style="margin-top: 12px; text-align: right;">
+                <button id="ytvhtImportCancel" style="margin-right:8px;">Cancel</button>
+                <button id="ytvhtImportStart">Import</button>
+            </div>
+            <div id="ytvhtImportStatus" style="margin-top: 10px; font-size: 12px;"></div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        const fileInput = modal.querySelector('#ytvhtImportFile');
+        const mergeRadio = modal.querySelector('#ytvhtImportMerge');
+        const statusEl = modal.querySelector('#ytvhtImportStatus');
+
+        modal.querySelector('#ytvhtImportCancel').onclick = () => {
+            overlay.remove();
+            if (window.location.hash === '#ytlh_import') {
+                try {
+                    history.replaceState(null, '', window.location.pathname + window.location.search);
+                } catch (e) {
+                    log('Error clearing import hash:', e);
+                }
+            }
+        };
+
+        modal.querySelector('#ytvhtImportStart').onclick = async () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) {
+                statusEl.textContent = 'Please choose a JSON file.';
+                return;
+            }
+
+            try {
+                statusEl.textContent = 'Reading file...';
+                const text = await file.text();
+                const data = JSON.parse(text);
+
+                let records = [];
+                let playlists = [];
+                let mergeMode = !!mergeRadio.checked;
+
+                if (data && typeof data === 'object' && data.history) {
+                    if (Array.isArray(data.history)) {
+                        records = data.history;
+                    } else if (typeof data.history === 'object') {
+                        records = Object.values(data.history);
+                    } else {
+                        throw new Error('Invalid file format: unexpected history structure');
+                    }
+
+                    if (Array.isArray(data.playlists)) {
+                        playlists = data.playlists;
+                    } else if (data.playlists && typeof data.playlists === 'object') {
+                        playlists = Object.values(data.playlists);
+                    }
+                } else if (Array.isArray(data)) {
+                    records = data;
+                    mergeMode = false;
+                } else {
+                    throw new Error('Invalid file format: expected an array of videos or an object with history/playlists');
+                }
+
+                if (!records.length && !playlists.length) {
+                    statusEl.textContent = 'No videos or playlists found in file.';
+                    return;
+                }
+
+                statusEl.textContent = 'Importing...';
+
+                try {
+                    const response = await runImport(records, playlists, mergeMode);
+
+                    if (response && response.status === 'success') {
+                        statusEl.textContent =
+                            `Import complete: ${response.importedVideos} videos, ` +
+                            `${response.importedPlaylists} playlists.`;
+                    } else {
+                        const errorMsg = response && response.error ? response.error : 'Unknown error';
+                        statusEl.textContent = `Import failed: ${errorMsg}`;
+                        console.error('Import failed:', errorMsg);
+                    }
+                } catch (importError) {
+                    console.error('Import overlay error:', importError);
+                    let errorMsg = importError.message || 'Unknown error';
+                    
+                    // Provide user-friendly error messages
+                    if (errorMsg.includes('Extension context invalidated') || errorMsg.includes('Background script')) {
+                        errorMsg = 'Extension context lost. Please reload the extension and try again.';
+                    } else if (errorMsg.includes('IndexedDB')) {
+                        errorMsg = 'IndexedDB not available. Please reload the extension.';
+                    }
+                    
+                    statusEl.textContent = `Error: ${errorMsg}`;
+                }
+            } catch (err) {
+                console.error('Import overlay error:', err);
+                statusEl.textContent = `Error: ${err.message || 'Unknown error'}`;
+            }
+        };
+    }
+
     // Update initialize() to handle version updates
     async function initialize() {
         if (isInitialized) {
@@ -2226,7 +2616,14 @@
                 setTimeout(processExistingThumbnails, 2000);
             }
 
+            // Intercept video link clicks to add timestamps
+            interceptVideoLinkClicks();
+
             isInitialized = true;
+            
+            // Check for import hash on initialization
+            maybeShowImportOverlayFromHash();
+            
             return true;
         } catch (error) {
             log('Error during initialization:', error);
@@ -2237,6 +2634,9 @@
 
     // Initialize on startup
     initialize();
+    
+    // Listen for hash changes to show import overlay
+    window.addEventListener('hashchange', maybeShowImportOverlayFromHash);
 
     // Listen for YouTube's own navigation events to handle SPA changes.
     window.addEventListener('yt-navigate-finish', handleSpaNavigation);

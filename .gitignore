@@ -103,3 +103,4 @@ jspm_packages/
 
 # CERT
 certs/
+/YouTubeLocalHistory.code-workspace

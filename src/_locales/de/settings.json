@@ -72,11 +72,11 @@
     "description": "Help text for export/import"
   },
   "settings_auto_clean_label": {
-    "message": "Automatische Löschperiode (Tage)",
+    "message": "Automatische Löschperiode",
     "description": "Label for auto-clean period in settings"
   },
   "settings_auto_clean_help": {
-    "message": "Entfernt automatisch Verlauf, der älter als diese Anzahl von Tagen ist",
+    "message": "Entfernt automatisch Verlauf nach dem ausgewählten Zeitraum",
     "description": "Help text for auto-clean period"
   },
   "settings_sync_label": {

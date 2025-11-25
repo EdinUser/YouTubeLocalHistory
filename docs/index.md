@@ -33,7 +33,7 @@ YT re:Watch solves both problems with **Account Independence + YouTube History P
 - ✅ **Replaces YouTube's built-in history** - completely independent from Google
 - ✅ **Local storage only** - Google doesn't get your viewing progress data
 - ✅ **No history profiling** - your viewing progress stays yours
-- ✅ **Cross-device sync** (Firefox) - history syncs privately across your devices
+- ✅ **Unlimited local storage** - GB-scale capacity with hybrid IndexedDB system
 
 ![Extension popup showing all features](./images/ytrw_videos.jpg)
 *Your videos, your progress, your way - regardless of which account you use*
@@ -131,7 +131,7 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 ![Settings customization](./images/ytrw_settings.jpg)
 
 ![Settings advanced options](./images/ytrw_settings2.jpg)
-*Additional settings for sync, privacy, and advanced features*
+*Additional settings for data management, privacy, and advanced features*
 
 ## 🔐 Account Independence + History Privacy = Perfect Combination
 
@@ -172,7 +172,7 @@ Because we store everything locally:
 - **Dark Mode**: The extension automatically matches your system theme
 - **Search History**: Use the search box to find specific videos
 - **Export Data**: Back up your history from the Settings tab
-- **Sync Devices**: Firefox users can enable Firefox Sync for cross-device history
+- **Export/Import Data**: Manually transfer your history between devices via JSON files
 
 ## 🤝 Need Help?
 
