@@ -124,6 +124,7 @@
     let playlistRetryTimeout = null;
     let messageListener = null;
     let urlCheckIntervalId = null;
+    let playlistNavigationCheckInterval = null;
     let historyApiTimeout = null;
 
     // Track thumbnail processing state
@@ -228,6 +229,10 @@
         if (urlCheckIntervalId) {
             clearInterval(urlCheckIntervalId);
             urlCheckIntervalId = null;
+        }
+        if (playlistNavigationCheckInterval) {
+            clearInterval(playlistNavigationCheckInterval);
+            playlistNavigationCheckInterval = null;
         }
         if (historyApiTimeout) {
             clearTimeout(historyApiTimeout);
@@ -629,6 +634,8 @@
         const href = anchor.getAttribute('href');
         if (!href) return;
 
+        log(`[Link Intercept] Processing anchor with href: ${href}`);
+
         // Extract video ID from URL
         let videoId = null;
         if (href.includes('watch?v=')) {
@@ -639,22 +646,36 @@
             videoId = match ? match[1] : null;
         }
 
-        if (!videoId) return;
+        if (!videoId) {
+            log(`[Link Intercept] No video ID found in href: ${href}`);
+            return;
+        }
+
+        log(`[Link Intercept] Found video ID: ${videoId}`);
 
         // Check if we have saved progress for this video
         try {
             const record = await ytStorage.getVideo(videoId);
+            log(`[Link Intercept] Retrieved record for ${videoId}:`, record);
+
             if (record && record.time && record.time > 0) {
                 // Modify the href to include timestamp
                 const newUrl = addTimestampToUrl(href, record.time);
+                log(`[Link Intercept] Original URL: ${href}`);
+                log(`[Link Intercept] Modified URL: ${newUrl}`);
+
                 if (newUrl !== href) {
                     anchor.setAttribute('href', newUrl);
-                    log(`[Link Intercept] Added timestamp ${record.time}s to video ${videoId}`);
+                    log(`[Link Intercept] ✅ Added timestamp ${record.time}s to video ${videoId}`);
+                } else {
+                    log(`[Link Intercept] URL unchanged, timestamp not added`);
                 }
+            } else {
+                log(`[Link Intercept] No saved progress found for video ${videoId}`);
             }
         } catch (error) {
             // Silently fail - don't break navigation if storage check fails
-            log(`[Link Intercept] Failed to check video ${videoId}:`, error);
+            log(`[Link Intercept] ❌ Failed to check video ${videoId}:`, error);
         }
     }
 
@@ -666,8 +687,22 @@
         document.addEventListener('click', async (e) => {
             // Find the closest anchor element
             let anchor = e.target.closest('a[href*="watch?v="], a[href*="/shorts/"]');
-            if (!anchor) return;
+            if (!anchor) {
+                // If no anchor found, check if we're clicking on an overlay element
+                // and try to find the anchor in the parent hierarchy
+                const overlayElement = e.target.closest('.ytvht-viewed-label, .ytvht-progress-bar');
+                if (overlayElement) {
+                    anchor = overlayElement.closest('a[href*="watch?v="], a[href*="/shorts/"]');
+                    log(`[Click Intercept] Click on overlay, found anchor: ${anchor ? anchor.href : 'none'}`);
+                }
+            }
 
+            if (!anchor) {
+                log(`[Click Intercept] No anchor found for click target:`, e.target);
+                return;
+            }
+
+            log(`[Click Intercept] Found anchor for video link: ${anchor.href}`);
             await addTimestampToLink(anchor);
         }, true); // Use capture phase to intercept before YouTube's handlers
 
@@ -1194,6 +1229,15 @@
             const videoId = getVideoId();
             if (!video || !videoId) return;
 
+            // Enhanced playlist context detection
+            const isPlaylistContext = !!new URLSearchParams(window.location.search).get('list');
+            const timeSinceNavigation = Date.now() - lastSpaNavigationTime;
+            const isRecentNavigation = timeSinceNavigation < 3000; // 3 seconds
+
+            if (isPlaylistContext && isRecentNavigation) {
+                log(`[PLAYLIST] ensureVideoReady called in playlist context (${timeSinceNavigation}ms after navigation)`);
+            }
+
             try {
                 // Get saved record using existing storage wrapper
                 // Retry logic: In Chrome, service worker might be sleeping, so retry a few times
@@ -1336,7 +1380,25 @@
         addTrackedEventListener(video, 'play', async () => {
             // Start save interval as usual
             startSaveInterval();
-            
+
+            // ENHANCED PLAYLIST AUTOPLAY DETECTION
+            // Check if this might be playlist autoplay that bypassed URL timestamp
+            const isPlaylistContext = !!new URLSearchParams(window.location.search).get('list');
+            const timeSinceNavigation = Date.now() - lastSpaNavigationTime;
+
+            if (isPlaylistContext && timeSinceNavigation < 5000) {
+                // This might be playlist autoplay - delay timing restoration
+                log(`[PLAYLIST] Detected potential autoplay in playlist context (${timeSinceNavigation}ms after navigation)`);
+
+                // Wait a bit for autoplay to settle, then restore timing
+                setTimeout(async () => {
+                    if (!timestampLoaded && video.currentTime < 10) {
+                        log('[PLAYLIST] Autoplay detected, attempting delayed timing restoration');
+                        await ensureVideoReady();
+                    }
+                }, 1500); // Wait 1.5s for autoplay to complete
+            }
+
             // Fallback restoration check: if video started playing from near beginning
             // but we have a saved timestamp much higher, force restoration
             const videoId = getVideoId();
@@ -1383,10 +1445,21 @@
             if (!video.paused) startSaveInterval();
         });
 
-        // DRY-RUN LOGGING: Add event listeners for content change detection
+        // ENHANCED VIDEO CHANGE DETECTION
+        // Detect video content changes (especially for playlist navigation)
         addTrackedEventListener(video, 'loadstart', () => {
             simulatedLastContentChangeTime = Date.now();
-            log(`[DRY-RUN] Video loadstart detected - content change at ${simulatedLastContentChangeTime}`);
+            log(`[VIDEO] Video loadstart detected - content change at ${simulatedLastContentChangeTime}`);
+
+            // Check if this is a playlist video change
+            const urlParams = new URLSearchParams(window.location.search);
+            const playlistId = urlParams.get('list');
+            const currentVideoId = getVideoId();
+
+            if (playlistId && currentVideoId && currentVideoId !== lastProcessedVideoId) {
+                log(`[VIDEO] Playlist video change detected: ${lastProcessedVideoId} → ${currentVideoId} in playlist ${playlistId}`);
+                handlePlaylistNavigation(currentVideoId);
+            }
         });
 
         addTrackedEventListener(video, 'emptied', () => {
@@ -1424,9 +1497,115 @@
             // Check if this is a video page navigation
             const videoId = getVideoId();
             if (videoId && videoId !== lastProcessedVideoId) {
-                log(`[URL-CHANGE] Triggering SPA navigation for video: ${videoId}`);
-                handleSpaNavigation();
+                // Check if this is playlist navigation or regular SPA navigation
+                const urlParams = new URLSearchParams(window.location.search);
+                const playlistId = urlParams.get('list');
+
+                if (playlistId) {
+                    log(`[URL-CHANGE] Triggering playlist navigation for video: ${videoId} in playlist: ${playlistId}`);
+                    handlePlaylistNavigation(videoId);
+                } else {
+                    log(`[URL-CHANGE] Triggering SPA navigation for video: ${videoId}`);
+                    handleSpaNavigation();
+                }
             }
+        }
+    }
+
+    // This function is called when playlist navigation is detected (video changes within playlist)
+    function handlePlaylistNavigation(newVideoId) {
+        log(`[PLAYLIST] Handling playlist navigation to video: ${newVideoId}`);
+
+        // Update processed video ID
+        lastProcessedVideoId = newVideoId;
+        lastSpaNavigationTime = Date.now();
+
+        // CRITICAL: Clear any inherited timing from previous playlist video
+        const existingVideo = document.querySelector('video');
+        if (existingVideo) {
+            log(`[PLAYLIST] Clearing inherited timing from previous playlist video (${existingVideo.currentTime}s)`);
+            existingVideo.currentTime = 0;
+            // Force reload of video data by clearing cached state
+            existingVideo.dataset.lastVideoId = '';
+            existingVideo.dataset.timestampLoaded = 'false';
+        }
+
+        // Reset initialization state to allow re-initialization for the new video
+        isInitialized = false;
+
+        // Reset timestampLoaded flags for all tracked videos
+        trackedVideos.forEach(video => {
+            if (!video) return;
+            // Clear any explicit timestampLoaded property used by older logic
+            if (video.timestampLoaded !== undefined) {
+                video.timestampLoaded = false;
+            }
+            // Clear dataset flag so restoration logic can run again
+            if (video.dataset) {
+                video.dataset.timestampLoaded = 'false';
+            }
+        });
+
+        // Stop any existing initialization interval
+        if (initChecker) {
+            clearInterval(initChecker);
+            initChecker = null;
+        }
+
+        // Try to find and initialize the video element immediately
+        const video = document.querySelector('video');
+        if (video && !trackedVideos.has(video)) {
+            log('[PLAYLIST] Video element found immediately, initializing...');
+            initializeWithVideo(video);
+        } else {
+            // Set up observer for video element detection
+            let playlistVideoObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const videos = [
+                                ...(node.tagName === 'VIDEO' ? [node] : []),
+                                ...node.querySelectorAll('video')
+                            ];
+
+                            videos.forEach(video => {
+                                if (!trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
+                                    log('[PLAYLIST] Video element detected by observer, initializing...');
+
+                                    // Disconnect the observer
+                                    playlistVideoObserver.disconnect();
+                                    playlistVideoObserver = null;
+
+                                    // Stop any existing timeout checker
+                                    if (initChecker) {
+                                        clearInterval(initChecker);
+                                        initChecker = null;
+                                    }
+
+                                    // Initialize immediately
+                                    initializeWithVideo(video);
+                                }
+                            });
+                        }
+                    });
+                });
+            });
+
+            // Start observing
+            playlistVideoObserver.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: false
+            });
+
+            // Fallback timeout
+            setTimeout(() => {
+                if (playlistVideoObserver) {
+                    playlistVideoObserver.disconnect();
+                    log('[PLAYLIST] Video detection timeout, falling back to standard initialization');
+                    initializeIfNeeded();
+                }
+            }, 3000);
         }
     }
 
@@ -1442,14 +1621,40 @@
         lastProcessedVideoId = videoId;
         lastSpaNavigationTime = Date.now(); // Track when navigation occurred
 
+        // CRITICAL: Clear any inherited timing from previous video immediately
+        // This prevents new videos from appearing with the previous video's timing
+        const existingVideo = document.querySelector('video');
+        if (existingVideo) {
+            log(`[SPA] Clearing inherited timing from previous video (${existingVideo.currentTime}s)`);
+            existingVideo.currentTime = 0;
+            // Force reload of video data by clearing cached state
+            existingVideo.dataset.lastVideoId = '';
+            existingVideo.dataset.timestampLoaded = 'false';
+            // Also reset any timestampLoaded state
+            if (existingVideo.timestampLoaded !== undefined) {
+                existingVideo.timestampLoaded = false;
+            }
+        }
+
+        // Track playlist context for enhanced autoplay handling
+        const isPlaylistNavigation = !!new URLSearchParams(window.location.search).get('list');
+        if (isPlaylistNavigation) {
+            log(`[SPA] Playlist navigation detected - will use enhanced autoplay timing restoration`);
+        }
+
         // Reset the main initialization flag to allow re-initialization for the new page.
         isInitialized = false;
         
-        // Reset timestampLoaded flags for all tracked videos to allow restoration retry
-        // This is critical for SPA navigation where videos might load before getVideo() succeeds
+        // Reset timestampLoaded flags for all tracked videos to allow restoration retry.
+        // This is critical for SPA navigation where videos might load before getVideo() succeeds.
         trackedVideos.forEach(video => {
-            // Clear any existing timestampLoaded state by removing and re-adding to tracked set
-            // The flag is scoped per video in setupVideoTracking, so this ensures fresh state
+            if (!video) return;
+            if (video.timestampLoaded !== undefined) {
+                video.timestampLoaded = false;
+            }
+            if (video.dataset) {
+                video.dataset.timestampLoaded = 'false';
+            }
         });
 
         // Stop any existing initialization interval
@@ -1471,6 +1676,14 @@
                         videos.forEach(video => {
                             if (!trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
                                 log('[SPA] Video element detected immediately by observer, initializing...');
+
+                                // Enhanced playlist handling: Ensure timing is cleared for new videos
+                                if (isPlaylistNavigation) {
+                                    log('[SPA] Playlist context: Forcing timing reset for new video element');
+                                    video.currentTime = 0;
+                                    video.dataset.lastVideoId = '';
+                                    video.dataset.timestampLoaded = 'false';
+                                }
 
                                 // Disconnect the SPA observer since we found the video
                                 spaVideoObserver.disconnect();
@@ -2646,6 +2859,30 @@
         log('[NAVIGATION] popstate event detected');
         checkUrlChange();
     });
+
+    // ENHANCED PLAYLIST NAVIGATION DETECTION
+    // Detect playlist video changes that don't trigger yt-navigate-finish
+    let lastPlaylistVideoId = null;
+    playlistNavigationCheckInterval = setInterval(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const playlistId = urlParams.get('list');
+        const currentVideoId = getVideoId();
+
+        // Only monitor if we're in a playlist
+        if (playlistId && currentVideoId) {
+            if (currentVideoId !== lastPlaylistVideoId) {
+                if (lastPlaylistVideoId) {
+                    // Video ID changed within the same playlist
+                    log(`[PLAYLIST] Detected playlist navigation: ${lastPlaylistVideoId} → ${currentVideoId} (playlist: ${playlistId})`);
+                    handlePlaylistNavigation(currentVideoId);
+                }
+                lastPlaylistVideoId = currentVideoId;
+            }
+        } else {
+            // Not in a playlist anymore
+            lastPlaylistVideoId = null;
+        }
+    }, 500); // Check every 500ms for playlist changes
 
     // Periodic URL checking as fallback (every 500ms)
     urlCheckIntervalId = setInterval(checkUrlChange, 500);

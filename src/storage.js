@@ -792,11 +792,6 @@
             
             // Archival to IndexedDB happens in background migration batches (non-blocking)
             // Never wait for IndexedDB write - if IndexedDB fails, storage.local still has the data
-            
-            // Only trigger sync if immediateSyncOnUpdate is true
-            if (this.immediateSyncOnUpdate) {
-                this.triggerSync(videoId);
-            }
         }
 
         // Remove video record (Hybrid: Remove from both storage.local and IndexedDB)
@@ -831,11 +826,6 @@
             // Create legacy tombstone in storage.local (for sync compatibility)
             const tombstoneKey = `deleted_video_${videoId}`;
             await storage.set({[tombstoneKey]: {deletedAt: Date.now()}});
-            
-            // Only trigger sync if immediateSyncOnUpdate is true
-            if (this.immediateSyncOnUpdate) {
-                this.triggerSync();
-            }
         }
 
         // Get all video records (Hybrid View: IndexedDB base + storage.local overlay)
@@ -941,11 +931,8 @@
             
             // CRITICAL: Always write to storage.local FIRST (most reliable)
             await storage.set({[`playlist_${playlistId}`]: data});
-            
+
             // Archival to IndexedDB happens in background migration batches (non-blocking)
-            
-            // Then trigger sync if enabled
-            this.triggerSync('playlist_' + playlistId);
         }
 
         // Remove playlist record (Hybrid: Remove from both storage.local and IndexedDB)
@@ -973,9 +960,6 @@
                     console.warn('[Storage] IndexedDB deletePlaylist failed:', error);
                 }
             }
-            
-            // Trigger sync after removal
-            this.triggerSync();
         }
 
         // Get all playlist records (Hybrid View: IndexedDB base + storage.local overlay)
@@ -1326,9 +1310,6 @@
             if (keysToRemove.length > 0) {
                 await storage.remove(keysToRemove);
             }
-            
-            // Trigger sync after clearing
-            this.triggerSync();
         }
 
         /**
@@ -1456,17 +1437,38 @@
 
         /**
          * Get persistent aggregated watch-time statistics.
+         *
          * Structure:
          *   {
          *     totalWatchSeconds: number,
          *     daily: { [YYYY-MM-DD]: number },
          *     hourly: number[24],
-         *     lastUpdated: number
+         *     lastUpdated: number,
+         *     counters: {
+         *       videos: number,
+         *       shorts: number,
+         *       totalDurationSeconds: number,
+         *       completed: number
+         *     },
+         *     // stats_synced:
+         *     //   true  => snapshot was rebuilt from merged DB + storage.local
+         *     //   false => legacy/partial snapshot; will be rebuilt on first read
+         *     stats_synced: boolean,
+         *     // lastFullRebuild: timestamp (ms) when a full hybrid rebuild last ran
+         *     lastFullRebuild: number
          *   }
+         *
+         * On first call after upgrade (or if the snapshot was never rebuilt),
+         * this method performs a one-time full rebuild from the hybrid dataset
+         * (`getAllVideos`, which merges IndexedDB + storage.local) and persists
+         * it to storage.local. Subsequent calls return the stored snapshot,
+         * which is incrementally updated by updateStats().
+         *
          * @returns {Promise<Object>} stats object (with defaults if missing)
          */
         async getStats() {
             await this.ensureMigrated();
+
             const result = await storage.get(['stats']);
             const defaults = {
                 totalWatchSeconds: 0,
@@ -1478,14 +1480,19 @@
                     shorts: 0,
                     totalDurationSeconds: 0,
                     completed: 0
-                }
+                },
+                stats_synced: false,
+                lastFullRebuild: 0
             };
-            const stats = result.stats || {};
+
+            let stats = result.stats || {};
+
             // Normalize to ensure arrays/objects are present
             stats.totalWatchSeconds = Number(stats.totalWatchSeconds || 0);
             stats.daily = stats.daily && typeof stats.daily === 'object' ? stats.daily : {};
             stats.hourly = Array.isArray(stats.hourly) && stats.hourly.length === 24 ? stats.hourly : new Array(24).fill(0);
             stats.lastUpdated = Number(stats.lastUpdated || 0);
+
             if (!stats.counters || typeof stats.counters !== 'object') {
                 stats.counters = { videos: 0, shorts: 0, totalDurationSeconds: 0, completed: 0 };
             } else {
@@ -1494,17 +1501,132 @@
                 stats.counters.totalDurationSeconds = Number(stats.counters.totalDurationSeconds || 0);
                 stats.counters.completed = Number(stats.counters.completed || 0);
             }
+
+            stats.stats_synced = stats.stats_synced === true;
+            stats.lastFullRebuild = Number(stats.lastFullRebuild || 0);
+
+            // One-time hybrid rebuild: if we have never rebuilt from merged DB+local,
+            // compute a fresh snapshot from getAllVideos() and persist it.
+            if (!stats.stats_synced) {
+                try {
+                    const rebuilt = await this._rebuildStatsFromHybrid();
+                    stats = Object.assign({}, defaults, rebuilt);
+                    await storage.set({ stats: stats });
+                } catch (error) {
+                    console.error('[Storage] Failed to rebuild stats from hybrid storage:', error);
+                    // On failure, fall back to whatever was previously stored.
+                }
+            }
+
             return Object.assign({}, defaults, stats);
         }
 
         /**
          * Persist the provided statistics object.
+         *
          * @param {Object} stats - statistics object as returned by getStats
          * @returns {Promise<void>}
          */
         async setStats(stats) {
             await this.ensureMigrated();
             await storage.set({ 'stats': stats });
+        }
+
+        /**
+         * Rebuild the persistent stats snapshot from hybrid storage.
+         *
+         * Uses getAllVideos(), which returns a merged view of all videos from
+         * IndexedDB and storage.local, to compute:
+         *   - totalWatchSeconds
+         *   - daily buckets (by local day)
+         *   - hourly buckets (0-23, local time)
+         *   - counters for videos, shorts, total duration, and completions
+         *
+         * The returned object is suitable for persisting via setStats().
+         *
+         * @returns {Promise<Object>} rebuilt stats snapshot
+         * @private
+         */
+        async _rebuildStatsFromHybrid() {
+            const now = Date.now();
+
+            // Hybrid view: IndexedDB base + storage.local overlay
+            const videosById = await this.getAllVideos();
+            const videos = Object.values(videosById || {});
+
+            const stats = {
+                totalWatchSeconds: 0,
+                daily: {},
+                hourly: new Array(24).fill(0),
+                counters: {
+                    videos: 0,
+                    shorts: 0,
+                    totalDurationSeconds: 0,
+                    completed: 0
+                },
+                lastUpdated: now,
+                stats_synced: true,
+                lastFullRebuild: now
+            };
+
+            for (const video of videos) {
+                if (!video) continue;
+
+                const time = typeof video.time === 'number' ? video.time : 0;
+                const duration = typeof video.duration === 'number' ? video.duration : 0;
+
+                if (time > 0) {
+                    stats.totalWatchSeconds += time;
+
+                    if (video.timestamp) {
+                        const date = new Date(video.timestamp);
+                        const dayKey = formatLocalDayKey(date);
+                        stats.daily[dayKey] = (stats.daily[dayKey] || 0) + time;
+
+                        const hour = date.getHours();
+                        stats.hourly[hour] = (stats.hourly[hour] || 0) + time;
+                    }
+                }
+
+                // Counters: number of videos vs shorts
+                if (video.isShorts === true) {
+                    stats.counters.shorts++;
+                } else {
+                    stats.counters.videos++;
+                }
+
+                // Total duration and completed count (>= 90% watched)
+                if (duration > 0) {
+                    stats.counters.totalDurationSeconds += duration;
+                    if (time > 0 && time / duration >= 0.9) {
+                        stats.counters.completed++;
+                    }
+                }
+            }
+
+            // Keep only the last 7 days of daily stats for compactness,
+            // consistent with the retention logic in updateStats().
+            try {
+                const retentionDays = 7;
+                const allowed = new Set();
+                const base = new Date();
+                for (let i = 0; i < retentionDays; i++) {
+                    const d = new Date(base);
+                    d.setDate(d.getDate() - i);
+                    allowed.add(formatLocalDayKey(d));
+                }
+                Object.keys(stats.daily).forEach(key => {
+                    if (!allowed.has(key)) {
+                        delete stats.daily[key];
+                    }
+                });
+            } catch (e) {
+                // If anything goes wrong with pruning, keep full daily map;
+                // this is non-critical and should not break stats.
+                console.warn('[Storage] Failed to prune daily stats to last 7 days:', e);
+            }
+
+            return stats;
         }
 
         /**
@@ -1552,7 +1674,7 @@
             const base = new Date();
             for (let i = 0; i < retentionDays; i++) {
                 const d = new Date(base);
-                d.setDate(base.getDate() - i);
+                d.setDate(d.getDate() - i);
                 allowed.add(formatLocalDayKey(d));
             }
             Object.keys(stats.daily).forEach(key => {
@@ -1580,83 +1702,7 @@
 
             await storage.set({ 'stats': stats });
 
-            // Do NOT trigger immediate sync on every stats update; this is too chatty.
-            // Respect immediateSyncOnUpdate flag for explicit cases, otherwise
-            // schedule a delayed sync and rely on background's 10-minute cadence.
-            if (this.immediateSyncOnUpdate) {
-                this.triggerSync();
-            } else if (!this._statsSyncTimer) {
-                this._statsSyncTimer = setTimeout(() => {
-                    this._statsSyncTimer = null;
-                    this.triggerSync();
-                }, this.statsSyncCadenceMs);
-            }
-        }
-
-        // Helper method to trigger sync if available
-        triggerSync(videoId = null) {
-            // Reduce delay for more immediate syncing
-            setTimeout(() => {
-                // Try multiple approaches to ensure sync is triggered
-                let syncTriggered = false;
-
-                // Firefox Sync disabled - redundant with hybrid storage architecture
-                // First try: Check if we're in background script context (has direct access to sync service)
-                /* if (globalScope.ytSyncService && globalScope.ytSyncService.syncEnabled) {
-                    if (videoId) {
-                        // Use efficient upload for specific video
-                        globalScope.ytSyncService.uploadNewData(videoId).then(success => {
-                            if (success) {
-                                console.log('[Storage] ✅ Direct video upload triggered successfully');
-                                syncTriggered = true;
-                            }
-                        }).catch(error => {
-                            console.log('[Storage] ⚠️ Direct video upload failed:', error);
-                        });
-                    } else {
-                        // Fall back to full sync
-                        globalScope.ytSyncService.triggerSync().then(success => {
-                            if (success) {
-                                console.log('[Storage] ✅ Direct sync trigger successful');
-                                syncTriggered = true;
-                            }
-                        }).catch(error => {
-                            console.log('[Storage] ⚠️ Direct sync trigger failed:', error);
-                        });
-                    }
-                    return; // Exit early if direct sync service is available
-                // }
-                */
-
-                // Second try: Send message to background script
-                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                    const message = videoId ?
-                        {type: 'uploadNewData', videoId: videoId} :
-                        {type: 'triggerSync'};
-
-                    chrome.runtime.sendMessage(message).then(result => {
-                        if (result && result.success) {
-                            console.log('[Storage] ✅ Background sync trigger successful');
-                            syncTriggered = true;
-                        } else {
-                            console.log('[Storage] ⚠️ Background sync not available or failed');
-                        }
-                    }).catch(error => {
-                        console.log('[Storage] ⚠️ Could not reach background script for sync trigger:', error);
-                    });
-                }
-
-                // Third try: Force immediate sync check (fallback for edge cases)
-                if (!syncTriggered) {
-                    setTimeout(() => {
-                        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                            chrome.runtime.sendMessage({type: 'triggerSync'}).catch(() => {
-                                // Final fallback failed, but don't log as this is expected sometimes
-                            });
-                        }
-                    }, 2000); // Delayed fallback attempt
-                }
-            }, 50); // Reduced from 100ms to 50ms for faster triggering
+            // Stats updates no longer trigger sync since sync functionality was removed
         }
 
         // Clean up tombstones older than retention period (default 30 days)

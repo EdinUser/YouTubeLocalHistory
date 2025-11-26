@@ -120,7 +120,7 @@ Your history list shows the channel name under each video title to help you scan
 ![Analytics detailed view](./images/ytrw_stats4.jpg)
 *Additional analytics showing watch time patterns and channel statistics*
   
-These charts now prefer locally persisted, privacy‑preserving statistics for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets.
+These charts now prefer a locally persisted, privacy‑preserving stats snapshot (rebuilt from your full hybrid history) for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets, and the activity view focuses on the last 7 local days only.
 
 - **Longest Unfinished Videos**: Resume long videos you haven't finished (shows channel, time left, and link)
 - **Top Watched Channels**: Your top 5 channels by videos watched (with links)

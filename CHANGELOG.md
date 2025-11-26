@@ -2,6 +2,20 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [4.0.1] - 2025-11-26
+
+### 🐛 Stats & Analytics Fixes
+- Fixed inconsistent Analytics summary cards by rebuilding the persistent stats snapshot from the full hybrid history (IndexedDB + localStorage) and using it as the single source of truth.
+- Summary cards (Total Watch Time, Videos Watched, Shorts Watched, Average Duration, Completion Rate, Playlists Saved) now read from the stored stats counters instead of only the currently loaded page.
+- Activity (Last 7 Days) and Watch Time by Hour charts now use the same persisted `daily`/`hourly` stats snapshot (with local‑day keys and 24 hourly buckets) for stable, full‑history graphs.
+
+### 🎬 Playlist Handling Improvements
+- Improved playlist detection and title extraction across YouTube layout variants using a broader selector set and a retry‑based saver.
+- Playlist “pause history” toggles are now more reliable and consistently respected when saving progress, preventing unwanted history entries for ignored playlists.
+
+### 🧹 Data Hygiene
+- Hybrid stats rebuilds now prune the `daily` stats map to the last 7 local days, keeping the snapshot compact and aligned with what the UI displays.
+
 ## [4.0.0] - 2025-11-25
 
 ### ✨ Major New Features
