@@ -1075,7 +1075,11 @@ function calculateAnalytics(records) {
         totalWatchTime: formatAnalyticsDuration(Math.floor(totalSeconds)),
         videosWatched,
         shortsWatched,
-        avgDuration: formatAnalyticsDuration(Math.floor(avgDurationSeconds) || 0),
+        avgDuration: formatAnalyticsDuration(
+            Number.isFinite(avgDurationSeconds) && avgDurationSeconds > 0
+                ? Math.floor(avgDurationSeconds)
+                : 0
+        ),
         completionRate,
         playlistsSaved
     };

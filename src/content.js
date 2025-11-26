@@ -1535,7 +1535,15 @@
 
         // Reset timestampLoaded flags for all tracked videos
         trackedVideos.forEach(video => {
-            // Clear any existing timestampLoaded state
+            if (!video) return;
+            // Clear any explicit timestampLoaded property used by older logic
+            if (video.timestampLoaded !== undefined) {
+                video.timestampLoaded = false;
+            }
+            // Clear dataset flag so restoration logic can run again
+            if (video.dataset) {
+                video.dataset.timestampLoaded = 'false';
+            }
         });
 
         // Stop any existing initialization interval
@@ -1637,11 +1645,16 @@
         // Reset the main initialization flag to allow re-initialization for the new page.
         isInitialized = false;
         
-        // Reset timestampLoaded flags for all tracked videos to allow restoration retry
-        // This is critical for SPA navigation where videos might load before getVideo() succeeds
+        // Reset timestampLoaded flags for all tracked videos to allow restoration retry.
+        // This is critical for SPA navigation where videos might load before getVideo() succeeds.
         trackedVideos.forEach(video => {
-            // Clear any existing timestampLoaded state by removing and re-adding to tracked set
-            // The flag is scoped per video in setupVideoTracking, so this ensures fresh state
+            if (!video) return;
+            if (video.timestampLoaded !== undefined) {
+                video.timestampLoaded = false;
+            }
+            if (video.dataset) {
+                video.dataset.timestampLoaded = 'false';
+            }
         });
 
         // Stop any existing initialization interval
