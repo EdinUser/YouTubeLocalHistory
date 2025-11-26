@@ -1612,7 +1612,7 @@
                 const base = new Date();
                 for (let i = 0; i < retentionDays; i++) {
                     const d = new Date(base);
-                    d.setDate(base.getDate() - i);
+                    d.setDate(d.getDate() - i);
                     allowed.add(formatLocalDayKey(d));
                 }
                 Object.keys(stats.daily).forEach(key => {
@@ -1674,7 +1674,7 @@
             const base = new Date();
             for (let i = 0; i < retentionDays; i++) {
                 const d = new Date(base);
-                d.setDate(base.getDate() - i);
+                d.setDate(d.getDate() - i);
                 allowed.add(formatLocalDayKey(d));
             }
             Object.keys(stats.daily).forEach(key => {
