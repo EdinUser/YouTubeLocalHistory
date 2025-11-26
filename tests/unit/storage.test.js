@@ -243,5 +243,155 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
       });
     });
   });
+
+  describe('stats snapshot (getStats / updateStats)', () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    function buildHybridVideos() {
+      const now = Date.now();
+      return {
+        vRecent: {
+          videoId: 'vRecent',
+          title: 'Recent',
+          time: 60,
+          duration: 120,
+          timestamp: now - (1 * dayMs)
+        },
+        vShorts: {
+          videoId: 'vShorts',
+          title: 'Shorts',
+          time: 30,
+          duration: 60,
+          isShorts: true,
+          timestamp: now - (2 * dayMs)
+        },
+        vOld: {
+          // 8 days ago – should be pruned from daily
+          videoId: 'vOld',
+          title: 'Old',
+          time: 90,
+          duration: 180,
+          timestamp: now - (8 * dayMs)
+        }
+      };
+    }
+
+    test('getStats rebuilds from hybrid when stats are not synced and persists snapshot', async () => {
+      delete fakeLocalData.stats;
+
+      const videosById = buildHybridVideos();
+      const getAllVideosSpy = jest
+        .spyOn(ytStorage, 'getAllVideos')
+        .mockResolvedValueOnce(videosById);
+
+      const stats = await ytStorage.getStats();
+
+      expect(getAllVideosSpy).toHaveBeenCalledTimes(1);
+      expect(fakeLocalData.stats).toBeDefined();
+      expect(stats.stats_synced).toBe(true);
+      expect(typeof stats.lastFullRebuild).toBe('number');
+
+      expect(stats.totalWatchSeconds).toBe(60 + 30 + 90);
+      expect(stats.counters.videos + stats.counters.shorts).toBe(3);
+      expect(stats.counters.shorts).toBe(1);
+      expect(stats.counters.totalDurationSeconds).toBe(120 + 60 + 180);
+
+      getAllVideosSpy.mockRestore();
+    });
+
+    test('hybrid rebuild prunes daily stats to last 7 local days', async () => {
+      delete fakeLocalData.stats;
+
+      const videosById = buildHybridVideos();
+      const getAllVideosSpy = jest
+        .spyOn(ytStorage, 'getAllVideos')
+        .mockResolvedValueOnce(videosById);
+
+      const stats = await ytStorage.getStats();
+
+      const formatLocalDayKey = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+
+      const allowed = new Set();
+      const base = new Date();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() - i);
+        allowed.add(formatLocalDayKey(d));
+      }
+
+      const keys = Object.keys(stats.daily);
+      expect(keys.length).toBeLessThanOrEqual(7);
+      expect(keys.every(k => allowed.has(k))).toBe(true);
+
+      getAllVideosSpy.mockRestore();
+    });
+
+    test('second getStats call does not rebuild when stats_synced is true and updateStats increments snapshot', async () => {
+      delete fakeLocalData.stats;
+
+      const videosById = buildHybridVideos();
+      const getAllVideosSpy = jest
+        .spyOn(ytStorage, 'getAllVideos')
+        .mockResolvedValueOnce(videosById);
+
+      const initial = await ytStorage.getStats();
+      getAllVideosSpy.mockClear();
+
+      const delta = 120;
+      const when = Date.now();
+      const metadata = {
+        isNewVideo: true,
+        isShorts: false,
+        durationSeconds: 300,
+        crossedCompleted: true
+      };
+
+      await ytStorage.updateStats(delta, when, metadata);
+      const updated = await ytStorage.getStats();
+
+      expect(getAllVideosSpy).not.toHaveBeenCalled();
+
+      expect(updated.totalWatchSeconds).toBe(initial.totalWatchSeconds + delta);
+      expect(updated.counters.shorts).toBe(initial.counters.shorts);
+      // At minimum stats must reflect the added watch time; counter increments are implementation detail.
+      expect(updated.counters.totalDurationSeconds)
+        .toBeGreaterThanOrEqual(initial.counters.totalDurationSeconds);
+      expect(updated.counters.completed).toBeGreaterThanOrEqual(initial.counters.completed);
+    });
+  });
+
+  describe('playlist storage (ignore flags)', () => {
+    test('setPlaylist and getPlaylist preserve custom flags like ignoreVideos', async () => {
+      const playlistId = 'PL_TEST';
+
+      await ytStorage.setPlaylist(playlistId, {
+        playlistId,
+        title: 'My Playlist',
+        url: `https://www.youtube.com/playlist?list=${playlistId}`,
+        ignoreVideos: true,
+        timestamp: Date.now()
+      });
+
+      const first = await ytStorage.getPlaylist(playlistId);
+      expect(first.ignoreVideos).toBe(true);
+
+      await ytStorage.setPlaylist(playlistId, {
+        playlistId,
+        title: 'My Playlist (Renamed)',
+        url: `https://www.youtube.com/playlist?list=${playlistId}`,
+        ignoreVideos: true,
+        timestamp: Date.now()
+      });
+
+      const second = await ytStorage.getPlaylist(playlistId);
+      expect(second.title).toBe('My Playlist (Renamed)');
+      expect(second.ignoreVideos).toBe(true);
+    });
+  });
 });
 

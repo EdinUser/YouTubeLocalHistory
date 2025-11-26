@@ -319,7 +319,7 @@ The export file contains:
 - **Video History**: All your watched videos with timestamps
 - **Playlists**: All saved playlists
 - **Settings**: Your customization preferences
- - **Stats**: Aggregated watch‑time snapshot powering Analytics (from dataVersion 1.1)
+- **Stats**: Aggregated watch‑time snapshot powering Analytics (from dataVersion 1.1) with last‑7‑days `daily` buckets and a 24‑slot `hourly` distribution to keep the snapshot compact.
 
 ---
 

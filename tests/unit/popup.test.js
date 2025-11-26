@@ -440,6 +440,66 @@ describe('Popup Functionality', () => {
       createObjectURLSpy.mockRestore();
       revokeObjectURLSpy.mockRestore();
     });
+
+    test('exportHistory includes stats snapshot from ytStorage.getStats', async () => {
+      const now = Date.now();
+      const validVideo = {
+        videoId: 'v1',
+        timestamp: now,
+        time: 30,
+        title: 'Valid Video'
+      };
+      const validPlaylist = {
+        playlistId: 'p1',
+        title: 'Valid Playlist'
+      };
+      const statsSnapshot = {
+        totalWatchSeconds: 123,
+        daily: { '2025-11-26': 123 },
+        hourly: new Array(24).fill(0),
+        lastUpdated: now,
+        counters: {
+          videos: 1,
+          shorts: 0,
+          totalDurationSeconds: 300,
+          completed: 1
+        }
+      };
+
+      mockYtStorage.getAllVideos.mockResolvedValue({ v1: validVideo });
+      mockYtStorage.getAllPlaylists.mockResolvedValue({ p1: validPlaylist });
+      mockYtStorage.getStats.mockResolvedValue(statsSnapshot);
+
+      const OriginalBlob = global.Blob;
+      let capturedParts = null;
+      global.Blob = function(parts, options) {
+        capturedParts = parts;
+        return new OriginalBlob(parts, options);
+      };
+
+      if (!global.URL.createObjectURL) {
+        global.URL.createObjectURL = () => 'blob:real';
+      }
+      if (!global.URL.revokeObjectURL) {
+        global.URL.revokeObjectURL = () => {};
+      }
+      const createObjectURLSpy = jest.spyOn(global.URL, 'createObjectURL').mockReturnValue('blob:mock');
+      const revokeObjectURLSpy = jest.spyOn(global.URL, 'revokeObjectURL').mockImplementation(() => {});
+
+      expect(typeof popup.exportHistory).toBe('function');
+      await popup.exportHistory();
+
+      expect(mockYtStorage.getStats).toHaveBeenCalled();
+      expect(capturedParts).not.toBeNull();
+
+      const jsonString = capturedParts.join('');
+      const exportData = JSON.parse(jsonString);
+      expect(exportData.stats).toEqual(statsSnapshot);
+
+      createObjectURLSpy.mockRestore();
+      revokeObjectURLSpy.mockRestore();
+      global.Blob = OriginalBlob;
+    });
   });
 
   describe('Import page opening', () => {

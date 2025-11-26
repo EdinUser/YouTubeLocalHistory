@@ -131,6 +131,10 @@ let totalPlaylistRecords = 0;
 // Stored aggregated stats cache (from persistent storage)
 let storedStats = null;
 
+// Full merged video list for analytics (hybrid: IndexedDB + storage.local).
+// Populated by updateAnalytics() when the Analytics tab is shown.
+let analyticsAllVideos = null;
+
 // Default settings
 const DEFAULT_SETTINGS = {
     autoCleanPeriod: 90, // days
@@ -1027,21 +1031,53 @@ function formatAnalyticsDuration(seconds) {
 
 // Calculate analytics data
 function calculateAnalytics(records) {
-    const totalSeconds = (storedStats && typeof storedStats.totalWatchSeconds === 'number')
-        ? storedStats.totalWatchSeconds
+    const hasStoredStats = !!(storedStats && typeof storedStats.totalWatchSeconds === 'number' && storedStats.counters);
+
+    // Total watch time: prefer persisted snapshot, fall back to current-page data
+    const totalSeconds = hasStoredStats
+        ? Math.max(0, Math.floor(storedStats.totalWatchSeconds || 0))
         : records.reduce((sum, record) => sum + (record.time || 0), 0);
-    const totalDuration = records.reduce((sum, record) => sum + (record.duration || 0), 0);
-    const completedVideos = records.filter(record =>
-        record.time && record.duration && (record.time / record.duration) >= 0.9
-    ).length;
+
+    let videosWatched = 0;
+    let shortsWatched = 0;
+    let avgDurationSeconds = 0;
+    let completionRate = 0;
+
+    if (hasStoredStats) {
+        const counters = storedStats.counters || {};
+        const videosCount = Math.max(0, Math.floor(Number(counters.videos || 0)));
+        const shortsCount = Math.max(0, Math.floor(Number(counters.shorts || 0)));
+        const totalItems = videosCount + shortsCount;
+        const totalDurationSeconds = Math.max(0, Math.floor(Number(counters.totalDurationSeconds || 0)));
+        const completedCount = Math.max(0, Math.floor(Number(counters.completed || 0)));
+
+        videosWatched = totalItems;
+        shortsWatched = shortsCount;
+        avgDurationSeconds = totalItems > 0 ? (totalDurationSeconds / totalItems) : 0;
+        completionRate = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
+    } else {
+        // Fallback: current-page-only behavior (what you previously had)
+        const totalDuration = records.reduce((sum, record) => sum + (record.duration || 0), 0);
+        const completedVideos = records.filter(record =>
+            record.time && record.duration && (record.time / record.duration) >= 0.9
+        ).length;
+
+        videosWatched = records.length;
+        shortsWatched = allShortsRecords.length;
+        avgDurationSeconds = videosWatched > 0 ? (totalDuration / videosWatched) : 0;
+        completionRate = videosWatched > 0 ? Math.round((completedVideos / videosWatched) * 100) : 0;
+    }
+
+    // Playlists are already loaded from getAllPlaylists() in updateAnalytics()
+    const playlistsSaved = Array.isArray(allPlaylists) ? allPlaylists.length : 0;
 
     return {
-        totalWatchTime: formatAnalyticsDuration(totalSeconds),
-        videosWatched: records.length,
-        shortsWatched: allShortsRecords.length,
-        avgDuration: formatAnalyticsDuration(totalDuration / records.length || 0),
-        completionRate: Math.round((completedVideos / records.length) * 100) || 0,
-        playlistsSaved: allPlaylists.length
+        totalWatchTime: formatAnalyticsDuration(Math.floor(totalSeconds)),
+        videosWatched,
+        shortsWatched,
+        avgDuration: formatAnalyticsDuration(Math.floor(avgDurationSeconds) || 0),
+        completionRate,
+        playlistsSaved
     };
 }
 
@@ -1106,6 +1142,21 @@ async function updateAnalytics() {
         }
     } catch (_) {
         allPlaylists = [];
+    }
+
+    // Load full merged video history for analytics (hybrid: IndexedDB + storage.local)
+    // so that channel/skip/completion distributions are based on the complete dataset,
+    // not just the current page.
+    try {
+        const videosObj = await ytStorage.getAllVideos();
+        if (videosObj && typeof videosObj === 'object') {
+            analyticsAllVideos = Object.values(videosObj);
+        } else {
+            analyticsAllVideos = [];
+        }
+    } catch (e) {
+        console.warn('[Analytics] Failed to load full video history for analytics, falling back to current page data:', e);
+        analyticsAllVideos = [...allHistoryRecords, ...allShortsRecords];
     }
 
     // Migrate stats if daily/hourly appear empty due to previous key format
@@ -1286,7 +1337,7 @@ function updateActivityChart() {
     // Clear previous chart
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Get last 7 days of activity (prefer stored daily totals if present)
+    // Get last 7 days of activity
     const now = new Date();
     const days = Array.from({length: 7}, (_, i) => {
         const date = new Date(now);
@@ -1294,18 +1345,28 @@ function updateActivityChart() {
         return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
     }).reverse();
 
-    const allVideosForDaily = [...allHistoryRecords, ...allShortsRecords];
+    const videoSource = Array.isArray(analyticsAllVideos) && analyticsAllVideos.length
+        ? analyticsAllVideos
+        : [...allHistoryRecords, ...allShortsRecords];
+
+    // Number of videos per day (use full merged list when available)
     const activity = days.map(day => {
-        return allVideosForDaily.filter(record => {
+        return videoSource.filter(record => {
+            if (!record.timestamp) return false;
             const d = new Date(record.timestamp);
             const recordDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
             return recordDate === day;
         }).length;
     });
 
-    // Also compute total minutes per day
+    // Total minutes per day: prefer storedStats.daily (rebuilt from hybrid stats)
     const minutesPerDay = days.map(day => {
-        const seconds = allVideosForDaily.reduce((sum, record) => {
+        if (storedStats && storedStats.daily && typeof storedStats.daily === 'object') {
+            const seconds = Number(storedStats.daily[day] || 0);
+            return Math.round(seconds / 60);
+        }
+
+        const secondsFromVideos = videoSource.reduce((sum, record) => {
             if (!record.timestamp) return sum;
             const d = new Date(record.timestamp);
             const recordDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -1314,7 +1375,7 @@ function updateActivityChart() {
             }
             return sum;
         }, 0);
-        return Math.round(seconds / 60);
+        return Math.round(secondsFromVideos / 60);
     });
 
     // Draw chart
@@ -1380,18 +1441,24 @@ function updateWatchTimeByHourChart() {
     // Clear previous chart
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate watch time by hour on the fly from current records
-    const hourlyData = new Array(24).fill(0);
-    const allVideos = [...allHistoryRecords, ...allShortsRecords];
-    allVideos.forEach(record => {
-        if (record.timestamp) {
-            const hour = new Date(record.timestamp).getHours();
-            hourlyData[hour] += record.time || 0;
-        }
-    });
+    // Calculate watch time by hour.
+    // Prefer persisted stats.hourly (rebuilt from hybrid storage), fall back to current records.
+    let hourlySeconds = null;
+    if (storedStats && Array.isArray(storedStats.hourly) && storedStats.hourly.length === 24) {
+        hourlySeconds = storedStats.hourly.map(v => Number(v || 0));
+    } else {
+        hourlySeconds = new Array(24).fill(0);
+        const allVideos = [...allHistoryRecords, ...allShortsRecords];
+        allVideos.forEach(record => {
+            if (record.timestamp) {
+                const hour = new Date(record.timestamp).getHours();
+                hourlySeconds[hour] += record.time || 0;
+            }
+        });
+    }
 
     // Convert seconds to minutes for better readability
-    const hourlyMinutes = hourlyData.map(seconds => Math.round(seconds / 60));
+    const hourlyMinutes = hourlySeconds.map(seconds => Math.round(seconds / 60));
 
     // Draw chart
     const maxMinutes = Math.max(...hourlyMinutes, 1);
@@ -3372,7 +3439,12 @@ function renderTopChannels() {
 
     // Aggregate by channel
     const channelMap = {};
-    allHistoryRecords.forEach(record => {
+    // Prefer full merged video list (non-Shorts) when available
+    const source = Array.isArray(analyticsAllVideos) && analyticsAllVideos.length
+        ? analyticsAllVideos.filter(r => !r.isShorts)
+        : allHistoryRecords;
+
+    source.forEach(record => {
         const channel = record.channelName || 'Unknown Channel';
         const channelId = record.channelId || '';
         if (channel === 'Unknown Channel') return; // skip unknown
@@ -3444,7 +3516,10 @@ function renderSkippedChannels() {
     if (!container) return;
 
     // Only consider long videos
-    const longVideos = allHistoryRecords.filter(r => r.duration >= 600);
+    const source = Array.isArray(analyticsAllVideos) && analyticsAllVideos.length
+        ? analyticsAllVideos.filter(r => !r.isShorts)
+        : allHistoryRecords;
+    const longVideos = source.filter(r => r.duration >= 600);
     const skipped = longVideos.filter(r => (r.time / r.duration) < 0.1);
 
     // Aggregate by channel
@@ -3528,7 +3603,10 @@ function renderCompletionBarChart() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Only consider long videos
-    const longVideos = allHistoryRecords.filter(r => r.duration >= 600);
+    const source = Array.isArray(analyticsAllVideos) && analyticsAllVideos.length
+        ? analyticsAllVideos.filter(r => !r.isShorts)
+        : allHistoryRecords;
+    const longVideos = source.filter(r => r.duration >= 600);
     const skipped = longVideos.filter(r => (r.time / r.duration) < 0.1);
     const partial = longVideos.filter(r => (r.time / r.duration) >= 0.1 && (r.time / r.duration) < 0.9);
     const completed = longVideos.filter(r => (r.time / r.duration) >= 0.9);

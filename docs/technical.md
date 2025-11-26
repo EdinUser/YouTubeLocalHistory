@@ -339,7 +339,12 @@ await ytStorage.updateStats(deltaSeconds, Date.now(), {
     shorts: 80,
     totalDurationSeconds: 540000,
     completed: 120
-  }
+  },
+  // Internal metadata:
+  // - stats_synced: true once a full hybrid rebuild has run
+  // - lastFullRebuild: timestamp (ms) of the last full rebuild from merged storage
+  stats_synced: true,
+  lastFullRebuild: 1695520000000
 }
 ```
 
