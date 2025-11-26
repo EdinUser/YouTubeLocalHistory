@@ -2864,7 +2864,6 @@
     // Detect playlist video changes that don't trigger yt-navigate-finish
     let lastPlaylistVideoId = null;
     playlistNavigationCheckInterval = setInterval(() => {
-        const currentUrl = window.location.href;
         const urlParams = new URLSearchParams(window.location.search);
         const playlistId = urlParams.get('list');
         const currentVideoId = getVideoId();
