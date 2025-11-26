@@ -45,3 +45,16 @@ global.chrome = {
     },
   },
 };
+
+// Minimal global ytStorage stub so the real content script
+// can be required in tests without throwing during initialize/loadSettings.
+global.ytStorage = {
+  getSettings: jest.fn().mockResolvedValue(null),
+  setSettings: jest.fn().mockResolvedValue(),
+  ensureMigrated: jest.fn().mockResolvedValue(),
+  getVideo: jest.fn().mockResolvedValue(null),
+  setVideo: jest.fn().mockResolvedValue(),
+  getPlaylist: jest.fn().mockResolvedValue(null),
+  getAllPlaylists: jest.fn().mockResolvedValue({}),
+  updateStats: jest.fn().mockResolvedValue(),
+};

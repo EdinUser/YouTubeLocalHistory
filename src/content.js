@@ -109,7 +109,7 @@
     const MAX_INIT_RETRIES = 3;
     let currentSettings = DEFAULT_SETTINGS;
     // Track already-initialized video elements to avoid duplicate listeners
-    const trackedVideos = new WeakSet();
+    const trackedVideos = new Set();
 
     // Track event listeners for cleanup
     const videoEventListeners = new WeakMap();
@@ -254,8 +254,8 @@
         }
         pendingOperations.clear();
 
-        // The WeakSet and WeakMap used for trackedVideos and videoEventListeners
-        // do not need to be (and cannot be) cleared manually. They will be
+        // The Set and WeakMap used for trackedVideos and videoEventListeners
+        // do not need to be cleared manually. They will be
         // garbage-collected automatically when the page unloads.
 
         // Reset state variables
@@ -1609,6 +1609,18 @@
         }
     }
 
+    // Shared helper to initialize after navigation when a video element is present
+    function initializeWithVideo(video) {
+        // Ensure video is actually visible and loaded
+        if (video && (video.readyState >= 1 || video.offsetWidth > 0)) {
+            // Re-run the initialization logic with the found video
+            initializeIfNeeded();
+        } else if (video) {
+            // Video exists but not ready, wait a bit then initialize
+            setTimeout(() => initializeIfNeeded(), 200);
+        }
+    }
+
     // This function is called when YouTube's SPA navigation is complete.
     function handleSpaNavigation() {
         const videoId = getVideoId();
@@ -1736,18 +1748,6 @@
             if (initChecker) {
                 clearInterval(initChecker);
                 initChecker = null;
-            }
-        }
-
-        // Add video dimensions check to avoid false positives on invisible/placeholder videos
-        function initializeWithVideo(video) {
-            // Ensure video is actually visible and loaded
-            if (video.readyState >= 1 || video.offsetWidth > 0) {
-                // Re-run the initialization logic with the found video
-                initializeIfNeeded();
-            } else {
-                // Video exists but not ready, wait a bit then initialize
-                setTimeout(() => initializeIfNeeded(), 200);
             }
         }
     }
@@ -2946,5 +2946,20 @@
                 }
             }
         });
+    }
+
+    // Expose internal navigation helpers for tests only.
+    // This is a no-op in production because __YTVHT_TEST__ is not defined.
+    if (typeof window !== 'undefined' && window.__YTVHT_TEST__) {
+        window.__YTVHT_TEST__.navigation = {
+            handleSpaNavigation,
+            handlePlaylistNavigation,
+            checkUrlChange,
+            getLastProcessedVideoId: () => lastProcessedVideoId
+        };
+        window.__YTVHT_TEST__.core = {
+            saveTimestamp,
+            saveShortsTimestamp
+        };
     }
 })();
