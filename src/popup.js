@@ -678,18 +678,37 @@ function showRecentSearches() {
 
     const topSearches = getTopSearches(5);
 
-    recentContainer.innerHTML = `
-        <div class="search-section">
-            <h4>Recent Searches</h4>
-            ${topSearches.map(search => `
-                <div class="suggestion-item recent-search-item" data-search="${search.replace(/"/g, '&quot;')}">
-                    <div class="suggestion-text">
-                        <div class="suggestion-title">${search}</div>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    // Clear existing content
+    recentContainer.innerHTML = '';
+
+    // Create search section
+    const searchSection = document.createElement('div');
+    searchSection.className = 'search-section';
+
+    // Create header
+    const header = document.createElement('h4');
+    header.textContent = 'Recent Searches';
+    searchSection.appendChild(header);
+
+    // Create suggestion items
+    topSearches.forEach(search => {
+        const item = document.createElement('div');
+        item.className = 'suggestion-item recent-search-item';
+        item.setAttribute('data-search', search);
+
+        const textContainer = document.createElement('div');
+        textContainer.className = 'suggestion-text';
+
+        const title = document.createElement('div');
+        title.className = 'suggestion-title';
+        title.textContent = search;
+
+        textContainer.appendChild(title);
+        item.appendChild(textContainer);
+        searchSection.appendChild(item);
+    });
+
+    recentContainer.appendChild(searchSection);
 
     // Add event listeners to avoid CSP issues
     recentContainer.querySelectorAll('.recent-search-item').forEach(item => {
@@ -711,27 +730,43 @@ function showAutocompleteSuggestions(query) {
         .filter(search => search.toLowerCase().includes(query.toLowerCase()))
         .slice(0, 8); // Limit to 8 suggestions
 
-    suggestionsContainer.innerHTML = `
-        <div class="search-section">
-            <h4>Search Suggestions</h4>
-            ${matchingSearches.map(search => `
-                <div class="suggestion-item autocomplete-item" data-search="${search.replace(/"/g, '&quot;')}">
-                    <div class="suggestion-text">
-                        <div class="suggestion-title">${search}</div>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    // Clear existing content
+    suggestionsContainer.innerHTML = '';
 
-    // Add event listeners to avoid CSP issues
-    suggestionsContainer.querySelectorAll('.autocomplete-item').forEach(item => {
+    // Create search section
+    const searchSection = document.createElement('div');
+    searchSection.className = 'search-section';
+
+    // Create header
+    const header = document.createElement('h4');
+    header.textContent = 'Search Suggestions';
+    searchSection.appendChild(header);
+
+    // Create suggestion items
+    matchingSearches.forEach(search => {
+        const item = document.createElement('div');
+        item.className = 'suggestion-item autocomplete-item';
+        item.setAttribute('data-search', search);
+
+        // Add click event listener
         item.addEventListener('click', function() {
             const searchQuery = this.getAttribute('data-search');
             applyRecentSearch(searchQuery);
         });
+
+        const textContainer = document.createElement('div');
+        textContainer.className = 'suggestion-text';
+
+        const title = document.createElement('div');
+        title.className = 'suggestion-title';
+        title.textContent = search;
+
+        textContainer.appendChild(title);
+        item.appendChild(textContainer);
+        searchSection.appendChild(item);
     });
 
+    suggestionsContainer.appendChild(searchSection);
     suggestionsContainer.style.display = 'block';
 }
 
@@ -1994,26 +2029,51 @@ function getContextualEmptyState(tab, searchQuery) {
 }
 
 function renderEmptyState(container, emptyState) {
-    container.innerHTML = `
-        <div class="empty-state">
-            <div class="empty-state-icon">${emptyState.icon}</div>
-            <h3 class="empty-title">${emptyState.title}</h3>
-            <p class="empty-subtitle">${emptyState.subtitle}</p>
-            ${emptyState.action ? `
-                <button class="empty-action-btn" data-empty-action="true">
-                    ${emptyState.action}
-                </button>
-            ` : ''}
-        </div>
-    `;
+    // Clear existing content
+    container.innerHTML = '';
 
-    // Add event listener for empty action button (CSP compliant)
-    if (emptyState.action && emptyState.actionCallback) {
-        const actionBtn = container.querySelector('.empty-action-btn');
-        if (actionBtn) {
+    // Create empty state container
+    const emptyStateDiv = document.createElement('div');
+    emptyStateDiv.className = 'empty-state';
+
+    // Create icon (SVG content is trusted and hardcoded)
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'empty-state-icon';
+    if (emptyState.icon) {
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(emptyState.icon, 'image/svg+xml');
+        const svgElement = svgDoc.documentElement;
+        iconDiv.appendChild(svgElement);
+    }
+    emptyStateDiv.appendChild(iconDiv);
+
+    // Create title
+    const title = document.createElement('h3');
+    title.className = 'empty-title';
+    title.textContent = emptyState.title;
+    emptyStateDiv.appendChild(title);
+
+    // Create subtitle
+    const subtitle = document.createElement('p');
+    subtitle.className = 'empty-subtitle';
+    subtitle.textContent = emptyState.subtitle;
+    emptyStateDiv.appendChild(subtitle);
+
+    // Create action button if needed
+    if (emptyState.action) {
+        const actionBtn = document.createElement('button');
+        actionBtn.className = 'empty-action-btn';
+        actionBtn.setAttribute('data-empty-action', 'true');
+        actionBtn.textContent = emptyState.action;
+
+        if (emptyState.actionCallback) {
             actionBtn.addEventListener('click', emptyState.actionCallback);
         }
+
+        emptyStateDiv.appendChild(actionBtn);
     }
+
+    container.appendChild(emptyStateDiv);
 }
 
 // Responsive table column management
@@ -2175,7 +2235,10 @@ function displayPlaylistsPage() {
             cell.innerHTML = '';
             const iconDiv = document.createElement('div');
             iconDiv.className = 'playlist-icon';
-            iconDiv.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/><circle cx="20" cy="7" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="20" cy="17" r="2"/></svg>`;
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString(`<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/><circle cx="20" cy="7" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="20" cy="17" r="2"/></svg>`, 'image/svg+xml');
+            const svgElement = svgDoc.documentElement;
+            iconDiv.appendChild(svgElement);
             cell.appendChild(iconDiv);
             const contentDiv = document.createElement('div');
             contentDiv.className = 'playlist-content';
