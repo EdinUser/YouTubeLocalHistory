@@ -2,7 +2,7 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
-## [4.0.2] - 2025-11-27
+## [4.0.3] - 2025-11-27
 
 ### 🐛 Playback & Navigation Fixes
 - **Enhanced playlist autoplay detection**: Improved logic to detect playlist autoplay scenarios and delay timestamp restoration appropriately, preventing conflicts with YouTube's autoplay behavior.
