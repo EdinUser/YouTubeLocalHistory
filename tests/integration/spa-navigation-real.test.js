@@ -77,7 +77,7 @@ describe('SPA / playlist navigation (real content.js)', () => {
     });
 
     const video = document.createElement('video');
-    video.currentTime = 5;
+    video.currentTime = 10; // Use > 5 to trigger reset
     document.body.appendChild(video);
 
     navigation.handleSpaNavigation();
