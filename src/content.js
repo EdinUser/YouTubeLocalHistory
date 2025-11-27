@@ -1385,40 +1385,47 @@
             // Check if this might be playlist autoplay that bypassed URL timestamp
             const isPlaylistContext = !!new URLSearchParams(window.location.search).get('list');
             const timeSinceNavigation = Date.now() - lastSpaNavigationTime;
+            const videoId = getVideoId();
+            let record = null;
 
-            if (isPlaylistContext && timeSinceNavigation < 5000) {
-                // This might be playlist autoplay - delay timing restoration
-                log(`[PLAYLIST] Detected potential autoplay in playlist context (${timeSinceNavigation}ms after navigation)`);
+            if (videoId) {
+                try {
+                    record = await ytStorage.getVideo(videoId);
+                } catch (error) {
+                    log('[play] Failed to read record for autoplay detection:', error);
+                }
+            }
 
-                // Wait a bit for autoplay to settle, then restore timing
+            const hasSignificantHistory = !!(record && typeof record.time === 'number' && record.time > 30);
+
+            if (isPlaylistContext && timeSinceNavigation < 5000 && hasSignificantHistory) {
+                // This might be playlist autoplay with meaningful history - delay timing restoration
+                log(`[PLAYLIST] Detected potential autoplay in playlist context (${timeSinceNavigation}ms after navigation) with saved time ${record.time.toFixed(1)}s`);
+
+                // Wait a bit for autoplay to settle, then restore timing if still near start
                 setTimeout(async () => {
                     if (!timestampLoaded && video.currentTime < 10) {
-                        log('[PLAYLIST] Autoplay detected, attempting delayed timing restoration');
+                        log('[PLAYLIST] Autoplay detected, attempting delayed timing restoration via ensureVideoReady');
                         await ensureVideoReady();
                     }
                 }, 1500); // Wait 1.5s for autoplay to complete
             }
 
-            // Fallback restoration check: if video started playing from near beginning
-            // but we have a saved timestamp much higher, force restoration
-            const videoId = getVideoId();
-            if (videoId) {
-                const record = await ytStorage.getVideo(videoId);
-                if (record && record.time > 10) { // Only if saved time is significant (>10s)
-                    const currentTime = video.currentTime;
-                    const savedTime = record.time;
-                    
-                    // If playing from near beginning (0-5s) but saved time is much higher
-                    if (currentTime < 5 && savedTime > 30) {
-                        log(`[FALLBACK] Video playing from ${currentTime.toFixed(1)}s but saved time is ${savedTime.toFixed(1)}s, forcing restoration`);
-                        // Small delay to avoid interrupting YouTube's own restoration
-                        setTimeout(() => {
-                            if (video.currentTime < 5) { // Double-check it wasn't restored
-                                video.currentTime = savedTime;
-                                log(`[FALLBACK] Restored to ${savedTime.toFixed(1)}s`);
-                            }
-                        }, 500);
-                    }
+            // Fallback restoration check: only when we have significant saved time
+            if (hasSignificantHistory) {
+                const savedTime = record.time;
+                const currentTime = video.currentTime;
+                
+                // If playing from near beginning (0-5s) but saved time is much higher
+                if (currentTime < 5) {
+                    log(`[FALLBACK] Video playing from ${currentTime.toFixed(1)}s but saved time is ${savedTime.toFixed(1)}s, considering restoration`);
+                    // Small delay to avoid interrupting YouTube's own restoration
+                    setTimeout(() => {
+                        if (video.currentTime < 5) { // Double-check it wasn't restored
+                            video.currentTime = savedTime;
+                            log(`[FALLBACK] Restored to ${savedTime.toFixed(1)}s`);
+                        }
+                    }, 500);
                 }
             }
         });
@@ -1523,8 +1530,13 @@
         // CRITICAL: Clear any inherited timing from previous playlist video
         const existingVideo = document.querySelector('video');
         if (existingVideo) {
-            log(`[PLAYLIST] Clearing inherited timing from previous playlist video (${existingVideo.currentTime}s)`);
-            existingVideo.currentTime = 0;
+            const currentTime = existingVideo.currentTime || 0;
+            if (currentTime > 5) {
+                log(`[PLAYLIST] Clearing inherited timing from previous playlist video (${currentTime}s)`);
+                existingVideo.currentTime = 0;
+            } else {
+                log('[PLAYLIST] Skipping timing reset; currentTime already near 0s');
+            }
             // Force reload of video data by clearing cached state
             existingVideo.dataset.lastVideoId = '';
             existingVideo.dataset.timestampLoaded = 'false';
@@ -1637,8 +1649,13 @@
         // This prevents new videos from appearing with the previous video's timing
         const existingVideo = document.querySelector('video');
         if (existingVideo) {
-            log(`[SPA] Clearing inherited timing from previous video (${existingVideo.currentTime}s)`);
-            existingVideo.currentTime = 0;
+            const currentTime = existingVideo.currentTime || 0;
+            if (currentTime > 5) {
+                log(`[SPA] Clearing inherited timing from previous video (${currentTime}s)`);
+                existingVideo.currentTime = 0;
+            } else {
+                log('[SPA] Skipping timing reset; currentTime already near 0s');
+            }
             // Force reload of video data by clearing cached state
             existingVideo.dataset.lastVideoId = '';
             existingVideo.dataset.timestampLoaded = 'false';
