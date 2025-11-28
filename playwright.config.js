@@ -1,5 +1,6 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
+const path = require('path');
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -15,7 +16,8 @@ module.exports = defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  // Use a simple console reporter to avoid needing a local HTTP server
+  reporter: 'list',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -36,6 +38,24 @@ module.exports = defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+    },
+
+    // Chromium with the YT re:Watch extension loaded
+    {
+      name: 'chromium-with-extension',
+      use: {
+        ...devices['Desktop Chrome'],
+        headless: false,
+        // Reuse a profile where YouTube cookies/consent have been accepted
+        storageState: path.join(__dirname, 'yt-storage.json'),
+        args: (() => {
+          const extensionPath = path.join(__dirname, 'build', 'chrome');
+          return [
+            `--disable-extensions-except=${extensionPath}`,
+            `--load-extension=${extensionPath}`,
+          ];
+        })(),
+      },
     },
 
     {

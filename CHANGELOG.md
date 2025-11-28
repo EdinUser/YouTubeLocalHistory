@@ -2,6 +2,29 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [4.0.3] - 2025-11-27
+
+### 🐛 Playback & Navigation Fixes
+- **Enhanced playlist autoplay detection**: Improved logic to detect playlist autoplay scenarios and delay timestamp restoration appropriately, preventing conflicts with YouTube's autoplay behavior.
+- **Smart timestamp restoration**: Added checks for significant viewing history (>30s) before attempting timestamp restoration to avoid unnecessary resets for short or unwatched videos.
+- **Refined timing reset logic**: Skip timing resets when videos are already playing near the beginning (within 5 seconds) to prevent unnecessary interruptions during playlist navigation.
+- **Improved SPA navigation handling**: Enhanced single-page application navigation detection with better timestamp flag management and null video object protection.
+
+### 📊 Analytics & Statistics Improvements
+- **Robust average duration calculation**: Added `Number.isFinite` checks to prevent invalid duration calculations in analytics summaries.
+- **Enhanced video tracking reliability**: Improved timestamp reset logic and dataset flag management for better consistency across navigation types.
+
+### 🗄️ Storage System Enhancements
+- **Fixed date manipulation logic**: Corrected retention days calculation to properly handle date arithmetic and prevent incorrect pruning of daily statistics.
+
+### 🧪 Testing & Quality Assurance
+- **Enhanced E2E test setup**: Improved Playwright configuration with dedicated `chromium-with-extension` project for better extension testing.
+- **Better navigation and consent dialog handling**: Updated test suites to handle YouTube's cookie/consent dialogs and improve test reliability.
+- **Jest setup improvements**: Added `ytStorage` mock and exposed testing helpers for more comprehensive unit testing.
+- **Memory management**: Replaced `WeakSet` with `Set` for `trackedVideos` to allow manual management during testing.
+
+---
+
 ## [4.0.1] - 2025-11-26
 
 ### 🐛 Stats & Analytics Fixes
