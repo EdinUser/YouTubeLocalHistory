@@ -227,6 +227,14 @@
     "message": "Sincronización completa iniciada... Esto puede tardar un momento.",
     "description": "Message when full sync is initiated"
   },
+  "settings_convert_history": {
+    "message": "Convertir historial de YouTube",
+    "description": "Button label to open the community converter tool"
+  },
+  "settings_convert_history_help": {
+    "message": "Abre la herramienta de la comunidad para convertir Google Takeout watch-history.json en un archivo de importación de YT re:Watch.",
+    "description": "Help text for the community converter tool link"
+  },
   "message_unknown_error": {
     "message": "Error desconocido",
     "description": "Fallback for unknown error details"

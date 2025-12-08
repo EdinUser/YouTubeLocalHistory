@@ -3,6 +3,7 @@
 [![Tests](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml/badge.svg)](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/EdinUser/YouTubeLocalHistory)](https://github.com/EdinUser/YouTubeLocalHistory/releases)
 [![Telegram Channel](https://img.shields.io/badge/Community-Telegram-2AABEE?logo=telegram&logoColor=white)](https://t.me/+eFftKWGVvSpiZjZk)
+[![Community Tool – YouTube History Converter (tannery495)](https://img.shields.io/badge/Community_Tool-YouTube_History_Converter-2AABEE)](https://github.com/tannery495/youtube-history-converter)
 
 # 📚 **[→ New User? Start Here! User-Friendly Guide](./docs/index.md) ←**
 
@@ -152,6 +153,9 @@ Analytics now prefer locally persisted, privacy-preserving statistics for better
 - **Bulletproof reliability**: Core functionality works even if IndexedDB unavailable
 - **Privacy protection**: All data stays local, no cloud storage required
 - **Performance optimized**: Fast queries with indexed search and memory-efficient pagination
+
+## Community tools
+- **YouTube history converter** by [@tannery495](https://github.com/tannery495): Converts Google Takeout `watch-history.json` into a YT re:Watch import file. Repo: [github.com/tannery495/youtube-history-converter](https://github.com/tannery495/youtube-history-converter).
 
 ### 🎨 **User Experience**
 - **Modern Interface**: Clean, card-based layout

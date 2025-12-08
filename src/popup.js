@@ -2988,6 +2988,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const clearButton = document.getElementById('ytvhtClearHistory');
         const exportButton = document.getElementById('ytvhtExportHistory');
         const importButton = document.getElementById('ytvhtImportHistory');
+        const convertButton = document.getElementById('ytvhtConvertHistory');
         const closeButton = document.getElementById('ytvhtClosePopup');
         const firstPageBtn = document.getElementById('ytvhtFirstPage');
         const prevPageBtn = document.getElementById('ytvhtPrevPage');
@@ -3013,6 +3014,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             ['ytvhtClearHistory', clearButton],
             ['ytvhtExportHistory', exportButton],
             ['ytvhtImportHistory', importButton],
+            ['ytvhtConvertHistory', convertButton],
             ['ytvhtClosePopup', closeButton],
             ['ytvhtFirstPage', firstPageBtn],
             ['ytvhtPrevPage', prevPageBtn],
@@ -3071,6 +3073,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         exportButton.addEventListener('click', exportHistory);
 
         importButton.addEventListener('click', () => openImportPage());
+        convertButton.addEventListener('click', () => {
+            window.open('https://github.com/tannery495/youtube-history-converter', '_blank', 'noopener');
+        });
         closeButton.addEventListener('click', () => window.close());
 
         // Pagination controls

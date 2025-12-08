@@ -227,6 +227,14 @@
     "message": "Стартира се пълна синхронизация... Това може да отнеме малко време.",
     "description": "Message when full sync is initiated"
   },
+  "settings_convert_history": {
+    "message": "Конвертиране на YouTube история",
+    "description": "Button label to open the community converter tool"
+  },
+  "settings_convert_history_help": {
+    "message": "Отваря общностния инструмент за конвертиране на Google Takeout watch-history.json във файл за импорт в YT re:Watch.",
+    "description": "Help text for the community converter tool link"
+  },
   "message_unknown_error": {
     "message": "Неизвестна грешка",
     "description": "Fallback for unknown error details"
