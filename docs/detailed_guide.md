@@ -1,12 +1,12 @@
-# ❤️ Support the Project
+## ❤️ Support the Project
 
 If you find YT re:Watch helpful, you can support ongoing development on [Patreon](https://patreon.com/EdinUser)!
 
 [![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange?logo=patreon&logoColor=white)](https://patreon.com/EdinUser)
 
-# 📖 Complete User Guide for YT re:Watch
+# 📖 YT re:Watch YouTube History Extension Guide (Multi-Account & Privacy)
 
-*A step-by-step guide to master your YouTube viewing experience*
+Your step-by-step guide to a privacy-first YouTube history extension that keeps progress consistent across multiple accounts (or no account), stores data locally, and helps you track and resume videos without Google access.
 
 ---
 

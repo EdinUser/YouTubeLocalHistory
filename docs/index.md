@@ -1,11 +1,14 @@
-# 🎬 YT re:Watch - Never Lose Your Place in YouTube Videos Again!
+# 🎬 YT re:Watch — YouTube History Extension for Multi-Account Privacy
 
 ![YT re:Watch](./images/hero.jpg)
+A private YouTube history extension that keeps multi-account progress in sync while staying privacy-first and local-only.
 
 [![Chrome Web Store](https://img.shields.io/badge/Get_it_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
 [![Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
 
 *Keep track of your YouTube journey — your data stays private on your device*
+
+YT re:Watch is a privacy-first YouTube history extension that works across multiple accounts (or no account), tracks your progress locally, and keeps your watch history independent from Google so you can resume anywhere without losing data.
 
 # ❤️ Support the Project
 
@@ -47,6 +50,8 @@ YT re:Watch solves both problems with **Account Independence + YouTube History P
 - Go to YouTube and start watching videos
 - The extension works automatically in the background
 - Click the extension icon to see your watch history
+
+Need a deeper walkthrough? Read the [Detailed Guide](./detailed_guide.md). Quick answers live in the [FAQ](./faq.md), fixes are in [Troubleshooting](./troubleshooting.md), and release notes are in the [Changelog](../CHANGELOG.md).
 
 ## 🎯 Who is This For?
 
@@ -209,6 +214,9 @@ Because we store everything locally:
 - **[Technical Documentation](./technical.md)** - Architecture and APIs
 - **[Contributing Guide](./contributing.md)** - How to contribute
 - **[Build Instructions](./build.md)** - Development setup
+
+## ℹ️ About YT re:Watch
+YT re:Watch is a privacy-first YouTube history extension that keeps watch progress consistent across multiple accounts, stores data locally instead of on Google, and helps you track and resume videos with customizable overlays and stats.
 
 ---
 
