@@ -1,5 +1,6 @@
-# ❓ Frequently Asked Questions
+# ❓ YT re:Watch FAQ — YouTube History Extension & Privacy
 
+Quick answers about the privacy-first YouTube history extension that keeps progress across multiple accounts, works without login, and stores your data locally.
 ## 🔄 Account Independence (Most Asked!)
 
 ### Q: What happens when I switch YouTube accounts?

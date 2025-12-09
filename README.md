@@ -1,4 +1,4 @@
-# 🎬 YT re:Watch - YouTube History Extension for Multiple Accounts & Privacy
+# ![YT re:Watch](./src/icon48.png) YT re:Watch - YouTube History Extension for Multiple Accounts & Privacy
 
 [![Tests](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml/badge.svg)](https://github.com/EdinUser/YouTubeLocalHistory/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/EdinUser/YouTubeLocalHistory)](https://github.com/EdinUser/YouTubeLocalHistory/releases)
