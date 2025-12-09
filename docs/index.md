@@ -1,13 +1,11 @@
 # 🎬 YT re:Watch - Never Lose Your Place in YouTube Videos Again!
 
-<div align="center">
-  <img src="../src/icon128.png" alt="YT re:Watch" width="96" height="96">
-  
-  [![Chrome Web Store](https://img.shields.io/badge/Get_it_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
-  [![Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
-  
-  *Keep track of your YouTube journey - Your data stays private on your device*
-</div>
+![YT re:Watch](./images/hero.jpg)
+
+[![Chrome Web Store](https://img.shields.io/badge/Get_it_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
+[![Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
+
+*Keep track of your YouTube journey — your data stays private on your device*
 
 # ❤️ Support the Project
 

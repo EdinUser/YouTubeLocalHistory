@@ -4,18 +4,21 @@ site_description: "User guide and reference for Rewatch"
 docs_dir: docs
 theme:
   name: material
-  logo: images/hero.jpg
-  favicon: images/hero.jpg
+  logo: assets/icon128.png
+  favicon: assets/icon128.png
 plugins:
   - search
   - macros
 nav:
   - Home: index.md
-  - Downloads: releases.md
-  - Features: features.md
-  - Settings: settings.md
-  - Tips & Best Practices: tips.md
+  - Detailed Guide: detailed_guide.md
   - FAQ: faq.md
+  - Technical: technical.md
+  - Build: build.md
+  - Testing: testing.md
+  - Troubleshooting: troubleshooting.md
+  - Contributing: contributing.md
+  - README: readme.md
   - Community: https://t.me/+eFftKWGVvSpiZjZk
 markdown_extensions:
   - admonition
