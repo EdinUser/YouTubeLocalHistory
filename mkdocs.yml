@@ -1,0 +1,26 @@
+site_name: Rewatch Docs
+site_url: https://rewatch.kirilov.dev
+site_description: "User guide and reference for Rewatch"
+docs_dir: docs
+theme:
+  name: material
+  logo: images/hero.jpg
+  favicon: images/hero.jpg
+plugins:
+  - search
+  - macros
+nav:
+  - Home: index.md
+  - Downloads: releases.md
+  - Features: features.md
+  - Settings: settings.md
+  - Tips & Best Practices: tips.md
+  - FAQ: faq.md
+  - Community: https://t.me/+eFftKWGVvSpiZjZk
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+  - attr_list
+
