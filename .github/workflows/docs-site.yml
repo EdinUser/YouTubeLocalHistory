@@ -1,0 +1,81 @@
+name: Build & Deploy Docs (MkDocs)
+
+on:
+  workflow_run:
+    workflows: ["re:Watch YouTube history manager"]
+    types:
+      - completed
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+concurrency:
+  group: docs-site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    if: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch latest release.json from VPS (if present)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          if ssh -i ~/.ssh/vps_key -p 10222 -o StrictHostKeyChecking=no root@"$VPS_HOST" test -f /var/www/rewatch.kirilov.dev/web/release.json; then
+            scp -P 10222 -i ~/.ssh/vps_key -o StrictHostKeyChecking=no root@"$VPS_HOST":/var/www/rewatch.kirilov.dev/web/release.json ./release.json
+          else
+            echo "{}" > release.json
+          fi
+
+      - name: Install MkDocs
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install mkdocs mkdocs-material mkdocs-macros-plugin
+
+      - name: Build MkDocs site
+        run: mkdocs build --clean --site-dir site
+
+      - name: Sync site to VPS (preserve downloads & release.json)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          rsync -avz --delete \
+            --exclude 'downloads/' \
+            --exclude 'release.json' \
+            --exclude 'community/' \
+            -e "ssh -i ~/.ssh/vps_key -p 10222 -o StrictHostKeyChecking=no" \
+            site/ root@"$VPS_HOST":/var/www/rewatch.kirilov.dev/web/
+
+      - name: Fix ISPConfig permissions
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 10222
+          script: |
+            chown -R web22:client1 /var/www/rewatch.kirilov.dev/web/
+            find /var/www/rewatch.kirilov.dev/web/ -type d -exec chmod 755 {} \;
+            find /var/www/rewatch.kirilov.dev/web/ -type f -exec chmod 644 {} \;
+
