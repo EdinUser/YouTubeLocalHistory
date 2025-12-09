@@ -3,7 +3,7 @@ site_url: https://rewatch.kirilov.dev
 site_description: "User guide and reference for Rewatch"
 docs_dir: docs
 theme:
-  name: material
+  name: custommill
   logo: assets/icon128.png
   favicon: assets/icon128.png
 plugins:
@@ -19,6 +19,7 @@ nav:
   - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md
   - README: readme.md
+  - Changelog: ../CHANGELOG.md
   - Community: https://t.me/+eFftKWGVvSpiZjZk
 markdown_extensions:
   - admonition
