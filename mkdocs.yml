@@ -1,6 +1,7 @@
 site_name: Rewatch Docs
 site_url: https://rewatch.kirilov.dev
 site_description: "User guide and reference for Rewatch"
+repo_url: https://github.com/EdinUser/YouTubeLocalHistory
 docs_dir: docs
 theme:
   name: material
