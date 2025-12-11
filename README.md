@@ -167,7 +167,9 @@ Analytics now prefer locally persisted, privacy-preserving statistics for better
 
 ## 🤝 Community & Support
 
-- 💬 **[Join our Telegram community](https://t.me/+eFftKWGVvSpiZjZk)** - Get help, share tips, and connect with other users
+- 🌐 **[Visit our website](https://rewatch.kirilov.dev/)** - Complete documentation and guides
+- 💬 **[Join our community forum](https://community.kirilov.dev/t/re-watch)** - Get help, share tips, and connect with other users
+- 💬 **[Telegram community](https://t.me/+eFftKWGVvSpiZjZk)** - Real-time chat and support
 - 📖 **[Read our documentation](./docs/index.md)** - Complete guides for all skill levels
 - 🐛 **[Report bugs on GitHub](https://github.com/EdinUser/YouTubeLocalHistory/issues)** - Help improve the extension
 - ⭐ **[Rate us on browser stores](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)** - Support the project

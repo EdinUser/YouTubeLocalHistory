@@ -16,6 +16,9 @@ If you find YT re:Watch helpful, you can support ongoing development on [Patreon
 
 [![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange?logo=patreon&logoColor=white)](https://patreon.com/EdinUser)
 
+## 🌐 Visit Our Website
+[https://rewatch.kirilov.dev/](https://rewatch.kirilov.dev/) - Complete documentation, guides, and latest updates
+
 ---
 
 ## 🤔 What is YT re:Watch?
@@ -187,7 +190,8 @@ Because we store everything locally:
 ### Get Support
 - 📖 **[Detailed Guide](./detailed_guide.md)** - Step-by-step instructions
 - ❓ **[FAQ](./faq.md)** - Common questions and answers
-- 💬 **[Community Chat](https://t.me/+eFftKWGVvSpiZjZk)** - Join our Telegram community
+- 💬 **[Community Forum](https://community.kirilov.dev/t/re-watch)** - Get help and connect with other users
+- 💬 **[Telegram Community](https://t.me/+eFftKWGVvSpiZjZk)** - Real-time community support
 - 🐛 **[Report Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues)** - Found a bug?
 
 ## 📈 What's New

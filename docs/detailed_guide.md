@@ -370,7 +370,8 @@ The export file contains:
 3. Try the troubleshooting steps above
 
 **Community Support:**
-- 💬 **[Join our Telegram community](https://t.me/+eFftKWGVvSpiZjZk)** - Active community support
+- 💬 **[Join our Community Forum](https://community.kirilov.dev/t/re-watch)** - Active community support
+- 💬 **[Telegram Community](https://t.me/+eFftKWGVvSpiZjZk)** - Real-time chat support
 - Ask questions and get help from other users
 - Share tips and tricks with the community
 
@@ -423,6 +424,7 @@ YT re:Watch is available in English, German, Spanish, French, and Bulgarian. All
 
 **Quick Links:**
 - 📖 [FAQ](./faq.md) - Common questions and answers
+- 💬 [Community Forum](https://community.kirilov.dev/t/re-watch) - Get help and connect with users
 - 💬 [Telegram Community](https://t.me/+eFftKWGVvSpiZjZk) - Chat with other users
 - 🐛 [Report Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues) - Bug reports and feature requests
 - 🔧 [Technical Docs](./technical.md) - For developers and advanced users

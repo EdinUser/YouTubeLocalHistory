@@ -274,8 +274,9 @@ This solves the common problem where deleted videos would reappear in searches.
 ## 🤝 Getting Help
 
 ### Q: I have a question not listed here
-**A:** 
-- **💬 Join our community**: [Telegram group](https://t.me/+eFftKWGVvSpiZjZk) - Get help from other users
+**A:**
+- **💬 Join our community**: [Community Forum](https://community.kirilov.dev/t/re-watch) - Get help from other users
+- **💬 Telegram group**: [Telegram Chat](https://t.me/+eFftKWGVvSpiZjZk) - Real-time support
 - **📖 Read the detailed guide**: [Detailed Guide](./detailed_guide.md) - Complete walkthrough
 - **🐛 Report issues**: [GitHub Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues) - Found a bug?
 
@@ -298,7 +299,7 @@ Check out our [Contributing Guide](./contributing.md) for more details.
 
 ---
 
-*Can't find your question? Join our [Telegram community](https://t.me/+eFftKWGVvSpiZjZk) - we're friendly and helpful!*
+*Can't find your question? Join our [Community Forum](https://community.kirilov.dev/t/re-watch) or [Telegram community](https://t.me/+eFftKWGVvSpiZjZk) - we're friendly and helpful!*
 
 ## 🌐 Multilanguage Support
 
