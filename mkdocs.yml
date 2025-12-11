@@ -13,15 +13,15 @@ plugins:
 nav:
   - Home: index.md
   - Detailed Guide: detailed_guide.md
+  - Changelog: ../CHANGELOG.md
   - FAQ: faq.md
   - Technical: technical.md
   - Build: build.md
   - Testing: testing.md
   - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md
-  - README: readme.md
-  - Changelog: ../CHANGELOG.md
-  - Community: https://t.me/+eFftKWGVvSpiZjZk
+  - Live chat: https://t.me/+eFftKWGVvSpiZjZk
+  - Community: https://community.kirilov.dev/t/re-watch
 markdown_extensions:
   - admonition
   - toc:
