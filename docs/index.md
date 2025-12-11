@@ -191,7 +191,7 @@ Because we store everything locally:
 - 📖 **[Detailed Guide](./detailed_guide.md)** - Step-by-step instructions
 - ❓ **[FAQ](./faq.md)** - Common questions and answers
 - 💬 **[Community Forum](https://community.kirilov.dev/t/re-watch)** - Get help and connect with other users
-- 💬 **[Telegram Chat](https://t.me/+eFftKWGVvSpiZjZk)** - Real-time community support
+- 💬 **[Telegram Community](https://t.me/+eFftKWGVvSpiZjZk)** - Real-time community support
 - 🐛 **[Report Issues](https://github.com/EdinUser/YouTubeLocalHistory/issues)** - Found a bug?
 
 ## 📈 What's New
