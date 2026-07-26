@@ -1,146 +1,126 @@
-# 🔨 Build Instructions
+# Build Instructions
 
-## 🛠️ Development Setup
+This guide explains how to install dependencies, run checks, and load YT re:Watch for local browser testing.
 
-This guide explains how to set up your development environment and build YT re:Watch extension for both Chrome and Firefox.
+## Prerequisites
 
-### Prerequisites
-- **Node.js 14+** - [Download here](https://nodejs.org/)
-- **NPM or Yarn** - Package manager (comes with Node.js)
-- **Chrome/Firefox** - For testing the extension
-- **Git** - For cloning the repository
+- Node.js 18 or newer
+- npm
+- Git
+- Firefox or Chrome/Chromium
+- Git Bash, WSL, or another Bash-compatible shell if you want to run `build.sh`
 
-### Local Development
+## Install
 
-#### 1. Clone the Repository
 ```bash
 git clone https://github.com/EdinUser/YouTubeLocalHistory.git
 cd YouTubeLocalHistory
-```
-
-#### 2. Install Dependencies
-```bash
 npm install
 ```
 
-This will install all required dependencies including:
-- **Jest** - For unit and integration testing
-- **Playwright** - For end-to-end testing
-- **ESLint** - For code linting
-- **Babel** - For JavaScript transpilation
+## Local Firefox Testing
 
-#### 3. Build the Extension
+This is the recommended development path on Windows.
+
 ```bash
-# Build both Chrome and Firefox versions
-./build.sh
-
-# Or build specific browser
-./build.sh chrome
-./build.sh firefox
+npm run prepare:firefox
 ```
 
-#### 4. Load in Browser
-After building, the extensions will be available in the `dist/` folder:
-- **Chrome**: `dist/youtube-local-history-chrome-v{version}.zip`
-- **Firefox**: `dist/youtube-local-history-firefox-v{version}.zip`
+Then open Firefox:
 
-**To load in browser:**
-- **Chrome**: Go to `chrome://extensions/`, enable "Developer mode", click "Load unpacked" and select the `build/chrome` folder
-- **Firefox**: Go to `about:debugging`, click "This Firefox", then "Load Temporary Add-on" and select the `build/firefox` folder
+1. Go to `about:debugging`.
+2. Click `This Firefox`.
+3. Click `Load Temporary Add-on`.
+4. Select `build/firefox/manifest.json`.
 
-### Testing
+After code changes, run `npm run prepare:firefox` again, then reload the temporary add-on.
 
-#### Run All Tests
+## Local Chrome Testing
+
+Use the release build script to prepare `build/chrome`, or copy the source files into a Chrome build folder using the same file list from `build.sh`.
+
+Then open Chrome:
+
+1. Go to `chrome://extensions/`.
+2. Enable `Developer mode`.
+3. Click `Load unpacked`.
+4. Select `build/chrome`.
+
+## Checks
+
+Run these before opening a pull request:
+
+```bash
+npm run lint
+npm test -- --runInBand
+npm run prepare:firefox
+npx web-ext lint --source-dir=build/firefox
+```
+
+Useful test commands:
+
 ```bash
 npm test
-```
-
-#### Run Specific Test Suites
-```bash
-# Unit tests only
 npm run test:unit
-
-# Integration tests only
 npm run test:integration
-
-# Memory tests only
 npm run test:memory
-
-# End-to-end tests (requires Playwright browsers)
 npm run test:e2e
-
-# Watch mode for development
-npm run test:watch
-```
-
-#### Test Coverage
-```bash
 npm run test:coverage
 ```
 
-This generates a coverage report in the `coverage/` folder.
+`npm run test:e2e` uses Playwright. If browsers are missing, run:
 
-### Building for Production
+```bash
+npx playwright install
+```
 
-#### Build Both Browsers
+## Release Packaging
+
+The release script builds browser folders and creates ZIP packages in `dist/`.
+
+```bash
+npm run build
+```
+
+or directly:
+
 ```bash
 ./build.sh
 ```
 
-This will:
-1. Clean previous builds
-2. Merge locale files
-3. Build Chrome extension (with signing if certificates are available)
-4. Build Firefox extension
-5. Create distribution packages in `dist/`
+Notes:
 
-#### Build Specific Browser
-```bash
-# Chrome only
-./build.sh chrome
+- `build.sh` is a Bash script. On Windows, run it from Git Bash or WSL.
+- Chrome CRX signing requires `google-chrome` and a private key at `certs/privatekey.pem`, or paths supplied through `CHROME_EXTENSION_DIR` and `PRIVATE_KEY_PATH`.
+- If Chrome signing is not configured, the Chrome ZIP may still be useful, but CRX generation can warn or fail depending on your environment.
 
-# Firefox only
-./build.sh firefox
-```
+Expected release outputs:
 
-#### Output Files
-After building, you'll find:
-- **Chrome**: `dist/youtube-local-history-chrome-v{version}.zip` and `.crx` (if signed)
-- **Firefox**: `dist/youtube-local-history-firefox-v{version}.zip`
+- `dist/youtube-local-history-chrome-v{version}.zip`
+- `dist/youtube-local-history-chrome-v{version}.crx` when signing succeeds
+- `dist/youtube-local-history-firefox-v{version}.zip`
 
-### Project Structure
+## Project Structure
 
-```
+```text
 src/
-├── _locales/          # Multi-language support files
-│   ├── en/           # English translations
-│   ├── de/           # German translations
-│   └── ...           # Other languages
-├── manifest.chrome.json   # Chrome extension manifest
-├── manifest.firefox.json  # Firefox extension manifest
-├── background.js         # Service worker/background script
-├── content.js           # Content script for YouTube pages
-├── popup.html/js        # Extension popup interface
-├── storage.js           # Local storage management
-└── indexeddb-storage.js # IndexedDB wrapper for unlimited storage
+  _locales/                  Translation files
+  manifest.chrome.json       Chrome extension manifest
+  manifest.firefox.json      Firefox extension manifest
+  background.js              Extension background script
+  content*.js                YouTube page content scripts
+  popup*.js                  Toolbar popup
+  feed*.js                   Full local feed page
+  import.html, import.js     Import page
+  storage.js                 Browser storage wrapper
+  indexeddb-storage.js       IndexedDB history storage
 ```
 
-### Development Tips
+## Debugging
 
-#### Hot Reloading
-- The build script doesn't include hot reloading
-- After making changes, run `./build.sh` and reload the extension in your browser
-- Use the "Reload" button in `chrome://extensions/` or `about:debugging`
+- Enable Debug Mode in Settings for extra logs.
+- Use `about:debugging` in Firefox to inspect the temporary extension.
+- Use `chrome://extensions/` in Chrome to inspect service worker/content script errors.
+- If the local feed looks stale, reload the extension and click `Refresh` in the feed page.
 
-#### Debugging
-- Enable "Debug Mode" in the extension settings for detailed logging
-- Check browser console for errors
-- Use `chrome://extensions/` or `about:debugging` for extension management
-
-#### Common Issues
-- **Build fails**: Ensure Node.js 14+ and all dependencies are installed
-- **Extension not loading**: Check manifest permissions and browser compatibility
-- **Tests failing**: Ensure Playwright browsers are installed (`npx playwright install`)
-
----
-*For more technical details, see [Technical Documentation](./technical.md)*
+For more technical details, see [Technical Documentation](./technical.md).

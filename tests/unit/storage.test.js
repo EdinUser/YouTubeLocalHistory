@@ -66,8 +66,6 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
     global.browser = undefined;
 
     // Simulate extension context so _isExtensionContext() returns true
-    global.location = { origin: 'chrome-extension://test-extension' };
-
     // Provide a lightweight ytIndexedDBStorage mock – only methods we assert on
     global.ytIndexedDBStorage = {
       getVideo: jest.fn().mockResolvedValue(null),
@@ -86,6 +84,7 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
     ytStorage = global.ytStorage;
 
     // Prevent hybrid migration from running real work in these tests
+    jest.spyOn(ytStorage, '_isExtensionContext').mockReturnValue(true);
     jest.spyOn(ytStorage, 'migrateVideosToIndexedDB').mockResolvedValue();
     jest.spyOn(ytStorage, 'migratePlaylistsToIndexedDB').mockResolvedValue();
   });
@@ -96,7 +95,6 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
     delete global.ytIndexedDBStorage;
     delete global.chrome;
     delete global.browser;
-    delete global.location;
   });
 
   describe('getVideo (local first, then IndexedDB)', () => {
@@ -382,4 +380,3 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
     });
   });
 });
-

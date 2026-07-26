@@ -1,6 +1,9 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');
+const fs = require('fs');
+
+const youtubeStorageState = path.join(__dirname, 'yt-storage.json');
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -46,8 +49,8 @@ module.exports = defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         headless: false,
-        // Reuse a profile where YouTube cookies/consent have been accepted
-        storageState: path.join(__dirname, 'yt-storage.json'),
+        // Optional local-only profile state for YouTube cookies/consent.
+        ...(fs.existsSync(youtubeStorageState) ? { storageState: youtubeStorageState } : {}),
         args: (() => {
           const extensionPath = path.join(__dirname, 'build', 'chrome');
           return [

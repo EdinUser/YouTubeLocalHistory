@@ -55,14 +55,6 @@
     "message": "Cerrar",
     "description": "Button label for closing the popup"
   },
-  "sync_status": {
-    "message": "Sincronización",
-    "description": "Label for sync status indicator"
-  },
-  "sync_status_tooltip": {
-    "message": "Estado de sincronización",
-    "description": "Tooltip for sync status indicator"
-  },
   "instructions_script_disabled_title": {
     "message": "Ejecución de scripts deshabilitada",
     "description": "Title for script execution disabled instructions"
@@ -167,24 +159,8 @@
     "message": "La lista será rastreada",
     "description": "Toast when ignore is disabled"
   },
-  "content_toggle_pause": {
-    "message": "re:Watch — Clic para pausar el historial",
-    "description": "Button text when tracking is active"
-  },
-  "content_toggle_paused": {
-    "message": "re:Watch — Historial en pausa. Clic para activar",
-    "description": "Button text when tracking is paused"
-  },
-  "content_toggle_pause_title": {
-    "message": "re:Watch — Clic para pausar el historial para esta lista",
-    "description": "Tooltip when tracking is active"
-  },
-  "content_toggle_paused_title": {
-    "message": "re:Watch — El historial está en pausa para esta lista. Clic para activar",
-    "description": "Tooltip when tracking is paused"
-  },
   "global_search_placeholder": {
     "message": "Buscar en todo el contenido...",
     "description": "Placeholder text for the global search input"
   }
-} 
+}

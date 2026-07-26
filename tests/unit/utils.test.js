@@ -16,27 +16,16 @@ describe('Utility Functions', () => {
     });
 
     test('should extract video ID from Shorts URL', () => {
-      Object.defineProperty(window, 'location', {
-        value: {
-          href: 'https://www.youtube.com/shorts/dQw4w9WgXcQ',
-          pathname: '/shorts/dQw4w9WgXcQ'
-        },
-        writable: true
-      });
+      const location = new URL('https://www.youtube.com/shorts/dQw4w9WgXcQ');
 
-      const videoId = window.location.pathname.match(/\/shorts\/([^\/\?]+)/)?.[1];
+      const videoId = location.pathname.match(/\/shorts\/([^\/\?]+)/)?.[1];
       expect(videoId).toBe('dQw4w9WgXcQ');
     });
 
     test('should extract video ID from youtu.be URL', () => {
-      Object.defineProperty(window, 'location', {
-        value: {
-          href: 'https://youtu.be/dQw4w9WgXcQ'
-        },
-        writable: true
-      });
+      const location = new URL('https://youtu.be/dQw4w9WgXcQ');
 
-      const videoId = window.location.href.match(/youtu\.be\/([^\/\?]+)/)?.[1];
+      const videoId = location.href.match(/youtu\.be\/([^\/\?]+)/)?.[1];
       expect(videoId).toBe('dQw4w9WgXcQ');
     });
 
@@ -104,15 +93,9 @@ describe('Utility Functions', () => {
     });
 
     test('should return null for non-playlist pages', () => {
-      Object.defineProperty(window, 'location', {
-        value: {
-          href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-          search: '?v=dQw4w9WgXcQ'
-        },
-        writable: true
-      });
+      const location = new URL('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
 
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = new URLSearchParams(location.search);
       const playlistId = urlParams.get('list');
       
       expect(playlistId).toBeNull();

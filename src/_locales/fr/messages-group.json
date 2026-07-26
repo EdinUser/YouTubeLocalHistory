@@ -47,10 +47,6 @@
     "message": "Êtes-vous sûr de vouloir effacer tout l'historique ? Cette action est irréversible.",
     "description": "Confirmation message for clearing all history"
   },
-  "message_confirm_full_sync": {
-    "message": "La synchronisation complète nettoiera les anciennes données et resynchronisera tout. Cela peut prendre un moment. Continuer ?",
-    "description": "Confirmation message for full sync"
-  },
   "message_warning_clear_all": {
     "message": "ATTENTION : Cela supprimera tout votre historique et vos playlists YouTube. Cette action est irréversible. Continuer ?",
     "description": "Warning message for clearing all history and playlists"
@@ -119,114 +115,6 @@
     "message": "Mode débogage désactivé",
     "description": "Message when debug mode is disabled"
   },
-  "message_sync_disabled": {
-    "message": "Synchronisation désactivée - Cliquez pour activer",
-    "description": "Tooltip for disabled sync status"
-  },
-  "message_sync_not_available": {
-    "message": "Synchronisation non disponible - Firefox Sync requis",
-    "description": "Tooltip for unavailable sync status"
-  },
-  "message_sync_initializing": {
-    "message": "Initialisation de la synchronisation...",
-    "description": "Tooltip for initializing sync status"
-  },
-  "message_sync_syncing": {
-    "message": "Synchronisation des données...",
-    "description": "Tooltip for syncing data status"
-  },
-  "message_sync_ready": {
-    "message": "Synchronisation prête",
-    "description": "Tooltip for sync ready status"
-  },
-  "message_sync_error": {
-    "message": "Erreur de synchronisation - Cliquez pour réessayer",
-    "description": "Tooltip for sync error status"
-  },
-  "message_sync_off": {
-    "message": "Désactivé",
-    "description": "Label for sync off status"
-  },
-  "message_sync_na": {
-    "message": "N/A",
-    "description": "Label for sync not available status"
-  },
-  "message_sync_init": {
-    "message": "Init",
-    "description": "Label for sync initializing status"
-  },
-  "message_sync_on": {
-    "message": "Activé",
-    "description": "Label for sync on status"
-  },
-  "message_sync": {
-    "message": "Synchronisation",
-    "description": "Label for sync status"
-  },
-  "message_syncing": {
-    "message": "Synchronisation...",
-    "description": "Label for syncing status"
-  },
-  "message_synced": {
-    "message": "Synchronisé",
-    "description": "Label for synced status"
-  },
-  "message_sync_now": {
-    "message": "Synchroniser maintenant",
-    "description": "Button label for sync now"
-  },
-  "message_full_sync": {
-    "message": "Synchronisation complète",
-    "description": "Button label for full sync"
-  },
-  "message_syncing_status": {
-    "message": "Synchronisation...",
-    "description": "Status text for syncing"
-  },
-  "message_synced_status": {
-    "message": "Synchronisé",
-    "description": "Status text for synced"
-  },
-  "message_never": {
-    "message": "Jamais",
-    "description": "Label for never synced"
-  },
-  "message_just_now": {
-    "message": "À l'instant",
-    "description": "Label for just now sync time"
-  },
-  "message_minutes_ago": {
-    "message": "il y a {MINUTES}m",
-    "description": "Label for minutes ago sync time"
-  },
-  "message_hours_ago": {
-    "message": "il y a {HOURS}h",
-    "description": "Label for hours ago sync time"
-  },
-  "message_days_ago": {
-    "message": "il y a {DAYS}j",
-    "description": "Label for days ago sync time"
-  },
-  "message_firefox_sync_not_available": {
-    "message": "Firefox Sync n'est pas disponible. Veuillez activer Firefox Sync dans les paramètres de votre navigateur.",
-    "description": "Error message when Firefox Sync is not available"
-  },
-  "message_failed_to_enable_sync": {
-    "message": "Échec de l'activation de la synchronisation. Veuillez vérifier vos paramètres Firefox Sync.",
-    "description": "Error message when enabling sync fails"
-  },
-  "message_failed_to_disable_sync": {
-    "message": "Échec de la désactivation de la synchronisation.",
-    "description": "Error message when disabling sync fails"
-  },
-  "message_sync_currently_disabled": {
-    "message": "La synchronisation est actuellement désactivée.",
-    "description": "Error message when sync is currently disabled"
-  },
-  "message_full_sync_initiated": {
-    "message": "Synchronisation complète lancée... Cela peut prendre un moment.",
-    "description": "Message when full sync is initiated"
-  },
   "settings_convert_history": {
     "message": "Convertir l’historique YouTube",
     "description": "Button label to open the community converter tool"
@@ -239,4 +127,4 @@
     "message": "Erreur inconnue",
     "description": "Fallback for unknown error details"
   }
-} 
+}

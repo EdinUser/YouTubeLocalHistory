@@ -12,14 +12,12 @@ Quick answers about the privacy-first YouTube history extension that keeps progr
 - Log out completely and still keep your viewing history
 - **Perfect for multi-account users!**
 
-![Extension interface showing consistent history](./images/ytrw_videos.jpg)
-*Your viewing history works the same across all accounts*
 
 ### Q: Can I use this without a YouTube account?
 **A:** YES! This is one of our biggest advantages:
 - No YouTube login required
 - No Google account needed  
-- Watch YouTube completely anonymously
+- Watch YouTube without signing in, while still keeping local history
 - Still get full history tracking and progress saving
 - Perfect for privacy-conscious users
 
@@ -44,9 +42,12 @@ The extension will start working immediately - no setup required!
 
 ### Q: How do I see my watch history?
 **A:** Click the extension icon in your browser's toolbar (looks like a play button). You'll see tabs for:
-- **Videos**: Your regular YouTube videos
+- **Home**: Local recommendations from subscribed channels
+- **Subscriptions**: Latest uploads from locally subscribed channels
 - **Shorts**: YouTube Shorts you've watched
-- **Playlists**: Playlists you've discovered
+- **Playlists**: Local playlists you create and manage
+- **History**: Your regular YouTube videos
+- **Channels**: Channels you subscribed to locally
 - **Analytics**: Charts showing your viewing patterns
 
 ### Q: Why don't I see the "viewed" label on videos?
@@ -69,7 +70,7 @@ The extension will start working immediately - no setup required!
 ### Q: The extension isn't working, what should I do?
 **A:** Try these steps in order:
 1. **Refresh the YouTube page** - this fixes 90% of issues
-2. **Close and reopen the extension popup**
+2. **Close and reopen the extension popup or refresh the feed page**
 3. **Check if you're on youtube.com** (not mobile YouTube or YouTube TV)
 4. **Disable and re-enable the extension**
 5. **Restart your browser**
@@ -80,7 +81,7 @@ The extension will start working immediately - no setup required!
 - You cleared your browser data
 - You're using incognito/private browsing mode
 
-Check the extension popup - your history should still be there.
+Check the extension popup or feed page - your history should still be there.
 
 ### Q: Videos aren't saving automatically
 **A:** Make sure:
@@ -92,9 +93,9 @@ Check the extension popup - your history should still be there.
 
 ## 📱 Features & Functionality
 
-### Q: What's the difference between Videos and Shorts tabs?
+### Q: What's the difference between History and Shorts tabs?
 **A:** 
-- **Videos Tab**: Regular YouTube videos (usually longer content)
+- **History view**: Regular YouTube videos (usually longer content)
 - **Shorts Tab**: YouTube Shorts (vertical videos under 60 seconds)
 - They're separated to help you track different types of content
 
@@ -108,7 +109,7 @@ Check the extension popup - your history should still be there.
 - Completion bar chart for long videos (skipped, partial, completed, with legend)
 
 ### Q: Can I search through my history?
-**A:** Yes! Use the search box at the top of the Videos tab to find specific videos by title.
+**A:** Yes! Use the search box in the History tab to find specific videos by title.
 
 ### Q: Can I delete individual videos from my history?
 **A:** Yes, click the "Delete" button next to any video to remove it from your history.
@@ -141,15 +142,15 @@ This solves the common problem where deleted videos would reappear in searches.
 **A:** YES! This is one of our biggest advantages:
 - No YouTube login required
 - No Google account needed  
-- Watch YouTube completely anonymously
+- Watch YouTube without signing in, while still keeping local history
 - Still get full history tracking and progress saving
 - Perfect for privacy-conscious users
 
 ### Q: How is this different from YouTube's built-in history?
 **A:** More convenient AND your history stays private:
 - **YouTube's history**: Stored on Google's servers, tied to your account, used for ads/recommendations, **inaccessible when you switch accounts**
-- **YT re:Watch**: Stored only on your device, history data stays private, Google doesn't get your progress, **works across ALL accounts**
-- Google doesn't get your viewing progress data!
+- **YT re:Watch**: Stored only on your device, history data stays in your browser profile, **works across ALL accounts**
+- YT re:Watch does not upload saved viewing progress to an extension-owned server.
 - Never lose your progress when switching between accounts!
 
 ### Q: Is my viewing history private?
@@ -158,11 +159,11 @@ This solves the common problem where deleted videos would reappear in searches.
 - We don't collect, see, or store any of your history information
 - No external servers are involved in history tracking
 - Your viewing progress is yours alone
-- Google doesn't get your progress data
+- YT re:Watch does not send your saved progress to an extension-owned server
 - Even we can't access your history data
 
 ### Q: Can I backup my data?
-**A:** Yes! Go to Settings tab and click "Export History" to download a backup file. You can import it later if needed.
+**A:** Yes! Go to Settings and use **Backup** to download a JSON backup file. You can restore it later if needed.
 
 ### Q: Does this affect my YouTube recommendations?
 **A:** No, this extension doesn't interact with YouTube's recommendation system at all. Your private viewing stays private!
@@ -174,8 +175,6 @@ This solves the common problem where deleted videos would reappear in searches.
 - Learning about subjects privately
 - Medical research without health profiling
 
-![Analytics showing private viewing patterns](./images/ytrw_stats3.jpg)
-*Track your research privately - no Google profiling*
 
 ### Q: Does this extension block ALL Google tracking?
 **A:** ⚠️ **NO - Important limitation to understand:**
@@ -208,9 +207,9 @@ This solves the common problem where deleted videos would reappear in searches.
 
 ### Q: Can I transfer my history between devices?
 **A:** Yes! Use the export/import feature to manually transfer your history between devices. There is **no automatic cloud sync** – export/import is the official way to move your data:
-1. Go to Settings tab → Data Management → Export History
+1. Go to Settings → Data Management → Backup
 2. Download the JSON file to your computer
-3. On the other device, go to Settings → Import History
+3. On the other device, go to Settings → Restore
 4. Select the JSON file and choose "Merge" or "Replace"
 
 ### Q: How much data can the extension store?
@@ -237,8 +236,6 @@ This solves the common problem where deleted videos would reappear in searches.
 ### Q: Can I customize the visual overlays?
 **A:** Yes! The overlays are fully customizable. In the Settings tab, you can change:
 
-![YouTube overlay showing viewed videos](./images/ytrw_overlay.jpg)
-*Example of overlay customization - change colors, text, and size*
 
 - **Overlay Title**: Change "viewed" to any text you prefer (max 12 characters)
 - **Overlay Color**: Choose from blue, red, green, purple, or orange
@@ -247,8 +244,7 @@ This solves the common problem where deleted videos would reappear in searches.
 
 ### Q: How do I switch between light and dark theme?
 **A:** 
-- **Quick way**: Click the theme button in the extension popup
-- **Settings way**: Go to Settings tab and choose your preferred theme
+- **Settings way**: Go to Settings and choose your preferred theme
 
 ### Q: Can I hide the progress bars?
 **A:** The extension is designed to be minimal and non-intrusive. You can make the labels smaller in Settings, but they can't be completely hidden since that's the main feature.

@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
+    <meta charset="utf-8">
     <title data-i18n="popup_title">YT re:Watch</title>
+    <script src="popup-preload.js"></script>
     <style>
         :root {
             /* Light theme (default) */
@@ -60,7 +62,9 @@
             font-family: Arial, sans-serif;
             padding: 10px;
             width: 600px;
+            min-height: 340px;
             max-height: 500px;
+            box-sizing: border-box;
             overflow-y: auto;
             background-color: var(--bg-color);
             color: var(--text-color);
@@ -101,6 +105,19 @@
             color: var(--link-hover-color);
             text-decoration: underline;
         }
+        .video-thumbnail-wrap {
+            position: relative; flex: 0 0 auto;
+        }
+        .video-progress-track {
+            position: absolute; left: 0; right: 0; bottom: 0;
+            height: 4px; overflow: hidden;
+            background: rgba(255,255,255,.25);
+            border-radius: 0 0 4px 4px;
+        }
+        .video-progress-fill {
+            display: block; height: 100%; width: 0;
+            background: var(--button-bg);
+        }
 
         /* Progress cell styles */
         td:nth-child(2) {
@@ -130,14 +147,14 @@
         }
         button {
             padding: 10px;
-            background-color: #d9534f;
-            color: white;
+            background-color: var(--button-bg);
+            color: var(--button-text);
             border: none;
             cursor: pointer;
             margin: 5px;
         }
         button:hover {
-            background-color: #c9302c;
+            background-color: var(--button-hover);
         }
         .message {
             margin-top: 10px;
@@ -198,12 +215,41 @@
         }
 
         .danger-button {
-            background-color: var(--button-bg);
+            background-color: #d9534f;
             color: var(--button-text);
         }
 
         .danger-button:hover {
-            background-color: var(--button-hover);
+            background-color: #c9302c;
+        }
+
+        /* Primary call-to-action button (e.g. "Open feed"). */
+        .primary-button {
+            background-color: var(--link-color);
+            color: #fff;
+            border-color: var(--link-color);
+        }
+
+        .primary-button:hover {
+            background-color: var(--link-hover-color);
+            opacity: 1;
+        }
+
+        /* Shared header row for the Subs / Watch Later tabs. */
+        .tab-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0 12px 0;
+        }
+
+        .tab-toolbar .count {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+
+        .tab-toolbar .spacer {
+            margin-left: auto;
         }
 
         /* Specific button styling */
@@ -248,77 +294,6 @@
             background-color: var(--hover-bg);
         }
 
-        /* Sync indicator styles */
-        .sync-indicator {
-            display: flex !important;
-            align-items: center;
-            gap: 6px;
-            padding: 8px;
-            border-radius: 4px;
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            font-size: 12px;
-            min-width: 80px;
-            justify-content: center;
-            transition: all 0.2s;
-            cursor: pointer;
-            visibility: visible !important;
-            opacity: 1 !important;
-        }
-
-        .sync-icon {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            transition: all 0.2s;
-        }
-
-        .sync-disabled .sync-icon {
-            background-color: #999;
-        }
-
-        .sync-not_available .sync-icon {
-            background-color: #999;
-            opacity: 0.5;
-        }
-
-        .sync-initializing .sync-icon {
-            background-color: #ffa500;
-            animation: pulse 1.5s infinite;
-        }
-
-        .sync-syncing .sync-icon {
-            background-color: #007bff;
-            animation: spin 1s linear infinite;
-        }
-
-        .sync-success .sync-icon {
-            background-color: #28a745;
-        }
-
-        .sync-error .sync-icon {
-            background-color: #dc3545;
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .sync-indicator:hover {
-            background-color: var(--hover-bg);
-        }
-
-        .sync-text {
-            font-weight: 500;
-            color: var(--text-color);
-        }
         .timestamp {
             color: var(--text-color);
             opacity: 0.8;
@@ -334,6 +309,10 @@
             display: flex;
             gap: 8px;
             margin-bottom: 10px;
+        }
+        .tab-bar .tab {
+            flex: 1 1 0;
+            border-radius: 8px;
         }
         .tab {
             padding: 8px 18px;
@@ -401,14 +380,40 @@
         .settings-group select {
             width: 100%;
             padding: 8px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--input-border);
             border-radius: 4px;
             margin-bottom: 5px;
+            background: var(--input-bg);
+            color: var(--text-color);
         }
         .settings-group .help-text {
             font-size: 0.9em;
-            color: #666;
+            color: var(--text-color);
+            opacity: 0.7;
             margin-top: 5px;
+        }
+        /* Checkbox settings: put the box and its label on one line (instead of the
+           label stacked above a lone checkbox), with the help text underneath. */
+        .settings-group:has(input[type="checkbox"]) {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: center;
+            column-gap: 8px;
+        }
+        .settings-group:has(input[type="checkbox"]) input[type="checkbox"] {
+            order: 1;
+            width: 16px;
+            height: 16px;
+            margin: 0;
+        }
+        .settings-group:has(input[type="checkbox"]) label {
+            order: 2;
+            margin-bottom: 0;
+        }
+        .settings-group:has(input[type="checkbox"]) .help-text {
+            order: 3;
+            grid-column: 1 / -1;
+            margin-top: 4px;
         }
         .color-preview {
             width: 20px;
@@ -797,9 +802,9 @@
 
         /* Delete button styles */
         .delete-button {
-            padding: 4px 8px;
-            font-size: 12px;
-            background-color: var(--button-bg);
+            width: 30px; height: 30px; padding: 0;
+            font-size: 0;
+            background-color: #d9534f;
             color: var(--button-text);
             border: none;
             border-radius: 4px;
@@ -808,10 +813,13 @@
             align-self: center;
             margin-left: auto; /* Push to the right */
         }
+        .delete-button::before { content: "🗑"; font-size: 15px; }
 
         .delete-button:hover {
+            background-color: #c9302c;
             opacity: 0.9;
         }
+        #ytvhtPagination { display: none !important; }
 
         /* Analytics styles */
         .analytics-container {
@@ -1044,24 +1052,20 @@
     <h1 data-i18n="popup_title">YT re:Watch</h1>
     <div class="controls">
         <div class="left-controls">
-            <button id="ytvhtToggleTheme" class="compact-button" data-i18n-title="theme_toggle_tooltip">
-                <span id="themeText" data-i18n="theme_toggle">Theme</span>
-            </button>
-            <button id="ytvhtClearHistory" class="compact-button danger-button" data-i18n-title="clear_tooltip" data-i18n="clear_label">Clear</button>
+            <!-- Theme is controlled from Settings → Theme (applies instantly). -->
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-            <!-- Firefox Sync disabled - redundant with hybrid storage architecture -->
-            <!-- <div id="ytvhtSyncIndicator" class="sync-indicator sync-disabled" data-i18n-title="sync_status_tooltip">
-                <div class="sync-icon"></div>
-                <span class="sync-text" data-i18n="sync_status">Sync</span>
-            </div> -->
+            <button id="ytvhtOpenFeed" class="compact-button primary-button" data-i18n-title="subscriptions_open_feed" title="Open feed">
+                <span aria-hidden="true">📺</span>
+                <span data-i18n="subscriptions_open_feed">Open feed</span>
+            </button>
             <button id="ytvhtClosePopup" class="compact-button" data-i18n="close_label">Close</button>
         </div>
     </div>
     <div id="ytvhtMessage" class="message"></div>
 
     <!-- Global Search Container -->
-    <div class="global-search-container">
+    <div class="global-search-container" style="display:none;">
         <div class="search-input-wrapper">
             <input type="text" id="ytvhtGlobalSearchInput" class="search-input" data-i18n-placeholder="global_search_placeholder" placeholder="Search all content..." />
             <button id="ytvhtSearchClear" class="search-clear-btn" style="display: none;" title="Clear search">&times;</button>
@@ -1069,11 +1073,12 @@
     </div>
 
     <div class="tab-bar">
-        <button id="ytvhtTabVideos" class="tab" data-i18n="tab_videos">Videos</button>
-        <button id="ytvhtTabShorts" class="tab" data-i18n="tab_shorts">Shorts</button>
-        <button id="ytvhtTabPlaylists" class="tab" data-i18n="tab_playlists">Playlists</button>
-        <button id="ytvhtTabAnalytics" class="tab" data-i18n="tab_analytics">Analytics</button>
-        <button id="ytvhtTabSettings" class="tab" data-i18n="tab_settings">Settings</button>
+        <button id="ytvhtTabVideos" class="tab">Continue watching</button>
+        <button id="ytvhtTabWatchlater" class="tab">Watch Later</button>
+        <button id="ytvhtTabShorts" class="tab" style="display:none;">Shorts</button>
+        <button id="ytvhtTabPlaylists" class="tab" style="display:none;">Playlists</button>
+        <button id="ytvhtTabSubscriptions" class="tab" style="display:none;">Channels</button>
+        <button id="ytvhtTabAnalytics" class="tab" style="display:none;">Analytics</button>
     </div>
 
     <!-- Analytics Tab Container -->
@@ -1151,7 +1156,7 @@
             </tbody>
         </table>
         <div id="ytvhtNoHistory" class="no-history" data-i18n="videos_no_history" style="display: none;">
-            No history found. Start watching some videos!
+            No unfinished videos. Start a video and it will appear here.
         </div>
         <!-- Add Videos Pagination Controls -->
         <div id="ytvhtPagination" style="display:none; justify-content:center; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;">
@@ -1213,6 +1218,40 @@
         </div>
     </div>
 
+    <!-- Subscriptions Tab Container -->
+    <div id="ytvhtSubscriptionsContainer" style="display:none;">
+        <div class="tab-toolbar" style="padding-right:4px;">
+            <span id="ytvhtSubsCount" class="count"></span>
+            <span class="spacer"></span>
+            <button id="ytvhtClearSubs" class="compact-button" data-i18n="subscriptions_clear_all">Clear all</button>
+        </div>
+        <table class="history-table" id="ytvhtSubscriptionsTable">
+            <tbody id="ytvhtSubscriptionsBody">
+                <!-- Subscription items will be inserted here -->
+            </tbody>
+        </table>
+        <div id="ytvhtNoSubscriptions" class="no-history" data-i18n="subscriptions_no_subs" style="display: none;">
+            No local subscriptions yet. Search in the extension and use Subscribe.
+        </div>
+    </div>
+
+    <!-- Watch Later Tab Container -->
+    <div id="ytvhtWatchlaterContainer" style="display:none;">
+        <div class="tab-toolbar">
+            <span id="ytvhtWatchlaterCount" class="count"></span>
+            <span class="spacer"></span>
+            <button id="ytvhtClearWatchlater" class="compact-button" data-i18n="watchlater_clear_all">Clear all</button>
+        </div>
+        <table class="history-table" id="ytvhtWatchlaterTable">
+            <tbody id="ytvhtWatchlaterBody">
+                <!-- Watch Later items will be inserted here -->
+            </tbody>
+        </table>
+        <div id="ytvhtNoWatchlater" class="no-history" data-i18n="watchlater_empty" style="display: none;">
+            Nothing saved yet. On YouTube, right-click a video and choose "Save to Watch Later (local)".
+        </div>
+    </div>
+
     <!-- Settings Tab Container -->
     <div id="ytvhtSettingsContainer" style="display:none;">
         <div class="settings-form">
@@ -1264,47 +1303,54 @@
                     </div>
                 </div>
                 <div class="settings-column">
-                    <h3 data-i18n="settings_data_sync">Data & Sync</h3>
+                    <h3 data-i18n="settings_data_sync">Data</h3>
                     <div class="settings-group">
                         <label for="ytvhtPauseHistoryInPlaylists" data-i18n="settings_pause_in_playlists_label">Pause history in playlists</label>
                         <input type="checkbox" id="ytvhtPauseHistoryInPlaylists">
                         <div class="help-text" data-i18n="settings_pause_in_playlists_help">When playing from a playlist, don't save video progress</div>
                     </div>
                     <div class="settings-group">
-                        <label data-i18n="settings_data_management_label">Data Management</label>
+                        <label data-i18n="settings_data_label">Data</label>
                         <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
                             <button id="ytvhtExportHistory" class="compact-button" data-i18n="settings_export">Export</button>
-                            <button id="ytvhtImportHistory" class="compact-button" data-i18n="settings_import">Import</button>
-                            <button id="ytvhtConvertHistory" class="compact-button" data-i18n="settings_convert_history">Convert</button>
+                            <button id="ytvhtImportHistory" class="compact-button" data-i18n="settings_import_history">Import History</button>
+                            <button id="ytvhtImportSubscriptions" class="compact-button" data-i18n="settings_import_subs">Import Subscriptions</button>
+                            <button id="ytvhtClearHistory" class="compact-button danger-button" data-i18n-title="clear_tooltip" data-i18n="clear_label">Clear</button>
                         </div>
-                        <div class="help-text" data-i18n="settings_export_help">Export your history data (Import coming soon)</div>
-                        <div class="help-text" data-i18n="settings_convert_history_help">Use the community tool to convert Google Takeout watch-history.json into an importable file.</div>
+                        <div class="help-text" data-i18n="settings_import_history_help">Import History accepts YouTube / Google Takeout watch history (.html).</div>
+                        <div class="help-text" data-i18n="settings_import_subs_help">Import Subscriptions accepts YouTube's subscriptions export (.csv).</div>
+                        <div class="help-text" data-i18n="settings_clear_help">Clear removes all saved video history (this cannot be undone)</div>
                     </div>
                     <div class="settings-group">
                         <label for="ytvhtAutoCleanPeriod" data-i18n="settings_auto_clean_label">Auto-clean Period</label>
                         <select id="ytvhtAutoCleanPeriod">
                             <option value="30">30 days</option>
-                            <option value="90" selected>90 days</option>
+                            <option value="90">90 days</option>
                             <option value="180">180 days</option>
-                            <option value="forever">Keep forever</option>
+                            <option value="forever" selected>Keep forever</option>
                         </select>
                         <div class="help-text" data-i18n="settings_auto_clean_help">Automatically remove history older than selected period</div>
                     </div>
-                    <!-- Firefox Sync disabled - redundant with hybrid storage architecture -->
-                    <!-- <div class="settings-group">
-                        <label for="ytvhtSyncEnabled" data-i18n="settings_sync_label">Firefox Sync</label>
-                        <input type="checkbox" id="ytvhtSyncEnabled">
-                        <div class="help-text" data-i18n="settings_sync_help">Sync your data across browser instances (Firefox only)</div>
+                    <div class="settings-group">
+                        <label for="ytvhtLocalFeedEnabled" data-i18n="settings_local_feed_label">Local subscriptions feed</label>
+                        <input type="checkbox" id="ytvhtLocalFeedEnabled">
+                        <div class="help-text" data-i18n="settings_local_feed_help">Show a feed of your locally subscribed channels on the YouTube home page</div>
                     </div>
                     <div class="settings-group">
-                        <label data-i18n="settings_last_sync_label">Last Sync</label>
-                        <div id="ytvhtLastSyncTime" class="version-text" data-i18n="message_never">Never</div>
-                        <div class="help-text">
-                            <button id="ytvhtTriggerSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; margin-right: 4px;" disabled data-i18n="settings_sync_now">Sync Now</button>
-                            <button id="ytvhtTriggerFullSync" style="padding: 4px 8px; font-size: 12px; margin-top: 4px; background-color: #007bff;" disabled data-i18n="settings_full_sync">Full Sync</button>
-                            <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;" data-i18n="settings_full_sync_help">Full Sync cleans old data and re-syncs everything</div>
-                        </div>
-                    </div> -->
+                        <label for="ytvhtHideAccountUI" data-i18n="settings_hide_account_label">Hide login & account UI</label>
+                        <input type="checkbox" id="ytvhtHideAccountUI">
+                        <div class="help-text" data-i18n="settings_hide_account_help">Hide YouTube's sign-in buttons, account menu, and native Subscribe/Join buttons (your local Subscribe stays).</div>
+                    </div>
+                    <div class="settings-group">
+                        <label for="ytvhtHideRecommendations" data-i18n="settings_hide_recs_label">Hide recommendations &amp; popups</label>
+                        <input type="checkbox" id="ytvhtHideRecommendations">
+                        <div class="help-text" data-i18n="settings_hide_recs_help">Hide YouTube's home recommendations and the "history is off / recommendations" nag popups, leaving only your local feed.</div>
+                    </div>
+                    <div class="settings-group">
+                        <label for="ytvhtFeedRefreshMinutes" data-i18n="settings_feed_refresh_label">Feed refresh interval (minutes)</label>
+                        <input type="number" id="ytvhtFeedRefreshMinutes" min="5" max="1440" value="60">
+                        <div class="help-text" data-i18n="settings_feed_refresh_help">How often the local feed checks subscribed channels for new uploads</div>
+                    </div>
                     <div class="settings-group">
                         <label for="ytvhtDebugMode" data-i18n="settings_debug_label">Debug Mode</label>
                         <input type="checkbox" id="ytvhtDebugMode">
@@ -1333,8 +1379,22 @@
     </div>
     <script src="indexeddb-storage.js"></script>
     <script src="storage.js"></script>
-
+    <script src="popup-core.js"></script>
+    <script src="popup-utils.js"></script>
+    <script src="popup-import.js"></script>
+    <script src="popup-settings.js"></script>
+    <script src="popup-search.js"></script>
+    <script src="popup-data-pages.js"></script>
+    <script src="popup-history-display.js"></script>
+    <script src="popup-video-pagination.js"></script>
+    <script src="popup-analytics-core.js"></script>
+    <script src="popup-analytics-charts.js"></script>
+    <script src="popup-analytics-extra.js"></script>
+    <script src="popup-playlists.js"></script>
+    <script src="popup-subscriptions.js"></script>
+    <script src="popup-theme.js"></script>
+    <script src="popup-shorts.js"></script>
+    <script src="popup-localization.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>
-

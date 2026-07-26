@@ -55,14 +55,6 @@
     "message": "Schließen",
     "description": "Button label for closing the popup"
   },
-  "sync_status": {
-    "message": "Sync",
-    "description": "Label for sync status indicator"
-  },
-  "sync_status_tooltip": {
-    "message": "Sync-Status",
-    "description": "Tooltip for sync status indicator"
-  },
   "instructions_script_disabled_title": {
     "message": "Skriptausführung deaktiviert",
     "description": "Title for script execution disabled instructions"
@@ -167,24 +159,8 @@
     "message": "Playlist wird verfolgt",
     "description": "Toast when ignore is disabled"
   },
-  "content_toggle_pause": {
-    "message": "re:Watch — Klicken, um Verlauf zu pausieren",
-    "description": "Button text when tracking is active"
-  },
-  "content_toggle_paused": {
-    "message": "re:Watch — Verlauf pausiert. Klicken zum Aktivieren",
-    "description": "Button text when tracking is paused"
-  },
-  "content_toggle_pause_title": {
-    "message": "re:Watch — Klicken, um den Verlauf für diese Playlist zu pausieren",
-    "description": "Tooltip when tracking is active"
-  },
-  "content_toggle_paused_title": {
-    "message": "re:Watch — Verlauf für diese Playlist pausiert. Klicken zum Aktivieren",
-    "description": "Tooltip when tracking is paused"
-  },
   "global_search_placeholder": {
     "message": "Alle Inhalte durchsuchen...",
     "description": "Placeholder text for the global search input"
   }
-} 
+}

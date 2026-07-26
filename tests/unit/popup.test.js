@@ -126,9 +126,14 @@ if (!global.window) {
 // Import mocks
 jest.mock('../../src/content.js');
 
+global.EXTENSION_VERSION = chrome.runtime.getManifest().version;
+require('../../src/popup-utils.js');
+require('../../src/popup-import.js');
+require('../../src/popup-history-display.js');
+
 // Load the real popup module once so its free functions/global helpers are registered
 require('../../src/popup.js');
-const popup = global; // popup.js attaches helpers like exportHistory/addTimestampToUrl to window/global
+const popup = { ...global, ...window }; // popup helpers attach to both window and globalThis across modules
 const contentModule = require('../../src/content.js');
 
 describe('Popup Functionality', () => {

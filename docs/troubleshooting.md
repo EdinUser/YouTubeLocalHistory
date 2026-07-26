@@ -14,7 +14,7 @@ This fixes 90% of all issues by clearing cached content and reloading the extens
 
 ### 2. Restart Extension
 1. Click the extension icon in your browser toolbar
-2. Close the popup completely
+2. Close the popup or feed page completely
 3. Click the extension icon again to reopen
 
 ### 3. Check Browser Compatibility
@@ -87,10 +87,10 @@ This fixes 90% of all issues by clearing cached content and reloading the extens
 ### History Display Problems
 
 #### History Tab Empty or Missing Videos
-**Symptoms**: Extension popup shows no history or missing videos
+**Symptoms**: Extension feed or popup shows no history or missing videos
 
 **Solutions**:
-1. **Refresh extension popup**: Close and reopen the extension
+1. **Refresh the extension UI**: Refresh the feed page or close and reopen the popup
 2. **Check storage quota**: Extension has 5GB+ storage limit
 3. **Browser data clearing**: If you cleared browser data, history is lost
 4. **Incognito mode**: Extension doesn't work in private browsing
@@ -119,10 +119,10 @@ This fixes 90% of all issues by clearing cached content and reloading the extens
 ### Performance Issues
 
 #### Extension Slow or Unresponsive
-**Symptoms**: Extension popup slow to open, videos slow to track
+**Symptoms**: Extension feed or popup slow to open, videos slow to track
 
 **Solutions**:
-1. **Clear extension data**: Go to extension settings > Advanced > Reset Data
+1. **Backup first**: Go to Settings > Data Management and download a backup before clearing data
 2. **Browser restart**: Complete restart frees up memory
 3. **Check storage usage**: Large history can slow down the extension
 4. **Disable unused features**: Turn off features you don't need
@@ -141,7 +141,7 @@ This fixes 90% of all issues by clearing cached content and reloading the extens
 Enable debug mode for detailed logging to help troubleshoot complex issues:
 
 ### Enable Debug Mode
-1. Open YT re:Watch extension popup
+1. Open the YT re:Watch feed page
 2. Go to **Settings** tab
 3. Enable **"Debug Mode"**
 4. Check browser console for detailed logs
@@ -149,7 +149,7 @@ Enable debug mode for detailed logging to help troubleshoot complex issues:
 ### Debug Information to Include in Bug Reports
 When reporting issues, include:
 - **Browser and version** (Chrome 120.0, Firefox 119.0)
-- **Extension version** (visible in extension popup)
+- **Extension version** (visible in the extension UI or browser add-on details)
 - **Operating system** (Windows 11, macOS 14.0, Ubuntu 22.04)
 - **Steps to reproduce** the issue
 - **Expected vs actual behavior**
@@ -170,7 +170,7 @@ When reporting issues, include:
 
 ### Emergency Fixes
 If nothing works:
-1. **Reset extension data**: Go to Settings > Advanced > Reset Data (loses all history)
+1. **Reset extension data**: Use your browser's extension storage controls only after exporting a backup (this loses local data)
 2. **Reinstall extension**: Remove and reinstall YT re:Watch
 3. **Check for updates**: Ensure you have the latest version
 

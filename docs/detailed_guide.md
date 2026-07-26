@@ -48,25 +48,28 @@ Your step-by-step guide to a privacy-first YouTube history extension that keeps 
 - **Ad blocker** (block tracking scripts)
 - **Privacy browser** (Firefox with strict settings, or Brave)
 
-YT re:Watch stops YouTube from getting your viewing progress data, but Google still knows you visited their site.
+YT re:Watch keeps its saved viewing progress in extension storage, but Google/YouTube can still see normal YouTube page requests when you browse the site.
 
-### Step 3: View Your History
+### Step 3: Open Your Local Feed and History
 1. Click the YT re:Watch icon in your browser toolbar
-2. You'll see your watched videos with progress indicators
-3. Explore the different tabs to see all features
+2. Use the quick actions or open the full feed page
+3. Explore Home, Subscriptions, Shorts, Playlists, History, Channels, Analytics, and Settings
 
 ---
 
 ## 🎯 Understanding the Interface
 
-### Extension Popup Overview
-When you click the extension icon, you'll see 5 tabs:
+### Extension Interface Overview
+The extension icon opens quick actions, while the full feed page contains the main tabs:
 
 | Tab | What It Shows |
 |-----|---------------|
-| **Videos** | Regular YouTube videos you've watched |
+| **Home** | Local recommendations from subscribed channels |
+| **Subscriptions** | Latest videos from locally subscribed channels |
 | **Shorts** | YouTube Shorts you've watched |
-| **Playlists** | Playlists you've discovered |
+| **Playlists** | Local playlists you create and manage |
+| **History** | Regular YouTube videos you've watched |
+| **Channels** | Channels you subscribed to locally |
 | **Analytics** | Charts and statistics about your viewing |
 | **Settings** | Customization options |
 
@@ -76,24 +79,18 @@ After watching videos, you'll notice:
 - **Progress bar**: Shows how much of the video you've watched
 - **Percentage indicator**: Shows completion percentage (e.g., "75%")
 
-### Videos Tab (Your Main History)
+### History Tab (Your Main History)
 
-![Videos tab interface](./images/ytrw_videos.jpg)
-*The Videos tab shows your complete YouTube watch history, with progress, search, and delete options.*
   
 Your history list shows the channel name under each video title to help you scan quickly.
 
 ### 🎬 Shorts Tab (YouTube Shorts)
 
-![Shorts tab interface](./images/ytrw_shorts.jpg)
-*The Shorts tab tracks your YouTube Shorts viewing separately, helping you understand your short-form content habits.*
   
 Shorts saves are now more reliable: the save cadence is 5 seconds and duration checks are relaxed to avoid missed saves.
 
 ### 📝 Playlists Tab
 
-![Playlists tab interface](./images/ytrw_playlists.jpg)
-*The Playlists tab lists all playlists you've discovered, with quick access and management options.*
 
 **Playlist Controls:**
 - **Ignore videos (per‑playlist toggle):** When enabled for a specific playlist, YT re:Watch will not save watch progress for videos watched while viewing that playlist.
@@ -123,17 +120,9 @@ Shorts saves are now more reliable: the save cadence is 5 seconds and duration c
 - Each bar shows the count of long videos that were skipped, partially watched, or completed
 - The legend to the right shows the color, label, and percentage for each segment
 
-![Analytics dashboard summary and top channels](./images/ytrw_stats1.jpg)
-*Summary cards and top channels in the Analytics tab.*
 
-![Analytics completion bar and unfinished videos](./images/ytrw_stats2.jpg)
-*Completion bar chart, unfinished videos, and skipped channels.*
 
-![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
-*Watch activity by day and by hour in the Analytics tab.*
 
-![Analytics detailed view](./images/ytrw_stats4.jpg)
-*Additional analytics showing watch time patterns and channel statistics*
   
 These charts now prefer locally persisted, privacy‑preserving statistics for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets.
 
@@ -144,7 +133,7 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
   - *System*: Follows your computer's theme
   - *Light*: Always use light theme
   - *Dark*: Always use dark theme
-- **Quick toggle**: Click the theme button in the popup header to switch between light and dark modes instantly.
+- **System default**: Choose System to follow your computer's theme automatically.
 
 **Overlay Customization:**
 - **Overlay Title**: Text shown on video thumbnails (max 12 characters)
@@ -162,13 +151,13 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 **Data Management:**
 - **Auto-clean Period**: Automatically remove old history
   - Range: 1–180 days, or **Forever** to keep all history without age-based cleanup
-  - Default: 90 days
+  - Default: Forever
   - Helps keep your history manageable while still allowing "forever history" if desired
 - **Items per Page**: How many videos to show per page
   - Range: 5-20 items
   - Larger numbers = less scrolling, smaller numbers = faster loading
--- **Export History**: Back up your data to a file
--- **Import History**: Restore or merge data from a backup
+- **Backup**: Back up all local data to a JSON file
+- **Restore**: Restore or merge data from a backup
 -- **Robust Deletion System**: Deleted videos stay deleted with tombstone protection
   - Videos deleted from history use tombstone protection so they don't reappear from archives or imports
   - 30-day protection period ensures deletions persist across migrations and imports
@@ -176,8 +165,8 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
  - **Persistent Statistics**: Analytics use a local stats snapshot (total, last 7 daily totals, 24 hourly totals). Seeded from your existing history after upgrade.
 
 **Data Management:**
-- **Export History**: Download complete history as JSON backup
-- **Import History**: Restore data from backup files (Merge or Replace modes)
+- **Backup**: Download a complete JSON backup
+- **Restore**: Restore data from backup files
 - **Migration Status**: Monitor hybrid storage migration progress
 - **Cross-device usage**: There is **no automatic sync** – use Export/Import to move history between browsers or devices manually
 
@@ -185,35 +174,29 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 - **Debug Mode**: Enable detailed logging for troubleshooting
 - **Version Info**: Shows current extension version
 
-![Settings tab interface](./images/ytrw_settings.jpg)
-*Customize your experience in the Settings tab, including theme, overlays, and data management.*
 
-![Settings advanced options](./images/ytrw_settings2.jpg)
-*Additional settings for data management, privacy, and advanced features*
 
 **Playlist Settings:**
 - **Pause history in playlists (global):** When enabled, the extension does not save watch progress for videos played while you are browsing within any playlist. Use this if you generally don't want playlist sessions to affect your history.
 
 ### What You See on YouTube
 
-![YouTube overlay showing viewed videos](./images/ytrw_overlay.jpg)
-*Visual overlays on YouTube show which videos you've watched and your progress at a glance.*
 
 ---
 
 ## 🔄 Data Management & Transfer
 
 ### Exporting Your History
-1. **Open Settings**: Click the Settings tab in the extension popup
+1. **Open Settings**: Open the full feed page and click Settings
 2. **Data Management**: Scroll to the "Data Management" section
-3. **Export History**: Click the "Export History" button
+3. **Backup**: Click the "Backup" button
 4. **Download**: Your complete history will download as a JSON file
 5. **Storage**: The file includes videos, playlists, and analytics data
 
 ### Importing History to Another Device
 1. **Transfer File**: Move the exported JSON file to your other device
 2. **Open Settings**: In the extension on the target device
-3. **Import History**: Click "Import History" and select the JSON file
+3. **Restore**: Click "Restore" and select the JSON file
 4. **Choose Mode**:
    - **Merge**: Combines with existing data (recommended)
    - **Replace**: Completely replaces existing history
@@ -232,13 +215,8 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 ### Theme Customization
 
-**Quick Theme Toggle:**
-1. Click the theme button in the popup header
-2. Toggles between light and dark themes
-3. Bypasses system theme preference
-
-**Detailed Theme Settings:**
-1. Go to Settings tab
+**Theme Settings:**
+1. Go to Settings
 2. Choose "Theme Preference"
 3. Select your preferred option:
    - **System**: Matches your OS theme automatically
@@ -293,9 +271,9 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 **How to Export:**
 1. Go to Settings tab
-2. Click "Export History"
+2. Click "Backup"
 3. Choose a location to save the file
-4. File will be named: `youtube-history-[date].json`
+4. File will be named as a YT re:Watch backup JSON file
 
 ### Importing Data
 
@@ -306,7 +284,7 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 **How to Import:**
 1. Go to Settings tab
-2. Click "Import History"
+2. Click "Restore"
 3. Select your backup file
 4. Choose import mode:
    - **Merge**: Combines with existing data
@@ -339,7 +317,7 @@ The export file contains:
 - Disable other YouTube extensions temporarily
 
 **Issue: History not showing**
-- Close and reopen the extension popup
+- Refresh the feed page or close and reopen the extension popup
 - Refresh the YouTube page
 - Check if you're logged into the same browser profile
 - Try exporting and importing your data

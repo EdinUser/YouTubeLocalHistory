@@ -37,10 +37,44 @@ global.window.ytvhtExports = global.window.ytvhtExports || {};
 // Mock the functions that would be exported by content.js
 const mockGetVideoIdFromThumbnail = jest.fn((element) => {
   if (!element || !element.getAttribute) return null;
-  const href = element.getAttribute('href');
-  if (!href) return null;
-  const match = href.match(/[?&]v=([^&]+)/);
-  return match ? match[1] : null;
+  const extractVideoId = (value) => {
+    const text = String(value || '');
+    const watchMatch = text.match(/[?&]v=([^&/#]+)/);
+    if (watchMatch) return watchMatch[1];
+    const shortsMatch = text.match(/\/shorts\/([^/?#]+)/);
+    if (shortsMatch) return shortsMatch[1];
+    const imageMatch = text.match(/\/vi(?:_webp)?\/([a-zA-Z0-9_-]{11})\//);
+    return imageMatch ? imageMatch[1] : null;
+  };
+
+  const directVideoId = extractVideoId(element.href) ||
+    extractVideoId(element.getAttribute('href')) ||
+    extractVideoId(element.getAttribute('data-url')) ||
+    extractVideoId(element.getAttribute('aria-label')) ||
+    extractVideoId(element.getAttribute('title'));
+  if (directVideoId) return directVideoId;
+
+  const anchors = element.querySelectorAll?.('a') || [];
+  for (const anchor of anchors) {
+    const videoId = extractVideoId(anchor.href) ||
+      extractVideoId(anchor.getAttribute('href')) ||
+      extractVideoId(anchor.getAttribute('data-url')) ||
+      extractVideoId(anchor.getAttribute('aria-label')) ||
+      extractVideoId(anchor.getAttribute('title'));
+    if (videoId) return videoId;
+  }
+
+  const images = element.querySelectorAll?.('img') || [];
+  for (const image of images) {
+    const videoId = extractVideoId(image.currentSrc) ||
+      extractVideoId(image.src) ||
+      extractVideoId(image.srcset) ||
+      extractVideoId(image.getAttribute('src')) ||
+      extractVideoId(image.getAttribute('srcset'));
+    if (videoId) return videoId;
+  }
+
+  return null;
 });
 
 // Create a mock implementation that we can control in our tests
@@ -215,6 +249,11 @@ describe('Thumbnail Overlay System', () => {
       // Test video link with additional parameters
       const videoWithParams = createMockElement('<a id="thumbnail" href="/watch?v=video456&list=test&index=1"></a>');
       expect(getVideoIdFromThumbnail(videoWithParams)).toBe('video456');
+    });
+
+    it('should extract video ID from YouTube thumbnail image URLs', () => {
+      const element = createMockElement('<div><img src="https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/maxresdefault.webp"></div>');
+      expect(getVideoIdFromThumbnail(element)).toBe('dQw4w9WgXcQ');
     });
     
     it('should return null for elements without video ID', () => {
