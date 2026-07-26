@@ -1,14 +1,13 @@
 # 🎬 YT re:Watch — YouTube History Extension for Multi-Account Privacy
 
-![YT re:Watch](./images/hero.jpg)
-A private YouTube history extension that keeps multi-account progress in sync while staying privacy-first and local-only.
+A private YouTube history extension that keeps multi-account progress local, adds local subscriptions, and provides a YouTube-style feed inside the browser.
 
 [![Chrome Web Store](https://img.shields.io/badge/Get_it_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
 [![Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
 
 *Keep track of your YouTube journey — your data stays private on your device*
 
-YT re:Watch is a privacy-first YouTube history extension that works across multiple accounts (or no account), tracks your progress locally, and keeps your watch history independent from Google so you can resume anywhere without losing data.
+YT re:Watch is a privacy-first YouTube history extension that works across multiple accounts (or no account), tracks your progress locally, and keeps your watch history independent from your Google account so you can resume without losing data. It also includes a local feed, local channel subscriptions, playlists, history, analytics, and settings.
 
 # ❤️ Support the Project
 
@@ -34,13 +33,11 @@ YT re:Watch solves both problems with **Account Independence + YouTube History P
 - ✅ **Multi-account workflow** - perfect for work/personal account users
 
 ### 🔒 **YouTube History Privacy**
-- ✅ **Replaces YouTube's built-in history** - completely independent from Google
-- ✅ **Local storage only** - Google doesn't get your viewing progress data
-- ✅ **No history profiling** - your viewing progress stays yours
+- ✅ **Independent from YouTube's built-in history** - stored separately from your Google account
+- ✅ **Local storage only** - YT re:Watch does not upload saved progress to an app server
+- ✅ **No extension-owned history profiling** - your viewing progress stays in your browser profile
 - ✅ **Unlimited local storage** - GB-scale capacity with hybrid IndexedDB system
 
-![Extension popup showing all features](./images/ytrw_videos.jpg)
-*Your videos, your progress, your way - regardless of which account you use*
 
 ## 🚀 Get Started in 30 Seconds
 
@@ -52,7 +49,7 @@ YT re:Watch solves both problems with **Account Independence + YouTube History P
 ### Step 2: That's It!
 - Go to YouTube and start watching videos
 - The extension works automatically in the background
-- Click the extension icon to see your watch history
+- Click the extension icon for quick actions, or open the full feed page for Home, Subscriptions, Shorts, Playlists, History, Channels, Analytics, and Settings
 
 Need a deeper walkthrough? Read the [Detailed Guide](./detailed_guide.md). Quick answers live in the [FAQ](./faq.md), fixes are in [Troubleshooting](./troubleshooting.md), and release notes are in the [Changelog](../CHANGELOG.md).
 
@@ -77,8 +74,6 @@ Need a deeper walkthrough? Read the [Detailed Guide](./detailed_guide.md). Quick
 - "I want to track my video watching without Google profiling"
 - "I need consistent history for research projects"
 
-![Analytics dashboard](./images/ytrw_stats1.jpg)
-*View your video watching statistics across all accounts*
 
 ### 🙋‍♀️ **Anyone Who Wants Convenience**
 - "I watch long videos but often get interrupted"
@@ -87,15 +82,13 @@ Need a deeper walkthrough? Read the [Detailed Guide](./detailed_guide.md). Quick
 
 ## 📱 What You'll See
 
-### 🏷️ **Visual Overlays on YouTube**
-The extension adds helpful visual indicators directly on YouTube:
+### 🏷️ **Viewed Indicators**
+The extension adds helpful visual indicators inside YT re:Watch, with best-effort labels on supported YouTube thumbnail layouts:
 
-![YouTube overlay showing viewed videos](./images/ytrw_overlay.jpg)
-*Smart overlays show your progress across all accounts*
 
 - **"Viewed" labels** - See which videos you've already watched
 - **Progress bars** - Visual indicator of how much you've completed
-- **Works everywhere** - Video listings, search results, recommendations
+- **Works across the local feed** - Home, subscriptions, playlists, search, and history
 - **Fully customizable** - Change colors, text, and size in Settings
 
 **Overlay Customization Options:**
@@ -105,26 +98,16 @@ The extension adds helpful visual indicators directly on YouTube:
 - **Learn more**: [Complete customization guide](./detailed_guide.md#overlay-customization)
 
 ### 🎛️ **Extension Interface**
-**Videos Tab** - Your main viewing history:
-![Videos tab interface](./images/ytrw_videos.jpg)
+**History Tab** - Your local watch history:
   
 Your history list shows the channel name under each video title to help you scan quickly.
 
 **Shorts Tab** - Separate tracking for YouTube Shorts:
-![Shorts tab interface](./images/ytrw_shorts.jpg)
 
 **Analytics Tab** - See your viewing patterns:
-![Analytics dashboard summary and top channels](./images/ytrw_stats1.jpg)
-*Summary cards and top channels in the Analytics tab*
 
-![Analytics completion bar and unfinished videos](./images/ytrw_stats2.jpg)
-*Completion bar chart, unfinished videos, and skipped channels*
 
-![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
-*Watch activity by day and by hour in the Analytics tab*
 
-![Analytics detailed view](./images/ytrw_stats4.jpg)
-*Additional analytics showing watch time patterns and channel statistics*
   
 These charts now prefer a locally persisted, privacy‑preserving stats snapshot (rebuilt from your full hybrid history) for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets, and the activity view focuses on the last 7 local days only.
 
@@ -134,10 +117,7 @@ These charts now prefer a locally persisted, privacy‑preserving stats snapshot
 - **Completion Bar Chart**: See your completion rate for long videos (skipped, partial, completed) with a bar chart and legend
 
 **Settings Tab** - Customize everything:
-![Settings customization](./images/ytrw_settings.jpg)
 
-![Settings advanced options](./images/ytrw_settings2.jpg)
-*Additional settings for data management, privacy, and advanced features*
 
 ## 🔐 Account Independence + History Privacy = Perfect Combination
 
@@ -150,12 +130,12 @@ Traditional YouTube history is **tied to your account** - meaning:
 
 **YT re:Watch fixes ALL of this** by storing data locally on your device, not tied to any account!
 
-### 🔒 **History Privacy Bonus: Google Doesn't Get Your Progress**
-Because we store everything locally:
-- ✅ **No Google servers** involved in your history tracking
-- ✅ **No profiling** based on your viewing progress
-- ✅ **No influence** on recommendations from your progress data
-- ✅ **No progress data collection** - we literally cannot see what you watch
+### 🔒 **History Privacy Bonus: Your Saved Progress Stays Local**
+Because the extension stores its own history locally:
+- ✅ **No extension-owned server** involved in your history tracking
+- ✅ **No app-side profiling** based on your saved progress
+- ✅ **No extension sync** that sends your history to a cloud service
+- ✅ **No progress data collection by YT re:Watch** - we cannot see what you watch
 
 ### 🏠 **Your Data, Your Rules**
 - **Local storage only** - stays on your device
@@ -176,15 +156,15 @@ Because we store everything locally:
 ## 💡 Pro Tips
 
 - **Dark Mode**: The extension automatically matches your system theme
-- **Search History**: Use the search box to find specific videos
-- **Export Data**: Back up your history from the Settings tab
+- **Search**: Use the feed search for YouTube results, or search local history in the History view
+- **Export Data**: Back up all local data from the Settings tab
 - **Export/Import Data**: Manually transfer your history between devices via JSON files
 
 ## 🤝 Need Help?
 
 ### Quick Fixes
 - **Extension not working?** Refresh the YouTube page
-- **History not showing?** Close and reopen the extension popup
+- **History not showing?** Refresh the feed page or reload the extension
 - **Missing videos?** Check if you're on youtube.com (not youtube.tv or mobile)
 
 ### Get Support
@@ -196,7 +176,7 @@ Because we store everything locally:
 
 ## 📈 What's New
 
-- **v3.1.5**: Enhanced navigation detection, improved timestamp restoration for all YouTube navigation patterns, and intelligent save interval management
+- **v5.0.0**: Adds the full local feed, local subscriptions, channel pages, playlists, analytics updates, backup/restore improvements, and Firefox temporary build support
 - **See all updates**: [CHANGELOG.md](../CHANGELOG.md)
 
 ## 🌟 Love YT re:Watch?
@@ -220,7 +200,7 @@ Because we store everything locally:
 - **[Build Instructions](./build.md)** - Development setup
 
 ## ℹ️ About YT re:Watch
-YT re:Watch is a privacy-first YouTube history extension that keeps watch progress consistent across multiple accounts, stores data locally instead of on Google, and helps you track and resume videos with customizable overlays and stats.
+YT re:Watch is a privacy-first YouTube history extension that keeps watch progress consistent across multiple accounts, stores extension data locally, and helps you browse a local YouTube-style feed with subscriptions, playlists, history, analytics, and settings.
 
 ---
 

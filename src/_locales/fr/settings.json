@@ -44,8 +44,8 @@
     "description": "Help text for overlay size"
   },
   "settings_data_sync": {
-    "message": "Données & Synchronisation",
-    "description": "Settings section title for data and sync"
+    "message": "Data",
+    "description": "Settings section title for data"
   },
   "settings_pause_in_playlists_label": {
     "message": "Mettre l'historique en pause dans les playlists",
@@ -79,30 +79,6 @@
     "message": "Supprimer automatiquement l'historique après la période sélectionnée",
     "description": "Help text for auto-clean period"
   },
-  "settings_sync_label": {
-    "message": "Firefox Sync",
-    "description": "Label for Firefox Sync option"
-  },
-  "settings_sync_help": {
-    "message": "Synchronisez vos données entre les instances du navigateur (Firefox uniquement)",
-    "description": "Help text for Firefox Sync"
-  },
-  "settings_last_sync_label": {
-    "message": "Dernière synchronisation",
-    "description": "Label for last sync time"
-  },
-  "settings_sync_now": {
-    "message": "Synchroniser maintenant",
-    "description": "Button label for triggering sync"
-  },
-  "settings_full_sync": {
-    "message": "Synchronisation complète",
-    "description": "Button label for triggering full sync"
-  },
-  "settings_full_sync_help": {
-    "message": "La synchronisation complète nettoie les anciennes données et resynchronise tout",
-    "description": "Help text for full sync"
-  },
   "settings_debug_label": {
     "message": "Mode débogage",
     "description": "Label for debug mode option"
@@ -118,5 +94,97 @@
   "settings_save": {
     "message": "Enregistrer les paramètres",
     "description": "Button label for saving settings"
+  },
+  "settings_data_label": {
+    "message": "Data",
+    "description": "Label for the data section in settings"
+  },
+  "settings_import_history": {
+    "message": "Import History",
+    "description": "Button label to import watch history"
+  },
+  "settings_import_history_help": {
+    "message": "Import History accepts the watch-history.html file from Google Takeout.",
+    "description": "Help text for the import history button"
+  },
+  "settings_import_subs": {
+    "message": "Import Subscriptions",
+    "description": "Button label to import subscriptions"
+  },
+  "settings_import_subs_help": {
+    "message": "Import Subscriptions accepts the subscriptions.csv file from Google Takeout.",
+    "description": "Help text for the import subscriptions button"
+  },
+  "settings_clear_help": {
+    "message": "Clear removes all saved video history (this cannot be undone)",
+    "description": "Help text for the Clear history button"
+  },
+  "settings_local_feed_label": {
+    "message": "Local feed",
+    "description": "Label for the local subscriptions feed toggle"
+  },
+  "settings_local_feed_help": {
+    "message": "Use locally subscribed channels to build the YT re:Watch feed",
+    "description": "Help text for the local subscriptions feed toggle"
+  },
+  "settings_hide_recs_label": {
+    "message": "Hide recommendations & popups",
+    "description": "Label for the hide recommendations toggle"
+  },
+  "settings_hide_recs_help": {
+    "message": "Hide YouTube's home recommendations and \"history is off\" nag popups.",
+    "description": "Help text for the hide recommendations toggle"
+  },
+  "settings_hide_account_label": {
+    "message": "Hide login & account UI",
+    "description": "Label for the hide account UI toggle"
+  },
+  "settings_hide_account_help": {
+    "message": "Hide YouTube's sign-in buttons, account menu, and native Subscribe/Join buttons (your local Subscribe stays).",
+    "description": "Help text for the hide account UI toggle"
+  },
+  "settings_feed_refresh_label": {
+    "message": "Feed refresh interval (minutes)",
+    "description": "Label for the feed refresh interval input"
+  },
+  "settings_feed_refresh_help": {
+    "message": "How often the local feed checks subscribed channels for new uploads",
+    "description": "Help text for the feed refresh interval input"
+  },
+  "subscriptions_refresh": {
+    "message": "Refresh feed",
+    "description": "Button label to refresh the local subscriptions feed"
+  },
+  "subscriptions_open_feed": {
+    "message": "Open YT re:Watch",
+    "description": "Button label to open the dedicated feed page"
+  },
+  "subscriptions_clear_all": {
+    "message": "Clear all",
+    "description": "Button label to remove all local subscriptions"
+  },
+  "subscriptions_no_subs": {
+    "message": "No local subscriptions yet. Search in the extension and use Subscribe.",
+    "description": "Empty state for the subscriptions tab"
+  },
+  "subscriptions_unsubscribe": {
+    "message": "Unsubscribe",
+    "description": "Button label to remove a local subscription"
+  },
+  "subscriptions_refreshing": {
+    "message": "Refreshing…",
+    "description": "Refresh button label while a refresh is in progress"
+  },
+  "subscriptions_refresh_started": {
+    "message": "Refreshing feed in your YouTube tab…",
+    "description": "Message shown when a feed refresh starts"
+  },
+  "subscriptions_open_youtube": {
+    "message": "Open a YouTube tab to refresh the feed.",
+    "description": "Message shown when no YouTube tab is open to refresh the feed"
+  },
+  "message_settings_saved": {
+    "message": "Settings saved",
+    "description": "Generic confirmation that settings were saved"
   }
-} 
+}

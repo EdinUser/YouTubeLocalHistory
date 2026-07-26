@@ -82,6 +82,31 @@
         return `${y}-${m}-${d}`;
     }
 
+    // ----- Forgiving, YouTube-like search matcher -----------------------------
+    // Lower-case, strip accents, turn punctuation into spaces. So "Pokémon!" and
+    // "pokemon" compare equal, and "C++/Rust" tokenizes into ["c", "rust"].
+    function normalizeSearchText(s) {
+        return String(s || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '')
+            .replace(/[^\p{L}\p{N}]+/gu, ' ')
+            .trim();
+    }
+    // Split a query into normalized words (compute once, reuse per record).
+    function searchTokens(query) {
+        const n = normalizeSearchText(query);
+        return n ? n.split(' ') : [];
+    }
+    // A record matches when every query word appears (any order) in its title
+    // or channel name.
+    function recordMatchesTokens(record, tokens) {
+        if (!tokens || !tokens.length) return true;
+        const hay = normalizeSearchText(record && record.title) + ' ' +
+            normalizeSearchText(record && record.channelName);
+        return tokens.every((t) => hay.indexOf(t) !== -1);
+    }
+
     // Storage wrapper class
     class SimpleStorage {
         constructor() {
@@ -241,19 +266,6 @@
             return typeof ytIndexedDBStorage !== 'undefined' && ytIndexedDBStorage !== null;
         }
 
-        // Firefox Sync disabled - redundant with hybrid storage architecture
-        /*
-
-        async _isSyncEnabled() {
-            try {
-                const settings = await this.getSettings();
-                return settings && settings.syncEnabled === true;
-            } catch (e) {
-                return false;
-            }
-        }
-        */
-
         /**
          * Migrate videos from storage.local to IndexedDB
          * Uses fail-safe sequence: upsert → verify → delete (only if verified)
@@ -287,9 +299,6 @@
                     return;
                 }
 
-                // Firefox Sync disabled - redundant with hybrid storage architecture
-                // const syncEnabled = await this._isSyncEnabled();
-                const syncEnabled = false; // Always false since sync is disabled
                 const now = Date.now();
                 const recentCutoff = now - this.RECENT_WINDOW_MS;
 
@@ -330,9 +339,8 @@
                                 throw new Error('Verification failed: field mismatch');
                             }
 
-                            // Step 3: Delete from storage.local (only if verified)
-                            // Firefox Sync disabled - always delete older records (outside recent window)
-                            // Only delete if older than recent window
+                            // Step 3: Delete from storage.local only after verification.
+                            // Keep recent records as a small compatibility cache.
                             if (record.timestamp < recentCutoff) {
                                 await storage.remove([key]);
                                 state.migratedCount++;
@@ -352,10 +360,10 @@
                 const remainingData = await storage.get(null);
                 const remainingVideoKeys = Object.keys(remainingData).filter(key => key.startsWith('video_'));
                 
-                if (remainingVideoKeys.length === 0 || (!syncEnabled && remainingVideoKeys.every(key => {
+                if (remainingVideoKeys.length === 0 || remainingVideoKeys.every(key => {
                     const rec = remainingData[key];
                     return rec && rec.timestamp >= recentCutoff;
-                }))) {
+                })) {
                     state.status = 'complete';
                     await this._setMigrationState('videos', state);
                     console.log(`[Storage] Video migration complete: ${state.migratedCount} migrated, ${state.errorCount} errors`);
@@ -402,9 +410,6 @@
                     return;
                 }
 
-                // Firefox Sync disabled - redundant with hybrid storage architecture
-                // const syncEnabled = await this._isSyncEnabled();
-                const syncEnabled = false; // Always false since sync is disabled
                 const now = Date.now();
                 const recentCutoff = now - this.RECENT_WINDOW_MS;
 
@@ -442,8 +447,8 @@
                                 throw new Error('Verification failed: field mismatch');
                             }
 
-                            // Delete from storage.local (only if verified)
-                            // Firefox Sync disabled - always delete older records (outside recent window)
+                            // Delete from storage.local only after verification.
+                            // Keep recent records as a small compatibility cache.
                             if (record.timestamp < recentCutoff) {
                                 await storage.remove([key]);
                                 state.migratedCount++;
@@ -460,10 +465,10 @@
                 const remainingData = await storage.get(null);
                 const remainingPlaylistKeys = Object.keys(remainingData).filter(key => key.startsWith('playlist_'));
                 
-                if (remainingPlaylistKeys.length === 0 || (!syncEnabled && remainingPlaylistKeys.every(key => {
+                if (remainingPlaylistKeys.length === 0 || remainingPlaylistKeys.every(key => {
                     const rec = remainingData[key];
                     return rec && rec.timestamp >= recentCutoff;
-                }))) {
+                })) {
                     state.status = 'complete';
                     await this._setMigrationState('playlists', state);
                     console.log(`[Storage] Playlist migration complete: ${state.migratedCount} migrated, ${state.errorCount} errors`);
@@ -1107,12 +1112,10 @@
                 };
             });
 
-            // Apply search filter to local records
+            // Apply search filter to local records (title + channel, any word order)
             if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                localRecords = localRecords.filter(record =>
-                    record.title?.toLowerCase().includes(query)
-                );
+                const tokens = searchTokens(searchQuery);
+                localRecords = localRecords.filter(record => recordMatchesTokens(record, tokens));
             }
 
             // Step 3: Merge arrays (local wins on conflicts by timestamp)
@@ -1212,10 +1215,8 @@
             }));
 
             if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                records = records.filter(record =>
-                    record.title?.toLowerCase().includes(query)
-                );
+                const tokens = searchTokens(searchQuery);
+                records = records.filter(record => recordMatchesTokens(record, tokens));
             }
 
             records.sort((a, b) => {
@@ -1269,6 +1270,38 @@
             await storage.set({'settings': settings});
         }
 
+        // ----- Watch Later (local, account-free) ----------------------------
+        // A small, user-curated list saved via the right-click menu. Stored in
+        // storage.local under `watchlater_<videoId>`, deliberately outside the
+        // IndexedDB hybrid/migration machinery (it's tiny and high-churn).
+        // Touches only storage.local, so it works in any context.
+        async getAllWatchLater() {
+            const allData = await storage.get(null);
+            const items = {};
+            Object.keys(allData).forEach((key) => {
+                if (key.startsWith('watchlater_')) {
+                    items[key.replace('watchlater_', '')] = allData[key];
+                }
+            });
+            return items;
+        }
+
+        async getWatchLater(videoId) {
+            if (!videoId) return null;
+            const result = await storage.get([`watchlater_${videoId}`]);
+            return result[`watchlater_${videoId}`] || null;
+        }
+
+        async setWatchLater(videoId, data) {
+            if (!videoId) return;
+            await storage.set({ [`watchlater_${videoId}`]: data });
+        }
+
+        async removeWatchLater(videoId) {
+            if (!videoId) return;
+            await storage.remove([`watchlater_${videoId}`]);
+        }
+
         // Clear all data
         async clear() {
             await storage.clear();
@@ -1312,6 +1345,28 @@
             }
         }
 
+        // Remove all extension data from this browser profile.
+        async resetAllData() {
+            if (!this._isExtensionContext()) {
+                try {
+                    return await this._callBackground('resetAllData', []);
+                } catch (error) {
+                    console.warn('[Storage] resetAllData background call failed:', error);
+                }
+            }
+
+            if (this._isIndexedDBAvailable()) {
+                try {
+                    await ytIndexedDBStorage.clearAll();
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB clearAll failed during reset:', error);
+                }
+            }
+
+            await storage.clear();
+            this.migrated = false;
+        }
+
         /**
          * Import records (videos and playlists) into hybrid storage
          * Writes to IndexedDB only (not storage.local) - imported records are archived
@@ -1320,6 +1375,57 @@
          * @param {boolean} mergeMode - If true, merge with existing data; if false, replace
          * @returns {Promise<Object>} { status: 'success', importedVideos: number, importedPlaylists: number }
          */
+        // Persist an array of video records. Tries IndexedDB first; if IndexedDB
+        // rejects writes (it can be read-only in some Firefox/extension contexts,
+        // surfacing as "a mutation operation ... did not allow mutations"), falls
+        // back to storage.local — the same store live tracking writes to and the
+        // popup reads as an overlay. unlimitedStorage is granted, so this scales.
+        async _bulkPutVideos(videos = []) {
+            if (!videos.length) return 0;
+            let useIndexedDB = this._isIndexedDBAvailable();
+            if (useIndexedDB) {
+                try {
+                    await ytIndexedDBStorage.putVideo(videos[0]);
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB unavailable for writes; importing into storage.local instead:', error && error.message);
+                    useIndexedDB = false;
+                }
+            }
+            if (useIndexedDB) {
+                for (let i = 1; i < videos.length; i++) {
+                    await ytIndexedDBStorage.putVideo(videos[i]);
+                }
+                return videos.length;
+            }
+            const batch = {};
+            for (const v of videos) batch[`video_${v.videoId}`] = v;
+            await storage.set(batch);
+            return videos.length;
+        }
+
+        async _bulkPutPlaylists(playlists = []) {
+            if (!playlists.length) return 0;
+            let useIndexedDB = this._isIndexedDBAvailable();
+            if (useIndexedDB) {
+                try {
+                    await ytIndexedDBStorage.putPlaylist(playlists[0]);
+                } catch (error) {
+                    console.warn('[Storage] IndexedDB unavailable for playlist writes; importing into storage.local instead:', error && error.message);
+                    useIndexedDB = false;
+                }
+            }
+            if (useIndexedDB) {
+                for (let i = 1; i < playlists.length; i++) {
+                    await ytIndexedDBStorage.putPlaylist(playlists[i]);
+                }
+                return playlists.length;
+            }
+            const batch = {};
+            for (const p of playlists) batch[`playlist_${p.playlistId}`] = p;
+            await storage.set(batch);
+            return playlists.length;
+        }
+
         async importRecords(records = [], playlists = [], mergeMode = false) {
             // Content scripts proxy to background
             if (!this._isExtensionContext()) {
@@ -1388,41 +1494,17 @@
                     }
                 }
 
-                // Write merged data to IndexedDB only
-                if (this._isIndexedDBAvailable()) {
-                    try {
-                        for (const video of Object.values(mergedVideos)) {
-                            await ytIndexedDBStorage.putVideo(video);
-                        }
-                        for (const playlist of Object.values(mergedPlaylists)) {
-                            await ytIndexedDBStorage.putPlaylist(playlist);
-                        }
-                    } catch (error) {
-                        console.error('[Storage] IndexedDB import failed:', error);
-                        throw new Error(`Import failed: ${error.message}`);
-                    }
-                } else {
-                    throw new Error('IndexedDB not available for import');
-                }
+                // Persist merged data. Prefers IndexedDB; falls back to
+                // storage.local if IndexedDB rejects writes (read-only in some
+                // Firefox setups). importedVideos/Playlists already reflect the
+                // newly added/updated counts computed above.
+                await this._bulkPutVideos(Object.values(mergedVideos));
+                await this._bulkPutPlaylists(Object.values(mergedPlaylists));
             } else {
-                // Replace mode: Write directly to IndexedDB
-                if (!this._isIndexedDBAvailable()) {
-                    throw new Error('IndexedDB storage is not available. Please reload the extension.');
-                }
-                
-                try {
-                    for (const video of validVideos) {
-                        await ytIndexedDBStorage.putVideo(video);
-                        importedVideos++;
-                    }
-                    for (const playlist of validPlaylists) {
-                        await ytIndexedDBStorage.putPlaylist(playlist);
-                        importedPlaylists++;
-                    }
-                } catch (error) {
-                    console.error('[Storage] IndexedDB import failed:', error);
-                    throw new Error(`Import failed: ${error.message || 'Unknown error'}`);
-                }
+                // Replace mode: persist records (IndexedDB, falling back to
+                // storage.local when IndexedDB is read-only/unavailable).
+                importedVideos += await this._bulkPutVideos(validVideos);
+                importedPlaylists += await this._bulkPutPlaylists(validPlaylists);
             }
 
             // Rebuild stats from IndexedDB after import
@@ -1750,6 +1832,186 @@
             if (oldTombstones.length > 0) {
                 await storage.remove(oldTombstones);
             }
+        }
+
+        // ============================================================
+        // Local Subscriptions (no Google account required)
+        // ============================================================
+        //
+        // Subscriptions live in storage.local under `sub_<id>` keys so they
+        // work in every context (content script, popup, background) without
+        // the IndexedDB hybrid layer or any network/account dependency.
+        //
+        // Record shape:
+        //   {
+        //     id,            // normalized key (UC id, or lowercased @handle)
+        //     channelName,
+        //     ucid,          // 'UC...' once resolved (needed for RSS), or null
+        //     handle,        // '@handle' if known, or null
+        //     thumbnail,     // channel avatar URL if available, or null
+        //     url,           // canonical channel URL
+        //     subscribedAt   // ms timestamp
+        //   }
+
+        // Normalize a raw channel identifier into a stable storage key part.
+        // Accepts 'UCxxxx', '@handle', 'channel/UCxxxx', '/@handle', etc.
+        _normalizeChannelId(rawId) {
+            if (!rawId || typeof rawId !== 'string') return '';
+            let id = rawId.trim();
+            // Strip leading slashes and common path prefixes
+            id = id.replace(/^\/+/, '');
+            id = id.replace(/^channel\//i, '');
+            id = id.replace(/^(c|user)\//i, '');
+            // UC ids are case-sensitive; keep them verbatim
+            if (/^UC[\w-]{20,}$/.test(id)) {
+                return id;
+            }
+            // Handles are case-insensitive; normalize to lowercase, ensure leading '@'
+            if (id.startsWith('@')) {
+                return '@' + id.slice(1).toLowerCase();
+            }
+            return id.toLowerCase();
+        }
+
+        // Get all subscriptions as a map keyed by normalized id.
+        async getSubscriptions() {
+            const allData = await storage.get(null);
+            const subs = {};
+            Object.keys(allData).forEach(key => {
+                if (key.startsWith('sub_')) {
+                    const record = allData[key];
+                    const id = key.slice('sub_'.length);
+                    subs[id] = { id, ...record };
+                }
+            });
+            return subs;
+        }
+
+        // Get subscriptions as an array, newest first.
+        async getSubscriptionList() {
+            const subs = await this.getSubscriptions();
+            return Object.values(subs).sort(
+                (a, b) => (b.subscribedAt || 0) - (a.subscribedAt || 0)
+            );
+        }
+
+        // Get a single subscription record (or null).
+        async getSubscription(rawId) {
+            const id = this._normalizeChannelId(rawId);
+            if (!id) return null;
+            // Fast path: direct key lookup
+            const result = await storage.get([`sub_${id}`]);
+            const record = result[`sub_${id}`];
+            if (record) return { id, ...record };
+            // Fallback scan: a sub may be keyed by ucid (e.g. from CSV import) but
+            // the channel page checks by @handle — or vice versa. Search by fields.
+            const allData = await storage.get(null);
+            for (const [key, val] of Object.entries(allData)) {
+                if (!key.startsWith('sub_')) continue;
+                const subId = key.slice(4);
+                if (subId === id) continue; // already checked above
+                if (val.handle && this._normalizeChannelId(val.handle) === id) {
+                    return { id: subId, ...val };
+                }
+                if (val.ucid && val.ucid === rawId && /^UC[\w-]+$/.test(rawId)) {
+                    return { id: subId, ...val };
+                }
+            }
+            return null;
+        }
+
+        // Is the channel subscribed?
+        async isSubscribed(rawId) {
+            return (await this.getSubscription(rawId)) !== null;
+        }
+
+        // Add (or overwrite) a subscription. `record` should include at least
+        // one of channelId/ucid/handle; channelName is recommended.
+        async addSubscription(record = {}) {
+            const rawId = record.id || record.ucid || record.channelId || record.handle;
+            const id = this._normalizeChannelId(rawId);
+            if (!id) {
+                throw new Error('addSubscription: missing channel identifier');
+            }
+            const toStore = {
+                channelName: record.channelName || 'Unknown Channel',
+                ucid: record.ucid || (/^UC[\w-]{20,}$/.test(id) ? id : null),
+                handle: record.handle || (id.startsWith('@') ? id : null),
+                thumbnail: record.thumbnail || null,
+                url: record.url || null,
+                subscribedAt: record.subscribedAt || Date.now()
+            };
+            await storage.set({ [`sub_${id}`]: toStore });
+            return { id, ...toStore };
+        }
+
+        // Merge partial fields into an existing subscription (e.g. resolved ucid).
+        async updateSubscription(rawId, partial = {}) {
+            const id = this._normalizeChannelId(rawId);
+            if (!id) return null;
+            const result = await storage.get([`sub_${id}`]);
+            const existing = result[`sub_${id}`];
+            if (!existing) return null;
+            const merged = { ...existing, ...partial };
+            await storage.set({ [`sub_${id}`]: merged });
+            return { id, ...merged };
+        }
+
+        // Remove a subscription.
+        async removeSubscription(rawId) {
+            const id = this._normalizeChannelId(rawId);
+            if (!id) return;
+            await storage.remove([`sub_${id}`]);
+        }
+
+        // Remove every local subscription in one storage operation.
+        async clearSubscriptions() {
+            const allData = await storage.get(null);
+            const keys = Object.keys(allData).filter((key) => key.startsWith('sub_'));
+            if (keys.length) await storage.remove(keys);
+        }
+
+        // Cached video durations (videoId -> seconds). RSS lacks duration, so it
+        // is fetched per video and cached here permanently.
+        async getDurationCache() {
+            const result = await storage.get(['durationCache']);
+            return result.durationCache || {};
+        }
+
+        async setDurationCache(map) {
+            await storage.set({ durationCache: map });
+        }
+
+        // Cached Shorts flags (videoId -> boolean). RSS doesn't mark Shorts, so we
+        // detect them via the /shorts/ URL and cache the result permanently.
+        async getShortsCache() {
+            const result = await storage.get(['shortsCache']);
+            return result.shortsCache || {};
+        }
+
+        async setShortsCache(map) {
+            await storage.set({ shortsCache: map });
+        }
+
+        // Cached YouTube release dates (videoId -> timestamp). Watch-history
+        // records contain the watched date, not the original upload date.
+        async getReleaseDateCache() {
+            const result = await storage.get(['releaseDateCache']);
+            return result.releaseDateCache || {};
+        }
+
+        async setReleaseDateCache(map) {
+            await storage.set({ releaseDateCache: map });
+        }
+
+        // Cached aggregated feed: { updatedAt, videos: [...] }
+        async getFeedCache() {
+            const result = await storage.get(['feedCache']);
+            return result.feedCache || { updatedAt: 0, videos: [] };
+        }
+
+        async setFeedCache(data) {
+            await storage.set({ feedCache: data });
         }
 
     }

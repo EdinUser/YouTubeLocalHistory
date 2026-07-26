@@ -26,6 +26,28 @@
     const STORE_PLAYLISTS = 'playlists';
     const STORE_DELETIONS = 'deletions';
 
+    // ----- Forgiving, YouTube-like search matcher -----------------------------
+    // Mirrors the matcher in storage.js: accent/punctuation-insensitive, matches
+    // every query word (any order) against the title or channel name.
+    function normalizeSearchText(s) {
+        return String(s || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '')
+            .replace(/[^\p{L}\p{N}]+/gu, ' ')
+            .trim();
+    }
+    function searchTokens(query) {
+        const n = normalizeSearchText(query);
+        return n ? n.split(' ') : [];
+    }
+    function recordMatchesTokens(record, tokens) {
+        if (!tokens || !tokens.length) return true;
+        const hay = normalizeSearchText(record && record.title) + ' ' +
+            normalizeSearchText(record && record.channelName);
+        return tokens.every((t) => hay.indexOf(t) !== -1);
+    }
+
     function log(message, data) {
         try {
             // Avoid throwing in restricted contexts
@@ -268,7 +290,7 @@
                 sortOrder = 'desc'
             } = options;
 
-            const queryLower = searchQuery ? String(searchQuery).toLowerCase() : '';
+            const tokens = searchTokens(searchQuery);
             const direction = sortOrder === 'asc' ? 'next' : 'prev';
             const offset = (page - 1) * pageSize;
 
@@ -317,13 +339,10 @@
                             }
                         }
 
-                        // Filter by search query (case-insensitive substring on title)
-                        if (queryLower) {
-                            const titleSource = (record.titleLower || record.title || '');
-                            if (!titleSource.toLowerCase().includes(queryLower)) {
-                                cursor.continue();
-                                return;
-                            }
+                        // Filter by search query (title + channel, any word order)
+                        if (tokens.length && !recordMatchesTokens(record, tokens)) {
+                            cursor.continue();
+                            return;
                         }
 
                         matchedCount += 1;
@@ -418,7 +437,7 @@
                 sortOrder = 'desc'
             } = options;
 
-            const queryLower = searchQuery ? String(searchQuery).toLowerCase() : '';
+            const tokens = searchTokens(searchQuery);
             const direction = sortOrder === 'asc' ? 'next' : 'prev';
             const offset = (page - 1) * pageSize;
 
@@ -457,13 +476,10 @@
 
                         const record = cursor.value;
 
-                        // Filter by search query (case-insensitive substring on title)
-                        if (queryLower) {
-                            const titleSource = (record.titleLower || record.title || '');
-                            if (!titleSource.toLowerCase().includes(queryLower)) {
-                                cursor.continue();
-                                return;
-                            }
+                        // Filter by search query (title + channel, any word order)
+                        if (tokens.length && !recordMatchesTokens(record, tokens)) {
+                            cursor.continue();
+                            return;
                         }
 
                         matchedCount += 1;

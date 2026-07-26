@@ -17,6 +17,7 @@ coverage/
 test-results/
 playwright-report/
 playwright/.cache/
+yt-storage.json
 
 # IDE and editor files
 .vscode/

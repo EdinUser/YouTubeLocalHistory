@@ -273,8 +273,8 @@ describe('Video Tracking Integration', () => {
         video.addEventListener('seeking', handlers.seekingHandler);
         video.addEventListener('seeked', handlers.seekedHandler);
         video.addEventListener('beforeunload', handlers.beforeunloadHandler);
-      } catch (error) {
-        console.error('Error adding event listeners:', error);
+      } catch (_) {
+        // This mock mirrors the production guard; error-path tests should stay quiet.
       }
 
       contentModule.trackedVideos.add(video);

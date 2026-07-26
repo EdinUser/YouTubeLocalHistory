@@ -11,6 +11,14 @@
         "message": "Playlists",
         "description": "Tab label for playlists"
     },
+    "tab_subscriptions": {
+        "message": "Subs",
+        "description": "Tab label for local subscriptions"
+    },
+    "tab_watchlater": {
+        "message": "Later",
+        "description": "Tab label for local Watch Later list"
+    },
     "tab_analytics": {
         "message": "Analytics",
         "description": "Tab label for analytics"
@@ -226,5 +234,17 @@
     "playlists_unknown_title": {
         "message": "Unknown Playlist",
         "description": "Fallback title for playlists with no title"
+    },
+    "watchlater_empty": {
+        "message": "Nothing saved yet. On YouTube, right-click a video and choose \"Save to Watch Later (local)\".",
+        "description": "Empty state for the Watch Later tab"
+    },
+    "watchlater_clear_all": {
+        "message": "Clear all",
+        "description": "Button to remove all Watch Later items"
+    },
+    "watchlater_confirm_clear": {
+        "message": "Clear all Watch Later items?",
+        "description": "Confirmation prompt before clearing the Watch Later list"
     }
 }

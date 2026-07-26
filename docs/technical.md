@@ -454,9 +454,10 @@ await ytStorage.getAllVideos(); // Returns merged view
 ## 🛠️ Development Setup
 
 ### Prerequisites
-- Node.js 14+
-- NPM or Yarn
+- Node.js 18+
+- npm
 - Chrome/Firefox for testing
+- Git Bash, WSL, or another Bash-compatible shell for `build.sh`
 
 ### Local Development
 
@@ -468,11 +469,10 @@ cd YouTubeLocalHistory
 # Install dependencies
 npm install
 
-# Build extension
-./build.sh
+# Recommended Firefox temporary build
+npm run prepare:firefox
 
-# Built extensions will be in dist/
-# Load dist/chrome or dist/firefox in browser
+# Load build/firefox/manifest.json as a temporary Firefox add-on
 ```
 
 ### Testing
@@ -480,6 +480,12 @@ npm install
 ```bash
 # Run all tests
 npm test
+
+# Recommended PR checks
+npm run lint
+npm test -- --runInBand
+npm run prepare:firefox
+npx web-ext lint --source-dir=build/firefox
 
 # Run specific test suites
 npm run test:unit
@@ -494,11 +500,7 @@ npm run test:coverage
 
 ```bash
 # Build both Chrome and Firefox versions
-./build.sh
-
-# Build specific browser
-./build.sh chrome
-./build.sh firefox
+npm run build
 ```
 
 ---

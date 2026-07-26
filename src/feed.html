@@ -1,0 +1,1931 @@
+<!DOCTYPE html>
+<html lang="en" class="app-loading">
+<head>
+    <meta charset="utf-8">
+    <title>Feed — YT re:Watch</title>
+    <style>
+        :root {
+            --bg: #0f0f0f;
+            --panel: #181818;
+            --text: #f1f1f1;
+            --text-2: #aaa;
+            --chip: #272727;
+            --border: rgba(255, 255, 255, 0.12);
+            --accent: #3ea6ff;
+            --primary-bg: var(--accent);
+            --primary-bg-hover: color-mix(in srgb, var(--accent) 86%, #ffffff);
+            --primary-border: transparent;
+            --primary-text: #0f0f0f;
+            --danger-bg: rgba(255, 112, 112, 0.16);
+            --danger-bg-hover: rgba(255, 112, 112, 0.24);
+            --danger-border: rgba(255, 112, 112, 0.45);
+            --danger-text: #ff9a9a;
+            --overlay-font-size: 12px;
+            --overlay-pad-y: 2px;
+            --overlay-pad-x: 6px;
+            --overlay-bar-height: 4px;
+        }
+        html[data-theme="light"] {
+            --bg: #fff;
+            --panel: #f7f7f7;
+            --text: #0f0f0f;
+            --text-2: #606060;
+            --chip: #e5e5e5;
+            --border: rgba(0, 0, 0, 0.14);
+            --primary-bg: #fff;
+            --primary-bg-hover: color-mix(in srgb, var(--accent) 10%, #fff);
+            --primary-border: color-mix(in srgb, var(--accent) 75%, #000);
+            --primary-text: color-mix(in srgb, var(--accent) 55%, #003b66);
+            --danger-bg: #fff;
+            --danger-bg-hover: #fff3f3;
+            --danger-border: #d46a6a;
+            --danger-text: #b3261e;
+        }
+        html[data-theme="dark"][data-accent="red"],
+        html[data-theme="dark"][data-accent="purple"] {
+            --primary-text: #fff;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Roboto", "Arial", sans-serif;
+        }
+        html.app-loading body { visibility: hidden; }
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            padding: 14px 24px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+        }
+        .brand { font-size: 18px; font-weight: 700; margin-right: 4px; white-space: nowrap; }
+        .brand small { font-weight: 400; color: var(--text-2); font-size: 13px; margin-left: 6px; }
+        .spacer { flex: 1 1 auto; }
+        .count { font-size: 13px; color: var(--text-2); white-space: nowrap; }
+        /* Group related controls so the bar reads as: brand · search · filters …… count · actions */
+        .filters { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .actions { display: flex; align-items: center; gap: 8px; }
+        input[type="search"], select {
+            background: var(--chip);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 8px 14px;
+            font-size: 14px;
+            outline: none;
+        }
+        input[type="search"] { flex: 1 1 240px; min-width: 200px; max-width: 420px; }
+        select { cursor: pointer; }
+        label.check {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 13px; color: var(--text-2); cursor: pointer; white-space: nowrap;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+        button.btn,
+        a.btn {
+            background: var(--chip);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        button.btn:hover,
+        a.btn:hover { background: #323232; }
+        button.btn:disabled { opacity: 0.5; cursor: default; }
+        button.btn.primary,
+        a.btn.primary {
+            background: var(--primary-bg);
+            color: var(--primary-text);
+            border-color: var(--primary-border);
+            font-weight: 600;
+        }
+        button.btn.primary:hover,
+        a.btn.primary:hover { background: var(--primary-bg-hover); }
+        .button-spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            margin-right: 7px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            vertical-align: -2px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .status {
+            padding: 10px 24px;
+            font-size: 16px;
+            color: var(--text);
+            min-height: 22px;
+        }
+        .status:empty { display: none; }
+        .status .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid var(--text-2); border-top-color: transparent;
+            border-radius: 50%; vertical-align: middle; margin-right: 8px;
+            animation: spin 0.8s linear infinite;
+        }
+        #ytSection > .section-h { display: none; }
+        .yt-search-state {
+            width: min(680px, calc(100% - 48px));
+            position: fixed;
+            left: 50%;
+            top: 38%;
+            z-index: 20;
+            transform: translate(-50%, -50%);
+            margin: 0;
+            padding: 42px 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            background: color-mix(in srgb, var(--panel) 88%, transparent);
+            color: var(--text);
+            min-height: 0;
+        }
+        .yt-search-loader {
+            width: 42px;
+            height: 42px;
+            flex: 0 0 42px;
+            border: 3px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .yt-search-state-text {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 0;
+            font-size: 17px;
+            line-height: 1.35;
+        }
+        .yt-search-state-text strong {
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .yt-search-state-text span {
+            color: var(--text-2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .yt-search-error {
+            width: min(680px, calc(100% - 48px));
+            margin: 28px auto;
+            padding: 22px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--panel);
+        }
+        .yt-search-error-text {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 0;
+        }
+        .yt-search-error-text strong { font-size: 18px; }
+        .yt-search-error-text span {
+            color: var(--text-2);
+            font-size: 14px;
+            line-height: 1.35;
+        }
+        .yt-search-error-detail {
+            color: var(--text-2);
+            font-size: 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            column-gap: 16px;
+            row-gap: 36px;
+            padding: 18px 24px 60px;
+        }
+        .empty {
+            padding: 60px 24px;
+            text-align: center;
+            color: var(--text-2);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .empty a { color: var(--accent); }
+        .section-h {
+            margin: 18px 0 0;
+            padding: 0 24px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .section-h .sub { font-weight: 400; color: var(--text-2); font-size: 13px; margin-left: 8px; }
+
+        /* --- Local subscriptions manager --- */
+        .subs-view { padding: 20px 24px 60px; }
+        .subs-toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 16px; margin-bottom: 18px;
+        }
+        .subs-title { font-size: 22px; font-weight: 700; margin: 0; }
+        .subs-count { color: var(--text-2); font-size: 14px; margin-top: 4px; }
+        .subs-list {
+            display: flex; flex-direction: column;
+            width: 100%;
+        }
+        .subs-row {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center; gap: 18px; padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .subs-channel {
+            min-width: 0; display: flex; align-items: center; gap: 14px;
+            color: var(--text); text-decoration: none; font-size: 17px;
+        }
+        .subs-channel:hover .subs-name { text-decoration: underline; }
+        .subs-avatar {
+            width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%;
+            object-fit: cover; background: var(--chip);
+        }
+        .subs-avatar-fallback {
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text); font-weight: 700; font-size: 18px;
+        }
+        .subs-name {
+            min-width: 0; overflow: hidden; white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .subs-empty {
+            max-width: 700px; padding: 50px 0; color: var(--text-2);
+            font-size: 15px; line-height: 1.6;
+        }
+        .btn.danger {
+            background: var(--danger-bg);
+            border-color: var(--danger-border);
+            color: var(--danger-text);
+            font-weight: 600;
+        }
+        .btn.danger:hover { background: var(--danger-bg-hover); }
+
+        /* --- Saved playlists --- */
+        .playlists-view { padding: 20px 24px 60px; }
+        .playlists-view.playlists-view-detail .playlists-toolbar {
+            display: none;
+        }
+        .playlists-view.playlists-view-detail {
+            padding-top: 22px;
+        }
+        .playlists-toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 16px; margin-bottom: 18px;
+        }
+        .playlists-title { font-size: 22px; font-weight: 700; margin: 0; }
+        .playlists-count { color: var(--text-2); font-size: 14px; margin-top: 4px; }
+        .playlists-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 28px 18px;
+            width: 100%;
+        }
+        .playlist-row {
+            min-width: 0; display: flex; flex-direction: column;
+        }
+        .playlist-link {
+            min-width: 0; display: block;
+            color: var(--text); text-decoration: none;
+        }
+        .playlist-thumb-link:hover + .playlist-text .playlist-name,
+        .playlist-name:hover { text-decoration: underline; }
+        .playlist-thumb {
+            position: relative; width: 100%; aspect-ratio: 16 / 9;
+            overflow: hidden; border-radius: 12px;
+            background: linear-gradient(135deg, #343434, #181818);
+        }
+        .playlist-thumb::before,
+        .playlist-thumb::after {
+            content: ""; position: absolute; left: 12px; right: 12px;
+            height: 7px; border-radius: 7px 7px 0 0; background: #494949;
+        }
+        .playlist-thumb::before { top: -7px; opacity: .55; }
+        .playlist-thumb::after { top: -3px; opacity: .8; }
+        .playlist-thumb img {
+            width: 100%; height: 100%; display: block; object-fit: cover;
+        }
+        .playlist-thumb-fallback {
+            width: 100%; height: 100%; display: flex;
+            align-items: center; justify-content: center;
+            color: var(--text-2); font-size: 42px;
+        }
+        .playlist-overlay {
+            position: absolute; right: 6px; bottom: 6px;
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 7px; border-radius: 4px;
+            background: rgba(0, 0, 0, .82); color: #fff;
+            font-size: 12px; font-weight: 600;
+        }
+        .playlist-text { display: block; min-width: 0; }
+        .playlist-title-row {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 8px; padding-top: 11px;
+        }
+        .playlist-name {
+            flex: 1 1 auto; min-width: 0;
+            overflow: hidden; white-space: nowrap;
+            text-overflow: ellipsis; font-size: 16px; font-weight: 600;
+            color: var(--text); text-decoration: none;
+        }
+        .playlist-name:hover { text-decoration: underline; }
+        .playlist-meta {
+            display: block; color: var(--text-2); font-size: 13px; margin-top: 4px;
+            overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+        }
+        .playlist-card-menu {
+            position: relative; flex: 0 0 auto; margin-top: -4px;
+        }
+        .playlist-card-menu .video-menu-button {
+            width: 32px; height: 32px; font-size: 20px;
+        }
+        .playlist-card-menu .video-menu { top: 34px; right: 0; }
+        .playlists-empty {
+            padding: 8px 0 0; color: var(--text-2);
+            font-size: 15px; line-height: 1.6;
+        }
+
+        /* --- Analytics view --- */
+        .an-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 16px;
+            padding: 18px 24px;
+        }
+        .an-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+        .an-card .l { font-size: 13px; color: var(--text-2); }
+        .an-card .v { font-size: 26px; font-weight: 700; color: var(--accent); margin-top: 6px; }
+        .an-charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 16px;
+            padding: 0 24px 48px;
+        }
+        .an-chart {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .an-chart-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+        .an-bars { display: flex; align-items: flex-end; gap: 6px; height: 170px; }
+        .an-bar-wrap { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; height: 100%; justify-content: flex-end; }
+        .an-bar { width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; transition: height 0.2s; }
+        .an-bar-label { font-size: 10px; color: var(--text-2); white-space: nowrap; }
+        .an-bar-value {
+            min-height: 14px; max-width: 100%;
+            color: var(--text-2); font-size: 10px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .an-insights {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            padding: 0 24px 48px;
+        }
+        .an-panel {
+            min-width: 0;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+        }
+        .an-panel-wide { grid-column: 1 / -1; }
+        .an-panel-title { margin: 0 0 16px; font-size: 16px; }
+        .an-empty { color: var(--text-2); font-size: 13px; padding: 10px 0; }
+        .an-completion-row { margin-top: 14px; }
+        .an-completion-head, .an-channel-row, .an-continue-meta {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        }
+        .an-completion-head { margin-bottom: 7px; font-size: 13px; }
+        .an-completion-head span:last-child { color: var(--text-2); }
+        .an-progress {
+            height: 8px; overflow: hidden;
+            background: var(--chip); border-radius: 999px;
+        }
+        .an-progress > span {
+            display: block; height: 100%;
+            background: var(--accent); border-radius: inherit;
+        }
+        .an-progress.partial > span { background: #a970ff; }
+        .an-progress.started > span { background: #f2b33d; }
+        .an-channel-row {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .an-channel-row:last-child { border-bottom: none; }
+        .an-channel-name {
+            min-width: 0; color: var(--text); font-size: 14px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .an-channel-stat { flex: 0 0 auto; color: var(--text-2); font-size: 12px; }
+        .an-continue-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px 18px;
+        }
+        .an-continue {
+            display: grid; grid-template-columns: 150px minmax(0, 1fr);
+            gap: 12px; min-width: 0;
+            color: inherit; text-decoration: none;
+        }
+        .an-continue-thumb {
+            position: relative; aspect-ratio: 16 / 9;
+            overflow: hidden; border-radius: 8px; background: var(--chip);
+        }
+        .an-continue-thumb img { width: 100%; height: 100%; display: block; object-fit: cover; }
+        .an-continue-duration {
+            position: absolute; right: 4px; bottom: 4px;
+            padding: 1px 4px; border-radius: 4px;
+            background: rgba(0,0,0,.8); color: #fff; font-size: 11px;
+        }
+        .an-continue-info { min-width: 0; }
+        .an-continue-title {
+            display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; color: var(--text);
+            font-size: 14px; font-weight: 600; line-height: 1.35;
+        }
+        .an-continue:hover .an-continue-title { color: var(--accent); }
+        .an-continue-channel {
+            margin: 5px 0; color: var(--text-2); font-size: 12px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .an-continue-meta { margin-top: 6px; color: var(--text-2); font-size: 11px; }
+        @media (max-width: 900px) {
+            .an-insights { grid-template-columns: 1fr; }
+            .an-panel-wide { grid-column: auto; }
+            .an-continue-list { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 560px) {
+            .an-cards, .an-charts, .an-insights { padding-left: 12px; padding-right: 12px; }
+            .an-continue { grid-template-columns: 120px minmax(0, 1fr); }
+        }
+
+        /* --- Settings view --- */
+        .settings-view {
+            max-width: 760px;
+            padding: 28px 24px 40px;
+        }
+        .settings-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .settings-title { margin: 0 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+        .settings-subtitle { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.5; }
+        .settings-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 0 0 auto;
+        }
+        .settings-shell {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .settings-block {
+            padding: 22px 24px;
+            border-top: 1px solid var(--border);
+        }
+        .settings-block:first-child { border-top: none; }
+        .settings-block-title {
+            margin: 0 0 16px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-2);
+        }
+        .setting-field {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+            align-items: center;
+            gap: 16px;
+            padding: 10px 0;
+        }
+        .setting-field label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+        }
+        .setting-field select {
+            width: 100%;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: var(--chip);
+            border: 1px solid transparent;
+        }
+        .setting-field select:focus {
+            outline: none;
+            border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+        }
+        .settings-action-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+        .settings-action-bar .btn {
+            padding: 9px 16px;
+            font-size: 13px;
+            border-radius: 999px;
+        }
+        .settings-data-rows {
+            display: grid;
+            gap: 10px;
+        }
+        .settings-data-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--chip) 70%, transparent);
+            border: 1px solid var(--border);
+        }
+        .settings-data-copy {
+            min-width: 0;
+            display: grid;
+            gap: 3px;
+        }
+        .settings-data-copy strong {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .settings-data-copy span {
+            font-size: 12px;
+            line-height: 1.45;
+            color: var(--text-2);
+        }
+        .settings-danger-split {
+            display: grid;
+            gap: 10px;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+        .settings-danger-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--chip) 70%, transparent);
+            border: 1px solid var(--border);
+        }
+        .settings-danger-copy {
+            min-width: 0;
+            display: grid;
+            gap: 3px;
+        }
+        .settings-danger-copy strong {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .settings-danger-copy span {
+            font-size: 12px;
+            line-height: 1.45;
+            color: var(--text-2);
+        }
+        .settings-danger-item .btn-ghost-danger {
+            flex: 0 0 auto;
+            background: transparent;
+            border-color: var(--danger-border);
+            color: var(--danger-text);
+        }
+        .settings-danger-item .btn-ghost-danger:hover {
+            background: var(--danger-bg-hover);
+        }
+        .settings-message {
+            color: var(--accent);
+            font-size: 13px;
+            min-height: 18px;
+            text-align: right;
+        }
+        @media (max-width: 760px) {
+            .settings-view { padding: 18px 12px 32px; }
+            .settings-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .settings-header-actions {
+                justify-content: space-between;
+            }
+            .setting-field {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            .settings-block { padding: 18px 16px; }
+            .settings-danger-item {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .settings-data-item {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .settings-data-item .settings-action-bar {
+                width: 100%;
+            }
+            .settings-data-item .settings-action-bar .btn {
+                flex: 1 1 auto;
+            }
+            .settings-danger-item .btn,
+            .settings-danger-item .btn-ghost-danger {
+                width: 100%;
+            }
+        }
+
+        /* --- Cards (ported from the in-page feed) --- */
+        .ytvht-feed-card { position: relative; display: flex; flex-direction: column; text-decoration: none; }
+        .ytvht-feed-card.video-menu-open { z-index: 80; }
+        .ytvht-feed-card a { text-decoration: none; color: inherit; }
+        .ytvht-thumb-link { display: block; }
+        .ytvht-thumb-wrap {
+            position: relative; width: 100%; aspect-ratio: 16 / 9;
+            border-radius: 12px; overflow: hidden; background: var(--chip);
+        }
+        .ytvht-thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .ytvht-card-duration {
+            position: absolute; right: 4px; bottom: 4px; padding: 1px 4px;
+            border-radius: 4px; background: rgba(0,0,0,0.8); color: #fff;
+            font-size: 12px; font-weight: 500; line-height: 1.4; z-index: 2;
+        }
+        .ytvht-live-badge {
+            position: absolute; left: 6px; bottom: 6px; z-index: 3;
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 6px; border-radius: 4px;
+            background: #f00; color: #fff;
+            font-size: 12px; font-weight: 700; line-height: 1;
+            letter-spacing: .2px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+        }
+        .ytvht-live-badge svg {
+            width: 14px; height: 14px;
+            fill: currentColor; stroke: currentColor;
+            stroke-width: 1.8; stroke-linecap: round;
+        }
+        .ytvht-live-badge svg path { fill: none; }
+        .ytvht-live-badge svg circle { stroke: none; }
+        .ytvht-viewed-label {
+            position: absolute; left: 6px; top: 6px; z-index: 2;
+            padding: var(--overlay-pad-y) var(--overlay-pad-x); border-radius: 4px;
+            background: var(--accent); color: #0f0f0f;
+            font-size: var(--overlay-font-size); font-weight: 600;
+            line-height: 1.2;
+        }
+        /* Partially-watched: same blue high-contrast pill as "viewed" (a number like
+           "33%" reads differently from the word at a glance), with bold + shadow so
+           the percent stays legible over any thumbnail. */
+        .ytvht-viewed-label.ytvht-partial {
+            background: var(--accent); color: #0f0f0f;
+            font-weight: 700;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+        }
+        .ytvht-progress-bar {
+            position: absolute; left: 0; bottom: 0; height: var(--overlay-bar-height);
+            background: var(--accent); border-radius: 0 3px 0 0; z-index: 2;
+        }
+        .ytvht-card-body { display: flex; gap: 12px; margin-top: 12px; }
+        .ytvht-avatar-link { flex: 0 0 36px; display: block; }
+        .ytvht-card-avatar {
+            flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%;
+            object-fit: cover; background: #373737; display: flex;
+            align-items: center; justify-content: center; color: var(--text);
+            font-size: 16px; font-weight: 500;
+        }
+        .ytvht-card-text { min-width: 0; flex: 1 1 auto; }
+        .video-menu-wrap { position: relative; flex: 0 0 auto; margin-left: auto; }
+        .video-menu-button {
+            width: 34px; height: 34px; padding: 0; border: none;
+            border-radius: 50%; background: transparent; color: var(--text);
+            font-size: 24px; line-height: 1; cursor: pointer;
+        }
+        .video-menu-button:hover { background: var(--chip); }
+        .video-menu {
+            position: absolute; right: 0; top: 36px; z-index: 50;
+            width: 225px; padding: 6px;
+            background: var(--panel); border: 1px solid var(--border);
+            border-radius: 10px; box-shadow: 0 6px 22px rgba(0,0,0,.45);
+        }
+        .video-menu[hidden] { display: none; }
+        .video-menu-item {
+            display: flex; align-items: center; gap: 11px;
+            width: 100%; padding: 10px 12px;
+            border: none; border-radius: 7px;
+            background: transparent; color: var(--text);
+            text-align: left; font-size: 13px; cursor: pointer;
+        }
+        .video-menu-item:hover { background: var(--chip); }
+        .video-menu-icon {
+            width: 19px; height: 19px; flex: 0 0 19px;
+            fill: none; stroke: currentColor; stroke-width: 1.8;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+        .playlist-picker-backdrop {
+            position: fixed; inset: 0; z-index: 300;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px; background: rgba(0, 0, 0, .68);
+        }
+        .playlist-picker-backdrop[hidden] { display: none; }
+        .playlist-picker {
+            width: min(430px, 100%); max-height: min(620px, 85vh);
+            overflow: hidden; display: flex; flex-direction: column;
+            background: var(--panel); color: var(--text);
+            border: 1px solid var(--border); border-radius: 14px;
+            box-shadow: 0 18px 55px rgba(0, 0, 0, .55);
+        }
+        .playlist-picker-head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 16px; padding: 18px 18px 12px;
+        }
+        .playlist-picker-title { margin: 0; font-size: 20px; }
+        .playlist-picker-close {
+            width: 34px; height: 34px; border: none; border-radius: 50%;
+            background: transparent; color: var(--text); font-size: 24px;
+            line-height: 1; cursor: pointer;
+        }
+        .playlist-picker-close:hover { background: var(--chip); }
+        .playlist-picker-list {
+            display: flex; flex-direction: column; gap: 4px;
+            padding: 4px 10px 12px; overflow-y: auto;
+        }
+        .playlist-picker-option {
+            display: grid; grid-template-columns: 58px minmax(0, 1fr) 28px;
+            align-items: center;
+            gap: 14px; width: 100%; padding: 12px;
+            border: none; border-radius: 9px;
+            background: transparent; color: var(--text);
+            text-align: left; cursor: pointer;
+        }
+        .playlist-picker-option:hover { background: var(--chip); }
+        .playlist-picker-thumb {
+            position: relative; width: 58px; aspect-ratio: 16 / 9;
+            overflow: hidden; border-radius: 6px; background: var(--chip);
+        }
+        .playlist-picker-thumb::before {
+            content: ""; position: absolute; left: 7px; right: 7px; top: -3px;
+            height: 5px; border-radius: 5px; background: #777; opacity: .7;
+        }
+        .playlist-picker-thumb img {
+            width: 100%; height: 100%; display: block; object-fit: cover;
+        }
+        .playlist-picker-thumb-fallback {
+            width: 100%; height: 100%; display: flex;
+            align-items: center; justify-content: center;
+            color: var(--text-2); font-size: 18px;
+        }
+        .playlist-picker-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+        .playlist-picker-option strong {
+            min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            font-size: 15px;
+        }
+        .playlist-picker-option .playlist-picker-meta {
+            color: var(--text-2); font-size: 12px; white-space: nowrap;
+        }
+        .playlist-picker-save-icon {
+            width: 23px; height: 23px; fill: none; stroke: currentColor;
+            stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+        }
+        .playlist-picker-empty {
+            padding: 14px 12px; color: var(--text-2); font-size: 14px;
+        }
+        .playlist-picker-create {
+            display: flex; gap: 8px; padding: 14px 18px 18px;
+            border-top: 1px solid var(--border);
+        }
+        .playlist-picker-create input {
+            min-width: 0; flex: 1 1 auto; border-radius: 18px;
+            padding: 9px 13px; background: var(--chip); color: var(--text);
+            border: 1px solid var(--border); outline: none;
+        }
+        .playlist-action-dialog { width: min(400px, 100%); }
+        .playlist-action-body {
+            padding: 4px 18px 8px; color: var(--text-2);
+            font-size: 14px; line-height: 1.55;
+        }
+        .playlist-action-form {
+            display: flex; flex-direction: column; gap: 8px;
+            padding: 8px 18px 4px;
+        }
+        .playlist-action-form-tight {
+            padding-top: 0;
+        }
+        .playlist-action-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-2);
+        }
+        .playlist-action-form input {
+            width: 100%; border-radius: 18px; padding: 10px 14px;
+            background: var(--chip); color: var(--text);
+            border: 1px solid var(--border); outline: none; font-size: 14px;
+        }
+        .playlist-action-form input:focus { border-color: var(--accent); }
+        .playlist-action-footer {
+            display: flex; justify-content: flex-end; gap: 10px;
+            padding: 14px 18px 18px; border-top: 1px solid var(--border);
+        }
+        .ytvht-card-title {
+            margin: 0 0 4px 0; font-size: 14px; font-weight: 500; line-height: 1.4;
+            color: var(--text); display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .ytvht-card-channel-row {
+            display: flex; align-items: baseline; gap: 6px; min-width: 0;
+            font-size: 12px; line-height: 1.5; color: var(--text-2);
+        }
+        .ytvht-card-channel, .ytvht-card-meta {
+            font-size: 12px; color: var(--text-2); line-height: 1.5;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .ytvht-card-channel { min-width: 0; }
+        .ytvht-card-channel:hover { color: var(--text); }
+        .ytvht-member-badge {
+            display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+            margin-top: 2px; padding: 2px 6px; border-radius: 4px;
+            background: color-mix(in srgb, #22c55e 13%, var(--chip));
+            color: #22c55e; font-size: 12px; font-weight: 700; line-height: 1.35;
+        }
+        .ytvht-member-badge-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #22c55e; color: #0b140f; font-size: 9px; line-height: 1;
+        }
+
+        /* --- Dedicated Shorts gallery --- */
+        body.shorts-mode .section-h {
+            display: flex !important;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            font-size: 24px;
+        }
+        .shorts-heading-icon {
+            width: 28px; height: 28px; flex: 0 0 28px;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: var(--accent);
+        }
+        .shorts-heading-icon svg {
+            width: 27px; height: 27px; display: block;
+            fill: none; stroke: currentColor; stroke-width: 1.8;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+        body.shorts-mode .section-h::after {
+            content: "Quick picks from your subscribed channels";
+            color: var(--text-2); font-size: 13px; font-weight: 400;
+            margin-left: 2px;
+        }
+        body.shorts-mode .grid {
+            grid-template-columns: repeat(auto-fill, 220px);
+            gap: 28px 16px;
+            align-items: start;
+            justify-content: start;
+        }
+        body.shorts-mode .ytvht-feed-card {
+            width: 220px;
+            min-width: 0;
+            transition: transform .16s ease;
+        }
+        body.shorts-mode .ytvht-feed-card.video-menu-open {
+            z-index: 120;
+        }
+        body.shorts-mode .ytvht-feed-card:hover {
+            transform: translateY(-4px);
+        }
+        body.shorts-mode .ytvht-thumb-wrap {
+            aspect-ratio: 9 / 16;
+            border-radius: 14px;
+            background: linear-gradient(160deg, #292929, #111);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, .28);
+        }
+        body.shorts-mode .ytvht-thumb-wrap img {
+            object-fit: cover;
+        }
+        body.shorts-mode .ytvht-card-body {
+            margin-top: 10px;
+            gap: 0;
+        }
+        body.shorts-mode .ytvht-avatar-link {
+            display: none;
+        }
+        body.shorts-mode .ytvht-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            -webkit-line-clamp: 2;
+        }
+        body.shorts-mode .ytvht-card-channel {
+            margin-top: 5px;
+        }
+        body.shorts-mode .ytvht-card-stats {
+            margin-top: 1px;
+        }
+        body.shorts-mode .ytvht-card-duration {
+            right: 7px; bottom: 7px;
+            padding: 3px 6px;
+        }
+        @media (max-width: 900px) {
+            body.shorts-mode .grid {
+                grid-template-columns: repeat(auto-fill, 170px);
+            }
+            body.shorts-mode .ytvht-feed-card { width: 170px; }
+        }
+        @media (max-width: 700px) {
+            body.shorts-mode .grid {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+                padding-left: 12px; padding-right: 12px;
+            }
+            body.shorts-mode .ytvht-feed-card { width: auto; }
+            body.shorts-mode .section-h::after { display: none; }
+        }
+
+        /* Subscribe button on search results */
+        .subbtn {
+            margin-top: 8px;
+            align-self: flex-start;
+            background: var(--accent);
+            color: #0f0f0f;
+            border: none;
+            border-radius: 16px;
+            padding: 6px 14px;
+            width: 108px;
+            box-sizing: border-box;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .subbtn.subbed {
+            background: var(--chip);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .subbtn:disabled { opacity: 0.6; cursor: default; }
+
+        /* Channel result card (full row) */
+        .channel-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 12px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        .channel-card:hover { background: color-mix(in srgb, var(--panel) 86%, var(--chip-hover)); }
+        .channel-card .ch-ava {
+            width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+            background: #373737; display: flex; align-items: center;
+            justify-content: center; font-size: 18px; font-weight: 600; color: var(--text);
+        }
+        .channel-card .ch-meta { flex: 1 1 auto; min-width: 0; }
+        .channel-card .ch-name { font-size: 15px; font-weight: 600; color: var(--text); text-decoration: none; }
+        .channel-card .ch-name:hover { text-decoration: underline; }
+        .channel-card .ch-subs { font-size: 13px; color: var(--text-2); }
+        .channel-card .subbtn { margin-top: 0; align-self: center; }
+        .ch-view {
+            flex: 0 0 auto;
+            color: var(--text-2);
+            font-size: 13px;
+            padding-right: 4px;
+        }
+
+        /* YouTube-style results: a vertical list of wide rows */
+        #ytSection { max-width: 1280px; }
+        .yt-results { display: flex; flex-direction: column; gap: 16px; padding: 18px 24px 60px; }
+        .yt-row {
+            position: relative;
+            display: grid;
+            grid-template-columns: 360px minmax(0, 1fr) 32px;
+            gap: 16px;
+            align-items: start;
+        }
+        .yt-row.yt-row-menu-only {
+            grid-template-columns: 360px minmax(0, 1fr) 32px;
+        }
+        .yt-row-thumb { width: 100%; display: block; }
+        .yt-row-thumb .ytvht-thumb-wrap { width: 100%; }
+        .yt-row-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; padding-top: 2px; }
+        .yt-row-actions {
+            display: grid;
+            grid-template-columns: 24px;
+            gap: 0;
+            align-items: start;
+            justify-content: end;
+            padding-top: 2px;
+        }
+        .yt-row-actions .video-menu-wrap { justify-self: end; }
+        .yt-row-actions.menu-only {
+            grid-template-columns: 24px;
+            gap: 0;
+        }
+        .search-group-title {
+            color: var(--text-2);
+            font-size: 13px;
+            font-weight: 600;
+            margin: 2px 0 -4px;
+        }
+        .search-channel-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 780px;
+        }
+        .playlists-list.playlists-list-detail {
+            display: block;
+        }
+        .local-playlist-detail {
+            grid-column: 1 / -1;
+            display: flex; flex-direction: column; gap: 0;
+            width: 100%;
+            max-width: 900px;
+        }
+        .local-playlist-header {
+            margin-bottom: 18px;
+        }
+        .local-playlist-title {
+            margin: 0 0 4px;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .local-playlist-count {
+            color: var(--text-2);
+            font-size: 14px;
+        }
+        .local-playlist-toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap;
+            padding-bottom: 16px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            width: 100%;
+        }
+        .local-playlist-toolbar-left {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .local-playlist-toolbar-actions {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            margin-left: auto;
+        }
+        .local-playlist-videos {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            width: 100%;
+        }
+        .local-playlist-detail .playlist-order-hint {
+            margin: 0 0 10px;
+        }
+        .local-playlist-detail .playlist-detail-row.yt-row,
+        .local-playlist-detail .playlist-detail-row.yt-row.yt-row-menu-only {
+            grid-template-columns: 280px minmax(0, 1fr) 32px;
+            width: 100%;
+        }
+        .local-playlist-detail .yt-row-title,
+        .local-playlist-detail .yt-row-channel {
+            text-decoration: none;
+        }
+        .local-playlist-detail .yt-row-title:hover,
+        .local-playlist-detail .yt-row-channel:hover {
+            text-decoration: underline;
+        }
+        .local-playlist-detail .playlist-detail-row,
+        .local-playlist-detail .playlist-sort-row {
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .local-playlist-detail .playlist-detail-row:last-child,
+        .local-playlist-detail .playlist-sort-row:last-child {
+            border-bottom: none;
+        }
+        .playlist-detail-loading-status {
+            display: flex; align-items: center; gap: 10px;
+            color: var(--text-2); font-size: 14px;
+            padding: 4px 0 14px;
+        }
+        .playlist-detail-loading-status .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid var(--text-2); border-top-color: transparent;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+        }
+        .playlist-detail-skeletons {
+            display: flex; flex-direction: column; width: 100%;
+        }
+        .playlist-detail-skeleton-row {
+            display: grid;
+            grid-template-columns: 280px minmax(0, 1fr);
+            gap: 16px; padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .playlist-detail-skeleton-row:last-child { border-bottom: none; }
+        .playlist-detail-skeleton-thumb {
+            width: 100%; aspect-ratio: 16 / 9; border-radius: 8px;
+            background: var(--chip);
+            animation: playlist-skeleton-pulse 1.4s ease-in-out infinite;
+        }
+        .playlist-detail-skeleton-text {
+            display: flex; flex-direction: column; gap: 10px; padding-top: 8px;
+        }
+        .playlist-detail-skeleton-line {
+            height: 14px; border-radius: 7px; background: var(--chip);
+            animation: playlist-skeleton-pulse 1.4s ease-in-out infinite;
+        }
+        .playlist-detail-skeleton-line.title { width: 85%; height: 18px; }
+        .playlist-detail-skeleton-line.meta { width: 42%; }
+        .playlist-detail-skeleton-line.channel { width: 28%; }
+        @keyframes playlist-skeleton-pulse {
+            0%, 100% { opacity: 0.45; }
+            50% { opacity: 0.9; }
+        }
+        .local-playlist-back { align-self: flex-start; }
+        .playlist-order-hint {
+            color: var(--text-2); font-size: 13px;
+            margin: -4px 0 2px;
+        }
+        .playlist-sort-row {
+            border-radius: 10px;
+            transition: opacity .15s, background .15s;
+        }
+        .playlist-sort-row.yt-row,
+        .playlist-sort-row.yt-row.yt-row-menu-only {
+            grid-template-columns: 34px 280px minmax(0, 1fr) 32px;
+            width: 100%;
+        }
+        .playlist-sort-row .playlist-drag-handle {
+            grid-column: 1;
+            align-self: start;
+            margin-top: 28px;
+        }
+        .playlist-sort-row .yt-row-thumb { grid-column: 2; }
+        .playlist-sort-row .yt-row-info { grid-column: 3; }
+        .playlist-sort-row .yt-row-actions { grid-column: 4; }
+        .playlist-sort-row.dragging { opacity: .45; }
+        .playlist-sort-row.drag-over {
+            background: color-mix(in srgb, var(--accent) 10%, transparent);
+        }
+        .playlist-drag-handle {
+            flex: 0 0 34px; width: 34px; height: 44px;
+            align-self: center; border: 0; border-radius: 8px;
+            background: transparent; color: var(--text-2);
+            font-size: 20px; cursor: grab;
+        }
+        .playlist-drag-handle:hover {
+            color: var(--text); background: var(--chip);
+        }
+        .playlist-drag-handle:active { cursor: grabbing; }
+        .yt-row-title {
+            font-size: 18px; font-weight: 500; line-height: 1.3; color: var(--text);
+            margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .yt-row-meta { font-size: 13px; color: var(--text-2); margin-bottom: 10px; }
+        .yt-row-channel { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
+        .yt-row-channel:hover { color: var(--text); }
+        .yt-row-ava { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: #373737; }
+        .history-view { padding: 22px 24px 60px; }
+        .history-toolbar {
+            display: flex; align-items: flex-end; justify-content: space-between;
+            gap: 18px; flex-wrap: wrap; margin-bottom: 22px;
+        }
+        .history-title { margin: 0 0 4px; font-size: 24px; }
+        .history-count { color: var(--text-2); font-size: 14px; }
+        .history-list {
+            display: flex; flex-direction: column; gap: 20px;
+            width: 100%;
+        }
+        .history-row {
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .history-row.yt-row,
+        .history-row.yt-row.yt-row-menu-only {
+            grid-template-columns: 360px minmax(0, 1fr) auto;
+        }
+        .history-row .yt-row-actions,
+        .history-row .yt-row-actions.menu-only {
+            grid-template-columns: auto 24px;
+            gap: 8px;
+            align-items: center;
+        }
+        .history-row .history-remove {
+            align-self: start;
+            justify-self: end;
+            white-space: nowrap;
+        }
+        .history-empty {
+            padding: 60px 0; color: var(--text-2); text-align: center;
+        }
+        .local-search-results {
+            max-width: 1280px;
+            padding-top: 8px;
+        }
+        .search-filters {
+            display: none; align-items: center; gap: 10px; flex-wrap: wrap;
+            max-width: 1280px; padding: 8px 24px 4px;
+        }
+        .search-filters.visible.open { display: none; }
+        .search-filter-label { color: var(--text-2); font-size: 13px; }
+        .search-filters select {
+            min-width: 130px; padding: 7px 12px;
+            border-radius: 18px; font-size: 13px;
+        }
+        .search-source-tabs {
+            display: none; gap: 8px; padding: 8px 24px 10px;
+            align-items: center;
+        }
+        .search-source-tabs.visible { display: none; }
+        .search-source-tab {
+            border: 1px solid var(--border); border-radius: 18px;
+            background: var(--chip); color: var(--text);
+            padding: 7px 16px; cursor: pointer; font-size: 13px;
+        }
+        .search-source-tab:hover { background: var(--chip-hover); }
+        .search-source-tab.active {
+            background: var(--accent); border-color: var(--accent);
+            color: #0f0f0f; font-weight: 600;
+        }
+        .search-filter-toggle {
+            margin-left: 4px; border: 1px solid var(--border);
+            border-radius: 18px; background: transparent; color: var(--text);
+            padding: 7px 14px; cursor: pointer; font-size: 13px;
+        }
+        .search-filter-toggle:hover,
+        .search-filter-toggle.active { background: var(--chip); }
+        .search-load-more {
+            align-self: center; margin: 12px auto 24px;
+            min-width: 140px;
+        }
+        .search-auto-load {
+            min-height: 48px;
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; color: var(--text-2); font-size: 13px;
+            margin: 8px 0 24px;
+        }
+        .local-channel-result {
+            display: grid;
+            grid-template-columns: 76px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 18px;
+            padding: 8px 12px 18px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .local-channel-avatar-link {
+            display: flex; justify-content: center; text-decoration: none;
+        }
+        .local-channel-avatar {
+            width: 72px; height: 72px; border-radius: 50%;
+            object-fit: cover; background: var(--chip);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text); font-size: 24px; font-weight: 700;
+        }
+        .local-channel-info { min-width: 0; }
+        .local-channel-name {
+            color: var(--text); text-decoration: none;
+            font-size: 22px; font-weight: 600;
+        }
+        .local-channel-name:hover { text-decoration: underline; }
+        .local-channel-meta {
+            color: var(--text-2); font-size: 13px; margin-top: 8px;
+        }
+        .local-channel-description {
+            color: var(--text-2); font-size: 13px; margin-top: 10px;
+        }
+        .local-channel-view {
+            color: var(--text-2);
+            font-size: 13px;
+            padding-right: 8px;
+        }
+        .channel-view {
+            max-width: 1280px;
+            padding: 22px 24px 70px;
+        }
+        .channel-view-back {
+            margin-bottom: 18px;
+        }
+        .channel-view-hero {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding: 18px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: var(--panel);
+        }
+        .channel-view-avatar {
+            width: 82px;
+            height: 82px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: var(--chip);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text);
+            font-size: 30px;
+            font-weight: 700;
+            flex: 0 0 82px;
+        }
+        .channel-view-info {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+        .channel-view-title {
+            margin: 0;
+            color: var(--text);
+            font-size: 28px;
+            line-height: 1.15;
+        }
+        .channel-view-meta {
+            margin-top: 7px;
+            color: var(--text-2);
+            font-size: 13px;
+        }
+        .channel-view-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 0 0 auto;
+        }
+        .channel-view-actions .subbtn {
+            margin: 0;
+        }
+        .channel-view-videos {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding-top: 22px;
+        }
+        .channel-view-empty {
+            padding: 44px 0;
+            color: var(--text-2);
+            text-align: center;
+        }
+        @media (max-width: 1100px) {
+            .yt-row,
+            .yt-row.yt-row-menu-only {
+                grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) 32px;
+            }
+            .history-row.yt-row,
+            .history-row.yt-row.yt-row-menu-only {
+                grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) auto;
+            }
+            .playlist-sort-row.yt-row,
+            .playlist-sort-row.yt-row.yt-row-menu-only {
+                grid-template-columns: 34px minmax(240px, 300px) minmax(0, 1fr) 32px;
+            }
+        }
+        @media (max-width: 800px) {
+            .local-channel-result {
+                grid-template-columns: 90px minmax(0, 1fr);
+                gap: 16px;
+            }
+            .local-channel-avatar { width: 80px; height: 80px; font-size: 28px; }
+            .local-channel-view { grid-column: 2; }
+            .yt-row { grid-template-columns: 1fr; }
+            .history-row.yt-row,
+            .history-row.yt-row.yt-row-menu-only {
+                grid-template-columns: 1fr auto;
+            }
+            .history-row .yt-row-thumb { grid-column: 1 / -1; }
+            .history-row .yt-row-info { grid-column: 1; }
+            .history-row .yt-row-actions { grid-column: 2; }
+            .playlist-sort-row.yt-row,
+            .playlist-sort-row.yt-row.yt-row-menu-only {
+                grid-template-columns: 34px minmax(0, 1fr) 32px;
+            }
+            .playlist-sort-row .yt-row-thumb { grid-column: 1 / -1; }
+            .playlist-sort-row .playlist-drag-handle {
+                grid-column: 1;
+                margin-top: 0;
+                align-self: center;
+            }
+            .playlist-sort-row .yt-row-info { grid-column: 2; }
+            .playlist-sort-row .yt-row-actions { grid-column: 3; }
+            .yt-row-thumb { width: 100%; }
+            .yt-row-actions { display: flex; justify-content: flex-start; }
+            .channel-view-hero {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+        /* A channel's latest uploads, shown indented under its result */
+        .yt-channel-latest { display: flex; flex-direction: column; gap: 14px; margin: 2px 0 6px 24px; padding-left: 16px; border-left: 2px solid var(--border); }
+
+        /* ===== YouTube-style layout: masthead + sidebar + main ===== */
+        .masthead {
+            position: sticky; top: 0; z-index: 30;
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(280px, 560px) minmax(220px, 1fr);
+            align-items: center;
+            gap: 16px;
+            padding: 8px 16px; height: 56px;
+            background: var(--bg); border-bottom: 1px solid var(--border);
+        }
+        .mast-left { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+        .icon-btn {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: transparent; border: none; cursor: pointer;
+            display: inline-flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 4px;
+        }
+        .icon-btn:hover { background: var(--chip); }
+        .icon-btn span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 2px; }
+        .brand-logo { color: var(--accent); margin-right: 2px; }
+        .mast-search { min-width: 0; display: flex; justify-content: center; }
+        .mast-search input[type="search"] { width: 100%; max-width: 560px; }
+        .mast-right { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+        @media (max-width: 900px) {
+            .masthead {
+                grid-template-columns: auto minmax(160px, 1fr) auto;
+            }
+        }
+
+        .layout { display: flex; align-items: flex-start; }
+        .sidebar {
+            position: sticky; top: 56px; align-self: flex-start;
+            flex: 0 0 200px; width: 200px;
+            height: calc(100vh - 56px); overflow-y: auto;
+            padding: 12px 8px;
+        }
+        .nav-item {
+            display: flex; align-items: center; gap: 16px; width: 100%;
+            padding: 10px 12px; margin-bottom: 2px;
+            background: transparent; border: none; border-radius: 10px;
+            color: var(--text); font-size: 14px; cursor: pointer; text-align: left;
+        }
+        .nav-item:hover { background: var(--chip); }
+        .nav-item.active {
+            background: color-mix(in srgb, var(--accent) 18%, var(--chip));
+            box-shadow: inset 3px 0 0 var(--accent);
+            font-weight: 600;
+        }
+        .nav-ico {
+            width: 22px; height: 22px; flex: 0 0 22px;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: var(--text-2);
+        }
+        .nav-ico svg {
+            width: 21px; height: 21px; display: block;
+            fill: none; stroke: currentColor; stroke-width: 1.8;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+        .nav-item:hover .nav-ico { color: var(--text); }
+        .nav-item.active .nav-ico { color: var(--accent); }
+        .nav-sep { height: 1px; background: var(--border); margin: 10px 8px; }
+
+        .main { flex: 1 1 auto; min-width: 0; }
+        .chips { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 24px 0; }
+
+        /* Options (⋮) dropdown next to Refresh — three clear round dots */
+        .icon-btn.dots span { width: 4px; height: 4px; border-radius: 50%; }
+        .menu-wrap { position: relative; }
+        .menu {
+            position: absolute; top: 46px; right: 0;
+            background: var(--panel); border: 1px solid var(--border);
+            border-radius: 10px; padding: 6px; min-width: 190px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); z-index: 40;
+        }
+        .menu:focus-within {
+            border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+        }
+        .menu[hidden] { display: none; }
+        .menu-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 10px; border-radius: 8px; cursor: pointer;
+            font-size: 14px; color: var(--text); white-space: nowrap;
+        }
+        .menu-item input { flex: 0 0 auto; }
+        .menu-item-icon {
+            width: 18px; height: 18px; flex: 0 0 18px;
+            color: var(--text-2); fill: none; stroke: currentColor;
+            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+        }
+        .menu-item:has(input:checked) .menu-item-icon { color: var(--accent); }
+        .menu-item:has(input:checked) .menu-item-icon.member {
+            color: #0f1411;
+        }
+        .menu-item-icon.member {
+            width: 14px; height: 14px; flex-basis: 14px;
+            border-radius: 50%; background: #16c86d; color: #0f1411;
+            fill: currentColor; stroke: none; padding: 2px; box-sizing: border-box;
+        }
+        .menu-item:hover { background: var(--chip); }
+
+        /* Hamburger collapses the sidebar; also auto-collapse on narrow screens. */
+        body.sidebar-collapsed .sidebar { display: none; }
+        @media (max-width: 1000px) { .sidebar { display: none; } }
+    </style>
+</head>
+<body>
+    <!-- Masthead -->
+    <header class="masthead">
+        <div class="mast-left">
+            <button class="icon-btn" id="menuToggle" title="Menu" aria-label="Menu" data-i18n-title="feed_menu" data-i18n-aria-label="feed_menu">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="brand" id="brandHome" role="button" tabindex="0" title="Back to your feed" data-i18n-title="feed_back_to_feed" style="cursor:pointer;">
+                <span class="brand-logo">▶</span>YT re:Watch
+            </div>
+        </div>
+        <div class="mast-search">
+            <input type="search" id="search" placeholder="Search YouTube" data-i18n-placeholder="feed_search_youtube" autocomplete="off">
+        </div>
+        <div class="mast-right">
+            <button class="btn primary" id="refresh" data-i18n="feed_refresh">Refresh</button>
+            <button class="btn primary" id="createPlaylist" type="button" style="display:none;" data-i18n="feed_create">Create</button>
+            <button class="btn danger" id="clearSubscriptions" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
+            <button class="btn danger" id="clearHistoryPage" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
+            <div class="menu-wrap">
+                <button class="icon-btn dots" id="optionsToggle" title="Options" aria-label="Options" data-i18n-title="feed_options" data-i18n-aria-label="feed_options">
+                    <span></span><span></span><span></span>
+                </button>
+                <div class="menu" id="optionsMenu" hidden>
+                    <label class="menu-item">
+                        <input type="checkbox" id="unwatched">
+                        <svg class="menu-item-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="m3 3 18 18"></path>
+                        </svg>
+                        <span data-i18n="feed_unwatched_only">Unwatched only</span>
+                    </label>
+                    <label class="menu-item">
+                        <input type="checkbox" id="hideMembers">
+                        <svg class="menu-item-icon member" viewBox="0 0 16 16" aria-hidden="true">
+                            <path d="M8 4.1 8.95 6l2.1.3-1.52 1.48.36 2.09L8 8.88 6.11 9.87l.36-2.09L4.95 6.3 7.05 6 8 4.1Z"></path>
+                        </svg>
+                        <span data-i18n="feed_hide_members">Hide member videos</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="layout">
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <button class="nav-item active" id="navHome" title="Personalized locally from your watch history" data-i18n-title="feed_nav_home_title">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.8 12 3l9 7.8"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-7h5v7"></path></svg></span><span data-i18n="feed_nav_home">Home</span>
+            </button>
+            <button class="nav-item" id="navSubscriptions" title="Latest videos from your subscribed channels" data-i18n-title="feed_nav_subscriptions_title">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2"></rect><path d="m9 3 3 3 3-3"></path><path d="m10 10 5 3-5 3v-6Z"></path></svg></span><span data-i18n="feed_nav_subscriptions">Subscriptions</span>
+            </button>
+            <button class="nav-item" id="navShorts">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13.5 2-7 11h5l-1 9 7-12h-5l1-8Z"></path></svg></span><span data-i18n="feed_nav_shorts">Shorts</span>
+            </button>
+            <button class="nav-item" id="navPlaylists" title="View saved playlists" data-i18n-title="feed_nav_playlists_title">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 11h10M4 16h7"></path><path d="m15 14 5 3-5 3v-6Z"></path></svg></span><span data-i18n="feed_nav_playlists">Playlists</span>
+            </button>
+            <button class="nav-item" id="navHistory" title="View your local watch history" data-i18n-title="feed_nav_history_title">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"></path><path d="M4 4v5h5"></path><path d="M12 7v5l3 2"></path></svg></span><span data-i18n="feed_nav_history">History</span>
+            </button>
+            <button class="nav-item" id="manage" title="Manage your locally subscribed channels" data-i18n-title="feed_nav_channels_title">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-4 2.5-6 5.5-6s5 2 5.5 6"></path><circle cx="17" cy="9" r="2.2"></circle><path d="M15.5 14c3.2-.5 5 1.2 5.5 4"></path></svg></span><span data-i18n="feed_nav_channels">Channels</span>
+            </button>
+            <div class="nav-sep"></div>
+            <button class="nav-item" id="analyticsToggle" title="View your watch analytics" data-i18n-title="feed_nav_analytics_title">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7"></path><path d="M2 20h20"></path></svg></span><span data-i18n="feed_nav_analytics">Analytics</span>
+            </button>
+            <div class="nav-sep"></div>
+            <button class="nav-item" id="navSettings" title="Open extension settings" data-i18n-title="feed_nav_settings_title">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H10v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3V10h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.16 4.1l.06.06A1.7 1.7 0 0 0 9.1 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3H14v.1a1.7 1.7 0 0 0 1.1 1.6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 9.1a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1V14h-.1a1.7 1.7 0 0 0-1.7 1Z"></path></svg></span><span data-i18n="feed_nav_settings">Settings</span>
+            </button>
+        </nav>
+
+        <!-- Main content -->
+        <main class="main">
+            <div class="chips">
+                <span class="count" id="count"></span>
+            </div>
+
+            <div class="status" id="status"></div>
+            <div class="status" id="homeDebug" style="display:none;"></div>
+
+            <h2 class="section-h" id="localHeading" data-i18n="feed_your_feed">Your feed</h2>
+            <div class="search-source-tabs" id="searchSourceTabs" aria-label="Search options" data-i18n-aria-label="feed_search_options">
+                <button class="search-filter-toggle" id="searchFilterToggle" type="button" data-i18n="feed_filters">Filters</button>
+            </div>
+            <div class="search-filters" id="searchFilters">
+                <select id="searchDate" aria-label="Upload date" data-i18n-aria-label="feed_upload_date">
+                    <option value="any" data-i18n="feed_upload_date">Upload date</option>
+                    <option value="day" data-i18n="feed_today">Today</option>
+                    <option value="week" data-i18n="feed_this_week">This week</option>
+                    <option value="month" data-i18n="feed_this_month">This month</option>
+                    <option value="year" data-i18n="feed_this_year">This year</option>
+                </select>
+                <select id="searchDuration" aria-label="Duration" data-i18n-aria-label="feed_duration">
+                    <option value="any" data-i18n="feed_duration">Duration</option>
+                    <option value="short" data-i18n="feed_under_4_minutes">Under 4 minutes</option>
+                    <option value="medium" data-i18n="feed_4_to_20_minutes">4-20 minutes</option>
+                    <option value="long" data-i18n="feed_over_20_minutes">Over 20 minutes</option>
+                </select>
+                <select id="searchWatched" aria-label="Watch status" data-i18n-aria-label="feed_watch_status">
+                    <option value="any" data-i18n="feed_watch_status">Watch status</option>
+                    <option value="unwatched" data-i18n="feed_unwatched">Unwatched</option>
+                    <option value="progress" data-i18n="feed_in_progress">In progress</option>
+                    <option value="watched" data-i18n="feed_watched">Watched</option>
+                </select>
+                <select id="searchSort" aria-label="Sort search results" data-i18n-aria-label="feed_sort_search_results">
+                    <option value="relevance" data-i18n="feed_sort">Sort</option>
+                    <option value="newest" data-i18n="feed_newest">Newest</option>
+                    <option value="oldest" data-i18n="feed_oldest">Oldest</option>
+                </select>
+            </div>
+            <div class="grid" id="grid"></div>
+            <div class="yt-results local-search-results" id="localSearchResults" style="display:none;"></div>
+            <div class="empty" id="empty" style="display:none;"></div>
+
+            <div id="ytSection" style="display:none;">
+                <h2 class="section-h"><span data-i18n="feed_search_results_for">Search results for</span> <span class="sub" id="ytSub"></span></h2>
+                <div class="status" id="ytStatus"></div>
+                <div class="yt-results" id="ytGrid"></div>
+            </div>
+
+            <section class="channel-view" id="channelSection" style="display:none;">
+                <button class="btn channel-view-back" id="channelBack" type="button" data-i18n="feed_back_to_results">Back to results</button>
+                <div class="channel-view-hero">
+                    <div id="channelAvatar"></div>
+                    <div class="channel-view-info">
+                        <h2 class="channel-view-title" id="channelTitle"></h2>
+                        <div class="channel-view-meta" id="channelMeta"></div>
+                    </div>
+                    <div class="channel-view-actions" id="channelActions"></div>
+                </div>
+                <div class="channel-view-videos" id="channelVideos"></div>
+                <div class="channel-view-empty" id="channelEmpty" style="display:none;" data-i18n="feed_no_channel_videos">No videos found for this channel yet.</div>
+            </section>
+
+            <!-- Local subscriptions manager -->
+            <section class="subs-view" id="subscriptionsSection" style="display:none;">
+                <div class="subs-toolbar">
+                    <div>
+                        <h2 class="subs-title" data-i18n="feed_channels">Channels</h2>
+                        <div class="subs-count" id="subscriptionsCount"></div>
+                    </div>
+                </div>
+                <div class="subs-list" id="subscriptionsList"></div>
+                <div class="subs-empty" id="subscriptionsEmpty" style="display:none;">
+                    <span data-i18n="feed_no_local_channels">No locally subscribed channels yet. Search in the extension and use Subscribe.</span>
+                </div>
+            </section>
+
+            <!-- Saved playlists -->
+            <section class="playlists-view" id="playlistsSection" style="display:none;">
+                <div class="playlists-toolbar">
+                    <div>
+                        <h2 class="playlists-title" data-i18n="feed_playlists">Playlists</h2>
+                        <div class="playlists-count" id="playlistsCount"></div>
+                    </div>
+                </div>
+                <div class="playlists-list" id="playlistsList"></div>
+                <div class="playlists-empty" id="playlistsEmpty" style="display:none;">
+                    <span data-i18n="feed_no_saved_playlists">No saved playlists yet.</span>
+                </div>
+            </section>
+
+            <!-- Local watch history -->
+            <section class="history-view" id="historySection" style="display:none;">
+                <div class="history-toolbar">
+                    <div>
+                        <h2 class="history-title" data-i18n="feed_history">History</h2>
+                        <div class="history-count" id="historyCount"></div>
+                    </div>
+                </div>
+                <div class="history-list" id="historyList"></div>
+                <div class="history-empty" id="historyEmpty" style="display:none;" data-i18n="feed_no_history_matches">No watch history matches these filters.</div>
+                <button class="btn primary search-load-more" id="historyLoadMore" style="display:none;" data-i18n="feed_load_more">Load more</button>
+            </section>
+
+            <!-- Analytics view (hidden until the Analytics nav item is clicked) -->
+            <div id="analyticsSection" style="display:none;">
+                <h2 class="section-h"><span data-i18n="feed_analytics">Analytics</span> <span class="sub" data-i18n="feed_analytics_subtitle">your watch stats, kept locally</span></h2>
+                <div class="an-cards" id="anCards"></div>
+                <div class="an-charts">
+                    <div class="an-chart">
+                        <div class="an-chart-title" data-i18n="feed_watch_activity_7_days">Watch activity (last 7 days)</div>
+                        <div class="an-bars" id="anDaily"></div>
+                    </div>
+                    <div class="an-chart">
+                        <div class="an-chart-title" data-i18n="feed_watch_time_by_hour">Watch time by hour</div>
+                        <div class="an-bars" id="anHourly"></div>
+                    </div>
+                </div>
+                <div class="an-insights">
+                    <section class="an-panel">
+                        <h3 class="an-panel-title" data-i18n="feed_how_much_finish">How much you finish</h3>
+                        <div id="anCompletion"></div>
+                    </section>
+                    <section class="an-panel">
+                        <h3 class="an-panel-title" data-i18n="feed_top_channels">Top channels</h3>
+                        <div id="anTopChannels"></div>
+                    </section>
+                    <section class="an-panel an-panel-wide">
+                        <h3 class="an-panel-title" data-i18n="feed_continue_watching">Continue watching</h3>
+                        <div class="an-continue-list" id="anContinue"></div>
+                    </section>
+                </div>
+            </div>
+
+            <section class="settings-view" id="settingsSection" style="display:none;">
+                <div class="settings-header">
+                    <div>
+                        <h2 class="settings-title" data-i18n="feed_settings">Settings</h2>
+                        <p class="settings-subtitle" data-i18n="feed_settings_subtitle">Everything stays local in this browser.</p>
+                    </div>
+                    <div class="settings-header-actions">
+                        <span class="settings-message" id="feedSettingsMessage"></span>
+                    </div>
+                </div>
+                <div class="settings-shell">
+                    <section class="settings-block">
+                        <h3 class="settings-block-title" data-i18n="feed_settings_display">Display</h3>
+                        <div class="setting-field">
+                            <label for="feedSettingTheme" data-i18n="feed_settings_theme">Theme</label>
+                            <select id="feedSettingTheme">
+                                <option value="system" data-i18n="feed_system_default">System default</option>
+                                <option value="dark" data-i18n="feed_dark">Dark</option>
+                                <option value="light" data-i18n="feed_light">Light</option>
+                            </select>
+                        </div>
+                        <div class="setting-field">
+                            <label for="feedSettingAccent" data-i18n="feed_accent_color">Accent color</label>
+                            <select id="feedSettingAccent">
+                                <option value="blue" data-i18n="feed_blue">Blue</option>
+                                <option value="red" data-i18n="feed_red">Red</option>
+                                <option value="green" data-i18n="feed_green">Green</option>
+                                <option value="purple" data-i18n="feed_purple">Purple</option>
+                                <option value="orange" data-i18n="feed_orange">Orange</option>
+                            </select>
+                        </div>
+                        <div class="setting-field">
+                            <label for="feedSettingDefaultPage" data-i18n="feed_default_tab">Default tab</label>
+                            <select id="feedSettingDefaultPage">
+                                <option value="home" data-i18n="feed_nav_home">Home</option>
+                                <option value="subscriptions" data-i18n="feed_nav_subscriptions">Subscriptions</option>
+                                <option value="shorts" data-i18n="feed_nav_shorts">Shorts</option>
+                                <option value="playlists" data-i18n="feed_nav_playlists">Playlists</option>
+                                <option value="history" data-i18n="feed_nav_history">History</option>
+                                <option value="channels" data-i18n="feed_nav_channels">Channels</option>
+                                <option value="analytics" data-i18n="feed_nav_analytics">Analytics</option>
+                                <option value="last" data-i18n="feed_last_used_tab">Last used tab</option>
+                            </select>
+                        </div>
+                    </section>
+                    <section class="settings-block">
+                        <h3 class="settings-block-title" data-i18n="feed_history_and_feed">History & feed</h3>
+                        <div class="setting-field">
+                            <label for="feedSettingRefresh" data-i18n="feed_check_new_videos">Check for new videos</label>
+                            <select id="feedSettingRefresh">
+                                <option value="15" data-i18n="feed_every_15_minutes">Every 15 minutes</option>
+                                <option value="30" data-i18n="feed_every_30_minutes">Every 30 minutes</option>
+                                <option value="60" data-i18n="feed_every_hour">Every hour</option>
+                                <option value="180" data-i18n="feed_every_3_hours">Every 3 hours</option>
+                                <option value="360" data-i18n="feed_every_6_hours">Every 6 hours</option>
+                                <option value="720" data-i18n="feed_every_12_hours">Every 12 hours</option>
+                                <option value="1440" data-i18n="feed_once_a_day">Once a day</option>
+                            </select>
+                        </div>
+                        <div class="setting-field">
+                            <label for="feedSettingAutoClean" data-i18n="feed_keep_watch_history">Keep watch history</label>
+                            <select id="feedSettingAutoClean">
+                                <option value="30" data-i18n="feed_30_days">30 days</option>
+                                <option value="90" data-i18n="feed_90_days">90 days</option>
+                                <option value="180" data-i18n="feed_180_days">180 days</option>
+                                <option value="forever" selected data-i18n="feed_forever">Forever</option>
+                            </select>
+                        </div>
+                    </section>
+                    <section class="settings-block">
+                        <h3 class="settings-block-title" data-i18n="feed_data">Data</h3>
+                        <div class="settings-data-rows">
+                            <div class="settings-data-item">
+                                <div class="settings-data-copy">
+                                    <strong data-i18n="feed_backup_restore">Backup & restore</strong>
+                                    <span data-i18n="feed_backup_restore_help">Download or load a JSON file with history, subscriptions, playlists, and settings.</span>
+                                </div>
+                                <div class="settings-action-bar">
+                                    <button class="btn primary" type="button" id="exportFeedData" data-i18n="feed_backup">Backup</button>
+                                    <button class="btn" type="button" id="importFeedData" data-i18n="feed_restore">Restore</button>
+                                </div>
+                            </div>
+                            <div class="settings-data-item">
+                                <div class="settings-data-copy">
+                                    <strong data-i18n="feed_import_from_youtube">Import from YouTube</strong>
+                                    <span data-i18n="feed_import_from_youtube_help">Use the watch-history.html file for your watch history and the subscriptions.csv file for your subscribed channels from Google Takeout.</span>
+                                </div>
+                                <div class="settings-action-bar">
+                                    <button class="btn" type="button" id="importYouTubeHistory" data-i18n="feed_history">History</button>
+                                    <button class="btn" type="button" id="importYouTubeChannels" data-i18n="feed_channels">Channels</button>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="file" id="restoreBackupFile" accept="application/json,.json" hidden>
+                        <input type="file" id="importHistoryFile" accept=".html,.htm" hidden>
+                        <input type="file" id="importChannelsFile" accept=".csv,.json,.txt" hidden>
+                        <div class="settings-danger-split">
+                            <div class="settings-danger-item reset-all">
+                                <div class="settings-danger-copy">
+                                    <strong data-i18n="feed_reset_all_data">Reset all data</strong>
+                                    <span data-i18n="feed_reset_all_data_help">Delete everything, including subscriptions, settings, and backups.</span>
+                                </div>
+                                <button class="btn btn-ghost-danger" type="button" id="resetAllData" data-i18n="feed_reset_all">Reset all</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="playlist-picker-backdrop" id="playlistPicker" hidden>
+        <div class="playlist-picker" role="dialog" aria-modal="true" aria-labelledby="playlistPickerTitle">
+            <div class="playlist-picker-head">
+                <h2 class="playlist-picker-title" id="playlistPickerTitle" data-i18n="feed_add_to_playlist">Add to playlist</h2>
+                <button class="playlist-picker-close" id="playlistPickerClose" type="button" aria-label="Close" data-i18n-aria-label="feed_close">×</button>
+            </div>
+            <div class="playlist-picker-list" id="playlistPickerList"></div>
+            <form class="playlist-picker-create" id="playlistPickerCreate">
+                <input id="playlistPickerName" type="text" maxlength="80" placeholder="Create new playlist" data-i18n-placeholder="feed_create_new_playlist" autocomplete="off">
+                <button class="btn primary" type="submit" data-i18n="feed_create">Create</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="playlist-picker-backdrop" id="playlistActionDialog" hidden>
+        <div class="playlist-picker playlist-action-dialog" role="dialog" aria-modal="true" aria-labelledby="playlistActionDialogTitle">
+            <div class="playlist-picker-head">
+                <h2 class="playlist-picker-title" id="playlistActionDialogTitle"></h2>
+                <button class="playlist-picker-close" id="playlistActionDialogClose" type="button" aria-label="Close" data-i18n-aria-label="feed_close">×</button>
+            </div>
+            <div id="playlistActionDialogBody"></div>
+            <div class="playlist-action-footer" id="playlistActionDialogFooter"></div>
+        </div>
+    </div>
+
+    <script src="indexeddb-storage.js"></script>
+    <script src="storage.js"></script>
+    <script src="feed-core.js"></script>
+    <script src="feed-state-utils.js"></script>
+    <script src="feed-cards.js"></script>
+    <script src="feed-local-search.js"></script>
+    <script src="feed-home.js"></script>
+    <script src="feed-analytics.js"></script>
+    <script src="feed-subscriptions-view.js"></script>
+    <script src="feed-playlist-import.js"></script>
+    <script src="feed-playlists-view.js"></script>
+    <script src="feed-history-view.js"></script>
+    <script src="feed-settings.js"></script>
+    <script src="feed-localization.js"></script>
+    <script src="feed-backup.js"></script>
+    <script src="feed-data-pipeline.js"></script>
+    <script src="feed-subscribe-results.js"></script>
+    <script src="feed-youtube-search-core.js"></script>
+    <script src="feed-youtube-search-render.js"></script>
+    <script src="feed-channel-view.js"></script>
+    <script src="feed-refresh.js"></script>
+    <script src="feed.js"></script>
+</body>
+</html>

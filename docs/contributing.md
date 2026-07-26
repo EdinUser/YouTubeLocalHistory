@@ -49,7 +49,7 @@ git checkout -b fix/important-bug
 ### Code Style Guidelines
 - **JavaScript ES6+** - Use modern JavaScript features
 - **Consistent naming** - Follow existing variable and function naming patterns
-- **JSDoc comments** - Add documentation for public APIs and complex functions
+- **Comments where useful** - Add short comments for complex behavior, especially storage migrations, YouTube parser logic, and feed ranking rules
 - **2-space indentation** - Match the existing codebase style
 - **Meaningful variable names** - Use descriptive names that explain purpose
 
@@ -58,9 +58,20 @@ git checkout -b fix/important-bug
 1. **Create feature branch** from `main`
 2. **Make your changes** following the guidelines above
 3. **Write tests** for new functionality
-4. **Run all tests** to ensure nothing is broken
+4. **Run checks** to ensure nothing is broken
 5. **Update documentation** if needed
 6. **Submit pull request** with clear description
+
+Recommended checks before opening a PR:
+
+```bash
+npm run lint
+npm test -- --runInBand
+npm run prepare:firefox
+npx web-ext lint --source-dir=build/firefox
+```
+
+For local Firefox testing, load `build/firefox/manifest.json` from `about:debugging` after running `npm run prepare:firefox`.
 
 ### Code Review Guidelines
 
@@ -93,7 +104,7 @@ When reviewing contributions, focus on:
 ### Testing Requirements
 - **Unit tests** for individual functions
 - **Integration tests** for feature interactions
-- **E2E tests** for complete user workflows
+- **E2E tests** for complete user workflows when a change affects browser behavior end-to-end
 - **Cross-browser testing** on Chrome and Firefox
 
 ## 🌍 Localization
@@ -102,7 +113,8 @@ When reviewing contributions, focus on:
 1. Create new folder in `src/_locales/{language_code}/`
 2. Copy structure from existing language (e.g., `en/`)
 3. Translate all JSON files
-4. Update `manifest.json` files to include the new language
+4. Keep message keys in sync across all locale JSON files
+5. Update browser manifests only if the new language needs manifest metadata
 
 ### Translation Guidelines
 - **Keep keys consistent** - Use the same message keys as English

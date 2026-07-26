@@ -20,10 +20,56 @@ copy_common_files() {
     local target_dir=$1
     cp "$PROJECT_ROOT/src/background.js" \
        "$PROJECT_ROOT/src/content.js" \
+       "$PROJECT_ROOT/src/content-css.js" \
+       "$PROJECT_ROOT/src/content-url.js" \
+       "$PROJECT_ROOT/src/content-import.js" \
+       "$PROJECT_ROOT/src/content-playlists.js" \
+       "$PROJECT_ROOT/src/content-info.js" \
+       "$PROJECT_ROOT/src/content-thumbnails.js" \
+       "$PROJECT_ROOT/src/content-messages.js" \
        "$PROJECT_ROOT/src/popup.html" \
+       "$PROJECT_ROOT/src/popup-core.js" \
+       "$PROJECT_ROOT/src/popup-utils.js" \
+       "$PROJECT_ROOT/src/popup-import.js" \
+       "$PROJECT_ROOT/src/popup-settings.js" \
+       "$PROJECT_ROOT/src/popup-search.js" \
+       "$PROJECT_ROOT/src/popup-data-pages.js" \
+       "$PROJECT_ROOT/src/popup-history-display.js" \
+       "$PROJECT_ROOT/src/popup-video-pagination.js" \
+       "$PROJECT_ROOT/src/popup-analytics-core.js" \
+       "$PROJECT_ROOT/src/popup-analytics-charts.js" \
+       "$PROJECT_ROOT/src/popup-analytics-extra.js" \
+       "$PROJECT_ROOT/src/popup-playlists.js" \
+       "$PROJECT_ROOT/src/popup-subscriptions.js" \
+       "$PROJECT_ROOT/src/popup-theme.js" \
+       "$PROJECT_ROOT/src/popup-shorts.js" \
+       "$PROJECT_ROOT/src/popup-localization.js" \
        "$PROJECT_ROOT/src/popup.js" \
+       "$PROJECT_ROOT/src/import.html" \
+       "$PROJECT_ROOT/src/import.js" \
+       "$PROJECT_ROOT/src/feed.html" \
+       "$PROJECT_ROOT/src/feed-core.js" \
+       "$PROJECT_ROOT/src/feed-state-utils.js" \
+       "$PROJECT_ROOT/src/feed-cards.js" \
+       "$PROJECT_ROOT/src/feed-local-search.js" \
+       "$PROJECT_ROOT/src/feed-home.js" \
+       "$PROJECT_ROOT/src/feed-analytics.js" \
+       "$PROJECT_ROOT/src/feed-subscriptions-view.js" \
+       "$PROJECT_ROOT/src/feed-playlist-import.js" \
+       "$PROJECT_ROOT/src/feed-playlists-view.js" \
+       "$PROJECT_ROOT/src/feed-history-view.js" \
+       "$PROJECT_ROOT/src/feed-settings.js" \
+       "$PROJECT_ROOT/src/feed-localization.js" \
+       "$PROJECT_ROOT/src/feed-backup.js" \
+       "$PROJECT_ROOT/src/feed-data-pipeline.js" \
+       "$PROJECT_ROOT/src/feed-subscribe-results.js" \
+       "$PROJECT_ROOT/src/feed-youtube-search-core.js" \
+       "$PROJECT_ROOT/src/feed-youtube-search-render.js" \
+       "$PROJECT_ROOT/src/feed-channel-view.js" \
+       "$PROJECT_ROOT/src/feed-refresh.js" \
+       "$PROJECT_ROOT/src/feed.js" \
        "$PROJECT_ROOT/src/storage.js" \
-       "$PROJECT_ROOT/src/sync-service.js" \
+       "$PROJECT_ROOT/src/content-subscriptions.js" \
        "$PROJECT_ROOT/src/indexeddb-storage.js" \
        "$target_dir/"
     cp "$PROJECT_ROOT/src/icon"*.png "$target_dir/"
@@ -65,7 +111,7 @@ copy_common_files "$PROJECT_ROOT/build/firefox"
 cp "$PROJECT_ROOT/src/manifest.firefox.json" "$PROJECT_ROOT/build/firefox/manifest.json"
 cd "$PROJECT_ROOT/build/firefox"
 # For Firefox, we need to zip the files directly, not the directory
-zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js popup.html popup.js storage.js sync-service.js indexeddb-storage.js icon*.png -x ".*"
+zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js content-css.js content-url.js content-import.js content-playlists.js content-info.js content-thumbnails.js content-messages.js popup.html popup-core.js popup-utils.js popup-import.js popup-settings.js popup-search.js popup-data-pages.js popup-history-display.js popup-video-pagination.js popup-analytics-core.js popup-analytics-charts.js popup-analytics-extra.js popup-playlists.js popup-subscriptions.js popup-theme.js popup-shorts.js popup-localization.js popup.js import.html import.js feed.html feed-core.js feed-state-utils.js feed-cards.js feed-local-search.js feed-home.js feed-analytics.js feed-subscriptions-view.js feed-playlist-import.js feed-playlists-view.js feed-history-view.js feed-settings.js feed-localization.js feed-backup.js feed-data-pipeline.js feed-subscribe-results.js feed-youtube-search-core.js feed-youtube-search-render.js feed-channel-view.js feed-refresh.js feed.js storage.js content-subscriptions.js indexeddb-storage.js icon*.png -x ".*"
 # Include _locales in the Firefox zip if it exists
 if [ -d _locales ]; then
     zip -r "../../dist/youtube-local-history-firefox-v$VERSION.zip" _locales -x ".*"
