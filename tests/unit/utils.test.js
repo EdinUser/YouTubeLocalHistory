@@ -11,32 +11,20 @@ describe('Utility Functions', () => {
       const url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
       const urlParams = new URLSearchParams(url.split('?')[1]);
       const videoId = urlParams.get('v');
-      
+
       expect(videoId).toBe('dQw4w9WgXcQ');
     });
 
     test('should extract video ID from Shorts URL', () => {
-      Object.defineProperty(window, 'location', {
-        value: {
-          href: 'https://www.youtube.com/shorts/dQw4w9WgXcQ',
-          pathname: '/shorts/dQw4w9WgXcQ'
-        },
-        writable: true
-      });
-
-      const videoId = window.location.pathname.match(/\/shorts\/([^\/\?]+)/)?.[1];
+      const href = 'https://www.youtube.com/shorts/dQw4w9WgXcQ';
+      const pathname = new URL(href).pathname;
+      const videoId = pathname.match(/\/shorts\/([^\/\?]+)/)?.[1];
       expect(videoId).toBe('dQw4w9WgXcQ');
     });
 
     test('should extract video ID from youtu.be URL', () => {
-      Object.defineProperty(window, 'location', {
-        value: {
-          href: 'https://youtu.be/dQw4w9WgXcQ'
-        },
-        writable: true
-      });
-
-      const videoId = window.location.href.match(/youtu\.be\/([^\/\?]+)/)?.[1];
+      const href = 'https://youtu.be/dQw4w9WgXcQ';
+      const videoId = href.match(/youtu\.be\/([^\/\?]+)/)?.[1];
       expect(videoId).toBe('dQw4w9WgXcQ');
     });
 
@@ -44,7 +32,7 @@ describe('Utility Functions', () => {
       const url = 'https://www.youtube.com/';
       const urlParams = new URLSearchParams(url.split('?')[1]);
       const videoId = urlParams.get('v');
-      
+
       expect(videoId).toBeNull();
     });
   });
@@ -66,7 +54,7 @@ describe('Utility Functions', () => {
           const videoIdMatch = url.match(/youtu\.be\/([^?&]+)/);
           videoId = videoIdMatch ? videoIdMatch[1] : null;
         }
-        
+
         // Remove query parameters except 'v'
         const cleanUrl = url.split('?')[0] + '?v=' + videoId;
         expect(cleanUrl).toContain('v=dQw4w9WgXcQ');
@@ -91,11 +79,11 @@ describe('Utility Functions', () => {
 
       const playlistId = 'PL1234567890';
       const playlistTitle = 'Test Playlist';
-      
+
       // Extract playlist ID from meta tag
       const metaUrl = document.querySelector('meta[property="og:url"]')?.content;
       const extractedPlaylistId = metaUrl?.match(/[?&]list=([^&]+)/)?.[1];
-      
+
       // Extract title from page
       const extractedTitle = document.querySelector('#title')?.textContent;
 
@@ -104,17 +92,10 @@ describe('Utility Functions', () => {
     });
 
     test('should return null for non-playlist pages', () => {
-      Object.defineProperty(window, 'location', {
-        value: {
-          href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-          search: '?v=dQw4w9WgXcQ'
-        },
-        writable: true
-      });
-
-      const urlParams = new URLSearchParams(window.location.search);
+      const search = '?v=dQw4w9WgXcQ';
+      const urlParams = new URLSearchParams(search);
       const playlistId = urlParams.get('list');
-      
+
       expect(playlistId).toBeNull();
     });
   });
@@ -206,7 +187,7 @@ describe('Utility Functions', () => {
         const hours = Math.floor(seconds / 3600);
         const mins = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
-        
+
         if (hours > 0) {
           return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
@@ -217,4 +198,4 @@ describe('Utility Functions', () => {
       expect(formatLongTime(7325)).toBe('2:02:05');
     });
   });
-}); 
+});

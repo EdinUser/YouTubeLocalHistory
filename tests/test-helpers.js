@@ -3,13 +3,27 @@
  */
 
 /**
+ * Change the jsdom document URL for a test. `window.location` is not configurable; assigning it
+ * triggers jsdom "navigation" errors. Same-origin path changes via history.replaceState work when
+ * jest.config sets testEnvironmentOptions.url to https://www.youtube.com/.
+ * @param {string|URL} url
+ */
+function mockWindowLocation(url) {
+  const u = new URL(typeof url === 'string' ? url : url.href);
+  if (typeof window === 'undefined' || !window.history) {
+    throw new Error('mockWindowLocation requires a jsdom window (see jest.config.js testEnvironmentOptions.url)');
+  }
+  window.history.replaceState(null, '', u.pathname + u.search + u.hash);
+}
+
+/**
  * Creates a mock video element with basic functionality
  * @returns {HTMLVideoElement} A mock video element
  */
 function createMockVideoElement() {
   // Create a plain object instead of a real video element to avoid read-only property issues
   const eventListeners = {};
-  
+
   const video = {
     currentTime: 30,
     paused: false,
@@ -39,7 +53,7 @@ function createMockVideoElement() {
       }
       eventListeners[event].push(handler);
     }),
-    
+
     removeEventListener: jest.fn((event, handler) => {
       if (eventListeners[event]) {
         const index = eventListeners[event].indexOf(handler);
@@ -48,14 +62,14 @@ function createMockVideoElement() {
         }
       }
     }),
-    
+
     // Helper method to trigger events on the video
     triggerEvent: (event, data) => {
       if (eventListeners[event]) {
         eventListeners[event].forEach(handler => handler(data));
       }
     },
-    
+
     // Mock other DOM element properties
     nodeType: 1,
     tagName: 'VIDEO',
@@ -74,14 +88,14 @@ function createMockVideoElement() {
     },
     style: {}
   };
-  
+
   // Helper method to trigger events on the video
   video.triggerEvent = (event, data) => {
     if (eventListeners[event]) {
       eventListeners[event].forEach(handler => handler(data));
     }
   };
-  
+
   return video;
 }
 
@@ -100,5 +114,6 @@ function createMockThumbnail() {
 // Export the functions for use in test files
 module.exports = {
   createMockVideoElement,
-  createMockThumbnail
+  createMockThumbnail,
+  mockWindowLocation,
 };

@@ -8,34 +8,7 @@
 
 const { test, expect } = require('@playwright/test');
 
-// Helper to dismiss YouTube cookie/consent dialogs that block interaction
-async function dismissYouTubeConsent(page) {
-  try {
-    // Try common "Reject all" / "Accept all" buttons
-    const rejectButton = page.getByRole('button', { name: /reject all/i }).first();
-    if (await rejectButton.isVisible().catch(() => false)) {
-      await rejectButton.click();
-      await page.waitForTimeout(500);
-      return;
-    }
-
-    const acceptButton = page.getByRole('button', { name: /accept all/i }).first();
-    if (await acceptButton.isVisible().catch(() => false)) {
-      await acceptButton.click();
-      await page.waitForTimeout(500);
-      return;
-    }
-
-    // Fallback: look for a generic "I agree" style button
-    const agreeButton = page.getByRole('button', { name: /i agree|got it/i }).first();
-    if (await agreeButton.isVisible().catch(() => false)) {
-      await agreeButton.click();
-      await page.waitForTimeout(500);
-    }
-  } catch {
-    // If selectors or wording change, ignore and continue
-  }
-}
+const { dismissYouTubeConsent } = require('./youtube-consent');
 
 // Test configuration
 test.describe('YT re:Watch Extension E2E', () => {
@@ -201,7 +174,7 @@ test.describe('Extension Functionality (requires extension)', () => {
     // --- First Click: Open Popup ---
     // Simulate the extension action being clicked
     await backgroundPage.evaluate(() => chrome.runtime.sendMessage({ type: 'openPopup' }));
-    
+
     // Wait for the popup to open
     await context.waitForEvent('page');
     expect(getPopupCount()).toBe(1);
@@ -366,4 +339,4 @@ test.describe('Accessibility Tests', () => {
     const video = page.locator('video');
     await expect(video).toHaveAttribute('controls');
   });
-}); 
+});

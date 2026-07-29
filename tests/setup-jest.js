@@ -3,20 +3,12 @@ const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
-// Now require JSDOM
-const { JSDOM } = require('jsdom');
+// Use Jest's built-in jsdom (see jest.config.js testEnvironmentOptions). Do not assign
+// global.window to a second JSDOM instance — Jest's global *is* the Window, and replacing
+// global.window breaks window.location / window.window invariants.
 
-// Create a basic DOM environment
-const dom = new JSDOM('<!doctype html><html><body></body></html>', {
-  url: 'https://www.youtube.com/',
-  runScripts: 'dangerously',
-  resources: 'usable',
-});
-
-// Set global objects
-global.window = dom.window;
-global.document = dom.window.document;
 global.navigator = {
+  ...global.navigator,
   userAgent: 'node.js',
 };
 

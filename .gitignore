@@ -1,7 +1,9 @@
 # Build outputs
 build/
 dist/
-helpers/
+# Ignore helper/build artifacts; keep maintainer audit doc tracked
+helpers/**
+!helpers/PROJECT_AUDIT.md
 *.zip
 *.xpi
 
@@ -10,6 +12,9 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Playwright saved browser state (may contain cookies — never commit)
+yt-storage.json
 
 # Test outputs
 coverage/

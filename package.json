@@ -10,8 +10,11 @@
     "test:memory": "jest --testPathPattern=memory",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
+    "build:e2e": "bash scripts/build-chrome-unpacked.sh",
+    "test:e2e": "playwright test --project=chromium-extension",
+    "test:e2e:youtube": "playwright test --project=chromium",
+    "test:e2e:all": "playwright test",
+    "test:e2e:ui": "playwright test --project=chromium-extension --ui",
     "build": "./build.sh",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix"
