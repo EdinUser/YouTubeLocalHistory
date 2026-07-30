@@ -2,8 +2,7 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 /**
- * Local: `npm run test:e2e` — extension smoke (build/chrome + headed Chromium).
- * Optional: `npm run test:e2e:youtube` — YouTube pages without the extension (fast regression on selectors).
+ * Local: `npm run test:e2e` — core extension behavior against live YouTube.
  *
  * To run every Playwright project: `npx playwright test`
  */
@@ -28,7 +27,7 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: ['**/extension-smoke.spec.js'],
+      testIgnore: ['**/extension-*.spec.js', '**/core-*.spec.js', '**/static-*.spec.js'],
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chromium',
@@ -36,8 +35,18 @@ module.exports = defineConfig({
     },
     {
       name: 'chromium-extension',
-      testMatch: ['**/extension-smoke.spec.js'],
+      testMatch: ['**/core-*.spec.js'],
       // Extension loads via tests/e2e/extension-fixture.js (launchPersistentContext); keep one worker for stability.
+      workers: 1,
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chromium',
+      },
+    },
+    {
+      name: 'chromium-extension-static',
+      testMatch: ['**/static-*.spec.js'],
+      // Static replay still uses the real extension context and extension storage.
       workers: 1,
       use: {
         ...devices['Desktop Chrome'],

@@ -3,7 +3,6 @@ build/
 dist/
 # Ignore helper/build artifacts; keep maintainer audit doc tracked
 helpers/**
-!helpers/PROJECT_AUDIT.md
 *.zip
 *.xpi
 
@@ -22,6 +21,7 @@ coverage/
 test-results/
 playwright-report/
 playwright/.cache/
+tests/fixtures/youtube-pages/captures/
 
 # IDE and editor files
 .vscode/

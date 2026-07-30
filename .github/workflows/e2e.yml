@@ -27,5 +27,5 @@ jobs:
       - name: Build unpacked extension
         run: npm run build:e2e
 
-      - name: Run extension smoke tests
+      - name: Run Chromium extension E2E tests
         run: xvfb-run --auto-servernum npm run test:e2e

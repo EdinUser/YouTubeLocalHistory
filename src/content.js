@@ -902,7 +902,7 @@
     }
 
     // Save the current video timestamp (regular videos)
-    async function saveTimestamp() {
+    async function saveTimestamp(forcedTime = null) {
         if (window.location.pathname.startsWith('/shorts/')) {
             await saveShortsTimestamp();
             return;
@@ -934,7 +934,7 @@
             // ignore URL parsing errors
         }
 
-        let currentTime = video.currentTime;
+        let currentTime = typeof forcedTime === 'number' && forcedTime > 0 ? forcedTime : video.currentTime;
         const duration = video.duration;
         const videoId = getVideoId();
         if (!videoId) return;
@@ -1168,12 +1168,12 @@
     }
 
     // Start periodic saving with shorter interval
-    function startSaveInterval() {
+    function startSaveInterval(saveFn = saveTimestamp) {
         if (saveIntervalId) {
             clearInterval(saveIntervalId);
         }
-        saveTimestamp(); // Save immediately
-        saveIntervalId = setInterval(saveTimestamp, 5000); // Changed from SAVE_INTERVAL to fixed 5000ms
+        saveFn(); // Save immediately
+        saveIntervalId = setInterval(saveFn, 5000); // Changed from SAVE_INTERVAL to fixed 5000ms
     }
 
     // Debounce helper function
@@ -1215,12 +1215,55 @@
         let timestampLoaded = false;
         let lastSaveTime = 0;
         const MIN_SAVE_INTERVAL = 1000;
+        const MIN_RESTORE_TIME = 30;
+        const RESTORE_GUARD_WINDOW = 20000;
+        const CONTENT_CHANGE_GUARD_WINDOW = 5000;
+        let restoreRetryTimeout = null;
+        const trackingStartedAt = Date.now();
+
+        const getLowerResetSaveDeferral = async (candidateTime = null) => {
+            const videoId = getVideoId();
+            if (!videoId) return null;
+
+            const currentTime = typeof candidateTime === 'number' && candidateTime > 0 ? candidateTime : video.currentTime || 0;
+            if (currentTime <= 0) return null;
+
+            try {
+                const record = await ytStorage.getVideo(videoId);
+                const savedTime = record && typeof record.time === 'number' ? record.time : 0;
+                if (savedTime < MIN_RESTORE_TIME || currentTime >= savedTime - 2) {
+                    return null;
+                }
+
+                const now = Date.now();
+                const recentlyStartedTracking = now - trackingStartedAt < RESTORE_GUARD_WINDOW;
+                const recentContentChange = now - simulatedLastContentChangeTime < CONTENT_CHANGE_GUARD_WINDOW;
+
+                return recentlyStartedTracking || recentContentChange ? savedTime : null;
+            } catch (error) {
+                log('[RESTORE-GUARD] Failed to inspect saved timestamp before saving:', error);
+                return null;
+            }
+        };
+
+        const guardedSaveTimestamp = async (candidateTime = null) => {
+            const deferredSavedTime = await getLowerResetSaveDeferral(candidateTime);
+            if (deferredSavedTime) {
+                const currentTime = typeof candidateTime === 'number' && candidateTime > 0 ? candidateTime : video.currentTime || 0;
+                log(`[RESTORE-GUARD] Deferring save at ${currentTime.toFixed(2)}s and reapplying saved timestamp ${deferredSavedTime.toFixed(2)}s after player reset`);
+                video.currentTime = deferredSavedTime;
+                timestampLoaded = true;
+                return;
+            }
+
+            await saveTimestamp(candidateTime);
+        };
 
         const debouncedSave = debounce(async () => {
             const now = Date.now();
             if (now - lastSaveTime < MIN_SAVE_INTERVAL) return;
             lastSaveTime = now;
-            await saveTimestamp();
+            await guardedSaveTimestamp();
         }, 500);
 
         const ensureVideoReady = async () => {
@@ -1301,18 +1344,40 @@
                 log(`[DRY-RUN] Video state: paused=${video.paused}, currentTime=${currentTimeAfterMetadata.toFixed(2)}s, savedTime=${savedTime.toFixed(2)}s`);
                 log(`[DRY-RUN] Time windows: SPA=${timeSinceSpaNavigation}ms ago (${isRecentSpaNavigation ? 'RECENT' : 'OLD'}), ContentChange=${timeSinceSimulatedContentChange}ms ago (${isRecentSimulatedContentChange ? 'RECENT' : 'OLD'})`);
 
+                const setSavedTime = () => {
+                    video.currentTime = savedTime;
+
+                    // YouTube can swap/reset the media element after preroll ads or player reloads.
+                    // Keep retrying briefly while the real content is still before the saved point.
+                    if (restoreRetryTimeout) clearTimeout(restoreRetryTimeout);
+                    restoreRetryTimeout = setTimeout(() => {
+                        if (!video.isConnected) return;
+                        const latestTime = video.currentTime || 0;
+                        const latestDuration = video.duration || 0;
+                        if (
+                            savedTime >= MIN_RESTORE_TIME &&
+                            latestDuration > savedTime &&
+                            latestTime > 0 &&
+                            latestTime < savedTime - tolerance
+                        ) {
+                            log(`[RESTORE-RETRY] Reapplying saved timestamp ${savedTime.toFixed(2)}s after player reset (current=${latestTime.toFixed(2)}s)`);
+                            video.currentTime = savedTime;
+                        }
+                    }, 2000);
+                };
+
                 if (Math.abs(currentTimeAfterMetadata - savedTime) > tolerance) {
                     // CURRENT LOGIC (time-based SPA navigation)
                     if (isRecentSpaNavigation) {
                         log(`[CURRENT] Recent SPA navigation (${timeSinceSpaNavigation}ms ago), restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
-                        video.currentTime = savedTime;
+                        setSavedTime();
                     } else {
                         // Not recent SPA navigation - check if it's a mode change
                         if (!video.paused && currentTimeAfterMetadata > savedTime) {
                             log(`[CURRENT] Video is playing and ahead of saved time, likely mode change - skipping restore`);
                         } else {
                             log(`[CURRENT] Restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
-                            video.currentTime = savedTime;
+                            setSavedTime();
                         }
                     }
 
@@ -1331,7 +1396,7 @@
                 timestampLoaded = true;
 
                 if (!video.paused) {
-                    startSaveInterval();
+                    startSaveInterval(guardedSaveTimestamp);
                 }
             } catch (err) {
                 log(`[ensureVideoReady] Error:`, err);
@@ -1379,7 +1444,7 @@
         // Event handlers with minimal logging
         addTrackedEventListener(video, 'play', async () => {
             // Start save interval as usual
-            startSaveInterval();
+            startSaveInterval(guardedSaveTimestamp);
 
             // ENHANCED PLAYLIST AUTOPLAY DETECTION
             // Check if this might be playlist autoplay that bypassed URL timestamp
@@ -1429,17 +1494,39 @@
                 }
             }
         });
+        addTrackedEventListener(video, 'loadstart', async () => {
+            const videoId = getVideoId();
+            if (!videoId) return;
+
+            try {
+                const record = await ytStorage.getVideo(videoId);
+                const savedTime = record && typeof record.time === 'number' ? record.time : 0;
+                if (savedTime < MIN_RESTORE_TIME) return;
+
+                setTimeout(() => {
+                    if (!video.isConnected) return;
+                    const currentTime = video.currentTime || 0;
+                    const duration = video.duration || 0;
+                    if (duration > savedTime && currentTime > 0 && currentTime < savedTime - 2) {
+                        log(`[LOADSTART-RESTORE] Reapplying saved timestamp ${savedTime.toFixed(2)}s after video loadstart reset (current=${currentTime.toFixed(2)}s)`);
+                        video.currentTime = savedTime;
+                    }
+                }, 1500);
+            } catch (error) {
+                log('[LOADSTART-RESTORE] Failed to restore after loadstart:', error);
+            }
+        });
         addTrackedEventListener(video, 'pause', () => {
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
             }
-            debouncedSave();
+            debouncedSave(video.currentTime || 0);
         });
         addTrackedEventListener(video, 'timeupdate', () => {
             const currentTime = Math.floor(video.currentTime);
             const interval = window.location.pathname.startsWith('/shorts/') ? 5 : 15;
-            if (currentTime > 0 && currentTime % interval === 0) debouncedSave();
+            if (currentTime > 0 && currentTime % interval === 0) debouncedSave(video.currentTime || currentTime);
         });
         addTrackedEventListener(video, 'seeking', () => {
             if (saveIntervalId) {
@@ -1448,8 +1535,8 @@
             }
         });
         addTrackedEventListener(video, 'seeked', () => {
-            debouncedSave();
-            if (!video.paused) startSaveInterval();
+            debouncedSave(video.currentTime || 0);
+            if (!video.paused) startSaveInterval(guardedSaveTimestamp);
         });
 
         // ENHANCED VIDEO CHANGE DETECTION
@@ -1490,7 +1577,7 @@
         // This handles SPA navigation where video auto-starts before listeners are attached
         if (!video.paused && !saveIntervalId) {
             log('[SPA] Video already playing during setup, starting save interval immediately');
-            startSaveInterval();
+            startSaveInterval(guardedSaveTimestamp);
         }
     }
 
@@ -1772,6 +1859,31 @@
     // Initialize and set up event listeners
     async function initializeIfNeeded() {
         if (isInitialized) {
+            const video = document.querySelector('video');
+            if (video && !trackedVideos.has(video)) {
+                log('Page initialized before video element; attaching video tracking now...');
+                try {
+                    await ytStorage.ensureMigrated();
+                    setupVideoTracking(video);
+                    tryToSavePlaylist();
+                    showExtensionInfo();
+
+                    if (document.body) {
+                        videoObserver.observe(document.body, {
+                            childList: true,
+                            subtree: true
+                        });
+                    }
+                } catch (error) {
+                    log('Error initializing delayed video tracking:', error);
+                    return false;
+                }
+            }
+
+            if (!video && getVideoId()) {
+                return false;
+            }
+
             return true;
         }
 
@@ -2274,11 +2386,36 @@
         // Ensure the target element has relative positioning
         targetElement.style.position = 'relative';
 
+        const videoContainer =
+            thumbnailElement.closest('ytd-rich-item-renderer') ||
+            thumbnailElement.closest('ytd-grid-video-renderer') ||
+            thumbnailElement.closest('ytd-video-renderer') ||
+            thumbnailElement.closest('ytd-playlist-video-renderer') ||
+            thumbnailElement.closest('ytd-playlist-panel-video-renderer') ||
+            thumbnailElement.closest('ytd-compact-video-renderer') ||
+            thumbnailElement.closest('yt-lockup-view-model') ||
+            thumbnailElement;
+        videoContainer.querySelectorAll('.ytvht-viewed-label, .ytvht-progress-bar, .ytvht-remove-button').forEach(existingOverlay => {
+            if (!targetElement.contains(existingOverlay)) {
+                existingOverlay.remove();
+            }
+        });
+
         let label = targetElement.querySelector('.ytvht-viewed-label');
         let progress = targetElement.querySelector('.ytvht-progress-bar');
         let removeBtn = targetElement.querySelector('.ytvht-remove-button');
 
         ytStorage.getVideo(videoId).then(record => {
+            videoContainer.querySelectorAll('.ytvht-viewed-label, .ytvht-progress-bar, .ytvht-remove-button').forEach(existingOverlay => {
+                if (!targetElement.contains(existingOverlay)) {
+                    existingOverlay.remove();
+                }
+            });
+
+            label = targetElement.querySelector('.ytvht-viewed-label');
+            progress = targetElement.querySelector('.ytvht-progress-bar');
+            removeBtn = targetElement.querySelector('.ytvht-remove-button');
+
             if (record) {
                 const size = OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium;
                 const color = OVERLAY_COLORS[currentSettings.overlayColor];

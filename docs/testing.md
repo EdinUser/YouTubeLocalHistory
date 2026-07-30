@@ -23,20 +23,21 @@ Runs **Jest** (unit, integration, memory). Playwright E2E is separate: `npm run 
 
 ## 🔬 Test Categories
 
-### End-to-End (Playwright) — local first
+### End-to-End (Chromium Playwright) — local first
 
-Real Chromium loads the **unpacked** extension from `build/chrome`.
+Real Chromium loads the **unpacked E2E** extension from `build/e2e/chrome`.
 
 ```bash
 npx playwright install chromium   # one-time
 
-npm run test:e2e         # extension smoke (headed window; MV3-friendly)
+npm run test:e2e         # live + static Chromium extension E2E
+npm run test:e2e:live    # live YouTube Chromium extension E2E
+npm run test:e2e:static  # captured-DOM Chromium extension E2E
 npm run test:e2e:ui      # Playwright UI
-npm run test:e2e:youtube  # YouTube-only checks, no extension
 npm run test:e2e:all     # all Playwright projects
 ```
 
-If `build/chrome/manifest.json` is missing, global setup runs `npm run build:e2e`.
+If `build/e2e/chrome/manifest.json` is missing, global setup runs `npm run build:e2e`.
 
 Set **`PW_HEADLESS=1`** only if you must run headless (extension behavior may differ; on Linux pair with `xvfb-run`).
 
@@ -44,11 +45,11 @@ Optional **yt-storage.json** in the repo root (loaded by `extension-fixture.js` 
 
 GitHub: run **E2E (Playwright)** manually via Actions (`workflow_dispatch`) — `.github/workflows/e2e.yml`.
 
-- **`global-setup.js` / `global-teardown.js`**: Prepare/teardown.
-- **`extension-smoke.spec.js`**: `#ytvht-styles` on YouTube + popup UI (`popup.html`) via `chrome-extension://` URL + search-driven watch/save flow (`funny cats` result opens, plays briefly, and must persist under extension storage).
-- **`extension.e2e.test.js`**: Heavier YouTube flows (mostly `chromium` project without extension).
+- **`core-resume.spec.js`**: live YouTube save/resume contract.
+- **`core-overlays.spec.js`**: live playlist/channel overlay contracts.
+- **`static-overlays.spec.js`**: captured playlist/channel DOM overlay contracts.
 
-Older detail: extension smoke uses **headed** Chromium so MV3 loads reliably on developer machines; CI uses `xvfb-run` (see `.github/workflows/e2e.yml`). Headless Chromium can still be useful for debugging, but YouTube may show anti-bot / CAPTCHA interstitials on watch pages there, especially for search-result navigation.
+Local Chromium extension tests are headed by default unless `PW_HEADLESS=1`; CI uses `xvfb-run` (see `.github/workflows/e2e.yml`). Headless Chromium can still be useful for debugging, but live YouTube may show anti-bot / CAPTCHA interstitials on watch pages.
 
 ### Testing YouTube DOM changes
 

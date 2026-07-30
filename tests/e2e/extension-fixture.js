@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 
 const rootDir = path.resolve(__dirname, '../..');
-const extensionPath = path.resolve(rootDir, 'build', 'chrome');
+const extensionPath = path.resolve(rootDir, 'build', 'e2e', 'chrome');
 const storageStatePath = path.join(rootDir, 'yt-storage.json');
 
 const test = base.extend({

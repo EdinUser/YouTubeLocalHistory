@@ -3,8 +3,9 @@
 # Use environment variables with fallbacks for security (paths not exposed in git)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Clean build directories - FIX: Remove quotes around globs to allow expansion
-rm -rf $PROJECT_ROOT/build/chrome/* $PROJECT_ROOT/build/firefox/*
+# Clean store build directories only. E2E builds live under build/e2e.
+rm -rf "$PROJECT_ROOT/build/chrome" "$PROJECT_ROOT/build/firefox"
+mkdir -p "$PROJECT_ROOT/build/chrome" "$PROJECT_ROOT/build/firefox"
 
 # Create dist directory if it doesn't exist
 mkdir -p "$PROJECT_ROOT/dist"

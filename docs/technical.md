@@ -651,8 +651,13 @@ tests/
 │   ├── video-tracking.test.js
 │   └── storage.test.js
 ├── e2e/
-│   ├── extension.e2e.test.js
-│   └── user-flows.test.js
+│   ├── core-resume.spec.js
+│   ├── core-overlays.spec.js
+│   └── static-overlays.spec.js
+├── firefox/
+│   ├── core-resume.firefox.test.js
+│   ├── core-overlays.firefox.test.js
+│   └── static-overlays.firefox.test.js
 └── helpers/
     ├── setup.js
     └── mock-data.js
