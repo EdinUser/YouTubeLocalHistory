@@ -3113,7 +3113,9 @@
         };
         window.__YTVHT_TEST__.core = {
             saveTimestamp,
-            saveShortsTimestamp
+            saveShortsTimestamp,
+            savePlaylistInfo,
+            loadSettings
         };
     }
 })();
