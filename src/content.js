@@ -382,6 +382,7 @@
     });
 
     const {
+        savePlaylistInfo,
         tryToSavePlaylist,
         ensurePlaylistIgnoreToggles
     } = window.YTVHTContentPlaylists.create({
@@ -1534,8 +1535,10 @@
             getLastProcessedVideoId: () => lastProcessedVideoId
         };
         window.__YTVHT_TEST__.core = {
+            loadSettings,
             saveTimestamp,
-            saveShortsTimestamp
+            saveShortsTimestamp,
+            savePlaylistInfo
         };
     }
 })();

@@ -46,24 +46,8 @@ global.window.YTVHTContentCss = {
   updateOverlayCSS: jest.fn(),
 };
 
-global.window.YTVHTContentUrls = {
-  create: () => ({
-    getVideoId: () => {
-      const shortsMatch = window.location.pathname.match(/\/shorts\/([^/?]+)/);
-      if (shortsMatch) return shortsMatch[1];
-      return new URLSearchParams(window.location.search).get('v');
-    },
-    getCleanVideoUrl: () => window.location.href,
-    interceptVideoLinkClicks: jest.fn(),
-  }),
-};
-
-global.window.YTVHTContentPlaylists = {
-  create: () => ({
-    tryToSavePlaylist: jest.fn(),
-    ensurePlaylistIgnoreToggles: jest.fn(),
-  }),
-};
+require('../src/content-url.js');
+require('../src/content-playlists.js');
 
 global.window.YTVHTContentThumbnails = {
   create: () => ({
