@@ -2,10 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 const srcLocalesDir = path.join(__dirname, 'src/_locales');
-const buildTargets = [
-  path.join(__dirname, 'build/chrome/_locales'),
-  path.join(__dirname, 'build/firefox/_locales'),
-];
+const buildTargets = process.argv.slice(2).map(target => path.resolve(__dirname, target));
+
+if (!buildTargets.length) {
+  buildTargets.push(
+    path.join(__dirname, 'build/chrome/_locales'),
+    path.join(__dirname, 'build/firefox/_locales')
+  );
+}
 
 function mergeLocaleFiles(locale, localePath) {
   const files = fs.readdirSync(localePath)

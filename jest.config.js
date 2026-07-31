@@ -1,5 +1,10 @@
 module.exports = {
   testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    url: 'https://www.youtube.com/',
+    pretendToBeVisual: true,
+    runScripts: 'dangerously',
+  },
   setupFilesAfterEnv: ['<rootDir>/tests/setup-jest.js'],
   testMatch: ['**/tests/**/*.test.js'],
   moduleNameMapper: {
@@ -13,6 +18,7 @@ module.exports = {
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/tests/e2e/'
+    '/tests/e2e/',
+    '/tests/firefox/'
   ]
 };

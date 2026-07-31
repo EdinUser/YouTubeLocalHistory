@@ -7,6 +7,8 @@
 
 'use strict';
 
+const { mockWindowLocation } = require('../test-helpers');
+
 // Ensure the test hook object exists before loading the content script
 if (!global.window.__YTVHT_TEST__) {
   global.window.__YTVHT_TEST__ = {};
@@ -20,13 +22,7 @@ const navigation = global.window.__YTVHT_TEST__.navigation;
 describe('SPA / playlist navigation (real content.js)', () => {
   test('handleSpaNavigation does not throw for new video', () => {
     document.body.innerHTML = '';
-    // Simulate being on a watch page with a video ID
-    const url = new URL('https://www.youtube.com/watch?v=video1');
-    delete window.location;
-    Object.defineProperty(window, 'location', {
-      value: url,
-      writable: true
-    });
+    mockWindowLocation('https://www.youtube.com/watch?v=video1');
 
     // Add a video element to exercise the timing reset path
     const video = document.createElement('video');
@@ -41,12 +37,7 @@ describe('SPA / playlist navigation (real content.js)', () => {
 
   test('checkUrlChange triggers SPA navigation for new video URL', () => {
     document.body.innerHTML = '';
-    const url = new URL('https://www.youtube.com/watch?v=spa123');
-    delete window.location;
-    Object.defineProperty(window, 'location', {
-      value: url,
-      writable: true
-    });
+    mockWindowLocation('https://www.youtube.com/watch?v=spa123');
 
     navigation.checkUrlChange();
 
@@ -55,12 +46,7 @@ describe('SPA / playlist navigation (real content.js)', () => {
 
   test('checkUrlChange triggers playlist navigation for playlist URL', () => {
     document.body.innerHTML = '';
-    const url = new URL('https://www.youtube.com/watch?v=plvid1&list=PLXYZ');
-    delete window.location;
-    Object.defineProperty(window, 'location', {
-      value: url,
-      writable: true
-    });
+    mockWindowLocation('https://www.youtube.com/watch?v=plvid1&list=PLXYZ');
 
     navigation.checkUrlChange();
 
@@ -69,12 +55,7 @@ describe('SPA / playlist navigation (real content.js)', () => {
 
   test('handleSpaNavigation is idempotent for same video ID', () => {
     document.body.innerHTML = '';
-    const url = new URL('https://www.youtube.com/watch?v=videoRepeat');
-    delete window.location;
-    Object.defineProperty(window, 'location', {
-      value: url,
-      writable: true
-    });
+    mockWindowLocation('https://www.youtube.com/watch?v=videoRepeat');
 
     const video = document.createElement('video');
     video.currentTime = 10; // Use > 5 to trigger reset
@@ -92,12 +73,7 @@ describe('SPA / playlist navigation (real content.js)', () => {
 
   test('handlePlaylistNavigation does not throw in playlist context', () => {
     document.body.innerHTML = '';
-    const url = new URL('https://www.youtube.com/watch?v=video1&list=PL123');
-    delete window.location;
-    Object.defineProperty(window, 'location', {
-      value: url,
-      writable: true
-    });
+    mockWindowLocation('https://www.youtube.com/watch?v=video1&list=PL123');
 
     const video = document.createElement('video');
     video.currentTime = 10;
