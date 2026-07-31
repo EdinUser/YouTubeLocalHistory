@@ -691,12 +691,12 @@
     }
 
     // Start periodic progress saves while playback is active.
-    function startSaveInterval() {
+    function startSaveInterval(saveFn = saveTimestamp) {
         if (saveIntervalId) {
             clearInterval(saveIntervalId);
         }
-        saveTimestamp();
-        saveIntervalId = setInterval(saveTimestamp, SAVE_INTERVAL);
+        saveFn();
+        saveIntervalId = setInterval(saveFn, SAVE_INTERVAL);
     }
 
     // Coalesce rapid media events into one storage write.
@@ -754,11 +754,32 @@
             video.currentTime = t;
         };
 
+        const trackingStartedAt = Date.now();
+        const guardedSaveTimestamp = async (candidateTime = null) => {
+            const videoId = getVideoId();
+            const currentTime = typeof candidateTime === 'number' && candidateTime > 0 ? candidateTime : video.currentTime;
+            if (!videoId || currentTime <= 0) return;
+
+            try {
+                const record = await ytStorage.getVideo(videoId);
+                const savedTime = record && typeof record.time === 'number' ? record.time : 0;
+                if (savedTime >= 30 && currentTime < savedTime - 2 && Date.now() - trackingStartedAt < 20000) {
+                    restoreVideoTime(savedTime);
+                    timestampLoaded = true;
+                    return;
+                }
+            } catch (error) {
+                log('[RESTORE-GUARD] Failed to inspect saved timestamp before saving:', error);
+            }
+
+            await saveTimestamp(candidateTime);
+        };
+
         const debouncedSave = debounce(async () => {
             const now = Date.now();
             if (now - lastSaveTime < MIN_SAVE_INTERVAL) return;
             lastSaveTime = now;
-            await saveTimestamp();
+            await guardedSaveTimestamp();
         }, 500);
 
         const ensureVideoReady = async () => {
@@ -851,7 +872,7 @@
                 timestampLoaded = true;
 
                 if (!video.paused) {
-                    startSaveInterval();
+                    startSaveInterval(guardedSaveTimestamp);
                 }
             } catch (err) {
                 log(`[ensureVideoReady] Error:`, err);
@@ -897,7 +918,7 @@
         });
 
         addTrackedEventListener(video, 'play', async () => {
-            startSaveInterval();
+            startSaveInterval(guardedSaveTimestamp);
 
             // Playlist autoplay can bypass normal URL/timestamp restoration, so
             // give the player a moment to settle before restoring saved progress.
@@ -970,7 +991,7 @@
         });
         addTrackedEventListener(video, 'seeked', () => {
             debouncedSave();
-            if (!video.paused) startSaveInterval();
+            if (!video.paused) startSaveInterval(guardedSaveTimestamp);
         });
 
         // Detect video content changes (especially for playlist navigation)
@@ -997,7 +1018,7 @@
         // SPA navigation can attach listeners after autoplay already started.
         if (!video.paused && !saveIntervalId) {
             log('[SPA] Video already playing during setup, starting save interval immediately');
-            startSaveInterval();
+            startSaveInterval(guardedSaveTimestamp);
         }
     }
 

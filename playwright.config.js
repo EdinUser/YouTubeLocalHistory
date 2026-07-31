@@ -1,113 +1,57 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
-const path = require('path');
-const fs = require('fs');
-
-const youtubeStorageState = path.join(__dirname, 'yt-storage.json');
 
 /**
- * @see https://playwright.dev/docs/test-configuration
+ * Local: `npm run test:e2e` — core extension behavior against live YouTube.
+ *
+ * To run every Playwright project: `npx playwright test`
  */
 module.exports = defineConfig({
   testDir: './tests/e2e',
-  /* Run tests in files in parallel */
   fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  // Use a simple console reporter to avoid needing a local HTTP server
   reporter: 'list',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://127.0.0.1:3000',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
-    
-    /* Take screenshot on failure */
     screenshot: 'only-on-failure',
-    
-    /* Record video on failure */
     video: 'retain-on-failure',
   },
-
-  /* Configure projects for major browsers */
+  timeout: 60000,
+  expect: {
+    timeout: 20000,
+  },
+  globalSetup: require.resolve('./tests/e2e/global-setup.js'),
+  globalTeardown: require.resolve('./tests/e2e/global-teardown.js'),
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-
-    // Chromium with the YT re:Watch extension loaded
-    {
-      name: 'chromium-with-extension',
+      testIgnore: ['**/extension-*.spec.js', '**/core-*.spec.js', '**/static-*.spec.js'],
       use: {
         ...devices['Desktop Chrome'],
-        headless: false,
-        // Optional local-only profile state for YouTube cookies/consent.
-        ...(fs.existsSync(youtubeStorageState) ? { storageState: youtubeStorageState } : {}),
-        args: (() => {
-          const extensionPath = path.join(__dirname, 'build', 'chrome');
-          return [
-            `--disable-extensions-except=${extensionPath}`,
-            `--load-extension=${extensionPath}`,
-          ];
-        })(),
+        channel: 'chromium',
       },
     },
-
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: 'chromium-extension',
+      testMatch: ['**/core-*.spec.js'],
+      // Extension loads via tests/e2e/extension-fixture.js (launchPersistentContext); keep one worker for stability.
+      workers: 1,
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chromium',
+      },
     },
-
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: 'chromium-extension-static',
+      testMatch: ['**/static-*.spec.js'],
+      // Static replay still uses the real extension context and extension storage.
+      workers: 1,
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chromium',
+      },
     },
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
   ],
-
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://127.0.0.1:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
-  
-  /* Global timeout for tests */
-  timeout: 30000,
-  
-  /* Expect timeout */
-  expect: {
-    timeout: 10000,
-  },
-  
-  /* Global setup and teardown */
-  globalSetup: require.resolve('./tests/e2e/global-setup.js'),
-  globalTeardown: require.resolve('./tests/e2e/global-teardown.js'),
-}); 
+});

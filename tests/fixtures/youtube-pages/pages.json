@@ -1,0 +1,25 @@
+{
+  "pages": [
+    {
+      "name": "rick-watch",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "purpose": "Watch-page DOM fixture for content script initialization, video ID extraction, watch-page overlay/sidebar behavior, and SPA route fixtures. Do not use as proof that real playback resumes.",
+      "readySelector": "ytd-watch-flexy, #movie_player, video",
+      "settleMs": 4000
+    },
+    {
+      "name": "controlled-playlist",
+      "url": "https://www.youtube.com/playlist?list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR",
+      "purpose": "Maintainer-controlled playlist page for deterministic thumbnail/list overlay regression tests.",
+      "readySelector": "ytd-playlist-video-renderer, a[href*=\"watch?v=\"]",
+      "settleMs": 4000
+    },
+    {
+      "name": "controlled-channel-videos",
+      "url": "https://www.youtube.com/@TodorKirilov/videos",
+      "purpose": "Maintainer-controlled channel videos page for deterministic grid/list overlay regression tests.",
+      "readySelector": "ytd-rich-grid-media, a[href*=\"watch?v=\"]",
+      "settleMs": 4000
+    }
+  ]
+}

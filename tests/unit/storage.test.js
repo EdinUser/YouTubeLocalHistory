@@ -65,7 +65,6 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
     // No Firefox-specific browser API in these tests
     global.browser = undefined;
 
-    // Simulate extension context so _isExtensionContext() returns true
     // Provide a lightweight ytIndexedDBStorage mock – only methods we assert on
     global.ytIndexedDBStorage = {
       getVideo: jest.fn().mockResolvedValue(null),
@@ -84,9 +83,10 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
     ytStorage = global.ytStorage;
 
     // Prevent hybrid migration from running real work in these tests
-    jest.spyOn(ytStorage, '_isExtensionContext').mockReturnValue(true);
     jest.spyOn(ytStorage, 'migrateVideosToIndexedDB').mockResolvedValue();
     jest.spyOn(ytStorage, 'migratePlaylistsToIndexedDB').mockResolvedValue();
+    // Avoid assigning global.location (jsdom treats that as navigation and throws)
+    jest.spyOn(ytStorage, '_isExtensionContext').mockReturnValue(true);
   });
 
   afterEach(() => {

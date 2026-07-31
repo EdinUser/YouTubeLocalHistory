@@ -17,8 +17,14 @@ tests/
 │   └── video-tracking.test.js  # Video tracking workflow tests
 ├── memory/                     # Memory leak detection tests
 │   └── cleanup.test.js         # Cleanup and memory management tests
-└── e2e/                        # End-to-end tests (optional / future)
-    └── extension.e2e.test.js   # Full browser automation tests
+├── e2e/                        # Chromium Playwright extension tests
+│   ├── core-resume.spec.js     # Live YouTube save/resume contract
+│   ├── core-overlays.spec.js   # Live YouTube overlay contracts
+│   └── static-overlays.spec.js # Captured YouTube DOM overlay contracts
+└── firefox/                    # Firefox Selenium/WebExtension tests
+    ├── core-resume.firefox.test.js
+    ├── core-overlays.firefox.test.js
+    └── static-overlays.firefox.test.js
 ```
 
 ## Running Tests
@@ -53,7 +59,10 @@ npm run test:watch
 
 ### Run E2E Tests (if configured)
 ```bash
-npm run test:e2e
+npm run test:e2e       # Chromium live + static
+npm run test:e2e:live  # Chromium live only
+npm run test:e2e:static
+npm run test:firefox:all
 npm run test:e2e:ui  # Opens Playwright UI
 ```
 

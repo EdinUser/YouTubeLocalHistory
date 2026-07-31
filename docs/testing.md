@@ -6,13 +6,11 @@ This document provides a comprehensive overview of the testing strategy, framewo
 
 ## 🚀 Running Tests
 
-All tests can be executed using the following command from the project root:
-
 ```bash
 npm test
 ```
 
-This command will run all test suites, including unit, integration, memory, and end-to-end tests.
+Runs **Jest** (unit, integration, memory). Playwright E2E is separate: `npm run test:e2e` (see End-to-End section below).
 
 ---
 
@@ -25,16 +23,69 @@ This command will run all test suites, including unit, integration, memory, and 
 
 ## 🔬 Test Categories
 
-### End-to-End (E2E) Tests (`/tests/e2e`)
+### End-to-End (Chromium Playwright) — local first
 
-E2E tests simulate real user workflows from start to finish. They run the extension in a headless browser to validate the complete user experience.
+Real Chromium loads the **unpacked E2E** extension from `build/e2e/chrome`.
 
-- **`global-setup.js` / `global-teardown.js`**: These files handle the setup and teardown for the Playwright test environment. The setup script launches a persistent browser context with the extension loaded, and the teardown script closes it.
-- **`extension.e2e.test.js`**: Contains the main E2E test suite. It verifies core extension functionality, such as:
-  - The popup window opens correctly.
-  - The history view displays tracked videos.
-  - Settings can be changed and persisted.
-  - Search and filter functionalities in the popup work as expected.
+```bash
+npx playwright install chromium   # one-time
+
+npm run test:e2e         # live + static Chromium extension E2E
+npm run test:e2e:live    # live YouTube Chromium extension E2E
+npm run test:e2e:static  # captured-DOM Chromium extension E2E
+npm run test:e2e:ui      # Playwright UI
+npm run test:e2e:all     # all Playwright projects
+```
+
+If `build/e2e/chrome/manifest.json` is missing, global setup runs `npm run build:e2e`.
+
+Set **`PW_HEADLESS=1`** only if you must run headless (extension behavior may differ; on Linux pair with `xvfb-run`).
+
+Optional **yt-storage.json** in the repo root (loaded by `extension-fixture.js` when present) saves cookies after you accept consent once—**best way to avoid flaky CMP dialogs**; keep it **gitignored**. **`tests/e2e/youtube-consent.js`** also walks **every frame** (Google CMP often uses iframes), tries **button** and **link** roles, several **locales**, `tp-yt-paper-button` / `ytd-button-renderer` fallbacks, **Escape**, and multiple passes for stacked dialogs. Use `dismissYouTubeConsent(page, { preferReject: true })` if you want “reject all” first.
+
+GitHub: run **E2E (Playwright)** manually via Actions (`workflow_dispatch`) — `.github/workflows/e2e.yml`.
+
+- **`core-resume.spec.js`**: live YouTube save/resume contract.
+- **`core-overlays.spec.js`**: live playlist/channel overlay contracts.
+- **`static-overlays.spec.js`**: captured playlist/channel DOM overlay contracts.
+
+Local Chromium extension tests are headed by default unless `PW_HEADLESS=1`; CI uses `xvfb-run` (see `.github/workflows/e2e.yml`). Headless Chromium can still be useful for debugging, but live YouTube may show anti-bot / CAPTCHA interstitials on watch pages.
+
+### Testing YouTube DOM changes
+
+Live YouTube is useful as a **thin smoke target**, but it is not reliable enough to be the only way to catch markup changes. For DOM-sensitive extension behavior, prefer **fixture-based regression tests** in addition to live Playwright checks.
+
+Recommended approach:
+
+- Keep a very small live YouTube smoke suite:
+  - extension loads on `youtube.com`
+  - content script injects styles
+  - one or two critical selectors still exist
+- Move DOM parsing and DOM-targeting logic into helper functions where possible, then test those helpers against saved HTML fixtures with Jest/jsdom.
+- Save representative HTML snapshots for the YouTube surfaces the extension depends on:
+  - search results
+  - home/rich grid
+  - watch page recommendations
+  - playlist pages
+  - Shorts pages
+- Use those saved fixtures to validate:
+  - video ID extraction
+  - thumbnail target resolution
+  - title/channel extraction
+  - overlay insertion points
+
+Practical fixture workflow:
+
+1. Open the relevant YouTube page variant.
+2. Capture the DOM you actually depend on, usually with `document.body.innerHTML` or a narrower subtree instead of a full browser save.
+3. Store that snapshot under `tests/fixtures/youtube/` with a scenario-based name such as `search-results.html` or `playlist-sidebar.html`.
+4. Write Jest/jsdom tests that load the fixture and run the extension’s DOM helpers against it.
+5. When YouTube changes its markup, add the new snapshot and a regression test before adjusting the production selectors.
+
+This gives the project two safety nets:
+
+- **Live smoke** tells us that production YouTube behavior has changed.
+- **Fixture-based tests** let us debug and lock in selector/parser fixes deterministically without fighting CAPTCHA, VPN reputation, or other anti-bot systems.
 
 ### Integration Tests (`/tests/integration`)
 

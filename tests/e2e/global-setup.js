@@ -1,29 +1,24 @@
-
 /**
- * Global setup for Playwright tests
- * This runs once before all tests.
+ * Global setup for Playwright: ensure unpacked extension exists under build/e2e/chrome.
  */
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
 
-async function globalSetup(config) {
-  console.log('Setting up E2E test environment...');
+async function globalSetup() {
+  const root = path.resolve(__dirname, '../..');
+  const manifest = path.join(root, 'build', 'e2e', 'chrome', 'manifest.json');
 
-  // You can add global setup here, such as:
-  // - Building the extension
-  // - Setting up test data
-  // - Configuring browser extensions
-  // - Setting up authentication
+  if (!fs.existsSync(manifest)) {
+    console.log('[e2e] Building unpacked extension (build/e2e/chrome)...');
+    execSync('bash scripts/build-chrome-unpacked.sh', { cwd: root, stdio: 'inherit' });
+  }
 
-  // Example: Build the extension before running tests
-  // const { execSync } = require('child_process');
-  // try {
-  //   execSync('npm run build', { stdio: 'inherit' });
-  //   console.log('Extension built successfully');
-  // } catch (error) {
-  //   console.error('Failed to build extension:', error);
-  //   throw error;
-  // }
-
-  console.log('E2E test environment setup complete');
+  if (!fs.existsSync(manifest)) {
+    throw new Error(
+      '[e2e] Missing build/e2e/chrome/manifest.json. Run manually: npm run build:e2e'
+    );
+  }
 }
 
 module.exports = globalSetup;
