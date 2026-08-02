@@ -1,3 +1,5 @@
+const playlistImportAsync = globalThis.ytvhtFeedAsync;
+
 function playlistSeedVideoId(record) {
     if (record && /^[A-Za-z0-9_-]{11}$/.test(record.videoId || '')) return record.videoId;
     const playlistId = String((record && record.playlistId) || '');
@@ -201,7 +203,7 @@ async function enrichLocalPlaylistMetadata(record, videos) {
     if (!missing.length) return;
 
     await ensureConsentCookie();
-    await runPool(missing.slice(0, 80), 8, async (video) => {
+    await playlistImportAsync.runPool(missing.slice(0, 80), 8, async (video) => {
         const metadata = await fetchSearchMetadata(video.videoId);
         if (!metadata) return;
         if (metadata.published) {
@@ -374,4 +376,3 @@ function makePlaylistRowDraggable(row, video, record, detail, enabled) {
     });
     row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
 }
-

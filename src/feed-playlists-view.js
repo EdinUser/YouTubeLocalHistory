@@ -1,3 +1,5 @@
+const playlistAsync = globalThis.ytvhtFeedAsync;
+
 function playlistMetaText(record) {
     const count = Number(record.videoCount || 0);
     const videoPart = count
@@ -484,7 +486,7 @@ async function renderPlaylists() {
     records.sort((a, b) => Number(b.timestamp || b.lastUpdated || 0) - Number(a.timestamp || a.lastUpdated || 0));
     const missingArtwork = records.filter((record) => !record._local && !record.thumbnail).slice(0, 30);
     if (missingArtwork.length) {
-        await runPool(missingArtwork, 4, enrichPlaylistCard);
+        await playlistAsync.runPool(missingArtwork, 4, enrichPlaylistCard);
     }
     list.textContent = '';
     list.classList.remove('playlists-list-detail');
