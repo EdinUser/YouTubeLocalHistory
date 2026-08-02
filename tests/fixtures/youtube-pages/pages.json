@@ -23,8 +23,8 @@
     },
     {
       "name": "controlled-channel-header",
-      "url": "https://www.youtube.com/channel/UCRCraKP10Q5fSAbCimkizIA",
-      "purpose": "Canonical channel-header DOM fixture for the re:Watch local-subscribe companion attachment next to YouTube's own Subscribe control.",
+      "url": "https://www.youtube.com/@NerdroticDaily",
+      "purpose": "Handle-based channel-header DOM fixture for the re:Watch local-subscribe companion attachment next to YouTube's own Subscribe control.",
       "readySelector": "#subscribe-button, ytd-c4-tabbed-header-renderer #buttons",
       "settleMs": 4000
     }

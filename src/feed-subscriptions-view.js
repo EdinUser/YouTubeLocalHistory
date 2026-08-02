@@ -160,6 +160,11 @@ function setupSubscriptionAddForm() {
                 if (scheduler) await scheduler.initializeSubscriptions([resolved.channelId]);
             }
             await renderSubscriptions();
+            if (outcome.status === 'followed') {
+                // A previously empty Channels view completed an empty initial
+                // batch, so hydrate this explicit addition immediately.
+                await hydrateVisibleChannelMetadata([outcome.subscription]);
+            }
         } catch (error) {
             setSubscriptionAddStatus(error && error.message ? error.message : 'Could not subscribe to that channel.', true);
         } finally {

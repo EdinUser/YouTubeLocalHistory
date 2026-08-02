@@ -256,6 +256,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return; // Return early because we're using sendResponse
         }
 
+        // Content scripts have a YouTube-page context. Keep the canonical feed
+        // repositories in the extension-origin background instead.
+        if (message.type === 'localSubscriptionStore') {
+            if (!sender.tab || !/^https:\/\/(?:www\.)?youtube\.com\//.test(sender.url || '')) {
+                sendResponse({ error: 'Local subscription requests must come from a YouTube tab.' });
+                return;
+            }
+            if (typeof ytIndexedDBStorage === 'undefined') {
+                sendResponse({ error: 'Extension database is unavailable. Reload the extension.' });
+                return;
+            }
+            try {
+                const args = message.args || {};
+                let result;
+                if (message.operation === 'get') result = await ytIndexedDBStorage.getSubscriptionRecord(args.channelId);
+                else if (message.operation === 'putSubscription') result = await ytIndexedDBStorage.putSubscriptionRecord(args.record);
+                else if (message.operation === 'putSyncState') result = await ytIndexedDBStorage.putChannelSyncState(args.record);
+                else if (message.operation === 'unfollow') result = await ytIndexedDBStorage.deleteSubscriptionAndSyncState(args.channelId);
+                else throw new Error('Unknown local subscription operation.');
+                chrome.runtime.sendMessage({ type: 'localSubscriptionChanged', channelId: args.channelId || args.record?.channelId }).catch(() => {});
+                sendResponse({ result });
+            } catch (error) {
+                sendResponse({ error: error && error.message ? error.message : String(error) });
+            }
+            return;
+        }
+
         if (message.type === 'getPlaylistMetadata') {
             const playlistId = String(message.playlistId || '').trim();
             if (!playlistId) {

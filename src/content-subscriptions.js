@@ -23,14 +23,38 @@
                 }
             }
         }
-        if (!channelId) return null;
-        const title = document.querySelector('meta[property="og:title"]')?.content || document.title.replace(/\s*-\s*YouTube\s*$/i, '');
+        if (!channelId && !handleMatch) return null;
+        const ownerTitle = document.querySelector('ytd-video-owner-renderer #channel-name, ytd-video-owner-renderer #upload-info a, yt-page-header-renderer h1')?.textContent.trim();
+        // og:title is the video title on /watch, so only use it as a fallback
+        // on a channel route where it really identifies the channel.
+        const title = ownerTitle || (channelMatch || handleMatch
+            ? (document.querySelector('meta[property="og:title"]')?.content || document.title.replace(/\s*-\s*YouTube\s*$/i, ''))
+            : '');
         const thumbnail = document.querySelector('meta[property="og:image"]')?.content || '';
         return { channelId, channelTitle: title || '', thumbnail, handle: handleMatch ? handleMatch[1] : '' };
     }
 
+    function canonicalSubscriptionStorage() {
+        const call = (operation, args) => new Promise((resolve, reject) => {
+            const runtime = globalThis.chrome && globalThis.chrome.runtime;
+            runtime.sendMessage({ type: 'localSubscriptionStore', operation, args }, (response) => {
+                if (runtime.lastError) reject(new Error(runtime.lastError.message));
+                else if (!response || response.error) reject(new Error(response && response.error || 'Local subscription request failed.'));
+                else resolve(response.result || null);
+            });
+        });
+        return {
+            getSubscriptionRecord: (channelId) => call('get', { channelId }),
+            putSubscriptionRecord: (record) => call('putSubscription', { record }),
+            putChannelSyncState: (record) => call('putSyncState', { record }),
+            deleteSubscriptionAndSyncState: (channelId) => call('unfollow', { channelId })
+        };
+    }
+
+    const subscriptionStorage = canonicalSubscriptionStorage();
+
     async function refreshFollowButton(button, info) {
-        const existing = await ytIndexedDBStorage.getSubscriptionRecord(info.channelId);
+        const existing = info.channelId && await subscriptionStorage.getSubscriptionRecord(info.channelId);
         button.textContent = existing ? 'Unfollow re:Watch' : 'Subscribe with re:Watch';
         button.classList.toggle('ytvht-sub-btn-following', Boolean(existing));
     }
@@ -46,8 +70,8 @@
     }
 
     async function mountFollowButton() {
-        const info = channelInfoFromPage();
-        if (!info || typeof ytIndexedDBStorage === 'undefined') return;
+        let info = channelInfoFromPage();
+        if (!info || !globalThis.chrome?.runtime?.sendMessage) return;
         const existingButton = document.querySelector('.ytvht-sub-btn');
         if (existingButton) {
             await refreshFollowButton(existingButton, info);
@@ -60,13 +84,29 @@
         button.className = 'ytvht-sub-btn';
         button.style.cssText = 'margin:4px 8px;padding:8px 12px;border:0;border-radius:18px;background:#3ea6ff;color:#0f0f0f;font-weight:600;cursor:pointer;';
         await refreshFollowButton(button, info);
-        button.addEventListener('click', async () => {
+        const stopYouTubeOwnerAction = (event) => {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        };
+        ['pointerdown', 'mousedown', 'mouseup'].forEach((type) => button.addEventListener(type, stopYouTubeOwnerAction, true));
+        button.addEventListener('click', async (event) => {
+            stopYouTubeOwnerAction(event);
             button.disabled = true;
             try {
-                const existing = await ytIndexedDBStorage.getSubscriptionRecord(info.channelId);
-                if (existing) await ytvhtLocalSubscriptionActions.unfollow(ytIndexedDBStorage, info.channelId);
-                else await ytvhtLocalSubscriptionActions.follow(ytIndexedDBStorage, info);
+                if (!info.channelId) {
+                    button.textContent = 'Preparing re:Watch subscription…';
+                    info = { ...info, ...(await ytvhtLocalSubscriptionActions.resolveInput(info.handle, fetch)) };
+                }
+                const existing = await subscriptionStorage.getSubscriptionRecord(info.channelId);
+                if (existing) await ytvhtLocalSubscriptionActions.unfollow(subscriptionStorage, info.channelId);
+                else await ytvhtLocalSubscriptionActions.follow(subscriptionStorage, info);
                 await refreshFollowButton(button, info);
+            } catch (error) {
+                console.error('[re:Watch] local subscription update failed', error);
+                button.title = error && error.message ? error.message : 'Could not update the local subscription.';
+                await refreshFollowButton(button, info).catch(() => {
+                    button.textContent = 'Subscribe with re:Watch';
+                });
             } finally {
                 button.disabled = false;
             }

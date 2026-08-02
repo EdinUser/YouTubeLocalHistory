@@ -148,6 +148,14 @@ function onStorageChanged(changes, area) {
     }
 }
 
+globalThis.chrome?.runtime?.onMessage?.addListener((message) => {
+    if (!message || message.type !== 'localSubscriptionChanged' || !subscriptionsActive) return;
+    renderSubscriptions().then(async () => {
+        const subscription = await ytIndexedDBStorage.getSubscriptionRecord(message.channelId);
+        if (subscription) await hydrateVisibleChannelMetadata([subscription]);
+    }).catch(() => {});
+});
+
 function initializationHistoryPriority() {
     const recent = new Set();
     const seen = new Set();

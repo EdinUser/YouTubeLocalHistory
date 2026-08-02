@@ -17,7 +17,7 @@ const CAPTURE_DIR = path.join(ROOT_DIR, 'tests', 'fixtures', 'youtube-pages', 'c
 const PLAYLIST_URL = 'https://www.youtube.com/playlist?list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR';
 const CHANNEL_VIDEOS_URL = 'https://www.youtube.com/@TodorKirilov/videos';
 const WATCH_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-const CHANNEL_HEADER_URL = 'https://www.youtube.com/channel/UCRCraKP10Q5fSAbCimkizIA';
+const CHANNEL_HEADER_URL = 'https://www.youtube.com/@NerdroticDaily';
 const SAVED_TIME = 45;
 const SAVED_DURATION = 180;
 
@@ -306,7 +306,7 @@ async function replacePageWithCapturedHtml(page, url, html) {
 }
 
 test.describe('Static overlays (captured YouTube DOM)', () => {
-  test('captured canonical channel header receives one independent re:Watch subscribe companion', async ({ page }) => {
+  test('captured handle-based channel header receives one independent re:Watch subscribe companion', async ({ page }) => {
     const capture = readCapture('controlled-channel-header');
     test.skip(!capture, 'Run `npm run fixtures:youtube:download -- --only controlled-channel-header --headless` first.');
     await openCapturedPage(page, CHANNEL_HEADER_URL, capture.html);
@@ -325,6 +325,7 @@ test.describe('Static overlays (captured YouTube DOM)', () => {
     await expect(page.locator('.ytvht-sub-btn')).toHaveText('Subscribe with re:Watch');
     await expect(page.locator('ytd-watch-metadata #subscribe-button + .ytvht-sub-btn')).toHaveCount(1);
   });
+
 
   test('captured playlist item gets overlay once and overlay remove deletes storage', async ({ context, page }) => {
     const capture = readCapture('controlled-playlist');

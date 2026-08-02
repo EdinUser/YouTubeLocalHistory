@@ -20,7 +20,9 @@
             : (typeof self !== 'undefined' ? self : this));
 
     const DB_NAME = 'YTLH_HybridDB';
-    const DB_VERSION = 4;
+    // Version 5 introduces the canonical local-feed stores. Existing installs
+    // need this bump before onupgradeneeded can create those stores.
+    const DB_VERSION = 5;
 
     const STORE_VIDEOS = 'videos';
     const STORE_PLAYLISTS = 'playlists';

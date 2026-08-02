@@ -115,7 +115,7 @@ describe('v5 IndexedDB feed repositories', () => {
     const dbModule = require('../../src/indexeddb-storage.js');
     await dbModule.openDatabase();
 
-    expect(dbModule.DB_VERSION).toBe(4);
+    expect(dbModule.DB_VERSION).toBe(5);
     expect(schema.stores.get(dbModule.STORE_SUBSCRIPTIONS).keyPath).toBe('channelId');
     expect(Array.from(schema.stores.get(dbModule.STORE_SUBSCRIPTIONS)._indexes.keys()))
       .toEqual(expect.arrayContaining(['followedAt', 'source']));
