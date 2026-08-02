@@ -7,8 +7,8 @@
     "message": "????? ??? ???? ?????",
     "description": "Tooltip for returning to the feed"
   },
-  "feed_search_youtube": {
-    "message": "??????? ? YouTube",
+  "feed_search_local": {
+    "message": "Search your history and subscriptions",
     "description": "Search field placeholder"
   },
   "feed_refresh": {

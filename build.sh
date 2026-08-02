@@ -86,7 +86,18 @@ echo "Signing Chrome extension..."
 # Use environment variables with fallbacks for security (paths not exposed in git)
 CHROME_EXTENSION_DIR="${CHROME_EXTENSION_DIR:-$PROJECT_ROOT/build/chrome}"
 PRIVATE_KEY_PATH="${PRIVATE_KEY_PATH:-$PROJECT_ROOT/certs/privatekey.pem}"
-google-chrome --pack-extension="$CHROME_EXTENSION_DIR" --pack-extension-key="$PRIVATE_KEY_PATH"
+
+CHROME_BIN="$(command -v google-chrome-stable || command -v google-chrome || true)"
+
+if [ -z "$CHROME_BIN" ]; then
+    echo "Error: Google Chrome is not installed."
+    echo "Install it with: sudo dnf install google-chrome-stable"
+    exit 1
+fi
+
+"$CHROME_BIN" \
+    --pack-extension="$CHROME_EXTENSION_DIR" \
+    --pack-extension-key="$PRIVATE_KEY_PATH"
 
 # Copy the generated .crx file to dist directory with proper naming
 # Chrome creates the .crx file in the build directory, not inside the chrome subdirectory

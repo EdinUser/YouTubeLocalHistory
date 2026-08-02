@@ -6,6 +6,7 @@ const SHORTS_MAX_SECONDS = 180;
 function isShort(v) {
     if (v && v.isShort === true) return true;
     if (v && v.videoId && shortsCache[v.videoId] === true) return true;
+    if (v && v.source === 'rss') return false;
     const d = Number((v && v.duration) || (v && v.videoId && durationCache[v.videoId]) || 0);
     return d > 0 && d <= SHORTS_MAX_SECONDS;
 }
@@ -399,13 +400,9 @@ function currentView() {
         list = applyMemberFilter(list);
         list = applyShortsFilter(list);
         if (!shortsOnly && !subscriptionsChronological) {
-            list = list.filter(hasHomeDurationBadge);
             const homeList = rankHomeVideos(list).slice(0, VISIBLE_FEED_LIMIT);
             rememberHomeRecommendations(homeList);
             return { list: homeList, q };
-        }
-        if (subscriptionsChronological) {
-            list = list.filter(hasSubscriptionDurationBadge);
         }
         return { list: sortList(list, sort).slice(0, VISIBLE_FEED_LIMIT), q };
     }
@@ -596,15 +593,11 @@ function render() {
 
     if (q) {
         heading.style.display = 'none';
-        grid.style.display = 'none';
-        if (searchResults) searchResults.style.display = 'none';
-        empty.style.display = 'none';
-        count.textContent = '';
-        renderYouTubeSearchResults(q);
-        return;
     }
 
-    cancelYouTubeSearch();
+    if (!shortsOnly && !subscriptionsChronological && list.length && typeof ytvhtFeedViewData !== 'undefined') {
+        ytvhtFeedViewData.persistHomeImpressions(ytIndexedDBStorage, list, Date.now()).catch(() => {});
+    }
 
     if (allVideos.length === 0 && !q) {
         grid.style.display = 'none';
@@ -622,7 +615,9 @@ function render() {
         empty.style.display = 'block';
         empty.textContent = q
             ? 'Nothing in your feed or history matches “' + q + '”.'
-            : 'No home videos match the current filters. Try turning off Unwatched only or click Refresh.';
+            : (shortsOnly
+                ? 'No Shorts match the current filters. Try turning off Unwatched only or click Refresh.'
+                : 'No home videos match the current filters. Try turning off Unwatched only or click Refresh.');
     } else {
         empty.style.display = 'none';
         if (q && searchResults) {
@@ -641,7 +636,6 @@ function render() {
                 });
                 searchResults.appendChild(more);
             }
-            if (q.length >= 3) enrichSearchReleaseDates(metadataCandidates, q);
         } else {
             if (searchResults) searchResults.style.display = 'none';
             grid.style.display = 'grid';

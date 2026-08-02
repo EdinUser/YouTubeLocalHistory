@@ -26,6 +26,7 @@
                 "*://*.youtube.com/*"
             ],
             "js": [
+                "indexeddb-storage.js",
                 "storage.js",
                 "content-css.js",
                 "content-url.js",
@@ -35,7 +36,6 @@
                 "content-thumbnails.js",
                 "content-messages.js",
                 "content.js",
-                "feed-core.js",
                 "content-subscriptions.js"
             ],
             "run_at": "document_end"

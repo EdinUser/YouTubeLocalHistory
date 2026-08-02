@@ -1,16 +1,121 @@
 // ----- wiring ------------------------------------------------------------
+const INITIALIZATION_CONTINUATION_DELAY_MS = 350;
+const DORMANT_MAINTENANCE_WAKE_DELAY_MS = 1000;
+let pageFeedWorkTimer = null;
+let pageFeedWorkPromise = null;
+let sharedFeedSchedulerStarted = false;
+let activeInitializationProgress = null;
+let latestPageSyncStatus = { message: '', busy: false };
+
+function isFeedContentViewActive() {
+    return !analyticsActive && !subscriptionsActive && !playlistsActive &&
+        !historyActive && !settingsActive && !channelActive;
+}
+
+function clearPageFeedWorkTimer() {
+    if (pageFeedWorkTimer !== null) clearTimeout(pageFeedWorkTimer);
+    pageFeedWorkTimer = null;
+}
+
+function schedulePageFeedWork(delayMs) {
+    clearPageFeedWorkTimer();
+    pageFeedWorkTimer = setTimeout(() => {
+        pageFeedWorkTimer = null;
+        runPageActiveFeedWork().catch((error) => {
+            console.warn('[feed] scheduled feed work failed', error && error.message);
+        });
+    }, Math.max(0, Number(delayMs || 0)));
+}
+
+async function feedRefreshIntervalMs() {
+    const settings = (await ytStorage.getSettings()) || {};
+    const minutes = Math.max(5, Math.min(1440, Number(settings.feedRefreshMinutes || 60)));
+    return minutes * 60 * 1000;
+}
+
+function setPageActiveSyncStatus(message, busy) {
+    latestPageSyncStatus = { message: message || '', busy: !!busy };
+    if (typeof setFeedSyncStatus !== 'function') return;
+    setFeedSyncStatus(isFeedContentViewActive() ? message : '', busy);
+}
+
+function restorePageActiveSyncStatus() {
+    if (typeof setFeedSyncStatus !== 'function') return;
+    setFeedSyncStatus(latestPageSyncStatus.message, latestPageSyncStatus.busy);
+}
+
+async function runPageActiveFeedWork() {
+    if (pageFeedWorkPromise) return pageFeedWorkPromise;
+    pageFeedWorkPromise = (async () => {
+        const scheduler = ensureSharedFeedScheduler();
+        if (!scheduler) throw new Error('Feed scheduler is unavailable');
+        const intervalMs = await feedRefreshIntervalMs();
+        scheduler.successfulCheckIntervalMs = intervalMs;
+        if (!sharedFeedSchedulerStarted) {
+            await scheduler.start();
+            sharedFeedSchedulerStarted = true;
+        }
+
+        const before = await scheduler.getInitializationProgress();
+        if (before.pending > 0) {
+            activeInitializationProgress = { completed: before.completed, total: before.total };
+            setPageActiveSyncStatus(`Preparing local feed · ${before.completed} / ${before.total} channels`, true);
+            const result = await scheduler.runInitialization();
+            const after = await scheduler.getInitializationProgress();
+            activeInitializationProgress = null;
+            // Keep the local projection current, but do not rerender an already
+            // visible Home page: new inventory waits for Show/opening Home.
+            await loadData();
+            pendingFeedVideoCount += result.insertedVideoCount;
+            if (result.insertedVideoCount) showNewFeedVideos(pendingFeedVideoCount);
+            if (settingsActive && typeof setFeedSettingsMessage === 'function') {
+                setFeedSettingsMessage(`Preparing local feed: ${after.completed} of ${after.total} channels scanned; ${after.pending} remaining.`);
+            }
+            if (after.pending > 0) {
+                setPageActiveSyncStatus(`Preparing local feed · ${after.completed} / ${after.total} channels`, false);
+                schedulePageFeedWork(INITIALIZATION_CONTINUATION_DELAY_MS);
+            } else {
+                setPageActiveSyncStatus('Local feed ready', false);
+                schedulePageFeedWork(intervalMs);
+            }
+            return { result, progress: after };
+        }
+
+        setPageActiveSyncStatus('Checking for new uploads', true);
+        const result = await scheduler.runForeground();
+        await loadData();
+        pendingFeedVideoCount += result.insertedVideoCount;
+        if (result.insertedVideoCount) showNewFeedVideos(pendingFeedVideoCount);
+        let dormant = null;
+        if (result.total === 0) {
+            setPageActiveSyncStatus('Checking a low-activity channel', true);
+            dormant = await scheduler.runDormantMaintenance({ pageActive: true });
+        }
+        const dormantInserted = Number(dormant && dormant.terminal && dormant.terminal.insertedVideoCount || 0);
+        if (dormantInserted) {
+            await loadData();
+            pendingFeedVideoCount += dormantInserted;
+            showNewFeedVideos(pendingFeedVideoCount);
+        }
+        setPageActiveSyncStatus(result.insertedVideoCount || dormantInserted ? 'New uploads found' : 'Up to date', false);
+        schedulePageFeedWork(dormant && dormant.ran ? DORMANT_MAINTENANCE_WAKE_DELAY_MS : intervalMs);
+        return { result, progress: before };
+    })().finally(() => {
+        activeInitializationProgress = null;
+        pageFeedWorkPromise = null;
+    });
+    return pageFeedWorkPromise;
+}
+
+function requestPageActiveFeedWork() {
+    if (pageFeedWorkPromise) {
+        return pageFeedWorkPromise.then(() => runPageActiveFeedWork());
+    }
+    return runPageActiveFeedWork();
+}
+
 function onStorageChanged(changes, area) {
     if (area && area !== 'local') return;
-    if (changes && changes.feedCache) {
-        const v = changes.feedCache.newValue;
-        allVideos = (v && Array.isArray(v.videos)) ? v.videos : [];
-        lastUpdated = (v && v.updatedAt) || Date.now();
-        feedCachePolicy = (v && v.policy) || '';
-        setStatus('Feed updated.', false);
-        // Don't pop the feed grid over the analytics view if it's open.
-        if (channelActive && activeChannelInfo) renderChannelPage(activeChannelInfo);
-        else if (!analyticsActive && !subscriptionsActive && !playlistsActive && !historyActive && !settingsActive) render();
-    }
     if (changes && changes.durationCache) {
         durationCache = changes.durationCache.newValue || {};
         if (!analyticsActive && !subscriptionsActive && !playlistsActive && !historyActive && !settingsActive) render();
@@ -19,6 +124,21 @@ function onStorageChanged(changes, area) {
         shortsCache = changes.shortsCache.newValue || {};
         if (!analyticsActive && !subscriptionsActive && !playlistsActive && !historyActive && !settingsActive) render();
     }
+    if (changes && changes.settings && pageFeedWorkTimer !== null) {
+        feedRefreshIntervalMs().then(schedulePageFeedWork).catch(() => {});
+    }
+    const videoChanges = changes && Object.entries(changes).filter(([key]) => key.startsWith('video_'));
+    if (videoChanges && videoChanges.length) {
+        videoChanges.forEach(([key, change]) => {
+            const videoId = key.slice('video_'.length);
+            if (change.newValue) watchedMap[videoId] = change.newValue;
+            else delete watchedMap[videoId];
+            if (typeof refreshWatchedOverlayForVideo === 'function') refreshWatchedOverlayForVideo(videoId);
+        });
+        if (historyActive) renderHistory();
+        else if (channelActive && activeChannelInfo) renderChannelPage(activeChannelInfo);
+        else if (isFeedContentViewActive() && document.getElementById('unwatched')?.checked) render();
+    }
     if (subscriptionsActive && changes && Object.keys(changes).some((key) => key.startsWith('sub_'))) {
         renderSubscriptions();
     }
@@ -26,9 +146,51 @@ function onStorageChanged(changes, area) {
         changes && Object.keys(changes).some((key) => key.startsWith('playlist_'))) {
         renderPlaylists();
     }
-    if (historyActive && changes && Object.keys(changes).some((key) => key.startsWith('video_'))) {
-        renderHistory();
-    }
+}
+
+function initializationHistoryPriority() {
+    const recent = new Set();
+    const seen = new Set();
+    const recentCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    const subscriptionsByIdentity = new Map();
+    const identityValues = (record) => [record && record.channelId, record && record.ucid,
+        record && record.id, record && record.handle, record && record.channelName]
+        .map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
+
+    (localSubscriptions || []).forEach((subscription) => {
+        const channelId = subscription.ucid || subscription.id || subscription.channelId;
+        identityValues(subscription).forEach((identity) => subscriptionsByIdentity.set(identity, channelId));
+    });
+    Object.values(watchedMap || {}).forEach((record) => {
+        const channelId = identityValues(record).map((identity) => subscriptionsByIdentity.get(identity)).find(Boolean);
+        if (!channelId) return;
+        seen.add(channelId);
+        if (Number(record.timestamp || 0) >= recentCutoff) recent.add(channelId);
+    });
+    return { recentHistoryChannelIds: [...recent], historyChannelIds: [...seen] };
+}
+
+function ensureSharedFeedScheduler() {
+    if (sharedFeedScheduler) return sharedFeedScheduler;
+    if (typeof ytvhtFeedScheduler === 'undefined' || !ytIndexedDBStorage) return null;
+    sharedFeedScheduler = new ytvhtFeedScheduler.FeedScheduler({
+        storage: ytIndexedDBStorage,
+        ...initializationHistoryPriority()
+    });
+    sharedFeedScheduler.subscribe((progress) => {
+        if (!progress.active) return;
+        if (activeInitializationProgress) {
+            const completed = activeInitializationProgress.completed + progress.completed;
+            setPageActiveSyncStatus(`Scanning channels · ${completed} / ${activeInitializationProgress.total}`, true);
+        } else {
+            setPageActiveSyncStatus(`Scanning channels · ${progress.completed} / ${progress.total}`, true);
+        }
+    });
+    return sharedFeedScheduler;
+}
+
+async function startCanonicalFeedWork() {
+    return requestPageActiveFeedWork();
 }
 
 function openFeedView(view) {
@@ -60,8 +222,9 @@ async function getStartupFeedView() {
     } catch (_) { /* use last/home fallback */ }
     if (defaultPage && defaultPage !== 'last') return defaultPage;
     try {
-        const last = sessionStorage.getItem(LAST_VIEW_KEY) || 'home';
-        return last === 'settings' ? 'home' : last;
+        const stored = await chrome.storage.local.get([LAST_VIEW_STORAGE_KEY]);
+        const last = stored[LAST_VIEW_STORAGE_KEY] || sessionStorage.getItem(LAST_VIEW_KEY) || 'home';
+        return ytvhtFeedViewPreference.selectStartupFeedView(defaultPage, last);
     } catch (_) { return 'home'; }
 }
 
@@ -69,20 +232,15 @@ function init() {
     const searchInput = document.getElementById('search');
     searchInput.addEventListener('input', () => {
         searchVisibleLimit = SEARCH_PAGE_SIZE;
-        youtubeVisibleLimit = SEARCH_PAGE_SIZE;
         // Typing in search means the user wants the feed, not another section.
         if (analyticsActive || subscriptionsActive || playlistsActive || historyActive || settingsActive || channelActive) showFeed();
         else render();
-        const query = searchInput.value.trim();
-        if (query.length >= 2) enrichSearchChannelAvatars(query);
-        scheduleYouTubeSearch(query);
     });
     ['searchDate', 'searchDuration', 'searchWatched', 'searchSort'].forEach((id) => {
         const control = document.getElementById(id);
         if (!control) return;
         control.addEventListener('change', () => {
             searchVisibleLimit = SEARCH_PAGE_SIZE;
-            youtubeVisibleLimit = SEARCH_PAGE_SIZE;
             updateSearchFilterButton();
             render();
         });
@@ -108,8 +266,6 @@ function init() {
     const goHome = () => {
         searchInput.value = '';
         searchVisibleLimit = SEARCH_PAGE_SIZE;
-        youtubeVisibleLimit = SEARCH_PAGE_SIZE;
-        cancelYouTubeSearch();
         shortsOnly = false;
         subscriptionsChronological = false;
         channelActive = false;
@@ -133,8 +289,6 @@ function init() {
         navShorts.addEventListener('click', () => {
             searchInput.value = '';
             searchVisibleLimit = SEARCH_PAGE_SIZE;
-            youtubeVisibleLimit = SEARCH_PAGE_SIZE;
-            cancelYouTubeSearch();
             shortsOnly = true;
             subscriptionsChronological = false;
             showFeed();
@@ -145,8 +299,6 @@ function init() {
         navSubscriptions.addEventListener('click', () => {
             searchInput.value = '';
             searchVisibleLimit = SEARCH_PAGE_SIZE;
-            youtubeVisibleLimit = SEARCH_PAGE_SIZE;
-            cancelYouTubeSearch();
             shortsOnly = false;
             subscriptionsChronological = true;
             showFeed();
@@ -155,13 +307,11 @@ function init() {
     const navPlaylists = document.getElementById('navPlaylists');
     if (navPlaylists) navPlaylists.addEventListener('click', () => {
         searchInput.value = '';
-        cancelYouTubeSearch();
         showPlaylists();
     });
     const navHistory = document.getElementById('navHistory');
     if (navHistory) navHistory.addEventListener('click', () => {
         searchInput.value = '';
-        cancelYouTubeSearch();
         historyVisibleLimit = 30;
         showHistory();
     });
@@ -205,7 +355,6 @@ function init() {
     if (analyticsToggle) {
         analyticsToggle.addEventListener('click', () => {
             searchInput.value = '';
-            cancelYouTubeSearch();
             if (analyticsActive) { showFeed(); } else { showAnalytics(); }
         });
     }
@@ -213,7 +362,6 @@ function init() {
     if (navSettings) {
         navSettings.addEventListener('click', () => {
             searchInput.value = '';
-            cancelYouTubeSearch();
             showSettings();
         });
     }
@@ -272,14 +420,15 @@ function init() {
     const clearSubscriptions = document.getElementById('clearSubscriptions');
     if (clearSubscriptions) {
         clearSubscriptions.addEventListener('click', async () => {
-            const subscriptions = await ytStorage.getSubscriptionList();
+            const subscriptions = await ytIndexedDBStorage.listSubscriptionRecords();
             if (!subscriptions.length) return;
             if (!confirm(`Are you sure you want to remove all ${subscriptions.length} local subscriptions?`)) return;
 
             clearSubscriptions.disabled = true;
             try {
-                await ytStorage.clearSubscriptions();
-                await ytStorage.setFeedCache({ updatedAt: Date.now(), videos: [], diagnostics: [] });
+                await Promise.all(subscriptions.map(async (subscription) => {
+                    await ytIndexedDBStorage.deleteSubscriptionAndSyncState(subscription.channelId);
+                }));
                 await renderSubscriptions();
                 setStatus('All local subscriptions removed.', false);
             } catch (error) {
@@ -295,6 +444,8 @@ function init() {
             chrome.storage.onChanged.addListener(onStorageChanged);
         }
     } catch (_) { /* ignore */ }
+
+    window.addEventListener('unload', clearPageFeedWorkTimer, { once: true });
 
     loadData().then(async () => {
         const hashView = (location.hash || '').replace(/^#/, '').trim();
@@ -312,14 +463,9 @@ function init() {
 // Refresh on open when the cache is empty or stale, so the page works
 // without anyone clicking Refresh (and without a YouTube tab).
 async function maybeAutoRefresh() {
-    if (typeof feedRefreshIsSuppressed === 'function' && feedRefreshIsSuppressed()) return;
-    let subs = [];
-    try { subs = await ytStorage.getSubscriptionList(); } catch (_) { /* ignore */ }
-    if (!subs.length) return;
-    const stale = !lastUpdated || (Date.now() - lastUpdated) > 30 * 60 * 1000;
-    if (allVideos.length === 0 || stale) {
-        refresh();
-    }
+    startCanonicalFeedWork().catch((error) => {
+        console.warn('[feed] canonical scheduler startup failed', error && error.message);
+    });
 }
 
 if (document.readyState === 'loading') {

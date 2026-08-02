@@ -8,22 +8,16 @@ async function loadData() {
     } catch (_) { /* defaults */ }
 
     try {
-        const cache = (await ytStorage.getFeedCache()) || {};
-        allVideos = Array.isArray(cache.videos)
-            ? cache.videos.filter((video) =>
-                video &&
-                video.videoId &&
-                !video._historyOnly &&
-                !video.importedHistory &&
-                !String(video._whenText || '').toLowerCase().startsWith('watched ')
-            )
-            : [];
-        lastUpdated = cache.updatedAt || 0;
-        feedCachePolicy = cache.policy || '';
-        feedDiagnostics = Array.isArray(cache.diagnostics) ? cache.diagnostics : [];
+        const data = await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage);
+        allVideos = data.videos;
+        localSubscriptions = data.subscriptions;
+        lastUpdated = allVideos.reduce((latest, video) => Math.max(latest, Number(video.lastSeenInFeedAt || 0)), 0);
+        feedCachePolicy = 'v5-canonical';
+        feedDiagnostics = [];
     } catch (e) {
-        console.error('[feed] failed to load feed cache', e);
+        console.error('[feed] failed to load canonical feed inventory', e);
         allVideos = [];
+        localSubscriptions = [];
         feedCachePolicy = '';
         feedDiagnostics = [];
     }
@@ -42,19 +36,6 @@ async function loadData() {
         shortsCache = await ytStorage.getShortsCache();
     } catch (_) {
         shortsCache = {};
-    }
-    try {
-        localSubscriptions = await ytStorage.getSubscriptionList();
-    } catch (_) {
-        localSubscriptions = [];
-    }
-    if (localSubscriptions.length > 0 &&
-        feedCachePolicy !== FEED_CACHE_POLICY &&
-        !isRefreshing &&
-        !(typeof feedRefreshIsSuppressed === 'function' && feedRefreshIsSuppressed())) {
-        refreshFeedNow(true).catch((error) => {
-            console.warn('[feed] cache policy refresh failed', error && error.message);
-        });
     }
     try {
         const feedbackResult = await chrome.storage.local.get(['feedFeedback']);
@@ -112,40 +93,59 @@ function setRefreshResultStatus() {
     setStatus(allVideos.length ? tFeed('feed_updated', 'Feed updated.') : '', false);
 }
 
-async function refresh() {
-    if (isRefreshing) {
-        setRefreshUi(true);
-        setStatus('', false);
-        try {
-            while (isRefreshing) {
-                await new Promise((resolve) => setTimeout(resolve, 150));
-            }
-            await loadData();
-            if (historyActive) await renderHistory();
-            else if (channelActive && activeChannelInfo) renderChannelPage(activeChannelInfo);
-            else if (!analyticsActive && !subscriptionsActive && !playlistsActive && !settingsActive) render();
-            setRefreshResultStatus();
-        } finally {
-            setRefreshUi(false);
-        }
+function setFeedSyncStatus(message, busy) {
+    const status = document.getElementById('feedSyncStatus');
+    if (!status) return;
+    status.textContent = message || '';
+    status.toggleAttribute('hidden', !message);
+    status.setAttribute('aria-busy', busy ? 'true' : 'false');
+}
+
+function renderFeedNotice() {
+    const status = document.getElementById('status');
+    const visible = pendingFeedVideoCount > 0 && !shortsOnly &&
+        !analyticsActive && !subscriptionsActive && !playlistsActive &&
+        !historyActive && !settingsActive && !channelActive;
+    if (!status) return;
+    if (!visible) {
+        status.textContent = '';
+        status.style.display = 'none';
         return;
     }
+    status.textContent = '';
+    status.style.display = '';
+    status.appendChild(document.createTextNode(`${pendingFeedVideoCount} new subscription videos available `));
+    const show = document.createElement('button');
+    show.className = 'btn';
+    show.textContent = 'Show';
+    show.addEventListener('click', async () => {
+        await loadData();
+        pendingFeedVideoCount = 0;
+        const search = document.getElementById('search');
+        if (search) search.value = '';
+        shortsOnly = false;
+        subscriptionsChronological = true;
+        showFeed();
+        setStatus('', false);
+    });
+    status.appendChild(show);
+}
+
+function showNewFeedVideos(count) {
+    pendingFeedVideoCount = Number(count || pendingFeedVideoCount || 0);
+    renderFeedNotice();
+}
+
+async function refresh() {
     setRefreshUi(true);
     setStatus('', false);
     try {
-        const needsFullRefresh = allVideos.length === 0 || feedCachePolicy !== FEED_CACHE_POLICY;
-        await refreshFeedNow(needsFullRefresh);
-        await loadData();
-        if (!shortsOnly && !subscriptionsChronological &&
-            !analyticsActive && !subscriptionsActive && !playlistsActive && !historyActive && !settingsActive) {
-            reshuffleHome();
+        const work = await requestPageActiveFeedWork();
+        if (!work.result.insertedVideoCount && work.progress.pending === 0) {
+            setFeedSyncStatus('Up to date', false);
         }
-        if (historyActive) await renderHistory();
-        else if (channelActive && activeChannelInfo) renderChannelPage(activeChannelInfo);
-        else if (!analyticsActive && !subscriptionsActive && !playlistsActive && !settingsActive) render();
-        setRefreshResultStatus();
     } catch (e) {
-        setStatus(tFeed('feed_refresh_failed_status', 'Refresh failed: $1. If YouTube shows a consent wall, open youtube.com once in this browser.', [e.message || tFeed('message_unknown_error', 'error')]), false);
+        setStatus(tFeed('feed_refresh_failed_status', 'Refresh failed: $1.', [e.message || tFeed('message_unknown_error', 'error')]), false);
     } finally {
         setRefreshUi(false);
     }

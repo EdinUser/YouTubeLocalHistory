@@ -7,13 +7,9 @@ mkdir -p "$ROOT/build/e2e/chrome"
 
 node "$ROOT/merge_locales.js" "build/e2e/chrome/_locales"
 
-cp "$ROOT/src/background.js" \
-   "$ROOT/src/content.js" \
-   "$ROOT/src/popup.html" \
-   "$ROOT/src/popup.js" \
-   "$ROOT/src/storage.js" \
-   "$ROOT/src/indexeddb-storage.js" \
-   "$ROOT/build/e2e/chrome/"
+# This is a development/E2E package. Copy every source module so manifest
+# dependencies and HTML-loaded modules cannot drift from this builder.
+cp "$ROOT"/src/*.js "$ROOT"/src/*.html "$ROOT/build/e2e/chrome/"
 cp "$ROOT/src/icon"*.png "$ROOT/build/e2e/chrome/"
 cp "$ROOT/src/manifest.chrome.json" "$ROOT/build/e2e/chrome/manifest.json"
 

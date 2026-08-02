@@ -1,18 +1,7 @@
 // ----- subscribe (from search results) -----------------------------------
 async function findSub(info) {
-    for (const k of [info.ucid, info.handle, info.channelId].filter(Boolean)) {
-        const s = await ytStorage.getSubscription(k);
-        if (s) return s;
-    }
-    const wantedName = channelKey(info.channelName);
-    if (wantedName) {
-        const subscriptions = await ytStorage.getSubscriptionList();
-        const byName = subscriptions.find((subscription) =>
-            channelKey(subscription.channelName) === wantedName
-        );
-        if (byName) return byName;
-    }
-    return null;
+    const channelId = String(info && (info.ucid || info.channelId) || '');
+    return /^UC[\w-]+$/.test(channelId) ? ytIndexedDBStorage.getSubscriptionRecord(channelId) : null;
 }
 
 function subscribeButtonKey(info) {
@@ -71,16 +60,26 @@ function buildSubscribeButton(info) {
         try {
             const existing = await findSub(info);
             if (existing) {
-                await ytStorage.removeSubscription(existing.id);
+                await ytIndexedDBStorage.deleteSubscriptionRecord(existing.channelId);
+                await ytIndexedDBStorage.deleteChannelSyncState(existing.channelId);
             } else {
-                await ytStorage.addSubscription({
-                    id: info.channelId, ucid: info.ucid, handle: info.handle,
-                    channelName: info.channelName, thumbnail: info.thumbnail, url: info.url
+                const channelId = String(info.ucid || info.channelId || '');
+                if (!/^UC[\w-]+$/.test(channelId)) {
+                    throw new Error('A canonical channel ID is required before following a channel');
+                }
+                await ytIndexedDBStorage.putSubscriptionRecord({
+                    channelId,
+                    channelTitle: info.channelName || '',
+                    thumbnail: info.thumbnail || '',
+                    handle: info.handle || '',
+                    source: 'manual',
+                    followedAt: Date.now()
                 });
-                if (!info.ucid || !info.thumbnail) await enrichSubscription(info);
-                setStatus(`Subscribed to ${info.channelName || 'channel'} — click Refresh to load their videos.`, false);
+                const scheduler = ensureSharedFeedScheduler();
+                if (scheduler) await scheduler.initializeSubscriptions([channelId]);
+                setStatus(`Subscribed to ${info.channelName || 'channel'} — preparing local feed.`, false);
             }
-            localSubscriptions = await ytStorage.getSubscriptionList();
+            localSubscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
             await paint();
         } finally {
             btn.disabled = false;
@@ -96,6 +95,7 @@ function buildResultRow(video, opts) {
     applyLocalChannelArtwork(video);
     const row = document.createElement('div');
     row.className = 'yt-row';
+    row.dataset.ytvhtVideoId = video.videoId;
 
     const thumbLink = document.createElement('a');
     thumbLink.className = 'yt-row-thumb';

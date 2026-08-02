@@ -1,6 +1,16 @@
 // ----- in-extension channel page -----------------------------------------
 let activeChannelInfo = null;
 
+function relativeAgeDays(text) {
+    const value = String(text || '').toLowerCase();
+    if (value.includes('yesterday')) return 1;
+    if (value.includes('just now') || value.includes('minute') || value.includes('hour')) return 0;
+    const match = value.match(/(\d+)\s+(day|week|month|year)/);
+    if (!match) return null;
+    const multipliers = { day: 1, week: 7, month: 30, year: 365 };
+    return Number(match[1]) * multipliers[match[2]];
+}
+
 function channelIdentity(info) {
     const ids = [info && info.channelId, info && info.ucid, info && info.handle]
         .filter(Boolean)
@@ -45,9 +55,7 @@ function normalizeChannelInfo(info) {
 
 function collectChannelVideos(info) {
     const byId = new Map();
-    const sources = []
-        .concat(youtubeSearchResults || [])
-        .concat(buildLocalIndex());
+    const sources = buildLocalIndex();
     sources.forEach((video) => {
         if (!video || video._type === 'channel' || !videoMatchesChannelInfo(video, info)) return;
         const key = video.videoId || `${channelKey(video.channelName)}:${normalizeText(video.title)}`;
@@ -116,12 +124,6 @@ function renderChannelPage(info) {
 }
 
 function showChannelPage(info) {
-    if (youtubeSearchTimer) {
-        clearTimeout(youtubeSearchTimer);
-        youtubeSearchTimer = null;
-    }
-    youtubeSearchRequestId++;
-    youtubeSearchLoadingMore = false;
     document.body.classList.remove('shorts-mode');
     setRefreshVisible(false);
     setCreatePlaylistVisible(false);
@@ -136,7 +138,7 @@ function showChannelPage(info) {
     playlistsActive = false;
     historyActive = false;
     settingsActive = false;
-    ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection',
+    ['localHeading', 'grid', 'localSearchResults', 'empty',
         'analyticsSection', 'subscriptionsSection', 'playlistsSection',
         'historySection', 'settingsSection'].forEach((id) => {
         const el = document.getElementById(id);

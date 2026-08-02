@@ -295,25 +295,21 @@ async function importYouTubeChannelsFile(file) {
     if (!subs.length) {
         throw new Error('No channels found. Use subscriptions.csv from YouTube or Takeout.');
     }
-    let added = 0;
-    for (const sub of subs) {
-        try {
-            await ytStorage.addSubscription({
-                id: sub.ucid,
-                ucid: sub.ucid,
-                channelName: sub.title,
-                url: sub.url
-            });
-            added++;
-        } catch (_) { /* skip bad rows */ }
+    const { outcome, queuedChannelIds } = await ytvhtFeedSubscriptionImport.importCanonicalSubscriptions(ytIndexedDBStorage, subs);
+    localSubscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
+    const scheduler = ensureSharedFeedScheduler();
+    if (scheduler && queuedChannelIds.length) {
+        await scheduler.initializeSubscriptions(queuedChannelIds);
+        setFeedSettingsMessage(`Imported ${outcome.added} channels; preparing your local feed.`);
+        requestPageActiveFeedWork().catch((error) => {
+            console.warn('[feed] initialization after import failed', error);
+        });
     }
-    localSubscriptions = await ytStorage.getSubscriptionList();
     notifySubsChanged();
-    return added;
+    return outcome;
 }
 
 async function resetAllFeedData() {
-    if (typeof cancelFeedRefreshes === 'function') cancelFeedRefreshes();
     setRefreshUi(false);
     setStatus('', false);
     await ytStorage.resetAllData();
@@ -333,7 +329,6 @@ async function resetAllFeedData() {
     const searchInput = document.getElementById('search');
     if (searchInput) searchInput.value = '';
     searchVisibleLimit = SEARCH_PAGE_SIZE;
-    youtubeVisibleLimit = SEARCH_PAGE_SIZE;
     shortsOnly = false;
     subscriptionsChronological = false;
     channelActive = false;
@@ -458,8 +453,8 @@ function initFeedDataSettings() {
         setFeedSettingsMessage('Importing channels…');
         if (button) button.disabled = true;
         try {
-            const count = await importYouTubeChannelsFile(file);
-            setFeedSettingsMessage(`Imported ${count} channels. Click Refresh on Subscriptions to load videos.`);
+            const outcome = await importYouTubeChannelsFile(file);
+            setFeedSettingsMessage(`Imported ${outcome.added} channels; ${outcome.initializationQueued} queued to prepare your local feed.`);
         } catch (error) {
             console.error('[settings] channels import failed', error);
             setFeedSettingsMessage(error.message || 'Could not import channels.');

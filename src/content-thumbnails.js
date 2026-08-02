@@ -238,17 +238,16 @@
         }
 
         function removeNativePageProgressBars(root = document) {
-            if (isExtensionFeedPage()) return;
-            root.querySelectorAll?.('.ytvht-progress-mask, .ytvht-progress-bar')
-                .forEach((node) => node.remove());
+            // Full thumbnail overlays (label, progress, and remove control) are
+            // part of the extension's public interaction contract on YouTube.
+            // Keep this hook for callers, but do not strip those controls.
         }
 
         function updateNativeOverlayMode() {
             const de = document.documentElement;
             const extensionFeed = isExtensionFeedPage();
             de.toggleAttribute('ytvht-extension-feed', extensionFeed);
-            de.toggleAttribute('ytvht-native-badge-only', !extensionFeed);
-            removeNativePageProgressBars();
+            de.removeAttribute('ytvht-native-badge-only');
         }
 
         function findThumbnailOverlayTarget(thumbnailElement) {
@@ -408,6 +407,13 @@
                         '.ytvht-progress-bar',
                         '.ytvht-remove-button'
                     ]);
+                    // Several mutation-driven passes can await storage at the
+                    // same time. Re-read the DOM after that await so a later
+                    // pass reuses controls created by an earlier one.
+                    label = targetElement.querySelector('.ytvht-viewed-label');
+                    progressMask = targetElement.querySelector('.ytvht-progress-mask');
+                    progress = targetElement.querySelector('.ytvht-progress-bar');
+                    removeBtn = targetElement.querySelector('.ytvht-remove-button');
                     setOverlayHostClass(true);
                     const settings = getCurrentSettings();
                     const size = overlayLabelSizeMap[settings.overlayLabelSize] || overlayLabelSizeMap.medium;
@@ -422,13 +428,6 @@
                     const progressPercent = duration > 0
                         ? Math.max(0, Math.min(100, (time / duration) * 100))
                         : 100;
-
-                    if (isNativeYouTubePage) {
-                        overlayHosts.forEach((host) => removeYtvhtOverlayNodes(host));
-                        clearNativePseudoOverlay(targetElement);
-                        renderNativeDomOverlay(targetElement, settings, size, color, progressPercent, true);
-                        return;
-                    }
 
                     if (!label) {
                         label = document.createElement('div');

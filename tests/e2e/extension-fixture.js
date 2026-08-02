@@ -17,7 +17,8 @@ const test = base.extend({
     /** @type {import('@playwright/test').BrowserContextOptions} */
     const opts = {
       channel: 'chromium',
-      headless: process.env.PW_HEADLESS === '1',
+      // Default to headless; PW_HEADED=1 is the explicit debugging override.
+      headless: process.env.PW_HEADED !== '1',
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,

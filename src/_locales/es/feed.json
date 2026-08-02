@@ -7,8 +7,8 @@
     "message": "Volver a tu feed",
     "description": "Tooltip for returning to the feed"
   },
-  "feed_search_youtube": {
-    "message": "Buscar en YouTube",
+  "feed_search_local": {
+    "message": "Buscar en tu historial y suscripciones",
     "description": "Search field placeholder"
   },
   "feed_refresh": {

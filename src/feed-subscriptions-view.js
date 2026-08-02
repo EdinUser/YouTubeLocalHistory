@@ -1,12 +1,8 @@
 function showFeedStatus(show) {
     const status = document.getElementById('status');
     if (!status) return;
-    if (show && isRefreshing) {
-        setStatus('', false);
-    } else if (!isRefreshing) {
-        status.textContent = '';
-    }
     status.style.display = show && status.textContent ? '' : 'none';
+    if (!show && typeof setFeedSyncStatus === 'function') setFeedSyncStatus('', false);
 }
 
 function setRefreshVisible(visible) {
@@ -51,9 +47,7 @@ function leaveSearchPage() {
     const search = document.getElementById('search');
     if (search) search.value = '';
     searchVisibleLimit = SEARCH_PAGE_SIZE;
-    youtubeVisibleLimit = SEARCH_PAGE_SIZE;
     hideSearchControls();
-    if (typeof cancelYouTubeSearch === 'function') cancelYouTubeSearch();
 }
 
 // Toggle between the feed grid and the analytics view.
@@ -74,7 +68,7 @@ function showAnalytics() {
     historyActive = false;
     settingsActive = false;
     channelActive = false;
-    ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection', 'channelSection'].forEach((id) => {
+    ['localHeading', 'grid', 'localSearchResults', 'empty', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -127,6 +121,8 @@ function showFeed() {
     if (heading) heading.style.display = '';
     setActiveNav(shortsOnly ? 'navShorts' : (subscriptionsChronological ? 'navSubscriptions' : 'navHome'));
     render();
+    if (typeof restorePageActiveSyncStatus === 'function') restorePageActiveSyncStatus();
+    if (typeof renderFeedNotice === 'function') renderFeedNotice();
 }
 
 function subscriptionUrl(sub) {
@@ -143,7 +139,13 @@ async function renderSubscriptions() {
     if (!list || !empty || !count) return;
 
     let subscriptions = [];
-    try { subscriptions = await ytStorage.getSubscriptionList(); } catch (_) { /* show empty */ }
+    try {
+        subscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
+        subscriptions = await Promise.all(subscriptions.map(async (subscription) => ({
+            ...subscription,
+            ...((await ytIndexedDBStorage.getChannelSyncState(subscription.channelId)) || {})
+        })));
+    } catch (_) { /* show empty */ }
     list.textContent = '';
     count.textContent = `${subscriptions.length} channel${subscriptions.length === 1 ? '' : 's'}`;
     empty.style.display = subscriptions.length ? 'none' : 'block';
@@ -151,7 +153,12 @@ async function renderSubscriptions() {
 
     subscriptions.forEach((sub) => {
         const row = document.createElement('div');
-        row.className = 'subs-row';
+        row.className = 'subs-row subs-card';
+        row.dataset.channelId = sub.channelId;
+        const banner = document.createElement('div');
+        banner.className = 'subs-banner';
+        if (sub.bannerUrl) banner.style.backgroundImage = `linear-gradient(to bottom, color-mix(in srgb, var(--bg) 50%, transparent), var(--bg)), url("${sub.bannerUrl}")`;
+        row.appendChild(banner);
 
         const channel = document.createElement('a');
         channel.className = 'subs-channel';
@@ -173,11 +180,31 @@ async function renderSubscriptions() {
         }
         channel.appendChild(avatar);
 
+        const copy = document.createElement('span');
+        copy.className = 'subs-copy';
         const name = document.createElement('span');
         name.className = 'subs-name';
         name.textContent = decodeHtmlEntities(sub.channelName || sub.id || 'Unknown channel');
-        channel.appendChild(name);
+        copy.appendChild(name);
+        const identity = document.createElement('div');
+        identity.className = 'subs-count';
+        identity.textContent = `${sub.handle || ''}${sub.handle ? ' · ' : ''}${sub.channelId}`;
+        copy.appendChild(identity);
+        channel.appendChild(copy);
         row.appendChild(channel);
+
+        const latest = sub.latestUploadAt ? `Last upload ${relativeTime(sub.latestUploadAt)}` : '';
+        const nextCheck = formatNextChannelCheck(sub.nextEligibleCheckAt);
+        const videoCount = sub.videoCount && /^\d[\d, .]*$/.test(sub.videoCount)
+            ? `${sub.videoCount} videos`
+            : sub.videoCount;
+        const metaText = [sub.subscriberCount, videoCount, latest, sub.activityClass, nextCheck].filter(Boolean).join(' · ');
+        if (metaText) {
+            const meta = document.createElement('div');
+            meta.className = 'subs-meta';
+            meta.textContent = metaText;
+            row.appendChild(meta);
+        }
 
         const unsubscribe = document.createElement('button');
         unsubscribe.className = 'btn';
@@ -185,12 +212,9 @@ async function renderSubscriptions() {
         unsubscribe.addEventListener('click', async () => {
             unsubscribe.disabled = true;
             try {
-                await ytStorage.removeSubscription(sub.id);
+                await ytIndexedDBStorage.deleteSubscriptionAndSyncState(sub.channelId);
                 await renderSubscriptions();
                 setStatus(`Unsubscribed from ${name.textContent}.`, false);
-                refreshFeedNow(false).catch((error) => {
-                    console.warn('[subscriptions] feed refresh after unsubscribe failed', error);
-                });
             } catch (error) {
                 console.error('[subscriptions] remove failed', error);
                 unsubscribe.disabled = false;
@@ -199,9 +223,84 @@ async function renderSubscriptions() {
         row.appendChild(unsubscribe);
         list.appendChild(row);
     });
+    if (!channelMetadataStarted) hydrateVisibleChannelMetadata(subscriptions).catch(() => {});
+    else if (channelMetadataAwaitingVisibility) observeNextChannelMetadataBatch(subscriptions, list);
+}
+
+function formatNextChannelCheck(timestamp) {
+    const deltaMs = Number(timestamp || 0) - Date.now();
+    if (!Number.isFinite(deltaMs) || !timestamp) return '';
+    if (deltaMs <= 0) return 'Next check due';
+    const minutes = Math.ceil(deltaMs / 60000);
+    if (minutes < 60) return `Next check in ${minutes}m`;
+    const hours = Math.ceil(minutes / 60);
+    if (hours < 48) return `Next check in ${hours}h`;
+    return `Next check in ${Math.ceil(hours / 24)}d`;
+}
+
+async function hydrateVisibleChannelMetadata(subscriptions) {
+    if (!subscriptionsActive || !ytvhtFeedChannelMetadata || channelMetadataInFlight) return;
+    const candidates = ytvhtFeedChannelMetadata.selectHydrationBatch(subscriptions, channelMetadataProcessedIds);
+    channelMetadataStarted = true;
+    if (!candidates.length) return;
+    channelMetadataInFlight = true;
+    const controller = new AbortController();
+    channelMetadataAbortController = controller;
+    try {
+        await ytvhtFeedChannelMetadata.hydrateSubscriptionBatch(candidates, {
+            storage: ytIndexedDBStorage,
+            processedIds: channelMetadataProcessedIds,
+            concurrency: 3,
+            signal: controller.signal
+        });
+        if (controller.signal.aborted) return;
+        channelMetadataLastHydratedId = candidates[candidates.length - 1].channelId;
+        channelMetadataAwaitingVisibility = subscriptions.some((sub) => ytvhtFeedChannelMetadata.needsHydration(sub) && !channelMetadataProcessedIds.has(sub.channelId));
+        if (subscriptionsActive) renderSubscriptions();
+    } finally {
+        if (channelMetadataAbortController === controller) {
+            channelMetadataAbortController = null;
+            channelMetadataInFlight = false;
+        }
+    }
+}
+
+function observeNextChannelMetadataBatch(subscriptions, list) {
+    if (!subscriptionsActive || channelMetadataObserver || !channelMetadataLastHydratedId || typeof IntersectionObserver === 'undefined') return;
+    const target = list.querySelector(`[data-channel-id="${channelMetadataLastHydratedId}"]`);
+    if (!target) return;
+    channelMetadataObserver = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        channelMetadataObserver.disconnect();
+        channelMetadataObserver = null;
+        channelMetadataAwaitingVisibility = false;
+        hydrateVisibleChannelMetadata(subscriptions).catch(() => {});
+    }, { rootMargin: '160px 0px' });
+    channelMetadataObserver.observe(target);
+}
+
+let channelMetadataObserver = null;
+let channelMetadataAbortController = null;
+let channelMetadataInFlight = false;
+let channelMetadataStarted = false;
+let channelMetadataAwaitingVisibility = false;
+let channelMetadataLastHydratedId = '';
+const channelMetadataProcessedIds = new Set();
+
+function resetChannelMetadataHydration() {
+    channelMetadataObserver?.disconnect();
+    channelMetadataAbortController?.abort();
+    channelMetadataObserver = null;
+    channelMetadataAbortController = null;
+    channelMetadataInFlight = false;
+    channelMetadataStarted = false;
+    channelMetadataAwaitingVisibility = false;
+    channelMetadataLastHydratedId = '';
+    channelMetadataProcessedIds.clear();
 }
 
 function showSubscriptions() {
+    resetChannelMetadataHydration();
     rememberView('channels');
     document.body.classList.remove('shorts-mode');
     setRefreshVisible(false);

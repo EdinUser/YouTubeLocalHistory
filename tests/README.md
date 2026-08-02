@@ -39,6 +39,15 @@ npm install
 npm test
 ```
 
+### Run the Complete Local Extension Suite
+```bash
+npm run test:local:full
+```
+
+This refreshes ignored browser-page fixtures and the three credential-free
+public RSS readings before running Jest plus the Chromium and Firefox extension
+suites. It is a local command; CI does not make these external requests.
+
 ### Run Specific Test Types
 ```bash
 # Unit tests only
@@ -59,12 +68,18 @@ npm run test:watch
 
 ### Run E2E Tests (if configured)
 ```bash
-npm run test:e2e       # Chromium live + static
+npm run test:e2e       # build + Chromium live and static
+npm run test:e2e:all   # build Chrome + Firefox, then run all browser E2E checks
 npm run test:e2e:live  # Chromium live only
 npm run test:e2e:static
 npm run test:firefox:all
 npm run test:e2e:ui  # Opens Playwright UI
+npm run test:channel-metadata:live  # opt-in public YouTube Channels metadata contract
 ```
+
+Chromium and Firefox extension E2E runs are headless by default. To use a
+visible browser while debugging, prefix the command with `PW_HEADED=1`, for
+example `PW_HEADED=1 npm run test:e2e:live`.
 
 ## Test Types Explained
 

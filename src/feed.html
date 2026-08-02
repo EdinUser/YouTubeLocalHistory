@@ -258,6 +258,13 @@
             align-items: center; gap: 18px; padding: 10px 0;
             border-bottom: 1px solid var(--border);
         }
+        .subs-card { position: relative; overflow: hidden; min-height: 116px; padding: 0; border-radius: 12px; border: 1px solid var(--border); }
+        .subs-banner { position: absolute; inset: 0; background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 50%, transparent) 0%, var(--bg) 100%); background-size: cover; background-position: center; opacity: .8; }
+        .subs-card .subs-channel { position: relative; padding: 18px; align-items: flex-end; }
+        .subs-card .subs-avatar { width: 58px; height: 58px; flex-basis: 58px; border: 2px solid var(--bg); }
+        .subs-card .subs-copy { min-width: 0; }
+        .subs-card .subs-meta { position: relative; grid-column: 1; padding: 0 18px 16px 90px; color: var(--text-2); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .subs-card > .btn { position: relative; grid-column: 2; grid-row: 1 / span 2; margin-right: 18px; }
         .subs-channel {
             min-width: 0; display: flex; align-items: center; gap: 14px;
             color: var(--text); text-decoration: none; font-size: 17px;
@@ -1477,6 +1484,8 @@
         .mast-search { min-width: 0; display: flex; justify-content: center; }
         .mast-search input[type="search"] { width: 100%; max-width: 560px; }
         .mast-right { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+        .feed-sync-status { color: var(--text-2); font-size: 12px; white-space: nowrap; }
+        .feed-sync-status[hidden] { display: none; }
         @media (max-width: 900px) {
             .masthead {
                 grid-template-columns: auto minmax(160px, 1fr) auto;
@@ -1571,9 +1580,10 @@
             </div>
         </div>
         <div class="mast-search">
-            <input type="search" id="search" placeholder="Search YouTube" data-i18n-placeholder="feed_search_youtube" autocomplete="off">
+            <input type="search" id="search" placeholder="Search your history and subscriptions" data-i18n-placeholder="feed_search_local" autocomplete="off">
         </div>
         <div class="mast-right">
+            <span class="feed-sync-status" id="feedSyncStatus" hidden aria-live="polite"></span>
             <button class="btn primary" id="refresh" data-i18n="feed_refresh">Refresh</button>
             <button class="btn primary" id="createPlaylist" type="button" style="display:none;" data-i18n="feed_create">Create</button>
             <button class="btn danger" id="clearSubscriptions" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
@@ -1677,12 +1687,6 @@
             <div class="grid" id="grid"></div>
             <div class="yt-results local-search-results" id="localSearchResults" style="display:none;"></div>
             <div class="empty" id="empty" style="display:none;"></div>
-
-            <div id="ytSection" style="display:none;">
-                <h2 class="section-h"><span data-i18n="feed_search_results_for">Search results for</span> <span class="sub" id="ytSub"></span></h2>
-                <div class="status" id="ytStatus"></div>
-                <div class="yt-results" id="ytGrid"></div>
-            </div>
 
             <section class="channel-view" id="channelSection" style="display:none;">
                 <button class="btn channel-view-back" id="channelBack" type="button" data-i18n="feed_back_to_results">Back to results</button>
@@ -1907,7 +1911,19 @@
 
     <script src="indexeddb-storage.js"></script>
     <script src="storage.js"></script>
+    <script src="feed-contracts.js"></script>
+    <script src="rss-parser.js"></script>
+    <script src="rss-client.js"></script>
+    <script src="feed-ingestion.js"></script>
+    <script src="feed-enrichment.js"></script>
+    <script src="feed-channel-metadata.js"></script>
+    <script src="feed-retention.js"></script>
+    <script src="feed-channel-classification.js"></script>
+    <script src="feed-scheduler.js"></script>
+    <script src="feed-view-data.js"></script>
+    <script src="feed-subscription-import.js"></script>
     <script src="feed-core.js"></script>
+    <script src="feed-view-preference.js"></script>
     <script src="feed-state-utils.js"></script>
     <script src="feed-cards.js"></script>
     <script src="feed-local-search.js"></script>
@@ -1920,10 +1936,7 @@
     <script src="feed-settings.js"></script>
     <script src="feed-localization.js"></script>
     <script src="feed-backup.js"></script>
-    <script src="feed-data-pipeline.js"></script>
     <script src="feed-subscribe-results.js"></script>
-    <script src="feed-youtube-search-core.js"></script>
-    <script src="feed-youtube-search-render.js"></script>
     <script src="feed-channel-view.js"></script>
     <script src="feed-refresh.js"></script>
     <script src="feed.js"></script>

@@ -37,7 +37,8 @@ function createFirefoxOptions(profileDir) {
     .setPreference('datareporting.policy.dataSubmissionEnabled', false)
     .setPreference('toolkit.telemetry.enabled', false);
 
-  if (process.env.FIREFOX_HEADLESS !== '0') {
+  // Use the same debugging override as Chromium extension tests.
+  if (process.env.PW_HEADED !== '1') {
     options.addArguments('-headless');
   }
 

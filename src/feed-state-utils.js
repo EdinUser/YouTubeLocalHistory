@@ -9,35 +9,26 @@
 
 'use strict';
 
-let allVideos = [];      // from feedCache
+let allVideos = [];      // canonical subscription_feed_videos projection
 let watchedMap = {};     // videoId -> watch record (for the "viewed" overlay)
 let durationCache = {};  // videoId -> seconds
 let shortsCache = {};    // videoId -> true when YouTube resolved it as a Short
 let releaseDateCache = {}; // videoId -> original YouTube release timestamp
-const metadataAttempts = new Map();
-let releaseDateBatchRunning = false;
 let overlayTitle = 'Viewed';
 let lastUpdated = 0;
 let feedCachePolicy = '';
 let feedDiagnostics = [];
 let localSubscriptions = [];
+let sharedFeedScheduler = null;
+let pendingFeedVideoCount = 0;
 let feedFeedback = { notInterested: {}, channelLess: {}, channelMore: {} };
 let searchVisibleLimit = 25;
 const SEARCH_PAGE_SIZE = 25;
-let youtubeSearchResults = [];
-let youtubeSearchQuery = '';
-let youtubeVisibleLimit = 25;
-let youtubeSearchTimer = null;
-let youtubeSearchRequestId = 0;
-let youtubeSearchContinuation = '';
-let youtubeSearchLoadingMore = false;
-let youtubeSearchObserver = null;
-let youtubeSearchConfig = null;
-let youtubeSearchPagingError = '';
 let searchFiltersOpen = false;
 let channelActive = false;
 const enrichingSearchChannels = new Set();
 const LAST_VIEW_KEY = 'ytvht.lastFeedView.v1';
+const LAST_VIEW_STORAGE_KEY = 'ytvht.lastFeedView.v1';
 
 function updateSearchFilterButton() {
     const button = document.getElementById('searchFilterToggle');
@@ -55,6 +46,10 @@ function updateSearchFilterButton() {
 
 function rememberView(view) {
     try { sessionStorage.setItem(LAST_VIEW_KEY, view); } catch (_) { /* optional */ }
+    if (typeof ytvhtFeedViewPreference !== 'undefined' && !ytvhtFeedViewPreference.shouldPersistLastView(view)) return;
+    try {
+        chrome.storage.local.set({ [LAST_VIEW_STORAGE_KEY]: view }).catch(() => {});
+    } catch (_) { /* optional */ }
 }
 
 // ----- formatting helpers (shared with content-subscriptions.js) ----------

@@ -157,21 +157,8 @@
                 return;
             }
             setImportStatus(`Importing ${subs.length} subscriptionsâ€¦`);
-            let added = 0;
-            for (const s of subs) {
-                try {
-                    await ytStorage.addSubscription({
-                        id: s.ucid,
-                        ucid: s.ucid,
-                        channelName: s.title,
-                        url: s.url
-                    });
-                    added++;
-                } catch (_) {
-                    // Skip bad rows.
-                }
-            }
-            setImportStatus(`Imported ${added} subscriptions. Open YouTube and click Refresh to load their videos.`);
+            const { outcome } = await globalThis.ytvhtFeedSubscriptionImport.importCanonicalSubscriptions(globalThis.ytIndexedDBStorage, subs);
+            setImportStatus(`Imported ${outcome.added} subscriptions; ${outcome.initializationQueued} queued to prepare your local feed. Open the feed page to begin scanning.`);
             if (typeof notifyYouTubeTabs === 'function') notifyYouTubeTabs({ type: 'ytvhtSubsChanged' });
             if (typeof displaySubscriptionsPage === 'function') displaySubscriptionsPage();
         } catch (err) {

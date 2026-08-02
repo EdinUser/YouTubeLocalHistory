@@ -36,6 +36,14 @@ function addWatchedOverlay(thumbWrap, record) {
     }
 }
 
+function refreshWatchedOverlayForVideo(videoId) {
+    if (!videoId) return;
+    document.querySelectorAll(`[data-ytvht-video-id="${videoId}"] .ytvht-thumb-wrap`).forEach((thumbWrap) => {
+        thumbWrap.querySelectorAll('.ytvht-viewed-label, .ytvht-progress-bar').forEach((overlay) => overlay.remove());
+        addWatchedOverlay(thumbWrap, watchedMap[videoId] || null);
+    });
+}
+
 function videoSaveRecord(video) {
     return {
         videoId: video.videoId,
@@ -331,8 +339,9 @@ function buildVideoMenu(video, options) {
         [tFeed('feed_unsubscribe', 'Unsubscribe'), '<circle cx="9" cy="8" r="3"></circle><path d="M3.5 18c.5-3.5 2.4-5 5.5-5 1.2 0 2.2.2 3 .7"></path><path d="M15 11h6"></path>', async () => {
             const subscription = findSubscriptionForVideo(video);
             if (!subscription) return tFeed('feed_not_subscribed', 'Not subscribed');
-            await ytStorage.removeSubscription(subscription.id);
-            localSubscriptions = await ytStorage.getSubscriptionList();
+            await ytIndexedDBStorage.deleteSubscriptionRecord(subscription.channelId);
+            await ytIndexedDBStorage.deleteChannelSyncState(subscription.channelId);
+            localSubscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
             allVideos = allVideos.filter((item) =>
                 channelKey(item.channelName) !== channelKey(subscription.channelName)
             );
@@ -425,6 +434,7 @@ function buildCard(video) {
 
     const card = document.createElement('div');
     card.className = 'ytvht-feed-card';
+    card.dataset.ytvhtVideoId = video.videoId;
 
     const thumbWrap = document.createElement('div');
     thumbWrap.className = 'ytvht-thumb-wrap';
