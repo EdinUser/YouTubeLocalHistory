@@ -28,6 +28,7 @@
             "js": [
                 "indexeddb-storage.js",
                 "storage.js",
+                "local-subscription-actions.js",
                 "content-css.js",
                 "content-url.js",
                 "content-import.js",

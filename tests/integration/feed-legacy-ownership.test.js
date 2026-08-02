@@ -14,11 +14,14 @@ test('the feed page does not load the aggregate cache pipeline or remote YouTube
 
 test('the page-overlay subscription control has no feed inventory, RSS, or network ownership', () => {
   const source = read('src/content-subscriptions.js');
+  const actions = read('src/local-subscription-actions.js');
   expect(source).not.toContain('feedCache');
   expect(source).not.toContain('videos.xml');
   expect(source).not.toContain('fetch(');
-  expect(source).toContain('putSubscriptionRecord');
-  expect(source).toContain('putChannelSyncState');
+  expect(source).toContain('ytvhtLocalSubscriptionActions.follow');
+  expect(actions).toContain('putSubscriptionRecord');
+  expect(actions).toContain('putChannelSyncState');
+  expect(actions).not.toContain('videos.xml');
 });
 
 test('extension content-script manifests no longer load the old feed-core worker dependency', () => {

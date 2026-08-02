@@ -131,6 +131,43 @@ function subscriptionUrl(sub) {
     return `https://www.youtube.com/channel/${sub.ucid || sub.id}`;
 }
 
+function setSubscriptionAddStatus(message, isError) {
+    const status = document.getElementById('subscriptionAddStatus');
+    if (!status) return;
+    status.textContent = message || '';
+    status.style.color = isError ? 'var(--danger-text)' : '';
+}
+
+function setupSubscriptionAddForm() {
+    const form = document.getElementById('subscriptionAddForm');
+    const input = document.getElementById('subscriptionAddInput');
+    if (!form || !input || form.dataset.bound) return;
+    form.dataset.bound = 'true';
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('button[type="submit"]');
+        button.disabled = true;
+        setSubscriptionAddStatus('Resolving channel…', false);
+        try {
+            const resolved = await ytvhtLocalSubscriptionActions.resolveInput(input.value, fetch);
+            const outcome = await ytvhtLocalSubscriptionActions.follow(ytIndexedDBStorage, resolved);
+            if (outcome.status === 'already-following') {
+                setSubscriptionAddStatus('Already following this channel with re:Watch.', false);
+            } else {
+                input.value = '';
+                setSubscriptionAddStatus('Subscribed with re:Watch — preparing local feed.', false);
+                const scheduler = ensureSharedFeedScheduler();
+                if (scheduler) await scheduler.initializeSubscriptions([resolved.channelId]);
+            }
+            await renderSubscriptions();
+        } catch (error) {
+            setSubscriptionAddStatus(error && error.message ? error.message : 'Could not subscribe to that channel.', true);
+        } finally {
+            button.disabled = false;
+        }
+    });
+}
+
 async function renderSubscriptions() {
     const list = document.getElementById('subscriptionsList');
     const empty = document.getElementById('subscriptionsEmpty');
@@ -138,6 +175,7 @@ async function renderSubscriptions() {
     const clear = document.getElementById('clearSubscriptions');
     if (!list || !empty || !count) return;
 
+    setupSubscriptionAddForm();
     let subscriptions = [];
     try {
         subscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;

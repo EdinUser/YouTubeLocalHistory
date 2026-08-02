@@ -25,7 +25,7 @@ function isSubbedCached(info) {
 }
 
 function paintSubscribeButton(button, subbed) {
-    button.textContent = subbed ? '✓ Subscribed' : '＋ Subscribe';
+    button.textContent = subbed ? 'Unfollow re:Watch' : 'Subscribe with re:Watch';
     button.classList.toggle('subbed', subbed);
     button.classList.remove('loading');
     button.removeAttribute('aria-label');
@@ -49,7 +49,7 @@ function buildSubscribeButton(info) {
             const subbed = !!(await findSub(info));
             paintMatchingSubscribeButtons(info, subbed);
         } catch (_) {
-            btn.textContent = '＋ Subscribe';
+            btn.textContent = 'Subscribe with re:Watch';
             btn.classList.remove('loading');
         }
     }
@@ -60,24 +60,14 @@ function buildSubscribeButton(info) {
         try {
             const existing = await findSub(info);
             if (existing) {
-                await ytIndexedDBStorage.deleteSubscriptionRecord(existing.channelId);
-                await ytIndexedDBStorage.deleteChannelSyncState(existing.channelId);
+                await ytvhtLocalSubscriptionActions.unfollow(ytIndexedDBStorage, existing.channelId);
             } else {
                 const channelId = String(info.ucid || info.channelId || '');
                 if (!/^UC[\w-]+$/.test(channelId)) {
                     throw new Error('A canonical channel ID is required before following a channel');
                 }
-                await ytIndexedDBStorage.putSubscriptionRecord({
-                    channelId,
-                    channelTitle: info.channelName || '',
-                    thumbnail: info.thumbnail || '',
-                    handle: info.handle || '',
-                    source: 'manual',
-                    followedAt: Date.now()
-                });
-                const scheduler = ensureSharedFeedScheduler();
-                if (scheduler) await scheduler.initializeSubscriptions([channelId]);
-                setStatus(`Subscribed to ${info.channelName || 'channel'} — preparing local feed.`, false);
+                await ytvhtLocalSubscriptionActions.follow(ytIndexedDBStorage, { ...info, channelId });
+                setStatus(`Subscribed to ${info.channelName || 'channel'} with re:Watch — preparing local feed.`, false);
             }
             localSubscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
             await paint();

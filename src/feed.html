@@ -249,6 +249,10 @@
         }
         .subs-title { font-size: 22px; font-weight: 700; margin: 0; }
         .subs-count { color: var(--text-2); font-size: 14px; margin-top: 4px; }
+        .subs-add { display: flex; gap: 8px; align-items: end; max-width: 720px; margin: 0 0 6px; }
+        .subs-add label { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; }
+        .subs-add input { flex: 1; min-width: 180px; padding: 9px 10px; color: var(--text); background: var(--chip); border: 1px solid var(--border); border-radius: 6px; }
+        .subs-add-status { min-height: 20px; margin: 0 0 12px; color: var(--text-2); font-size: 13px; }
         .subs-list {
             display: flex; flex-direction: column;
             width: 100%;
@@ -1710,9 +1714,15 @@
                         <div class="subs-count" id="subscriptionsCount"></div>
                     </div>
                 </div>
+                <form class="subs-add" id="subscriptionAddForm">
+                    <label for="subscriptionAddInput">Subscribe with re:Watch</label>
+                    <input id="subscriptionAddInput" type="text" autocomplete="off" placeholder="Channel URL, UC ID, or @handle">
+                    <button class="btn primary" type="submit">Subscribe</button>
+                </form>
+                <div class="subs-add-status" id="subscriptionAddStatus" aria-live="polite"></div>
                 <div class="subs-list" id="subscriptionsList"></div>
                 <div class="subs-empty" id="subscriptionsEmpty" style="display:none;">
-                    <span data-i18n="feed_no_local_channels">No locally subscribed channels yet. Search in the extension and use Subscribe.</span>
+                    <span data-i18n="feed_no_local_channels">No locally subscribed channels yet. Add a channel above or use Subscribe with re:Watch on YouTube.</span>
                 </div>
             </section>
 
@@ -1911,6 +1921,7 @@
 
     <script src="indexeddb-storage.js"></script>
     <script src="storage.js"></script>
+    <script src="local-subscription-actions.js"></script>
     <script src="feed-async.js"></script>
     <script src="feed-contracts.js"></script>
     <script src="rss-parser.js"></script>

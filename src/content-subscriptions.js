@@ -26,7 +26,7 @@
 
     async function refreshFollowButton(button, info) {
         const existing = await ytIndexedDBStorage.getSubscriptionRecord(info.channelId);
-        button.textContent = existing ? '✓ Following locally' : '＋ Follow locally';
+        button.textContent = existing ? 'Unfollow re:Watch' : 'Subscribe with re:Watch';
         button.classList.toggle('ytvht-sub-btn-following', Boolean(existing));
     }
 
@@ -34,7 +34,7 @@
         const info = channelInfoFromPage();
         document.querySelectorAll('.ytvht-sub-btn').forEach((button) => button.remove());
         if (!info || typeof ytIndexedDBStorage === 'undefined') return;
-        const anchor = document.querySelector('#subscribe-button, ytd-c4-tabbed-header-renderer #buttons, ytd-video-owner-renderer #subscribe-button');
+        const anchor = document.querySelector('#subscribe-button, ytd-video-owner-renderer #subscribe-button, ytd-c4-tabbed-header-renderer #buttons');
         if (!anchor || !anchor.parentNode) return;
         const button = document.createElement('button');
         button.type = 'button';
@@ -45,22 +45,8 @@
             button.disabled = true;
             try {
                 const existing = await ytIndexedDBStorage.getSubscriptionRecord(info.channelId);
-                if (existing) {
-                    await ytIndexedDBStorage.deleteSubscriptionAndSyncState(info.channelId);
-                } else {
-                    await ytIndexedDBStorage.putSubscriptionRecord({
-                        ...info,
-                        source: 'manual',
-                        followedAt: Date.now()
-                    });
-                    await ytIndexedDBStorage.putChannelSyncState({
-                        channelId: info.channelId,
-                        initializationState: 'pending',
-                        nextEligibleCheckAt: Date.now(),
-                        scanLeaseUntil: null,
-                        scanRunId: null
-                    });
-                }
+                if (existing) await ytvhtLocalSubscriptionActions.unfollow(ytIndexedDBStorage, info.channelId);
+                else await ytvhtLocalSubscriptionActions.follow(ytIndexedDBStorage, info);
                 await refreshFollowButton(button, info);
             } finally {
                 button.disabled = false;
