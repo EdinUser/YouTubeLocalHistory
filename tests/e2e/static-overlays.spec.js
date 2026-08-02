@@ -316,6 +316,16 @@ test.describe('Static overlays (captured YouTube DOM)', () => {
     await expect(page.locator('.ytvht-sub-btn')).toHaveCount(1);
   });
 
+  test('captured watch owner row receives the companion beside its visible native Subscribe button', async ({ page }) => {
+    const capture = readCapture('rick-watch');
+    test.skip(!capture, 'Run `npm run fixtures:youtube:download -- --only rick-watch --headless` first.');
+    await openCapturedPage(page, WATCH_URL, capture.html);
+    await expect(page.locator('ytd-watch-metadata #subscribe-button button[aria-label^="Subscribe"]')).toHaveCount(1);
+    await expect(page.locator('.ytvht-sub-btn')).toHaveCount(1);
+    await expect(page.locator('.ytvht-sub-btn')).toHaveText('Subscribe with re:Watch');
+    await expect(page.locator('ytd-watch-metadata #subscribe-button + .ytvht-sub-btn')).toHaveCount(1);
+  });
+
   test('captured playlist item gets overlay once and overlay remove deletes storage', async ({ context, page }) => {
     const capture = readCapture('controlled-playlist');
     test.skip(!capture, 'Run `npm run fixtures:youtube:download -- --only controlled-playlist` first.');

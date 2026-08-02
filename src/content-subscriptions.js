@@ -9,6 +9,11 @@
         const handleMatch = path.match(/^\/(@[\w.-]+)/);
         let channelId = channelMatch ? channelMatch[1] : null;
         if (!channelId) {
+            const ownerLink = document.querySelector('ytd-video-owner-renderer a[href*="/channel/UC"], ytd-watch-metadata a[href*="/channel/UC"], yt-page-header-renderer a[href*="/channel/UC"]');
+            const ownerMatch = ownerLink && ownerLink.getAttribute('href').match(/\/channel\/(UC[\w-]+)/);
+            channelId = ownerMatch ? ownerMatch[1] : null;
+        }
+        if (!channelId) {
             const scripts = Array.from(document.querySelectorAll('script')).map((script) => script.textContent || '');
             for (const text of scripts) {
                 const match = text.match(/"externalId":"(UC[\w-]+)"/);
@@ -30,11 +35,25 @@
         button.classList.toggle('ytvht-sub-btn-following', Boolean(existing));
     }
 
+    function subscriptionAnchor() {
+        const native = document.querySelector(
+            'ytd-watch-metadata #subscribe-button button[aria-label^="Subscribe"], ' +
+            'ytd-video-owner-renderer button[aria-label^="Subscribe"], ' +
+            'yt-page-header-renderer button[aria-label^="Subscribe"]'
+        );
+        if (!native) return null;
+        return native.closest('#subscribe-button, .ytFlexibleActionsViewModelAction') || native;
+    }
+
     async function mountFollowButton() {
         const info = channelInfoFromPage();
-        document.querySelectorAll('.ytvht-sub-btn').forEach((button) => button.remove());
         if (!info || typeof ytIndexedDBStorage === 'undefined') return;
-        const anchor = document.querySelector('#subscribe-button, ytd-video-owner-renderer #subscribe-button, ytd-c4-tabbed-header-renderer #buttons');
+        const existingButton = document.querySelector('.ytvht-sub-btn');
+        if (existingButton) {
+            await refreshFollowButton(existingButton, info);
+            return;
+        }
+        const anchor = subscriptionAnchor();
         if (!anchor || !anchor.parentNode) return;
         const button = document.createElement('button');
         button.type = 'button';
@@ -55,8 +74,18 @@
         anchor.parentNode.insertBefore(button, anchor.nextSibling);
     }
 
-    const scheduleMount = () => setTimeout(() => mountFollowButton().catch(() => {}), 500);
+    let mountTimer = null;
+    const scheduleMount = () => {
+        if (mountTimer) clearTimeout(mountTimer);
+        mountTimer = setTimeout(() => {
+            mountTimer = null;
+            mountFollowButton().catch(() => {});
+        }, 250);
+    };
     window.addEventListener('yt-navigate-finish', scheduleMount);
     window.addEventListener('yt-page-data-updated', scheduleMount);
+    if (typeof MutationObserver !== 'undefined') {
+        new MutationObserver(scheduleMount).observe(document.documentElement, { childList: true, subtree: true });
+    }
     scheduleMount();
 })();

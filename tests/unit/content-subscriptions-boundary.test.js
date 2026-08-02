@@ -7,7 +7,7 @@ const vm = require('vm');
 test('the page Follow action writes only canonical local subscription state and makes no request', async () => {
   jest.useFakeTimers();
   document.head.innerHTML = '<meta property="og:title" content="Fixture channel">';
-  document.body.innerHTML = '<div><div id="subscribe-button"></div></div>';
+  document.body.innerHTML = '<ytd-watch-metadata><div id="subscribe-button"><button aria-label="Subscribe to Fixture"></button></div></ytd-watch-metadata>';
   const fetch = jest.fn();
   const storage = {
     getSubscriptionRecord: jest.fn(async () => null),
