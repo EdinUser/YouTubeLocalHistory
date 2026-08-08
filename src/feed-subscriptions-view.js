@@ -147,15 +147,15 @@ function setupSubscriptionAddForm() {
         event.preventDefault();
         const button = form.querySelector('button[type="submit"]');
         button.disabled = true;
-        setSubscriptionAddStatus('Resolving channel…', false);
+        setSubscriptionAddStatus(tFeed('feed_resolving_channel', 'Resolving channel…'), false);
         try {
             const resolved = await ytvhtLocalSubscriptionActions.resolveInput(input.value, fetch);
             const outcome = await ytvhtLocalSubscriptionActions.follow(ytIndexedDBStorage, resolved);
             if (outcome.status === 'already-following') {
-                setSubscriptionAddStatus('Already following this channel with re:Watch.', false);
+                setSubscriptionAddStatus(tFeed('feed_already_following', 'Already following this channel with re:Watch.'), false);
             } else {
                 input.value = '';
-                setSubscriptionAddStatus('Subscribed with re:Watch — preparing local feed.', false);
+                setSubscriptionAddStatus(tFeed('feed_subscribed_preparing', 'Subscribed with re:Watch — preparing local feed.'), false);
                 const scheduler = ensureSharedFeedScheduler();
                 if (scheduler) await scheduler.initializeSubscriptions([resolved.channelId]);
             }
@@ -166,7 +166,8 @@ function setupSubscriptionAddForm() {
                 await hydrateVisibleChannelMetadata([outcome.subscription]);
             }
         } catch (error) {
-            setSubscriptionAddStatus(error && error.message ? error.message : 'Could not subscribe to that channel.', true);
+            console.warn('[subscriptions] add failed', error && error.message);
+            setSubscriptionAddStatus(tFeed('feed_subscribe_failed', 'Could not subscribe to that channel.'), true);
         } finally {
             button.disabled = false;
         }
@@ -190,7 +191,7 @@ async function renderSubscriptions() {
         })));
     } catch (_) { /* show empty */ }
     list.textContent = '';
-    count.textContent = `${subscriptions.length} channel${subscriptions.length === 1 ? '' : 's'}`;
+    count.textContent = feedPlural('feed_channels_count', subscriptions.length, '$1 channel', '$1 channels');
     empty.style.display = subscriptions.length ? 'none' : 'block';
     if (clear) clear.style.display = subscriptions.length ? '' : 'none';
 
@@ -227,7 +228,7 @@ async function renderSubscriptions() {
         copy.className = 'subs-copy';
         const name = document.createElement('span');
         name.className = 'subs-name';
-        name.textContent = decodeHtmlEntities(sub.channelName || sub.id || 'Unknown channel');
+        name.textContent = decodeHtmlEntities(sub.channelName || sub.id || tFeed('analytics_unknown_channel', 'Unknown channel'));
         copy.appendChild(name);
         const identity = document.createElement('div');
         identity.className = 'subs-count';
@@ -236,10 +237,15 @@ async function renderSubscriptions() {
         channel.appendChild(copy);
         row.appendChild(channel);
 
-        const latest = sub.latestUploadAt ? `Last upload ${relativeTime(sub.latestUploadAt)}` : '';
+        const latest = sub.latestUploadAt
+            ? tFeed('feed_last_upload', 'Last upload $1', [relativeTime(sub.latestUploadAt)])
+            : '';
         const nextCheck = formatNextChannelCheck(sub.nextEligibleCheckAt);
-        const videoCount = sub.videoCount && /^\d[\d, .]*$/.test(sub.videoCount)
-            ? `${sub.videoCount} videos`
+        const parsedVideoCount = sub.videoCount && /^\d[\d, ]*$/.test(sub.videoCount)
+            ? Number(String(sub.videoCount).replace(/[, ]/g, ''))
+            : NaN;
+        const videoCount = Number.isFinite(parsedVideoCount)
+            ? feedPlural('feed_videos', parsedVideoCount, '$1 video', '$1 videos')
             : sub.videoCount;
         const metaText = [sub.subscriberCount, videoCount, latest, sub.activityClass, nextCheck].filter(Boolean).join(' · ');
         if (metaText) {
@@ -251,13 +257,13 @@ async function renderSubscriptions() {
 
         const unsubscribe = document.createElement('button');
         unsubscribe.className = 'btn';
-        unsubscribe.textContent = 'Unsubscribe';
+        unsubscribe.textContent = tFeed('subscriptions_unsubscribe', 'Unsubscribe');
         unsubscribe.addEventListener('click', async () => {
             unsubscribe.disabled = true;
             try {
                 await ytIndexedDBStorage.deleteSubscriptionAndSyncState(sub.channelId);
                 await renderSubscriptions();
-                setStatus(`Unsubscribed from ${name.textContent}.`, false);
+                setStatus(tFeed('feed_unsubscribed_from_status', 'Unsubscribed from $1.', [name.textContent]), false);
             } catch (error) {
                 console.error('[subscriptions] remove failed', error);
                 unsubscribe.disabled = false;
@@ -273,12 +279,12 @@ async function renderSubscriptions() {
 function formatNextChannelCheck(timestamp) {
     const deltaMs = Number(timestamp || 0) - Date.now();
     if (!Number.isFinite(deltaMs) || !timestamp) return '';
-    if (deltaMs <= 0) return 'Next check due';
+    if (deltaMs <= 0) return tFeed('feed_next_check_due', 'Next check due');
     const minutes = Math.ceil(deltaMs / 60000);
-    if (minutes < 60) return `Next check in ${minutes}m`;
+    if (minutes < 60) return tFeed('feed_next_check_minutes', 'Next check in $1m', [feedFormatNumber(minutes)]);
     const hours = Math.ceil(minutes / 60);
-    if (hours < 48) return `Next check in ${hours}h`;
-    return `Next check in ${Math.ceil(hours / 24)}d`;
+    if (hours < 48) return tFeed('feed_next_check_hours', 'Next check in $1h', [feedFormatNumber(hours)]);
+    return tFeed('feed_next_check_days', 'Next check in $1d', [feedFormatNumber(Math.ceil(hours / 24))]);
 }
 
 async function hydrateVisibleChannelMetadata(subscriptions) {
@@ -394,9 +400,9 @@ function formatSavedDate(timestamp) {
 function formatUploadDate(timestamp) {
     if (!timestamp) return '';
     try {
-        return `Uploaded ${new Date(timestamp).toLocaleDateString(undefined, {
+        return tFeed('feed_uploaded_on', 'Uploaded $1', [new Date(timestamp).toLocaleDateString(undefined, {
             year: 'numeric', month: 'short', day: 'numeric'
-        })}`;
+        })]);
     } catch (_) {
         return '';
     }

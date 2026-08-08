@@ -2,7 +2,9 @@
 # Unpacked Chrome extension in build/e2e/chrome - no CRX/signing (for Playwright / dev load).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-rm -rf "$ROOT/build/e2e/chrome"
+# Keep the directory Chrome loaded stable. Removing and recreating it causes
+# Chrome to invalidate the unpacked extension, leaving its Reload action with
+# a transient "missing file" error even after the build has completed.
 mkdir -p "$ROOT/build/e2e/chrome"
 
 node "$ROOT/merge_locales.js" "build/e2e/chrome/_locales"

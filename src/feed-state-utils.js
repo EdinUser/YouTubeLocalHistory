@@ -14,7 +14,7 @@ let watchedMap = {};     // videoId -> watch record (for the "viewed" overlay)
 let durationCache = {};  // videoId -> seconds
 let shortsCache = {};    // videoId -> true when YouTube resolved it as a Short
 let releaseDateCache = {}; // videoId -> original YouTube release timestamp
-let overlayTitle = 'Viewed';
+let overlayTitle = '';
 let lastUpdated = 0;
 let feedCachePolicy = '';
 let feedDiagnostics = [];
@@ -39,8 +39,10 @@ function updateSearchFilterButton() {
             return value && value !== 'any' && value !== 'relevance';
         }).length;
     button.textContent = searchFiltersOpen
-        ? 'Hide filters'
-        : `Filters${active ? ` (${active})` : ''}`;
+        ? tFeed('feed_hide_filters', 'Hide filters')
+        : active
+            ? tFeed('feed_filters_active', 'Filters ($1)', [feedFormatNumber(active)])
+            : tFeed('feed_filters', 'Filters');
     button.classList.toggle('active', searchFiltersOpen || active > 0);
 }
 
@@ -70,30 +72,19 @@ function cleanDurationText(value) {
 
 function formatViews(n) {
     if (!n || n < 1) return '';
-    if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B views';
-    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M views';
-    if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K views';
-    return n + ' views';
+    return feedPlural(
+        'feed_views',
+        n,
+        '$1 view',
+        '$1 views',
+        [],
+        { notation: 'compact', maximumFractionDigits: 1 }
+    );
 }
 
 function relativeTime(ms) {
     if (!ms || !Number.isFinite(Number(ms))) return '';
-    const diff = Date.now() - ms;
-    if (!Number.isFinite(diff)) return '';
-    const sec = Math.floor(diff / 1000);
-    if (sec < 60) return 'just now';
-    const min = Math.floor(sec / 60);
-    if (min < 60) return `${min} minute${min === 1 ? '' : 's'} ago`;
-    const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`;
-    const day = Math.floor(hr / 24);
-    if (day < 7) return `${day} day${day === 1 ? '' : 's'} ago`;
-    const wk = Math.floor(day / 7);
-    if (wk < 5) return `${wk} week${wk === 1 ? '' : 's'} ago`;
-    const mo = Math.floor(day / 30);
-    if (mo < 12) return `${mo} month${mo === 1 ? '' : 's'} ago`;
-    const yr = Math.floor(day / 365);
-    return `${yr} year${yr === 1 ? '' : 's'} ago`;
+    return feedRelativeTime(Number(ms));
 }
 
 function parseRelativeTimeText(text) {

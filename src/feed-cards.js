@@ -61,13 +61,6 @@ async function saveFeedFeedback() {
     await chrome.storage.local.set({ feedFeedback });
 }
 
-function tFeed(key, fallback, substitutions) {
-    if (typeof feedMessage === 'function') {
-        return feedMessage(key, substitutions) || fallback;
-    }
-    return fallback;
-}
-
 function appendSvgMarkup(svg, markup) {
     const doc = new DOMParser().parseFromString(
         `<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`,
@@ -174,7 +167,7 @@ async function addVideoToLocalPlaylist(video) {
         if (!records.length) {
             const empty = document.createElement('div');
             empty.className = 'playlist-picker-empty';
-            empty.textContent = 'No playlists yet. Create your first one below.';
+            empty.textContent = tFeed('feed_no_playlists_create', 'No playlists yet. Create your first one below.');
             list.appendChild(empty);
         }
         records.forEach((playlist) => {
@@ -214,8 +207,10 @@ async function addVideoToLocalPlaylist(video) {
                 playlist._source === 'youtube' ? (playlist.localItems || {}) : (playlist.items || {})
             ).length;
             count.textContent = playlist._source === 'youtube'
-                ? (total ? `${total} locally added video${total === 1 ? '' : 's'}` : 'Saved playlist')
-                : `${total} video${total === 1 ? '' : 's'}`;
+                ? (total
+                    ? feedPlural('feed_locally_added_videos', total, '$1 locally added video', '$1 locally added videos')
+                    : tFeed('feed_saved_playlist', 'Saved playlist'))
+                : feedPlural('feed_videos', total, '$1 video', '$1 videos');
             text.appendChild(title);
             text.appendChild(count);
             const saveIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -314,8 +309,10 @@ function buildVideoMenu(video, options) {
                 }
             }
             await saveFeedFeedback();
-            setStatus(`We’ll recommend more from ${decodeHtmlEntities(video.channelName || 'this channel')}.`, false);
-            return 'We’ll recommend more';
+            setStatus(tFeed('feed_recommend_more_from_status', "We'll recommend more from $1.", [
+                decodeHtmlEntities(video.channelName || tFeed('feed_this_channel', 'this channel'))
+            ]), false);
+            return tFeed('feed_recommend_more_status', "We'll recommend more");
         }],
         [tFeed('feed_less_from_channel', 'Less from this channel'), '<circle cx="9" cy="8" r="3"></circle><path d="M3.5 18c.5-3.5 2.4-5 5.5-5 1.2 0 2.2.2 3 .7"></path><path d="M15 16h6"></path>', async () => {
             const key = channelKey(video.channelName);
@@ -479,7 +476,7 @@ function buildCard(video) {
     avatarLink.href = video.channelUrl || video.url;
     avatarLink.target = '_blank';
     avatarLink.rel = 'noopener';
-    const channelName = decodeHtmlEntities(video.channelName || '');
+    const channelName = decodeHtmlEntities(feedChannelTitle(video.channelName));
     avatarLink.title = channelName;
     if (video.channelThumbnail) {
         const avatar = document.createElement('img');
@@ -504,7 +501,7 @@ function buildCard(video) {
     titleLink.href = video.url;
     titleLink.target = '_blank';
     titleLink.rel = 'noopener';
-    const title = decodeHtmlEntities(video.title || '');
+    const title = decodeHtmlEntities(feedVideoTitle(video.title));
     titleLink.textContent = title;
     titleLink.title = title;
 
@@ -582,8 +579,8 @@ function videoAgeText(video) {
 
 function memberBadgeText(video) {
     const text = String(video?._memberBadgeText || video?.memberBadgeText || '').toLowerCase();
-    if (/members?[^a-z0-9]{0,20}only/.test(text)) return 'Members only';
-    if (/members?[^a-z0-9]{0,20}first/.test(text)) return 'Members first';
+    if (/members?[^a-z0-9]{0,20}only/.test(text)) return tFeed('feed_members_only', 'Members only');
+    if (/members?[^a-z0-9]{0,20}first/.test(text)) return tFeed('feed_members_first', 'Members first');
     return '';
 }
 
@@ -613,7 +610,7 @@ function addLiveBadge(thumbnail) {
         '<circle cx="12" cy="12" r="2.2"/>'
     );
     const text = document.createElement('span');
-    text.textContent = 'LIVE';
+    text.textContent = tFeed('feed_live', 'LIVE');
     badge.appendChild(icon);
     badge.appendChild(text);
     thumbnail.appendChild(badge);

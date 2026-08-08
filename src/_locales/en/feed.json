@@ -55,14 +55,6 @@
     "message": "Latest videos from your subscribed channels",
     "description": "Subscriptions navigation tooltip"
   },
-  "feed_nav_shorts": {
-    "message": "Shorts",
-    "description": "Shorts navigation label"
-  },
-  "feed_nav_playlists": {
-    "message": "Playlists",
-    "description": "Playlists navigation label"
-  },
   "feed_nav_playlists_title": {
     "message": "View saved playlists",
     "description": "Playlists navigation tooltip"
@@ -83,17 +75,9 @@
     "message": "Manage your locally subscribed channels",
     "description": "Channels navigation tooltip"
   },
-  "feed_nav_analytics": {
-    "message": "Analytics",
-    "description": "Analytics navigation label"
-  },
   "feed_nav_analytics_title": {
     "message": "View your watch analytics",
     "description": "Analytics navigation tooltip"
-  },
-  "feed_nav_settings": {
-    "message": "Settings",
-    "description": "Settings navigation label"
   },
   "feed_nav_settings_title": {
     "message": "Open extension settings",
@@ -114,10 +98,6 @@
   "feed_upload_date": {
     "message": "Upload date",
     "description": "Upload date filter label"
-  },
-  "feed_today": {
-    "message": "Today",
-    "description": "Today filter label"
   },
   "feed_this_week": {
     "message": "This week",
@@ -179,10 +159,6 @@
     "message": "Oldest",
     "description": "Oldest sort label"
   },
-  "feed_search_results_for": {
-    "message": "Search results for",
-    "description": "Search results heading prefix"
-  },
   "feed_back_to_results": {
     "message": "Back to results",
     "description": "Back to results button label"
@@ -196,12 +172,8 @@
     "description": "Channels label"
   },
   "feed_no_local_channels": {
-    "message": "No locally subscribed channels yet. Search in the extension and use Subscribe.",
+    "message": "No locally subscribed channels yet. Add a channel above or use Subscribe with re:Watch on YouTube.",
     "description": "Empty state for local channels"
-  },
-  "feed_playlists": {
-    "message": "Playlists",
-    "description": "Playlists label"
   },
   "feed_no_saved_playlists": {
     "message": "No saved playlists yet.",
@@ -218,10 +190,6 @@
   "feed_load_more": {
     "message": "Load more",
     "description": "Load more button label"
-  },
-  "feed_analytics": {
-    "message": "Analytics",
-    "description": "Analytics label"
   },
   "feed_analytics_subtitle": {
     "message": "your watch stats, kept locally",
@@ -247,10 +215,6 @@
     "message": "Continue watching",
     "description": "Continue watching analytics title"
   },
-  "feed_settings": {
-    "message": "Settings",
-    "description": "Settings label"
-  },
   "feed_settings_subtitle": {
     "message": "Everything stays local in this browser.",
     "description": "Settings subtitle"
@@ -258,22 +222,6 @@
   "feed_settings_display": {
     "message": "Display",
     "description": "Display settings section title"
-  },
-  "feed_settings_theme": {
-    "message": "Theme",
-    "description": "Theme setting label"
-  },
-  "feed_system_default": {
-    "message": "System default",
-    "description": "System default theme label"
-  },
-  "feed_dark": {
-    "message": "Dark",
-    "description": "Dark theme label"
-  },
-  "feed_light": {
-    "message": "Light",
-    "description": "Light theme label"
   },
   "feed_accent_color": {
     "message": "Accent color",
@@ -362,10 +310,6 @@
   "feed_forever": {
     "message": "Forever",
     "description": "Forever option label"
-  },
-  "feed_data": {
-    "message": "Data",
-    "description": "Data settings section title"
   },
   "feed_backup_restore": {
     "message": "Backup & restore",
@@ -494,10 +438,6 @@
   "feed_updated": {
     "message": "Feed updated.",
     "description": "feed updated"
-  },
-  "feed_no_videos_subscribe_first": {
-    "message": "No videos found. Subscribe to channels first.",
-    "description": "feed no videos subscribe first"
   },
   "feed_refresh_failed_status": {
     "message": "Refresh failed: $1. If YouTube shows a consent wall, open youtube.com once in this browser.",

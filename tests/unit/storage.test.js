@@ -147,6 +147,18 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
 
       expect(result).toBeNull();
     });
+
+    test('stops quietly when an old content script is invalidated by an extension reload', async () => {
+      jest.spyOn(ytStorage, '_isExtensionContext').mockReturnValue(false);
+      global.chrome.storage.local.get.mockImplementation(() => {
+        throw new Error('Extension context invalidated.');
+      });
+      const warn = jest.spyOn(console, 'warn').mockImplementation();
+
+      await expect(ytStorage.getVideo('stale-content-script')).resolves.toBeNull();
+      expect(global.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 
   describe('setVideo (local-first writes)', () => {

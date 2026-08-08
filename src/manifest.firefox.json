@@ -29,6 +29,7 @@
         "scripts": [
             "indexeddb-storage.js",
             "storage.js",
+            "local-subscription-actions.js",
             "background.js"
         ]
     },

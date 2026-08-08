@@ -55,21 +55,9 @@
     "message": "Когато се пуска от плейлист, не записвай напредъка",
     "description": "Help text for pause-in-playlists setting"
   },
-  "settings_data_management_label": {
-    "message": "Управление на данните",
-    "description": "Label for data management section"
-  },
   "settings_export": {
     "message": "Експортиране",
     "description": "Button label for exporting history"
-  },
-  "settings_import": {
-    "message": "Импортиране",
-    "description": "Button label for importing history"
-  },
-  "settings_export_help": {
-    "message": "Експортирайте вашите данни за история (Импортирането идва скоро)",
-    "description": "Help text for export/import"
   },
   "settings_auto_clean_label": {
     "message": "Автоматично почистване",
@@ -150,10 +138,6 @@
   "settings_feed_refresh_help": {
     "message": "How often the local feed checks subscribed channels for new uploads",
     "description": "Help text for the feed refresh interval input"
-  },
-  "subscriptions_refresh": {
-    "message": "Refresh feed",
-    "description": "Button label to refresh the local subscriptions feed"
   },
   "subscriptions_open_feed": {
     "message": "Open YT re:Watch",

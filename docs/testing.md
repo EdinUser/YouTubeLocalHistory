@@ -18,11 +18,11 @@ For the complete local extension suite, including fresh ignored YouTube HTML and
 npm run test:local:full
 ```
 
-This command uses a clean browser context for the HTML captures, reads the
-public RSS feeds for AsmonTV, Mentour Pilot, and Nerdrotic Daily without
-credentials, then runs Jest and the Chromium/Firefox packaged-extension suites.
-It is intentionally local-only: the default `npm test` and GitHub Actions do
-not make these external requests.
+This command uses a clean browser context for the HTML captures, then runs Jest
+and the Chromium/Firefox packaged-extension suites. It is intentionally
+local-only: the default `npm test` and GitHub Actions do not make these external
+requests. Refresh public RSS captures separately with
+`npm run fixtures:youtube:download -- --headless --with-rss`.
 
 ---
 
@@ -62,7 +62,11 @@ GitHub: run **E2E (Playwright)** manually via Actions (`workflow_dispatch`) — 
 
 - **`core-resume.spec.js`**: live YouTube save/resume contract.
 - **`core-overlays.spec.js`**: live playlist/channel overlay contracts.
-- **`static-overlays.spec.js`**: captured playlist/channel DOM overlay contracts.
+- **`static-overlays.spec.js`**: captured playlist/channel DOM overlay contracts, local follow companion SPA/identity behavior, context-menu command routing, and visible playlist-history controls.
+
+The Firefox static suite mirrors these installed-extension contracts. In
+particular, playlist controls must be tested for visibility (not only DOM
+presence), because YouTube may retain hidden legacy playlist headers.
 
 Local Chromium and Firefox extension tests are headless by default. Use
 `PW_HEADED=1` for a visible debugging session. Live YouTube may show anti-bot /

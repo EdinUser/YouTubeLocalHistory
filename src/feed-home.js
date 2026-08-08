@@ -539,18 +539,23 @@ function buildLocalChannelResult(match) {
 
     const meta = document.createElement('div');
     meta.className = 'local-channel-meta';
-    meta.textContent = `${match.videos.length} matching video${match.videos.length === 1 ? '' : 's'} in your local library`;
+    meta.textContent = feedPlural(
+        'feed_matching_local_videos',
+        match.videos.length,
+        '$1 matching video in your local library',
+        '$1 matching videos in your local library'
+    );
     details.appendChild(meta);
 
     const description = document.createElement('div');
     description.className = 'local-channel-description';
-    description.textContent = 'Locally subscribed channel';
+    description.textContent = tFeed('feed_locally_subscribed_channel', 'Locally subscribed channel');
     details.appendChild(description);
     row.appendChild(details);
 
     const view = document.createElement('span');
     view.className = 'local-channel-view';
-    view.textContent = 'View channel';
+    view.textContent = tFeed('feed_view_channel', 'View channel');
     row.appendChild(view);
 
     return row;
@@ -572,14 +577,16 @@ function render() {
     grid.textContent = '';
     if (searchResults) searchResults.textContent = '';
     // No plain "Your feed" label; only show a heading for search/Shorts context.
-    const headingText = q ? `Search results for “${q}”` : (shortsOnly ? 'Shorts' : '');
+    const headingText = q
+        ? tFeed('feed_search_results_for_query', 'Search results for “$1”', [q])
+        : (shortsOnly ? tFeed('tab_shorts', 'Shorts') : '');
     heading.textContent = '';
     if (shortsOnly && !q) {
         const icon = document.createElement('span');
         icon.className = 'shorts-heading-icon';
         icon.setAttribute('aria-hidden', 'true');
         icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="m13.5 2-7 11h5l-1 9 7-12h-5l1-8Z"></path></svg>';
-        heading.append(icon, document.createTextNode('Shorts'));
+        heading.append(icon, document.createTextNode(tFeed('tab_shorts', 'Shorts')));
     } else {
         heading.textContent = headingText;
     }
@@ -603,8 +610,10 @@ function render() {
         grid.style.display = 'none';
         if (searchResults) searchResults.style.display = 'none';
         empty.style.display = 'block';
-        empty.innerHTML = 'No videos yet. Search in the extension and use the ' +
-            '<b>Subscribe</b> button, then click <b>Refresh</b> here.';
+        empty.textContent = tFeed(
+            'feed_no_videos_add_subscription',
+            'No videos yet. Add a local subscription, then click Refresh here.'
+        );
         if (status) status.style.display = 'none';
         count.textContent = '';
         return;
@@ -614,10 +623,10 @@ function render() {
         if (searchResults) searchResults.style.display = 'none';
         empty.style.display = 'block';
         empty.textContent = q
-            ? 'Nothing in your feed or history matches “' + q + '”.'
+            ? tFeed('feed_no_search_matches', 'Nothing in your feed or history matches “$1”.', [q])
             : (shortsOnly
-                ? 'No Shorts match the current filters. Try turning off Unwatched only or click Refresh.'
-                : 'No home videos match the current filters. Try turning off Unwatched only or click Refresh.');
+                ? tFeed('feed_no_shorts_matches', 'No Shorts match the current filters. Try turning off Unwatched only or click Refresh.')
+                : tFeed('feed_no_home_matches', 'No home videos match the current filters. Try turning off Unwatched only or click Refresh.'));
     } else {
         empty.style.display = 'none';
         if (q && searchResults) {
@@ -629,7 +638,11 @@ function render() {
             if (visibleList.length < list.length) {
                 const more = document.createElement('button');
                 more.className = 'btn primary search-load-more';
-                more.textContent = `Load more (${list.length - visibleList.length} remaining)`;
+                more.textContent = tFeed(
+                    'feed_load_more_remaining',
+                    'Load more ($1 remaining)',
+                    [feedFormatNumber(list.length - visibleList.length)]
+                );
                 more.addEventListener('click', () => {
                     searchVisibleLimit += SEARCH_PAGE_SIZE;
                     render();

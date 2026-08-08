@@ -4,9 +4,9 @@ const { parseRssXml } = require('../../src/rss-parser.js');
 
 const FIXTURE_DIR = path.join(__dirname, '..', 'fixtures', 'feed', 'live');
 const RSS_FIXTURES = [
-  ['asmontv', 'UCRCraKP10Q5fSAbCimkizIA'],
-  ['mentour-pilot', 'UCQeRaTukNYft1_6AZPACnog'],
-  ['nerdrotic-daily', 'UCwpHKudUkP5tNgmMdexB3ow'],
+  ['asmontv', 'UCQeRaTukNYft1_6AZPACnog'],
+  ['mentour-pilot', 'UCwpHKudUkP5tNgmMdexB3ow'],
+  ['nerdrotic', 'UC5T0tXJN5CrMZUEJuz4oovw'],
 ];
 const capturedTest = RSS_FIXTURES.every(([name]) => fs.existsSync(path.join(FIXTURE_DIR, `${name}.xml`))) ? test : test.skip;
 

@@ -30,9 +30,26 @@ describe('SPA / playlist navigation (real content.js)', () => {
     document.body.appendChild(video);
 
     expect(() => navigation.handleSpaNavigation()).not.toThrow();
-    // After SPA handling, previously playing video should be reset to 0
-    expect(video.currentTime).toBe(0);
+    // The first yt-navigate-finish for a document is not a video-to-video
+    // transition. It must not erase a timestamp restored during page load.
+    expect(video.currentTime).toBe(42);
     expect(navigation.getLastProcessedVideoId()).toBe('video1');
+  });
+
+  test('handleSpaNavigation clears inherited time for an actual SPA video change', () => {
+    document.body.innerHTML = '';
+    mockWindowLocation('https://www.youtube.com/watch?v=previousVideo');
+    navigation.handleSpaNavigation();
+
+    const video = document.createElement('video');
+    video.currentTime = 42;
+    document.body.appendChild(video);
+    mockWindowLocation('https://www.youtube.com/watch?v=nextVideo');
+
+    navigation.handleSpaNavigation();
+
+    expect(video.currentTime).toBe(0);
+    expect(navigation.getLastProcessedVideoId()).toBe('nextVideo');
   });
 
   test('checkUrlChange triggers SPA navigation for new video URL', () => {

@@ -91,8 +91,8 @@ test('feed-page scheduler derives initialization priority from local watch recor
 test('settings refreshes stale initialization progress and dormant work has a visible shared status', () => {
   const feed = read('src/feed.js');
   const settings = read('src/feed-settings.js');
-  expect(feed).toContain("setPageActiveSyncStatus('Checking a low-activity channel', true);");
+  expect(feed).toContain("tFeed('feed_checking_low_activity', 'Checking a low-activity channel')");
   expect(settings).toContain('refreshFeedSettingsInitializationProgress();');
   expect(settings).toContain('scheduler.getInitializationProgress()');
-  expect(settings).toContain("/^Preparing local feed/.test(message.textContent || '')");
+  expect(settings).toContain("'feed_initialization_progress'");
 });

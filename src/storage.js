@@ -31,6 +31,11 @@
     })();
     const isChrome = typeof chrome !== 'undefined' && (!isFirefox);
 
+    function isExtensionContextInvalidated(error) {
+        const message = String(error && error.message || error || '');
+        return message.includes('Extension context invalidated') || message.includes('EXTENSION_CONTEXT_INVALIDATED');
+    }
+
     // Cross-browser storage wrapper
     const storage = {
         async get(keys) {
@@ -722,6 +727,11 @@
                         return localResult[`video_${videoId}`];
                     }
                 } catch (error) {
+                    // Reloading an extension permanently invalidates the old
+                    // content-script world in an already-open tab. Retrying
+                    // RPC from that world cannot succeed; the refreshed page
+                    // receives the new content script.
+                    if (isExtensionContextInvalidated(error)) return null;
                     // Continue to RPC if local read fails
                     console.warn('[Storage] storage.local read failed, trying RPC:', error.message);
                 }

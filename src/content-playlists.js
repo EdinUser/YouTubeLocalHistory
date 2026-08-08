@@ -192,13 +192,130 @@
             }
         }
 
+        function playlistToggleAnchor() {
+            // On a playlist URL YouTube keeps the title/actions in the page
+            // header; while playing from one it keeps them in the playlist
+            // panel.  These are structural selectors and do not depend on a
+            // localized YouTube label.
+            const isVisible = (element) => {
+                if (!element || element.closest('[hidden], [aria-hidden="true"]')) return false;
+                // This also runs under JSDOM integration coverage, where all
+                // layout geometry is zero. Structural hidden state is the
+                // portable signal we need to reject stale YouTube panels.
+                return true;
+            };
+            if (window.location.pathname.startsWith('/watch')) {
+                return Array.from(document.querySelectorAll(
+                    'ytd-playlist-panel-renderer #header, ytd-playlist-panel-renderer .header, ytd-playlist-panel-renderer #container'
+                )).find(isVisible) || null;
+            }
+            const selectors = [
+                'yt-page-header-view-model .ytFlexibleActionsViewModelActionRow',
+                'yt-page-header-view-model',
+                'ytd-playlist-sidebar-primary-info-renderer ytd-menu-renderer #top-level-buttons-computed',
+                'ytd-playlist-sidebar-primary-info-renderer #menu',
+                'ytd-playlist-sidebar-primary-info-renderer',
+                'ytd-playlist-metadata-header-renderer #actions',
+                'ytd-playlist-metadata-header-renderer',
+                'ytd-playlist-header-renderer #actions',
+                'ytd-playlist-header-renderer'
+            ];
+            // YouTube commonly leaves an old sidebar in the DOM with `hidden`
+            // while the current playlist uses a page-header view model. Never
+            // mount the control under that hidden copy.
+            for (const selector of selectors) {
+                const anchor = Array.from(document.querySelectorAll(selector))
+                    .find(isVisible);
+                if (anchor) return anchor;
+            }
+            return null;
+        }
+
+        function setPlaylistToggleState(button, paused) {
+            button.setAttribute('aria-pressed', paused ? 'true' : 'false');
+            button.dataset.ytvhtPlaylistHistoryPaused = paused ? 'true' : 'false';
+            button.title = paused
+                ? 're:Watch: playlist history paused'
+                : 're:Watch: playlist history active';
+            button.replaceChildren();
+            const icon = document.createElement('img');
+            icon.src = (globalThis.browser?.runtime || globalThis.chrome?.runtime).getURL('icon48.png');
+            icon.alt = '';
+            icon.width = 16;
+            icon.height = 16;
+            button.append(icon, document.createTextNode(paused ? 'History paused' : 'History active'));
+        }
+
+        function playlistToggleContainer(anchor) {
+            if (window.location.pathname.startsWith('/watch')) return anchor;
+            let row = anchor.parentElement?.querySelector(':scope > .ytvht-playlist-history-row');
+            if (!row) {
+                row = document.createElement('div');
+                row.className = 'ytvht-playlist-history-row';
+                if (anchor.parentElement) anchor.parentElement.insertBefore(row, anchor.nextSibling);
+                else anchor.append(row);
+            }
+            return row;
+        }
+
         async function attachPlaylistIgnoreToggles() {
-            document.querySelectorAll('.ytvht-ignore-toggle, .ytvht-ignore-row')
-                .forEach((node) => node.remove());
+            const playlistId = new URLSearchParams(window.location.search).get('list');
+            if (!playlistId) {
+                document.querySelectorAll('.ytvht-playlist-history-toggle').forEach((node) => node.remove());
+                return;
+            }
+            const anchor = playlistToggleAnchor();
+            if (!anchor) return;
+            const container = playlistToggleContainer(anchor);
+
+            // A SPA may retain the old header briefly. Reuse the one local
+            // control and move it into the row belonging to the live actions.
+            let button = container.querySelector(':scope > .ytvht-playlist-history-toggle') ||
+                document.querySelector('.ytvht-playlist-history-toggle');
+            if (!button) {
+                button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'ytvht-playlist-history-toggle';
+                button.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    const currentPlaylistId = button.dataset.ytvhtPlaylistId;
+                    if (!currentPlaylistId || button.disabled) return;
+                    button.disabled = true;
+                    try {
+                        const existing = await getStorage().getPlaylist(currentPlaylistId);
+                        const paused = !existing?.ignoreVideos;
+                        await getStorage().setPlaylist(currentPlaylistId, {
+                            ...(existing || {}),
+                            playlistId: currentPlaylistId,
+                            url: `https://www.youtube.com/playlist?list=${currentPlaylistId}`,
+                            ignoreVideos: paused,
+                            timestamp: existing?.timestamp || Date.now(),
+                            lastUpdated: Date.now()
+                        });
+                        setPlaylistToggleState(button, paused);
+                    } catch (error) {
+                        log('Could not update playlist history preference', error);
+                    } finally {
+                        button.disabled = false;
+                    }
+                }, true);
+            }
+            if (button.parentElement !== container) container.append(button);
+            button.dataset.ytvhtPlaylistId = playlistId;
+            const record = await getStorage().getPlaylist(playlistId);
+            setPlaylistToggleState(button, Boolean(record?.ignoreVideos));
         }
 
         function ensurePlaylistIgnoreToggles(retries = 12) {
-            attachPlaylistIgnoreToggles();
+            const mounted = attachPlaylistIgnoreToggles().catch((error) => {
+                log('Could not mount playlist history control', error);
+                return null;
+            });
+            if (retries > 0 && new URLSearchParams(window.location.search).has('list') && !playlistToggleAnchor()) {
+                setTimeout(() => ensurePlaylistIgnoreToggles(retries - 1), 500);
+            }
+            return mounted;
         }
 
         return {

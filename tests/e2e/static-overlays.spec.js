@@ -8,6 +8,8 @@ const path = require('path');
 const { test, expect } = require('./extension-fixture');
 const {
   getStoredVideo,
+  getLocalSubscription,
+  getServiceWorker,
   seedStoredVideo: seedExtensionVideo,
 } = require('./chromium-extension-storage');
 
@@ -20,6 +22,7 @@ const WATCH_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
 const CHANNEL_HEADER_URL = 'https://www.youtube.com/@NerdroticDaily';
 const SAVED_TIME = 45;
 const SAVED_DURATION = 180;
+const NERDROTIC_CHANNEL_ID = 'UCRCraKP10Q5fSAbCimkizIA';
 
 function readCapture(fixtureName) {
   const fixtureDir = path.join(CAPTURE_DIR, fixtureName);
@@ -316,14 +319,86 @@ test.describe('Static overlays (captured YouTube DOM)', () => {
     await expect(page.locator('.ytvht-sub-btn')).toHaveCount(1);
   });
 
+  test('local follow companion persists and switches channel identity through SPA navigation', async ({ context, page }) => {
+    const capture = readCapture('controlled-channel-header');
+    test.skip(!capture, 'Run `npm run fixtures:youtube:download -- --only controlled-channel-header --headless` first.');
+    await openCapturedPage(page, CHANNEL_HEADER_URL, capture.html);
+
+    const button = page.locator('.ytvht-sub-btn');
+    await expect(button).toHaveText('Subscribe with re:Watch');
+    await button.click();
+    await expect(button).toHaveText('Unfollow re:Watch');
+    await expect.poll(() => getLocalSubscription(context, NERDROTIC_CHANNEL_ID)).toMatchObject({ channelId: NERDROTIC_CHANNEL_ID });
+
+    const secondChannelId = 'UC0SecondFixtureChannel123';
+    const secondUrl = 'https://www.youtube.com/@SecondFixtureChannel';
+    const secondHtml = capture.html
+      .replaceAll('UCRCraKP10Q5fSAbCimkizIA', secondChannelId)
+      .replaceAll('NerdroticDaily', 'SecondFixtureChannel')
+      .replaceAll('Nerdrotic Daily', 'Second Fixture Channel');
+    await replacePageWithCapturedHtml(page, secondUrl, secondHtml);
+
+    await expect(button).toHaveText('Subscribe with re:Watch');
+    await expect.poll(() => page.evaluate(() => {
+      const companion = document.querySelector('.ytvht-sub-btn');
+      const nativeControl = companion && companion.previousElementSibling;
+      return Boolean(nativeControl && companion && companion.getBoundingClientRect().left > nativeControl.getBoundingClientRect().left);
+    })).toBe(true);
+    await button.click();
+    await expect(button).toHaveText('Unfollow re:Watch');
+    await expect.poll(() => getLocalSubscription(context, secondChannelId)).toMatchObject({ channelId: secondChannelId });
+  });
+
+  test('channel context action persists a canonical local subscription', async ({ context }) => {
+    const channelId = 'UC0ContextMenuFixture1234';
+    const serviceWorker = await getServiceWorker(context);
+
+    // Playwright cannot select Chrome's browser-chrome context-menu UI. Invoke
+    // the registered production handler in the loaded MV3 worker and verify
+    // the resulting extension-owned canonical record.
+    await serviceWorker.evaluate(async ({ menuItemId, linkUrl }) => {
+      await handleChannelContextAction({ menuItemId, linkUrl }, { id: 1 });
+    }, {
+      menuItemId: 'ytvht-toggle-channel-link',
+      linkUrl: `https://www.youtube.com/channel/${channelId}`
+    });
+
+    await expect.poll(() => getLocalSubscription(context, channelId)).toMatchObject({ channelId });
+  });
+
   test('captured watch owner row receives the companion beside its visible native Subscribe button', async ({ page }) => {
     const capture = readCapture('rick-watch');
     test.skip(!capture, 'Run `npm run fixtures:youtube:download -- --only rick-watch --headless` first.');
-    await openCapturedPage(page, WATCH_URL, capture.html);
-    await expect(page.locator('ytd-watch-metadata #subscribe-button button[aria-label^="Subscribe"]')).toHaveCount(1);
+    const localizedHtml = capture.html.replace(/aria-label="(?:Subscribe|Unsubscribe)[^"]*"/g, 'aria-label="Абониране"');
+    await openCapturedPage(page, WATCH_URL, localizedHtml);
+    await expect(page.locator('ytd-watch-metadata #subscribe-button')).toHaveCount(1);
     await expect(page.locator('.ytvht-sub-btn')).toHaveCount(1);
-    await expect(page.locator('.ytvht-sub-btn')).toHaveText('Subscribe with re:Watch');
+    await expect(page.locator('.ytvht-sub-btn')).toHaveAttribute('aria-label', 'Subscribe with re:Watch');
+    await expect(page.locator('.ytvht-sub-btn')).toHaveClass(/ytvht-sub-btn-compact/);
+    await expect(page.locator('.ytvht-sub-btn')).toHaveCSS('opacity', '0.7');
+    await expect(page.locator('.ytvht-sub-btn-check')).toHaveCount(0);
     await expect(page.locator('ytd-watch-metadata #subscribe-button + .ytvht-sub-btn')).toHaveCount(1);
+  });
+
+  test('watch follow icon is not remounted by unrelated page mutations', async ({ page }) => {
+    const capture = readCapture('rick-watch');
+    test.skip(!capture, 'Run `npm run fixtures:youtube:download -- --only rick-watch --headless` first.');
+    await openCapturedPage(page, WATCH_URL, capture.html);
+    await expect(page.locator('.ytvht-sub-btn-icon')).toHaveCount(1);
+
+    await page.evaluate(() => {
+      window.__ytvhtInitialFollowIcon = document.querySelector('.ytvht-sub-btn-icon');
+      for (let index = 0; index < 30; index += 1) {
+        document.body.append(document.createComment(`unrelated player mutation ${index}`));
+      }
+    });
+    // The former document-wide observer scheduled a remount after these
+    // mutations, replacing the icon repeatedly in Firefox.
+    await page.waitForTimeout(800);
+    await expect.poll(() => page.evaluate(() => ({
+      count: document.querySelectorAll('.ytvht-sub-btn-icon').length,
+      unchanged: document.querySelector('.ytvht-sub-btn-icon') === window.__ytvhtInitialFollowIcon,
+    }))).toEqual({ count: 1, unchanged: true });
   });
 
 
@@ -337,6 +412,15 @@ test.describe('Static overlays (captured YouTube DOM)', () => {
 
     await seedStoredVideo(context, videoId);
     await openCapturedPage(page, PLAYLIST_URL, capture.html);
+
+    const playlistHistory = page.locator('.ytvht-playlist-history-toggle');
+    await expect(playlistHistory).toHaveCount(1);
+    await expect(playlistHistory).toBeVisible();
+    await expect(page.locator('.ytvht-playlist-history-row')).toHaveCount(1);
+    await expect(playlistHistory.locator('..')).toHaveClass(/ytvht-playlist-history-row/);
+    await expect(playlistHistory).toHaveAttribute('aria-pressed', 'false');
+    await playlistHistory.click();
+    await expect(playlistHistory).toHaveAttribute('aria-pressed', 'true');
 
     await expectSavedOverlayVisible(page, videoId);
     await expectNoOverlayVisible(page, unsavedVideoId);
@@ -384,7 +468,8 @@ test.describe('Static overlays (captured YouTube DOM)', () => {
     const [watchVideoId] = extractVideoIdsFromHtml(capture.html);
     expect(watchVideoId, 'watch fixture should contain the watched video ID').toBe('dQw4w9WgXcQ');
 
-    await openCapturedPage(page, WATCH_URL, capture.html);
+    const playlistWatchUrl = `${WATCH_URL}&list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR`;
+    await openCapturedPage(page, playlistWatchUrl, capture.html);
 
     const [recommendationVideoId, unsavedRecommendationId] = await getRenderableVideoIds(page, [watchVideoId]);
     expect(recommendationVideoId, 'watch fixture should contain at least one recommendation video').toBeTruthy();

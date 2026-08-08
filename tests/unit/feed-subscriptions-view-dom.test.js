@@ -43,6 +43,12 @@ test('Channels renders local sync state and admits the next metadata batch only 
     ytvhtFeedViewData: { loadCanonicalFeedViewData: jest.fn(async () => ({ subscriptions })) },
     ytIndexedDBStorage: { getChannelSyncState: jest.fn(async () => null), putSubscriptionRecord: jest.fn(async () => {}) },
     decodeHtmlEntities: (value) => value, relativeTime: () => '1 minute ago',
+    tFeed: (_key, fallback, substitutions = []) => substitutions.reduce(
+      (message, value, index) => message.replace(`$${index + 1}`, value),
+      fallback
+    ),
+    feedFormatNumber: (value) => String(value),
+    feedPlural: (_key, count, one, other) => (count === 1 ? one : other).replace('$1', count),
     setStatus: jest.fn(), setActiveNav: jest.fn(), showFeedStatus: jest.fn(),
     setRefreshVisible: jest.fn(), setCreatePlaylistVisible: jest.fn(), setSaveSettingsVisible: jest.fn(),
     setClearSubscriptionsVisible: jest.fn(), setClearHistoryVisible: jest.fn(), setFeedOptionsVisible: jest.fn(),

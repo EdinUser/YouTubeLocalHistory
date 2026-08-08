@@ -3,7 +3,7 @@ console.log('YouTube Video History Tracker background script running.');
 // Load shared storage modules when this file runs as a Chrome MV3 service worker.
 if (typeof importScripts === 'function') {
     try {
-        importScripts('indexeddb-storage.js', 'storage.js');
+        importScripts('indexeddb-storage.js', 'storage.js', 'local-subscription-actions.js');
         if (typeof ytIndexedDBStorage === 'undefined') {
             console.error('[Background] ytIndexedDBStorage not available after import');
         }
@@ -256,10 +256,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return; // Return early because we're using sendResponse
         }
 
+        if (message.type === 'resolveLocalSubscriptionInput') {
+            if (!isLocalSubscriptionSender(sender)) {
+                sendResponse({ error: 'Channel resolution must come from a YouTube tab.' });
+                return;
+            }
+            try {
+                const result = await ytvhtLocalSubscriptionActions.resolveInput(message.input, fetch);
+                sendResponse({ result });
+            } catch (error) {
+                sendResponse({ error: error && error.message ? error.message : String(error) });
+            }
+            return;
+        }
+
         // Content scripts have a YouTube-page context. Keep the canonical feed
         // repositories in the extension-origin background instead.
         if (message.type === 'localSubscriptionStore') {
-            if (!sender.tab || !/^https:\/\/(?:www\.)?youtube\.com\//.test(sender.url || '')) {
+            if (!isLocalSubscriptionSender(sender)) {
                 sendResponse({ error: 'Local subscription requests must come from a YouTube tab.' });
                 return;
             }
@@ -270,7 +284,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             try {
                 const args = message.args || {};
                 let result;
-                if (message.operation === 'get') result = await ytIndexedDBStorage.getSubscriptionRecord(args.channelId);
+                if (message.operation === 'get') {
+                    result = args.channelId && await ytIndexedDBStorage.getSubscriptionRecord(args.channelId);
+                    if (!result && args.handle) {
+                        const handle = String(args.handle).toLowerCase();
+                        const records = await ytIndexedDBStorage.listSubscriptionRecords();
+                        result = records.find((record) => String(record.handle || '').toLowerCase() === handle) || null;
+                        // A watch page normally exposes only @handle. Imports
+                        // and early manual follows can have the canonical UC id
+                        // but no handle until the Channels page hydrates it.
+                        // Resolve here, in the extension origin, so the button
+                        // state never depends on scrolling that page first.
+                        if (!result && typeof ytvhtLocalSubscriptionActions !== 'undefined') {
+                            try {
+                                const resolved = await ytvhtLocalSubscriptionActions.resolveInput(args.handle, fetch);
+                                result = await ytIndexedDBStorage.getSubscriptionRecord(resolved.channelId);
+                                if (result && !result.handle && resolved.handle) {
+                                    result = await ytIndexedDBStorage.putSubscriptionRecord({ ...result, handle: resolved.handle });
+                                }
+                            } catch (_) {
+                                // A transient handle-resolution failure means
+                                // no match for now; it must not block the page.
+                            }
+                        }
+                    }
+                }
                 else if (message.operation === 'putSubscription') result = await ytIndexedDBStorage.putSubscriptionRecord(args.record);
                 else if (message.operation === 'putSyncState') result = await ytIndexedDBStorage.putChannelSyncState(args.record);
                 else if (message.operation === 'unfollow') result = await ytIndexedDBStorage.deleteSubscriptionAndSyncState(args.channelId);
@@ -430,6 +468,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Indicates async response
 });
 
+function isLocalSubscriptionSender(sender) {
+    const senderUrl = sender && sender.url || '';
+    // The loopback origin is injected only by the Firefox E2E build to replay
+    // captured YouTube DOM. Production manifests never inject there.
+    return Boolean(sender && sender.tab) && (
+        /^https:\/\/(?:www\.)?youtube\.com\//.test(senderUrl) ||
+        /^http:\/\/127\.0\.0\.1(?::\d+)?\//.test(senderUrl)
+    );
+}
+
 // Listen for storage changes
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local') {
@@ -459,6 +507,9 @@ chrome.windows.onRemoved.addListener(async (windowId) => {
 // Watch Later — right-click menu (no button injected into YouTube)
 // ============================================================
 const WATCH_LATER_MENU_ID = 'ytvht-add-watchlater';
+const WATCH_LATER_PAGE_MENU_ID = 'ytvht-add-watchlater-page';
+const CHANNEL_CONTEXT_PAGE_MENU_ID = 'ytvht-toggle-channel-page';
+const CHANNEL_CONTEXT_LINK_MENU_ID = 'ytvht-toggle-channel-link';
 
 function createContextMenus() {
     if (!chrome.contextMenus) return;
@@ -467,9 +518,28 @@ function createContextMenus() {
         chrome.contextMenus.create({
             id: WATCH_LATER_MENU_ID,
             title: 'Save to Watch Later (local)',
-            contexts: ['link', 'page', 'video'],
+            contexts: ['link', 'video'],
             documentUrlPatterns: ['*://*.youtube.com/*'],
-            targetUrlPatterns: ['*://*.youtube.com/*', '*://youtu.be/*']
+            targetUrlPatterns: ['*://*.youtube.com/watch*', '*://*.youtube.com/shorts/*', '*://youtu.be/*']
+        });
+        chrome.contextMenus.create({
+            id: WATCH_LATER_PAGE_MENU_ID,
+            title: 'Save to Watch Later (local)',
+            contexts: ['page'],
+            documentUrlPatterns: ['*://*.youtube.com/watch*', '*://*.youtube.com/shorts/*']
+        });
+        chrome.contextMenus.create({
+            id: CHANNEL_CONTEXT_PAGE_MENU_ID,
+            title: 'Subscribe or Unfollow with re:Watch',
+            contexts: ['page'],
+            documentUrlPatterns: ['*://*.youtube.com/channel/UC*', '*://*.youtube.com/@*']
+        });
+        chrome.contextMenus.create({
+            id: CHANNEL_CONTEXT_LINK_MENU_ID,
+            title: 'Subscribe or Unfollow with re:Watch',
+            contexts: ['link'],
+            documentUrlPatterns: ['*://*.youtube.com/*'],
+            targetUrlPatterns: ['*://*.youtube.com/channel/UC*', '*://*.youtube.com/@*']
         });
     });
 }
@@ -585,9 +655,48 @@ async function handleAddWatchLater(info, tab) {
     }
 }
 
+function subscriptionRepository() {
+    return {
+        getSubscriptionRecord: (channelId) => ytIndexedDBStorage.getSubscriptionRecord(channelId),
+        putSubscriptionRecord: (record) => ytIndexedDBStorage.putSubscriptionRecord(record),
+        putChannelSyncState: (record) => ytIndexedDBStorage.putChannelSyncState(record),
+        deleteSubscriptionAndSyncState: (channelId) => ytIndexedDBStorage.deleteSubscriptionAndSyncState(channelId)
+    };
+}
+
+async function handleChannelContextAction(info, tab) {
+    const rawInput = info.linkUrl || info.pageUrl || (tab && tab.url);
+    if (!rawInput || typeof ytvhtLocalSubscriptionActions === 'undefined') {
+        flashBadge(tab && tab.id, '?', '#ea4335');
+        return;
+    }
+    try {
+        const resolved = await ytvhtLocalSubscriptionActions.resolveInput(rawInput, fetch);
+        const target = { channelId: resolved.channelId, handle: resolved.handle || '' };
+        const repository = subscriptionRepository();
+        const existing = await repository.getSubscriptionRecord(target.channelId);
+        if (existing) {
+            await ytvhtLocalSubscriptionActions.unfollow(repository, target.channelId);
+            flashBadge(tab && tab.id, '−1', '#34a853');
+        } else {
+            await ytvhtLocalSubscriptionActions.follow(repository, target);
+            flashBadge(tab && tab.id, '+1', '#34a853');
+        }
+        chrome.runtime.sendMessage({ type: 'localSubscriptionChanged', channelId: target.channelId }).catch(() => {});
+    } catch (error) {
+        console.error('[re:Watch] context subscription update failed', error);
+        flashBadge(tab && tab.id, 'x', '#ea4335');
+    }
+}
+
 if (chrome.contextMenus && chrome.contextMenus.onClicked) {
     chrome.contextMenus.onClicked.addListener((info, tab) => {
-        if (info.menuItemId !== WATCH_LATER_MENU_ID) return;
-        handleAddWatchLater(info, tab).catch((e) => console.error('[WatchLater]', e));
+        if (info.menuItemId === WATCH_LATER_MENU_ID || info.menuItemId === WATCH_LATER_PAGE_MENU_ID) {
+            handleAddWatchLater(info, tab).catch((e) => console.error('[WatchLater]', e));
+            return;
+        }
+        if (info.menuItemId === CHANNEL_CONTEXT_PAGE_MENU_ID || info.menuItemId === CHANNEL_CONTEXT_LINK_MENU_ID) {
+            handleChannelContextAction(info, tab);
+        }
     });
 }

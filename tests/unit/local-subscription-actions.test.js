@@ -6,6 +6,7 @@ test('normalizes only explicit UC IDs and canonical YouTube channel or handle UR
   expect(actions.normalizeInput(CHANNEL_ID)).toEqual({ channelId: CHANNEL_ID });
   expect(actions.normalizeInput(`https://www.youtube.com/channel/${CHANNEL_ID}`)).toEqual({ channelId: CHANNEL_ID });
   expect(actions.normalizeInput('youtube.com/@fixture.channel')).toEqual({ handle: '@fixture.channel' });
+  expect(actions.normalizeInput('https://www.youtube.com/@fixture.channel/videos')).toEqual({ handle: '@fixture.channel' });
   expect(() => actions.normalizeInput('https://example.com/channel/' + CHANNEL_ID)).toThrow('youtube.com');
   expect(() => actions.normalizeInput('search words')).toThrow('Use a /channel');
 });

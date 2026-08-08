@@ -3,13 +3,13 @@ const playlistAsync = globalThis.ytvhtFeedAsync;
 function playlistMetaText(record) {
     const count = Number(record.videoCount || 0);
     const videoPart = count
-        ? `${count} video${count === 1 ? '' : 's'}`
-        : 'Empty';
-    const savedPart = `Saved ${formatSavedDate(record.timestamp || record.lastUpdated)}`;
+        ? feedPlural('feed_videos', count, '$1 video', '$1 videos')
+        : tFeed('feed_empty', 'Empty');
+    const savedPart = tFeed('feed_saved_on', 'Saved $1', [formatSavedDate(record.timestamp || record.lastUpdated)]);
     if (record._local) return `${videoPart} · ${savedPart}`;
     if (record._hasLocalItems) {
         const localItemCount = Object.keys(record.items || {}).length;
-        return `${videoPart} · ${localItemCount} local · ${savedPart}`;
+        return `${videoPart} · ${tFeed('feed_local_count', '$1 local', [feedFormatNumber(localItemCount)])} · ${savedPart}`;
     }
     return `${videoPart} · ${savedPart}`;
 }
@@ -58,7 +58,7 @@ function showPlaylistNameDialog(options) {
             return;
         }
 
-        titleEl.textContent = options.title || 'Playlist';
+        titleEl.textContent = options.title || tFeed('feed_playlist', 'Playlist');
         body.className = '';
         body.textContent = '';
         footer.textContent = '';
@@ -76,7 +76,7 @@ function showPlaylistNameDialog(options) {
 
         const label = document.createElement('label');
         label.className = 'playlist-action-label';
-        label.textContent = options.inputLabel || 'Playlist name';
+        label.textContent = options.inputLabel || tFeed('feed_playlist_name', 'Playlist name');
         label.htmlFor = 'playlistActionNameInput';
 
         const input = document.createElement('input');
@@ -84,7 +84,7 @@ function showPlaylistNameDialog(options) {
         input.type = 'text';
         input.maxLength = 80;
         input.value = options.initialValue || '';
-        input.placeholder = options.placeholder || 'Playlist name';
+        input.placeholder = options.placeholder || tFeed('feed_playlist_name', 'Playlist name');
         input.autocomplete = 'off';
 
         form.appendChild(label);
@@ -94,12 +94,12 @@ function showPlaylistNameDialog(options) {
         const cancel = document.createElement('button');
         cancel.className = 'btn';
         cancel.type = 'button';
-        cancel.textContent = 'Cancel';
+        cancel.textContent = tFeed('feed_cancel', 'Cancel');
 
         const save = document.createElement('button');
         save.className = 'btn primary';
         save.type = 'submit';
-        save.textContent = options.submitLabel || 'Save';
+        save.textContent = options.submitLabel || tFeed('feed_save', 'Save');
 
         footer.append(cancel, save);
 
@@ -137,21 +137,24 @@ function showPlaylistNameDialog(options) {
 
 function showPlaylistRenameDialog(record) {
     return showPlaylistNameDialog({
-        title: 'Rename playlist',
-        submitLabel: 'Save',
+        title: tFeed('feed_rename_playlist', 'Rename playlist'),
+        submitLabel: tFeed('feed_save', 'Save'),
         initialValue: record.title || '',
-        inputLabel: 'Playlist name',
-        placeholder: 'Enter a new name'
+        inputLabel: tFeed('feed_playlist_name', 'Playlist name'),
+        placeholder: tFeed('feed_enter_new_name', 'Enter a new name')
     });
 }
 
 function showPlaylistCreateDialog() {
     return showPlaylistNameDialog({
-        title: 'Create playlist',
-        submitLabel: 'Create',
-        inputLabel: 'Playlist name',
-        placeholder: 'My playlist',
-        description: 'Create an empty playlist, then add videos from the feed using ⋮ → Add to local playlist.'
+        title: tFeed('feed_create_playlist', 'Create playlist'),
+        submitLabel: tFeed('feed_create', 'Create'),
+        inputLabel: tFeed('feed_playlist_name', 'Playlist name'),
+        placeholder: tFeed('feed_my_playlist', 'My playlist'),
+        description: tFeed(
+            'feed_create_playlist_help',
+            'Create an empty playlist, then add videos from the feed using ⋮ → Add to local playlist.'
+        )
     });
 }
 
@@ -167,20 +170,24 @@ function showPlaylistDeleteDialog(titleText) {
             return;
         }
 
-        titleEl.textContent = 'Delete playlist?';
+        titleEl.textContent = tFeed('feed_delete_playlist_question', 'Delete playlist?');
         body.className = 'playlist-action-body';
-        body.textContent = `“${titleText}” will be removed from your local playlists. This cannot be undone.`;
+        body.textContent = tFeed(
+            'feed_delete_playlist_body',
+            '“$1” will be removed from your local playlists. This cannot be undone.',
+            [titleText]
+        );
         footer.textContent = '';
 
         const cancel = document.createElement('button');
         cancel.className = 'btn';
         cancel.type = 'button';
-        cancel.textContent = 'Cancel';
+        cancel.textContent = tFeed('feed_cancel', 'Cancel');
 
         const remove = document.createElement('button');
         remove.className = 'btn danger';
         remove.type = 'button';
-        remove.textContent = 'Delete';
+        remove.textContent = tFeed('delete_label', 'Delete');
 
         footer.append(cancel, remove);
 
@@ -209,8 +216,8 @@ function buildPlaylistCardMenu(titleText, options) {
     toggle.className = 'video-menu-button';
     toggle.type = 'button';
     toggle.textContent = '⋮';
-    toggle.title = 'Playlist options';
-    toggle.setAttribute('aria-label', 'Playlist options');
+    toggle.title = tFeed('feed_playlist_options', 'Playlist options');
+    toggle.setAttribute('aria-label', tFeed('feed_playlist_options', 'Playlist options'));
     const menu = document.createElement('div');
     menu.className = 'video-menu';
     menu.hidden = true;
@@ -246,13 +253,13 @@ function buildPlaylistCardMenu(titleText, options) {
 
     if (typeof options.onRename === 'function') {
         addItem(
-            'Rename',
+            tFeed('feed_rename', 'Rename'),
             '<path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
             options.onRename
         );
     }
     if (typeof options.onDelete === 'function') {
-        addItem('Delete', '<path d="M4 7h16"></path><path d="m9 7 .7-2h4.6l.7 2"></path><path d="M7 7l1 13h8l1-13"></path>', async () => {
+        addItem(tFeed('delete_label', 'Delete'), '<path d="M4 7h16"></path><path d="m9 7 .7-2h4.6l.7 2"></path><path d="M7 7l1 13h8l1-13"></path>', async () => {
             const confirmed = await showPlaylistDeleteDialog(titleText);
             if (!confirmed) return;
             await options.onDelete();
@@ -317,18 +324,18 @@ async function openRenamePlaylistDialog(record, onRenamed) {
     if (newTitle == null) return;
     const result = await renamePlaylistRecord(record, newTitle);
     if (result === 'empty') {
-        setStatus('Enter a playlist name.', true);
+        setStatus(tFeed('feed_enter_playlist_name', 'Enter a playlist name.'), true);
         return;
     }
     if (result === 'duplicate') {
-        setStatus('A playlist with that name already exists.', true);
+        setStatus(tFeed('feed_playlist_name_exists', 'A playlist with that name already exists.'), true);
         return;
     }
     if (result === 'missing') {
-        setStatus('Could not find that playlist.', true);
+        setStatus(tFeed('feed_playlist_not_found', 'Could not find that playlist.'), true);
         return;
     }
-    setStatus(`Renamed to “${record.title}”.`, false);
+    setStatus(tFeed('feed_playlist_renamed', 'Renamed to “$1”.', [record.title]), false);
     if (typeof onRenamed === 'function') await onRenamed();
 }
 
@@ -338,33 +345,35 @@ function appendPlaylistDetailActions(record, container, onDeleted, onRenamed) {
     const rename = document.createElement('button');
     rename.className = 'btn';
     rename.type = 'button';
-    rename.textContent = 'Rename';
+    rename.textContent = tFeed('feed_rename', 'Rename');
     rename.addEventListener('click', () => {
         openRenamePlaylistDialog(record, () => {
             if (typeof onRenamed === 'function') onRenamed(record.title);
         }).catch((error) => {
             console.error('[playlists] rename failed', error);
-            setStatus('Could not rename playlist.', true);
+            setStatus(tFeed('feed_playlist_rename_failed', 'Could not rename playlist.'), true);
         });
     });
 
     const remove = document.createElement('button');
     remove.className = 'btn danger';
     remove.type = 'button';
-    remove.textContent = 'Delete';
+    remove.textContent = tFeed('delete_label', 'Delete');
     remove.addEventListener('click', async () => {
-        const confirmed = await showPlaylistDeleteDialog(record.title || 'this playlist');
+        const confirmed = await showPlaylistDeleteDialog(
+            record.title || tFeed('feed_this_playlist', 'this playlist')
+        );
         if (!confirmed) return;
         remove.disabled = true;
         try {
             await deletePlaylistRecord(record);
             activePlaylistDetailId = null;
             if (typeof onDeleted === 'function') await onDeleted();
-            setStatus(`Removed ${record.title}.`, false);
+            setStatus(tFeed('feed_playlist_removed', 'Removed $1.', [record.title]), false);
         } catch (error) {
             console.error('[playlists] delete failed', error);
             remove.disabled = false;
-            setStatus('Could not delete playlist.', true);
+            setStatus(tFeed('feed_playlist_delete_failed', 'Could not delete playlist.'), true);
         }
     });
 
@@ -381,7 +390,7 @@ function playlistVideoMetaText(video) {
             duration: watched.duration || video.duration
         });
     }
-    return formatUploadDate(video.published) || 'Upload date unavailable';
+    return formatUploadDate(video.published) || tFeed('feed_upload_date_unavailable', 'Upload date unavailable');
 }
 
 async function createEmptyPlaylist() {
@@ -389,7 +398,7 @@ async function createEmptyPlaylist() {
     if (title == null) return;
     const trimmed = title.trim();
     if (!trimmed) {
-        setStatus('Enter a playlist name.', true);
+        setStatus(tFeed('feed_enter_playlist_name', 'Enter a playlist name.'), true);
         return;
     }
     const stored = await chrome.storage.local.get(['localVideoPlaylists']);
@@ -398,7 +407,7 @@ async function createEmptyPlaylist() {
         normalizeText(playlist.title) === normalizeText(trimmed)
     );
     if (sameTitle) {
-        setStatus('A playlist with that name already exists.', true);
+        setStatus(tFeed('feed_playlist_name_exists', 'A playlist with that name already exists.'), true);
         return;
     }
     let id = normalizeText(trimmed).replace(/\s+/g, '-') || `playlist-${Date.now()}`;
@@ -412,7 +421,7 @@ async function createEmptyPlaylist() {
         order: []
     };
     await chrome.storage.local.set({ localVideoPlaylists: playlists });
-    setStatus('Playlist created.', false);
+    setStatus(tFeed('feed_playlist_created', 'Playlist created.'), false);
     await renderPlaylists();
 }
 
@@ -423,7 +432,7 @@ function initPlaylistsToolbar() {
     createButton.addEventListener('click', () => {
         createEmptyPlaylist().catch((error) => {
             console.error('[playlists] create failed', error);
-            setStatus('Could not create playlist.', true);
+            setStatus(tFeed('feed_playlist_create_failed', 'Could not create playlist.'), true);
         });
     });
 }
@@ -438,7 +447,7 @@ async function renderPlaylists() {
     const heading = document.querySelector('.playlists-title');
     const section = document.getElementById('playlistsSection');
     if (!list || !empty || !count) return;
-    if (heading) heading.textContent = 'Playlists';
+    if (heading) heading.textContent = tFeed('tab_playlists', 'Playlists');
     setCreatePlaylistVisible(true);
     if (section) section.classList.remove('playlists-view-detail');
 
@@ -490,7 +499,7 @@ async function renderPlaylists() {
     }
     list.textContent = '';
     list.classList.remove('playlists-list-detail');
-    count.textContent = `${records.length} playlist${records.length === 1 ? '' : 's'}`;
+    count.textContent = feedPlural('feed_playlists_count', records.length, '$1 playlist', '$1 playlists');
     empty.style.display = records.length ? 'none' : 'block';
 
     records.forEach((record) => {
@@ -507,7 +516,7 @@ async function renderPlaylists() {
         thumbLink.href = '#';
         thumbLink.addEventListener('click', openDetail);
 
-        const titleText = decodeHtmlEntities(record.title || 'Unknown playlist');
+        const titleText = decodeHtmlEntities(record.title || tFeed('feed_unknown_playlist', 'Unknown playlist'));
 
         const thumb = document.createElement('div');
         thumb.className = 'playlist-thumb';
@@ -536,8 +545,8 @@ async function renderPlaylists() {
         const overlay = document.createElement('span');
         overlay.className = 'playlist-overlay';
         overlay.textContent = record.videoCount
-            ? `☷ ${record.videoCount} videos`
-            : '☷ Playlist';
+            ? `☷ ${feedPlural('feed_videos', record.videoCount, '$1 video', '$1 videos')}`
+            : `☷ ${tFeed('feed_playlist', 'Playlist')}`;
         thumb.appendChild(overlay);
         thumbLink.appendChild(thumb);
 
@@ -559,7 +568,7 @@ async function renderPlaylists() {
             onDelete: async () => {
                 await deletePlaylistRecord(record);
                 await renderPlaylists();
-                setStatus(`Removed ${titleText}.`, false);
+                setStatus(tFeed('feed_playlist_removed', 'Removed $1.', [titleText]), false);
             }
         }));
 
@@ -581,9 +590,11 @@ function setPlaylistDetailLoadingMessage(root, message) {
 
 function setPlaylistsNavBackMode(enabled) {
     const nav = document.getElementById('navPlaylists');
-    const label = nav && nav.querySelector('span[data-i18n="feed_nav_playlists"]');
+    const label = nav && nav.querySelector('span[data-i18n="tab_playlists"]');
     if (!label) return;
-    label.textContent = enabled ? 'Back' : (feedMessage('feed_nav_playlists') || 'Playlists');
+    label.textContent = enabled
+        ? tFeed('feed_back', 'Back')
+        : tFeed('tab_playlists', 'Playlists');
 }
 
 function buildPlaylistDetailLoading(record) {
@@ -594,10 +605,10 @@ function buildPlaylistDetailLoading(record) {
     header.className = 'local-playlist-header';
     const heading = document.createElement('h2');
     heading.className = 'local-playlist-title';
-    heading.textContent = decodeHtmlEntities(record.title || 'Playlist');
+    heading.textContent = decodeHtmlEntities(record.title || tFeed('feed_playlist', 'Playlist'));
     const meta = document.createElement('div');
     meta.className = 'local-playlist-count';
-    meta.textContent = 'Loading videos…';
+    meta.textContent = tFeed('feed_loading_videos', 'Loading videos…');
     header.appendChild(heading);
     header.appendChild(meta);
     detail.appendChild(header);
@@ -606,7 +617,7 @@ function buildPlaylistDetailLoading(record) {
     toolbar.className = 'local-playlist-toolbar';
     const back = document.createElement('button');
     back.className = 'btn local-playlist-back';
-    back.textContent = '← Back';
+    back.textContent = `← ${tFeed('feed_back', 'Back')}`;
     back.addEventListener('click', () => {
         activePlaylistDetailId = null;
         renderPlaylists();
@@ -616,7 +627,13 @@ function buildPlaylistDetailLoading(record) {
 
     const status = document.createElement('div');
     status.className = 'playlist-detail-loading-status';
-    status.innerHTML = '<span class="spinner" aria-hidden="true"></span><span class="playlist-detail-loading-text">Loading videos…</span>';
+    const spinner = document.createElement('span');
+    spinner.className = 'spinner';
+    spinner.setAttribute('aria-hidden', 'true');
+    const loadingText = document.createElement('span');
+    loadingText.className = 'playlist-detail-loading-text';
+    loadingText.textContent = tFeed('feed_loading_videos', 'Loading videos…');
+    status.append(spinner, loadingText);
     detail.appendChild(status);
 
     const skeletons = document.createElement('div');
@@ -660,9 +677,12 @@ async function renderLocalPlaylistDetail(record, allowImport = true) {
     const playlistItems = Object.keys(record.items || {}).length ? record.items : importedItems;
     const videos = orderedPlaylistVideos(record, playlistItems);
     if (videos.some((video) => !video.published || !video.duration)) {
-        setPlaylistDetailLoadingMessage(loadingDetail, 'Loading video details…');
+        setPlaylistDetailLoadingMessage(
+            loadingDetail,
+            tFeed('feed_loading_video_details', 'Loading video details…')
+        );
         const meta = loadingDetail.querySelector('.local-playlist-count');
-        if (meta) meta.textContent = 'Loading video details…';
+        if (meta) meta.textContent = tFeed('feed_loading_video_details', 'Loading video details…');
         await enrichLocalPlaylistMetadata(record, videos);
         if (renderToken !== playlistDetailRenderToken || activePlaylistDetailId !== record.playlistId) return;
     }
@@ -675,10 +695,10 @@ async function renderLocalPlaylistDetail(record, allowImport = true) {
     header.className = 'local-playlist-header';
     const heading = document.createElement('h2');
     heading.className = 'local-playlist-title';
-    heading.textContent = decodeHtmlEntities(record.title || 'Playlist');
+    heading.textContent = decodeHtmlEntities(record.title || tFeed('feed_playlist', 'Playlist'));
     const meta = document.createElement('div');
     meta.className = 'local-playlist-count';
-    meta.textContent = `${videos.length} saved video${videos.length === 1 ? '' : 's'}`;
+    meta.textContent = feedPlural('feed_saved_videos', videos.length, '$1 saved video', '$1 saved videos');
     header.appendChild(heading);
     header.appendChild(meta);
     detail.appendChild(header);
@@ -689,7 +709,7 @@ async function renderLocalPlaylistDetail(record, allowImport = true) {
     toolbarLeft.className = 'local-playlist-toolbar-left';
     const back = document.createElement('button');
     back.className = 'btn local-playlist-back';
-    back.textContent = '← Back';
+    back.textContent = `← ${tFeed('feed_back', 'Back')}`;
     back.addEventListener('click', () => {
         activePlaylistDetailId = null;
         renderPlaylists();
@@ -701,13 +721,15 @@ async function renderLocalPlaylistDetail(record, allowImport = true) {
         openYouTube.href = record.url || `https://www.youtube.com/playlist?list=${record.playlistId}`;
         openYouTube.target = '_blank';
         openYouTube.rel = 'noopener';
-        openYouTube.textContent = 'Open on YouTube';
+        openYouTube.textContent = tFeed('feed_open_on_youtube', 'Open on YouTube');
         toolbarLeft.appendChild(openYouTube);
     }
     const toolbarActions = document.createElement('div');
     toolbarActions.className = 'local-playlist-toolbar-actions';
     appendPlaylistDetailActions(record, toolbarActions, renderPlaylists, (newTitle) => {
-        heading.textContent = decodeHtmlEntities(newTitle || record.title || 'Playlist');
+        heading.textContent = decodeHtmlEntities(
+            newTitle || record.title || tFeed('feed_playlist', 'Playlist')
+        );
     });
     toolbar.appendChild(toolbarLeft);
     toolbar.appendChild(toolbarActions);
@@ -719,7 +741,7 @@ async function renderLocalPlaylistDetail(record, allowImport = true) {
         if (!hintSeen) {
             const hint = document.createElement('div');
             hint.className = 'playlist-order-hint';
-            hint.textContent = 'Drag the handle to reorder videos.';
+            hint.textContent = tFeed('feed_drag_reorder_hint', 'Drag the handle to reorder videos.');
             detail.appendChild(hint);
             chrome.storage.local.set({ playlistDragHintSeen: true }).catch(() => {});
         }
@@ -733,7 +755,7 @@ async function renderLocalPlaylistDetail(record, allowImport = true) {
             menuOptions: {
                 setAsPlaylistCover: async () => {
                     await setPlaylistCover(record, video.videoId);
-                    setStatus('Playlist cover updated.', false);
+                    setStatus(tFeed('feed_playlist_cover_updated', 'Playlist cover updated.'), false);
                 },
                 removeFromPlaylist: () => removeVideoFromLocalPlaylist(record, video.videoId)
             }
@@ -745,8 +767,14 @@ async function renderLocalPlaylistDetail(record, allowImport = true) {
         const empty = document.createElement('div');
         empty.className = 'playlists-empty';
         empty.textContent = record._local
-            ? 'This playlist is empty. Add videos from the feed using ⋮ → Add to local playlist.'
-            : 'Could not import this playlist yet. Open it on YouTube once, then try again.';
+            ? tFeed(
+                'feed_empty_local_playlist',
+                'This playlist is empty. Add videos from the feed using ⋮ → Add to local playlist.'
+            )
+            : tFeed(
+                'feed_playlist_import_unavailable',
+                'Could not import this playlist yet. Open it on YouTube once, then try again.'
+            );
         detail.appendChild(empty);
     } else {
         detail.appendChild(videosWrap);
@@ -799,15 +827,20 @@ function historyWatchedText(video) {
             year: 'numeric', month: 'short', day: 'numeric',
             hour: 'numeric', minute: '2-digit'
         })
-        : 'Unknown date';
+        : tFeed('feed_unknown_date', 'Unknown date');
     const duration = Number(video.duration || 0);
     const time = Number(video.time || 0);
     const isImportedEntry = video.importedHistory || (!duration && !time);
     const percent = duration > 0
         ? Math.max(0, Math.min(100, Math.round((time / duration) * 100)))
         : 0;
-    if (isImportedEntry) return `Imported from YouTube - ${watchedDate}`;
+    if (isImportedEntry) {
+        return tFeed('feed_imported_watched_on', 'Imported from YouTube — $1', [watchedDate]);
+    }
     return duration > 0
-        ? `Watched ${watchedDate} · ${percent}% watched`
-        : `Watched ${watchedDate}`;
+        ? tFeed('feed_watched_on_percent', 'Watched $1 · $2 watched', [
+            watchedDate,
+            feedFormatNumber(percent / 100, { style: 'percent' })
+        ])
+        : tFeed('feed_watched_on', 'Watched $1', [watchedDate]);
 }

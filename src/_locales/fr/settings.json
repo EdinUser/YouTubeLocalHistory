@@ -55,21 +55,9 @@
     "message": "Lors de la lecture depuis une playlist, ne pas enregistrer la progression",
     "description": "Help text for pause-in-playlists setting"
   },
-  "settings_data_management_label": {
-    "message": "Gestion des données",
-    "description": "Label for data management section"
-  },
   "settings_export": {
     "message": "Exporter",
     "description": "Button label for exporting history"
-  },
-  "settings_import": {
-    "message": "Importer",
-    "description": "Button label for importing history"
-  },
-  "settings_export_help": {
-    "message": "Exporter vos données d'historique (Importation bientôt disponible)",
-    "description": "Help text for export/import"
   },
   "settings_auto_clean_label": {
     "message": "Période de nettoyage auto",
@@ -150,10 +138,6 @@
   "settings_feed_refresh_help": {
     "message": "How often the local feed checks subscribed channels for new uploads",
     "description": "Help text for the feed refresh interval input"
-  },
-  "subscriptions_refresh": {
-    "message": "Refresh feed",
-    "description": "Button label to refresh the local subscriptions feed"
   },
   "subscriptions_open_feed": {
     "message": "Open YT re:Watch",

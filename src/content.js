@@ -157,44 +157,83 @@
     // Used to decide whether a timestamp restore belongs to a fresh navigation.
     let lastSpaNavigationTime = 0;
 
+    // Keep an in-flight restore across media and <video> element replacement
+    // while the watch URL still identifies the same YouTube video.
+    let pendingRestoreAfterMediaChange = null;
+    const RESTORE_MEDIA_SETTLE_MS = 500;
+
     // Fallback for route changes YouTube does not report through events.
     let lastUrl = window.location.href;
 
-    // YouTube often reuses the document and swaps video elements in-place.
-    let videoObserver = new MutationObserver((mutations) => {
+    function videosWithinNode(node) {
+        if (!node || node.nodeType !== Node.ELEMENT_NODE) return [];
+        return [
+            ...(node.tagName === 'VIDEO' ? [node] : []),
+            ...node.querySelectorAll('video')
+        ];
+    }
+
+    function getPrimaryVideo() {
+        if (typeof document === 'undefined') return null;
+        const pathname = window.location?.pathname || '';
+        const selectors = pathname.startsWith('/shorts/')
+            ? [
+                'ytd-reel-video-renderer[is-active] video',
+                'ytd-reel-video-renderer[active] video',
+                'video.html5-main-video'
+            ]
+            : [
+                '#movie_player video.html5-main-video',
+                '#movie_player video',
+                'ytd-player video.html5-main-video',
+                'video.html5-main-video'
+            ];
+
+        for (const selector of selectors) {
+            const candidate = document.querySelector(selector);
+            if (candidate?.isConnected) return candidate;
+        }
+
+        const connectedVideos = [...document.querySelectorAll('video')]
+            .filter(video => video.isConnected);
+        return connectedVideos.find(video => video.readyState >= 1) || connectedVideos[0] || null;
+    }
+
+    function isPrimaryVideo(video) {
+        return !!video && video.isConnected && getPrimaryVideo() === video;
+    }
+
+    // YouTube frequently reparents the same player. MutationObserver reports
+    // that as a removal plus an addition, but the element is connected again by
+    // the time this callback runs. Preserve its listeners and closure state.
+    function handleVideoMutations(mutations) {
+        const addedVideos = new Set();
+        const removedVideos = new Set();
+
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const videos = [
-                        ...(node.tagName === 'VIDEO' ? [node] : []),
-                        ...node.querySelectorAll('video')
-                    ];
-
-                    videos.forEach(video => {
-                        if (!trackedVideos.has(video)) {
-                            log('[Debug] Found new video element to track');
-                            setupVideoTracking(video);
-                        }
-                    });
-                }
+                videosWithinNode(node).forEach(video => addedVideos.add(video));
             });
-
             mutation.removedNodes.forEach((node) => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const videos = [
-                        ...(node.tagName === 'VIDEO' ? [node] : []),
-                        ...node.querySelectorAll('video')
-                    ];
-
-                    videos.forEach(video => {
-                        if (trackedVideos.has(video)) {
-                            cleanupVideoListeners(video);
-                        }
-                    });
-                }
+                videosWithinNode(node).forEach(video => removedVideos.add(video));
             });
         });
-    });
+
+        removedVideos.forEach((video) => {
+            if (!video.isConnected && trackedVideos.has(video)) {
+                cleanupVideoListeners(video);
+            }
+        });
+
+        const primaryVideo = getPrimaryVideo();
+        if (primaryVideo && addedVideos.has(primaryVideo) && !trackedVideos.has(primaryVideo)) {
+            log('[Debug] Found new primary video element to track');
+            setupVideoTracking(primaryVideo);
+        }
+    }
+
+    // YouTube often reuses the document and swaps video elements in-place.
+    let videoObserver = new MutationObserver(handleVideoMutations);
 
     function log(message, data) {
         if (currentSettings.debug) {
@@ -202,6 +241,56 @@
         }
     }
 
+    const RESTORE_TRACE_STORAGE_KEY = '__ytvht_e2e_restore_trace';
+    const restoreTraceEntries = [];
+    const restoreTraceVideoIds = new WeakMap();
+    let nextRestoreTraceVideoId = 1;
+
+    function getRestoreVideoTraceDetails(video) {
+        if (!video) return {};
+        if (!restoreTraceVideoIds.has(video)) {
+            restoreTraceVideoIds.set(video, nextRestoreTraceVideoId++);
+        }
+        return {
+            trackerId: restoreTraceVideoIds.get(video),
+            connected: video.isConnected,
+            primary: isPrimaryVideo(video),
+            className: video.className || '',
+            parentId: video.parentElement?.id || ''
+        };
+    }
+
+    function isRestoreTraceActive() {
+        try {
+            return window.location.hash.includes('ytvht_e2e_restore_trace');
+        } catch (_) {
+            return false;
+        }
+    }
+
+    // Only Firefox's diagnostic test adds this query parameter. Persist the
+    // trace in extension storage because YouTube can replace its document
+    // shell, which would discard a DOM-backed trace.
+    function traceRestore(event, details = {}) {
+        if (!isRestoreTraceActive()) return;
+
+        restoreTraceEntries.push({
+            at: Date.now(),
+            event,
+            videoId: new URL(window.location.href).searchParams.get('v') || '',
+            ...details
+        });
+        try {
+            const write = chrome.storage.local.set({
+                [RESTORE_TRACE_STORAGE_KEY]: restoreTraceEntries.slice(-100)
+            });
+            if (write && typeof write.catch === 'function') write.catch(() => {});
+        } catch (_) {
+            // Trace persistence must never affect content-script initialization.
+        }
+    }
+
+    traceRestore('content-script-loaded', { url: window.location.href });
     log('YouTube Video History Tracker script is running.');
 
     function startNativeThumbnailOverlays() {
@@ -433,7 +522,7 @@
             return;
         }
 
-        const video = document.querySelector('video');
+        const video = getPrimaryVideo();
         if (!video) return;
 
         // Playlist-aware pause/ignore logic
@@ -550,7 +639,7 @@
             return;
         }
 
-        const video = document.querySelector('video');
+        const video = getPrimaryVideo();
         if (!video) {
             log('No video element found for Shorts.');
             return;
@@ -744,19 +833,109 @@
         // position. Without this, seeking backward (e.g. to rewatch a video that was
         // saved near its end) gets yanked forward again, trapping the user in a loop.
         let userInteracted = false;
+        let lastUserSeekIntentAt = 0;
         let lastProgrammaticSeekAt = 0;
+        let pendingRestore = null;
+        let restoreAwaitingMediaChange = false;
+        let restoreAttemptInProgress = false;
         // The video ID this closure last set up restoration for; used to detect when a
         // reused <video> element switches to a different video (SPA navigation).
         let trackedClosureVideoId = getVideoId();
+        if (pendingRestoreAfterMediaChange && pendingRestoreAfterMediaChange.videoId !== trackedClosureVideoId) {
+            pendingRestoreAfterMediaChange = null;
+        }
+        if (pendingRestoreAfterMediaChange?.ownerVideo && !pendingRestoreAfterMediaChange.ownerVideo.isConnected) {
+            pendingRestoreAfterMediaChange.ownerVideo = null;
+            pendingRestoreAfterMediaChange.phase = 'awaiting-media';
+        }
+        const hasPendingMediaTransition = () => (
+            pendingRestoreAfterMediaChange && pendingRestoreAfterMediaChange.videoId === getVideoId()
+        );
+        let restoringPendingMedia = false;
+        let restoreAfterMediaLoadScheduled = false;
+        const restoreAfterNextMediaMetadata = () => {
+            if (!hasPendingMediaTransition() || restoreAfterMediaLoadScheduled) return;
+            restoreAfterMediaLoadScheduled = true;
+            traceRestore('restore-media-change-detected');
+            const restoreAfterMetadata = () => {
+                video.removeEventListener('loadedmetadata', restoreAfterMetadata);
+                restoreAfterMediaLoadScheduled = false;
+                if (!hasPendingMediaTransition()) return;
+                const transition = pendingRestoreAfterMediaChange;
+                if (transition.ownerVideo && transition.ownerVideo !== video) {
+                    if (transition.ownerVideo.isConnected) return;
+                    transition.ownerVideo = null;
+                }
+                if (!isPrimaryVideo(video)) return;
+                const pendingTarget = transition.targetTime;
+                if (Number.isFinite(video.duration) && video.duration < pendingTarget - 2) {
+                    traceRestore('restore-media-still-short', {
+                        duration: video.duration,
+                        targetTime: pendingTarget
+                    });
+                    transition.ownerVideo = null;
+                    transition.phase = 'awaiting-media';
+                    return;
+                }
+                restoreAwaitingMediaChange = false;
+                timestampLoaded = false;
+                restoringPendingMedia = true;
+                transition.ownerVideo = video;
+                transition.phase = 'restoring';
+                ensureVideoReady().catch(error => log('[RESTORE] Failed after media change:', error));
+            };
+            if (video.readyState >= 1) {
+                restoreAfterMetadata();
+            } else {
+                video.addEventListener('loadedmetadata', restoreAfterMetadata);
+            }
+        };
         // All extension-initiated seeks go through this so we don't mistake our own
         // restore for a user seek in the 'seeking' handler below.
-        const restoreVideoTime = (t) => {
+        const restoreVideoTime = (t, reason = 'restore') => {
+            traceRestore('restore-seek-requested', {
+                currentTime: video.currentTime || 0,
+                targetTime: t,
+                reason,
+                ...getRestoreVideoTraceDetails(video)
+            });
+            pendingRestore = { targetTime: t, reason };
+            pendingRestoreAfterMediaChange = {
+                videoId: getVideoId(),
+                targetTime: t,
+                reason,
+                ownerVideo: video,
+                phase: 'seeking'
+            };
             lastProgrammaticSeekAt = Date.now();
             video.currentTime = t;
         };
 
+        traceRestore('tracker-attached', {
+            currentTime: video.currentTime || 0,
+            readyState: video.readyState || 0,
+            ...getRestoreVideoTraceDetails(video)
+        });
+        if (isRestoreTraceActive()) {
+            [
+                'loadedmetadata', 'loadeddata', 'canplay', 'playing',
+                'waiting', 'stalled', 'suspend', 'abort', 'emptied', 'error'
+            ].forEach((event) => {
+                addTrackedEventListener(video, event, () => traceRestore(`video-${event}`, {
+                    currentTime: video.currentTime || 0,
+                    duration: Number.isFinite(video.duration) ? video.duration : 0,
+                    readyState: video.readyState || 0,
+                    ...getRestoreVideoTraceDetails(video)
+                }));
+            });
+        }
+
         const trackingStartedAt = Date.now();
         const guardedSaveTimestamp = async (candidateTime = null) => {
+            // A seek into a short pre-roll can be clamped. Do not overwrite the
+            // saved position or issue another seek until YouTube loads the next
+            // media item and its metadata is available.
+            if (pendingRestore || restoreAwaitingMediaChange || (hasPendingMediaTransition() && !restoringPendingMedia)) return;
             const videoId = getVideoId();
             const currentTime = typeof candidateTime === 'number' && candidateTime > 0 ? candidateTime : video.currentTime;
             if (!videoId || currentTime <= 0) return;
@@ -765,8 +944,7 @@
                 const record = await ytStorage.getVideo(videoId);
                 const savedTime = record && typeof record.time === 'number' ? record.time : 0;
                 if (savedTime >= 30 && currentTime < savedTime - 2 && Date.now() - trackingStartedAt < 20000) {
-                    restoreVideoTime(savedTime);
-                    timestampLoaded = true;
+                    restoreVideoTime(savedTime, 'save-guard');
                     return;
                 }
             } catch (error) {
@@ -784,10 +962,30 @@
         }, 500);
 
         const ensureVideoReady = async () => {
-            if (timestampLoaded || userInteracted) return;
+            if (timestampLoaded || userInteracted || pendingRestore || restoreAwaitingMediaChange || restoreAttemptInProgress || (hasPendingMediaTransition() && !restoringPendingMedia)) {
+                traceRestore('restore-skipped', {
+                    timestampLoaded,
+                    userInteracted,
+                    pendingRestore: !!pendingRestore,
+                    restoreAwaitingMediaChange,
+                    restoreAttemptInProgress,
+                    pendingMediaTransition: !!hasPendingMediaTransition(),
+                    restoringPendingMedia
+                });
+                return;
+            }
 
             const videoId = getVideoId();
-            if (!video || !videoId) return;
+            if (!video || !videoId) {
+                traceRestore('restore-skipped', { hasVideo: !!video, hasVideoId: !!videoId });
+                return;
+            }
+
+            traceRestore('restore-attempt-started', {
+                currentTime: video.currentTime || 0,
+                readyState: video.readyState || 0
+            });
+            restoreAttemptInProgress = true;
 
             // Enhanced playlist context detection
             const isPlaylistContext = !!new URLSearchParams(window.location.search).get('list');
@@ -808,19 +1006,31 @@
                 for (let attempt = 0; attempt < retries; attempt++) {
                     try {
                         record = await ytStorage.getVideo(videoId);
+                        traceRestore('storage-read', {
+                            attempt: attempt + 1,
+                            found: !!record,
+                            savedTime: record && typeof record.time === 'number' ? record.time : null
+                        });
                         if (record && record.time && record.time > 0) {
                             break; // Success, exit retry loop
                         }
                     } catch (error) {
+                        traceRestore('storage-read-error', {
+                            attempt: attempt + 1,
+                            message: error && error.message ? error.message : String(error)
+                        });
                         log(`[ensureVideoReady] getVideo attempt ${attempt + 1} failed:`, error.message);
-                        if (attempt < retries - 1) {
-                            // Wait before retry (exponential backoff)
-                            await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
-                        }
+                    }
+                    if (attempt < retries - 1) {
+                        // A waking MV3 worker can return no record before its
+                        // storage migration/read is ready, so retry empty reads
+                        // as well as rejected reads.
+                        await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
                     }
                 }
                 
                 if (!record || !record.time || record.time <= 0) {
+                    traceRestore('restore-no-record');
                     log(`[ensureVideoReady] No valid record found for ${videoId} after ${retries} attempts`);
                     return;
                 }
@@ -835,18 +1045,89 @@
 
                 // CASE 1: YouTube already restored correctly (within tolerance)
                 if (Math.abs(currentTime - savedTime) <= tolerance) {
+                    traceRestore('restore-already-at-saved-time', { currentTime, savedTime });
                     log(`YouTube already restored timestamp correctly (diff=${(currentTime - savedTime).toFixed(2)}s)`);
                     timestampLoaded = true;
+                    restoringPendingMedia = false;
+                    pendingRestoreAfterMediaChange = null;
                     return;
                 }
 
                 // CASE 2: YouTube did not restore or restored incorrectly
                 // Wait until metadata is fully loaded to safely set currentTime
                 if (video.readyState < 1) {
+                    traceRestore('restore-waiting-for-metadata', { readyState: video.readyState || 0 });
                     await waitForEvent(video, "loadedmetadata", 1000);
                 }
 
-                // Double-check after metadata is loaded
+                // Pre-roll media has valid metadata but cannot contain the
+                // saved position. Seeking it causes Firefox/YouTube to churn
+                // through replacement video elements. Keep the restore pending
+                // until a media item with a sufficient duration arrives.
+                if (Number.isFinite(video.duration) && video.duration > 0 && video.duration < savedTime - 2) {
+                    restoreAwaitingMediaChange = true;
+                    pendingRestoreAfterMediaChange = {
+                        videoId,
+                        targetTime: savedTime,
+                        reason: 'media-too-short',
+                        ownerVideo: null,
+                        phase: 'awaiting-media'
+                    };
+                    traceRestore('restore-media-too-short', {
+                        duration: video.duration,
+                        targetTime: savedTime
+                    });
+                    return;
+                }
+
+                // Firefox can accept currentTime at HAVE_METADATA while
+                // YouTube is still attaching its MediaSource, then replace the
+                // player with an empty element. Wait for canplay so the seek is
+                // applied only after the selected media is actually usable.
+                if (video.readyState < 3) {
+                    traceRestore('restore-waiting-for-playable-media', {
+                        readyState: video.readyState || 0,
+                        duration: Number.isFinite(video.duration) ? video.duration : 0
+                    });
+                    await waitForEvent(video, 'canplay', 5000);
+                }
+
+                if (!isPrimaryVideo(video)) {
+                    traceRestore('restore-player-changed-before-seek', {
+                        ...getRestoreVideoTraceDetails(video)
+                    });
+                    return;
+                }
+
+                // A main video can reach canplay while YouTube is still
+                // finishing an ad/pre-roll handoff. Seeking in that narrow
+                // window makes Firefox discard the player. Only carried-over
+                // restores need this stability window.
+                if (restoringPendingMedia) {
+                    const playableDuration = video.duration;
+                    traceRestore('restore-waiting-for-media-settle', {
+                        duration: Number.isFinite(playableDuration) ? playableDuration : 0,
+                        waitMs: RESTORE_MEDIA_SETTLE_MS
+                    });
+                    await new Promise(resolve => setTimeout(resolve, RESTORE_MEDIA_SETTLE_MS));
+
+                    const durationChanged = Number.isFinite(playableDuration) && (
+                        !Number.isFinite(video.duration)
+                        || video.duration <= 0
+                        || Math.abs(video.duration - playableDuration) > 0.5
+                    );
+                    if (!isPrimaryVideo(video) || video.readyState < 3 || durationChanged) {
+                        traceRestore('restore-media-changed-during-settle', {
+                            duration: Number.isFinite(video.duration) ? video.duration : 0,
+                            readyState: video.readyState || 0,
+                            ...getRestoreVideoTraceDetails(video)
+                        });
+                        return;
+                    }
+                }
+
+                // Double-check after the media becomes playable because
+                // YouTube may have applied its own resume position meanwhile.
                 const currentTimeAfterMetadata = video.currentTime || 0;
 
                 // Right after SPA navigation YouTube often starts the new video from 0,
@@ -859,7 +1140,7 @@
                 if (Math.abs(currentTimeAfterMetadata - savedTime) > tolerance) {
                     if (isRecentSpaNavigation) {
                         log(`Recent SPA navigation (${timeSinceSpaNavigation}ms ago), restoring → ${savedTime.toFixed(2)}s (current=${currentTimeAfterMetadata.toFixed(2)}s)`);
-                        restoreVideoTime(savedTime);
+                        restoreVideoTime(savedTime, 'initial-restore');
                     } else if (!video.paused && currentTimeAfterMetadata > savedTime) {
                         log('Video playing and ahead of saved time, likely mode change - skipping restore');
                     } else {
@@ -870,14 +1151,21 @@
                     log(`Already near target position (diff=${(currentTimeAfterMetadata - savedTime).toFixed(2)}s), skipping restore`);
                 }
 
-                timestampLoaded = true;
+                // A requested seek is only a restore after `seeked` confirms
+                // the media accepted the target. A short pre-roll can clamp it.
+                if (!pendingRestore) timestampLoaded = true;
 
                 if (!video.paused) {
                     startSaveInterval(guardedSaveTimestamp);
                 }
             } catch (err) {
+                traceRestore('restore-attempt-error', {
+                    message: err && err.message ? err.message : String(err)
+                });
                 log(`[ensureVideoReady] Error:`, err);
                 // Don't set timestampLoaded = true on error, so we can retry
+            } finally {
+                restoreAttemptInProgress = false;
             }
         };
 
@@ -885,6 +1173,12 @@
         ensureVideoReady().catch(error => {
             log(`[setupVideoTracking] ensureVideoReady failed:`, error);
         });
+        // A replacement video can be inserted after its loadstart already
+        // fired. In that case, wait directly for its metadata rather than
+        // requiring another loadstart event that may never arrive.
+        if (hasPendingMediaTransition()) {
+            restoreAfterNextMediaMetadata();
+        }
         
         // Fallback: If video starts playing from 0:00 but we have a saved time, restore it
         // This handles cases where getVideo() failed initially but the video started playing
@@ -892,20 +1186,19 @@
             // Wait a bit for video to start playing
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Check if we still haven't loaded the timestamp and video is at/near 0:00
-            if (!timestampLoaded && !userInteracted && video.currentTime < 5 && video.readyState >= 1) {
+            // YouTube may apply its own partial resume before extension storage
+            // is ready. Restore whenever that position is still behind ours.
+            if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia) && video.readyState >= 3) {
                 try {
                     const videoId = getVideoId();
                     if (!videoId) return;
 
-                    log(`[fallbackRestore] Video playing from ${video.currentTime.toFixed(1)}s, attempting restore...`);
                     const record = await ytStorage.getVideo(videoId);
 
-                    if (record && record.time && record.time > 30) {
+                    if (record && record.time && record.time > 30 && video.currentTime < record.time - 2) {
                         // Only restore if saved time is significant (>30s)
-                        log(`[fallbackRestore] Restoring to ${record.time.toFixed(1)}s`);
-                        restoreVideoTime(record.time);
-                        timestampLoaded = true;
+                        log(`[fallbackRestore] Restoring from ${video.currentTime.toFixed(1)}s to ${record.time.toFixed(1)}s`);
+                        restoreVideoTime(record.time, 'fallback-restore');
                     }
                 } catch (error) {
                     log(`[fallbackRestore] Failed:`, error);
@@ -916,6 +1209,13 @@
         // Start fallback restore check
         fallbackRestore().catch(error => {
             log(`[setupVideoTracking] fallbackRestore failed:`, error);
+        });
+
+        // Retry after a readiness timeout without racing the initial attempt.
+        addTrackedEventListener(video, 'canplay', () => {
+            if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia)) {
+                ensureVideoReady().catch(error => log('[RESTORE] Failed on canplay retry:', error));
+            }
         });
 
         addTrackedEventListener(video, 'play', async () => {
@@ -952,17 +1252,16 @@
             // Fallback restoration check: only when we have significant saved time,
             // and only if the user hasn't manually moved the playhead. Otherwise a
             // user who seeks back to the start gets yanked to the saved position.
-            if (hasSignificantHistory && !timestampLoaded && !userInteracted) {
+            if (hasSignificantHistory && !timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && (!hasPendingMediaTransition() || restoringPendingMedia)) {
                 const savedTime = record.time;
                 const currentTime = video.currentTime;
 
                 if (currentTime < 5) {
                     log(`[FALLBACK] Video playing from ${currentTime.toFixed(1)}s but saved time is ${savedTime.toFixed(1)}s, considering restoration`);
                     setTimeout(() => {
-                        if (!timestampLoaded && !userInteracted && video.currentTime < 5) {
+                        if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && (!hasPendingMediaTransition() || restoringPendingMedia) && video.currentTime < 5) {
                             restoreVideoTime(savedTime);
-                            timestampLoaded = true;
-                            log(`[FALLBACK] Restored to ${savedTime.toFixed(1)}s`);
+                            log(`[FALLBACK] Requested restore to ${savedTime.toFixed(1)}s`);
                         }
                     }, 500);
                 }
@@ -980,23 +1279,71 @@
             const interval = window.location.pathname.startsWith('/shorts/') ? 5 : 15;
             if (currentTime > 0 && currentTime % interval === 0) debouncedSave();
         });
+        addTrackedEventListener(video, 'pointerdown', () => {
+            lastUserSeekIntentAt = Date.now();
+        });
+        addTrackedEventListener(video, 'keydown', () => {
+            lastUserSeekIntentAt = Date.now();
+        });
         addTrackedEventListener(video, 'seeking', () => {
-            // Treat as a user seek unless it was triggered by our own restore call.
-            if (Date.now() - lastProgrammaticSeekAt > 800) {
+            // YouTube emits seeking events while selecting its initial position
+            // and while resetting media after navigation. Only a seek preceded
+            // by user input may opt out of restoring extension history.
+            const hasRecentUserSeekIntent = Date.now() - lastUserSeekIntentAt < 1000;
+            if (hasRecentUserSeekIntent && Date.now() - lastProgrammaticSeekAt > 800) {
                 userInteracted = true;
+                pendingRestoreAfterMediaChange = null;
             }
+            traceRestore('video-seeking', {
+                currentTime: video.currentTime || 0,
+                hasRecentUserSeekIntent,
+                userInteracted,
+                millisecondsSinceProgrammaticSeek: Date.now() - lastProgrammaticSeekAt,
+                ...getRestoreVideoTraceDetails(video)
+            });
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
             }
         });
         addTrackedEventListener(video, 'seeked', () => {
+            traceRestore('video-seeked', {
+                currentTime: video.currentTime || 0,
+                ...getRestoreVideoTraceDetails(video)
+            });
+            if (pendingRestore) {
+                const { targetTime, reason } = pendingRestore;
+                pendingRestore = null;
+                if (video.currentTime >= targetTime - 2 && isPrimaryVideo(video)) {
+                    timestampLoaded = true;
+                    restoringPendingMedia = false;
+                    pendingRestoreAfterMediaChange = null;
+                    traceRestore('restore-seek-confirmed', { currentTime: video.currentTime, targetTime, reason });
+                } else {
+                    restoringPendingMedia = false;
+                    restoreAwaitingMediaChange = true;
+                    pendingRestoreAfterMediaChange = {
+                        videoId: getVideoId(),
+                        targetTime,
+                        reason,
+                        ownerVideo: null,
+                        phase: 'awaiting-media'
+                    };
+                    traceRestore('restore-seek-clamped', { currentTime: video.currentTime || 0, targetTime, reason });
+                    log(`[RESTORE] Seek to ${targetTime.toFixed(2)}s was clamped at ${video.currentTime.toFixed(2)}s; waiting for the next media load.`);
+                }
+            }
             debouncedSave();
             if (!video.paused) startSaveInterval(guardedSaveTimestamp);
         });
 
         // Detect video content changes (especially for playlist navigation)
         addTrackedEventListener(video, 'loadstart', () => {
+            traceRestore('video-loadstart', {
+                currentTime: video.currentTime || 0,
+                readyState: video.readyState || 0,
+                ...getRestoreVideoTraceDetails(video)
+            });
             // Check if this is a playlist video change
             const urlParams = new URLSearchParams(window.location.search);
             const playlistId = urlParams.get('list');
@@ -1009,6 +1356,9 @@
                 userInteracted = false;
                 timestampLoaded = false;
             }
+
+            restoreAfterNextMediaMetadata();
+
 
             if (playlistId && currentVideoId && currentVideoId !== lastProcessedVideoId) {
                 log(`[VIDEO] Playlist video change detected: ${lastProcessedVideoId} → ${currentVideoId} in playlist ${playlistId}`);
@@ -1056,7 +1406,7 @@
         lastSpaNavigationTime = Date.now();
 
         // Playlist autoplay may reuse the previous video's playback position.
-        const existingVideo = document.querySelector('video');
+        const existingVideo = getPrimaryVideo();
         if (existingVideo) {
             const currentTime = existingVideo.currentTime || 0;
             if (currentTime > 5) {
@@ -1081,7 +1431,7 @@
         }
 
         // Try to find and initialize the video element immediately
-        const video = document.querySelector('video');
+        const video = getPrimaryVideo();
         if (video && !trackedVideos.has(video)) {
             log('[PLAYLIST] Video element found immediately, initializing...');
             initializeWithVideo(video);
@@ -1097,7 +1447,7 @@
                             ];
 
                             videos.forEach(video => {
-                                if (!trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
+                                if (video === getPrimaryVideo() && !trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
                                     log('[PLAYLIST] Video element detected by observer, initializing...');
 
                                     // Disconnect the observer
@@ -1152,18 +1502,22 @@
     // This function is called when YouTube's SPA navigation is complete.
     function handleSpaNavigation() {
         const videoId = getVideoId();
+        const previousVideoId = lastProcessedVideoId;
 
         // If we're not on a video page, or it's the same video, do nothing.
-        if (!videoId || videoId === lastProcessedVideoId) {
+        if (!videoId || videoId === previousVideoId) {
             return;
         }
         log(`[SPA] Navigation to new video detected: ${videoId}`);
         lastProcessedVideoId = videoId;
         lastSpaNavigationTime = Date.now();
 
-        // YouTube may reuse the <video> element with the previous video's time.
-        const existingVideo = document.querySelector('video');
-        if (existingVideo) {
+        // Only a real SPA video-to-video transition can inherit a previous
+        // video's time. On the first document video, yt-navigate-finish may
+        // arrive after the extension restored progress; resetting then erases
+        // the valid restore.
+        const existingVideo = getPrimaryVideo();
+        if (previousVideoId && existingVideo) {
             const currentTime = existingVideo.currentTime || 0;
             if (currentTime > 5) {
                 log(`[SPA] Clearing inherited timing from previous video (${currentTime}s)`);
@@ -1202,7 +1556,7 @@
                         ];
 
                         videos.forEach(video => {
-                            if (!trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
+                            if (video === getPrimaryVideo() && !trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
                                 log('[SPA] Video element detected immediately by observer, initializing...');
 
                                 // Enhanced playlist handling: Ensure timing is cleared for new videos
@@ -1273,16 +1627,10 @@
             return true;
         }
 
-        const video = document.querySelector('video');
+        const video = getPrimaryVideo();
         if (video) {
             log('Found video element, initializing...');
             try {
-                // If the video element is being reused from a previous page, clean up old listeners first.
-                if (trackedVideos.has(video)) {
-                    log('[SPA] Reused video element detected. Cleaning up listeners before re-initializing.');
-                    cleanupVideoListeners(video);
-                }
-
                 // Ensure storage is ready
                 await ytStorage.ensureMigrated();
                 log('Storage initialized successfully');
@@ -1290,7 +1638,11 @@
                 // Inject CSS to avoid CSP issues
                 injectCSS();
 
-                setupVideoTracking(video);
+                if (!trackedVideos.has(video)) {
+                    setupVideoTracking(video);
+                } else {
+                    log('[SPA] Reused video element is already tracked; preserving its listeners and restore state.');
+                }
                 tryToSavePlaylist();
                 showExtensionInfo();
 
@@ -1313,7 +1665,7 @@
         if (window.location.pathname.startsWith('/shorts/')) {
             // Shorts pages may load video after script runs, so observe for it
             shortsVideoObserver = new MutationObserver(() => {
-                const shortsVideo = document.querySelector('video');
+                const shortsVideo = getPrimaryVideo();
                 if (shortsVideo && !trackedVideos.has(shortsVideo)) {
                     log('Shorts video element detected by observer, initializing tracking...');
                     setupVideoTracking(shortsVideo);
@@ -1528,6 +1880,10 @@
     // Expose internal navigation helpers for tests only.
     // This is a no-op in production because __YTVHT_TEST__ is not defined.
     if (typeof window !== 'undefined' && window.__YTVHT_TEST__) {
+        const resetVideoTrackingForTests = () => {
+            [...trackedVideos].forEach(video => cleanupVideoListeners(video));
+            pendingRestoreAfterMediaChange = null;
+        };
         window.__YTVHT_TEST__.navigation = {
             handleSpaNavigation,
             handlePlaylistNavigation,
@@ -1538,7 +1894,13 @@
             loadSettings,
             saveTimestamp,
             saveShortsTimestamp,
-            savePlaylistInfo
+            savePlaylistInfo,
+            ensurePlaylistIgnoreToggles,
+            setupVideoTracking,
+            getPrimaryVideo,
+            handleVideoMutations,
+            getPendingRestoreForTests: () => pendingRestoreAfterMediaChange,
+            resetVideoTrackingForTests
         };
     }
 })();

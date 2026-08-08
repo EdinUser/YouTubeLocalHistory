@@ -343,8 +343,8 @@ function makePlaylistRowDraggable(row, video, record, detail, enabled) {
     const handle = document.createElement('button');
     handle.className = 'playlist-drag-handle';
     handle.type = 'button';
-    handle.title = 'Drag to reorder';
-    handle.setAttribute('aria-label', 'Drag to reorder');
+    handle.title = tFeed('feed_drag_reorder', 'Drag to reorder');
+    handle.setAttribute('aria-label', tFeed('feed_drag_reorder', 'Drag to reorder'));
     handle.textContent = '☰';
     handle.draggable = true;
     row.prepend(handle);

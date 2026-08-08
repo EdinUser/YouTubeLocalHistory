@@ -43,9 +43,14 @@ async function main() {
     await session.driver.wait(until.elementLocated(By.css('#refresh')), 10000);
     const schedulerStatusCount = await session.driver.findElements(By.css('#feedSyncStatus')).then((elements) => elements.length);
     assert.equal(schedulerStatusCount, 1, 'feed page should expose one scheduler-status surface beside Refresh');
+    await session.driver.wait(async () => session.driver.executeScript(() =>
+      !document.documentElement.classList.contains('app-loading') &&
+      document.querySelector('#feedSyncStatus')?.getAttribute('aria-busy') !== 'true'
+    ), 10000, 'automatic feed startup should settle before installing the controlled scan');
 
     await session.driver.executeAsyncScript((done) => {
       (async () => {
+        clearPageFeedWorkTimer();
         const channelId = 'UC9876543210abcdefghijkl';
         const thumbnailUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
         await ytIndexedDBStorage.putSubscriptionRecord({ channelId, channelTitle: 'Firefox progress fixture', source: 'manual', followedAt: 1 });
@@ -63,10 +68,23 @@ async function main() {
         done({ ok: true });
       })().catch((error) => done({ ok: false, error: error.message }));
     }).then((result) => assert.equal(result.ok, true, result.error));
-    await session.driver.wait(async () => session.driver.executeScript(() =>
-      document.querySelector('#grid')?.textContent.includes('Firefox cached fixture upload') &&
-      document.querySelector('#feedSyncStatus')?.textContent.includes('Scanning channels')
-    ), 10000, 'cached inventory and initialization progress should render before the fixture scan resolves');
+    try {
+      await session.driver.wait(async () => session.driver.executeScript(() =>
+        document.querySelector('#grid')?.textContent.includes('Firefox cached fixture upload') &&
+        document.querySelector('#feedSyncStatus')?.textContent.includes('Scanning channels') &&
+        typeof window.__releaseFirefoxFixtureScan === 'function'
+      ), 10000, 'cached inventory and initialization progress should render before the fixture scan resolves');
+    } catch (error) {
+      const diagnostic = await session.driver.executeScript(() => ({
+        releaseType: typeof window.__releaseFirefoxFixtureScan,
+        runType: typeof window.__firefoxFixtureRun,
+        syncStatus: document.querySelector('#feedSyncStatus')?.textContent || '',
+        syncBusy: document.querySelector('#feedSyncStatus')?.getAttribute('aria-busy') || '',
+        gridText: document.querySelector('#grid')?.textContent || ''
+      }));
+      error.message = `${error.message}. State: ${JSON.stringify(diagnostic)}`;
+      throw error;
+    }
     await session.driver.executeAsyncScript((done) => {
       window.__releaseFirefoxFixtureScan(ytvhtFeedContracts.createRssScanResult({
         channelId: 'UC9876543210abcdefghijkl', fetchedAt: Date.now(), entries: [{

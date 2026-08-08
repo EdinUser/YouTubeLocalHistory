@@ -4,9 +4,9 @@ const https = require('https');
 // Opt-in smoke coverage only: public feeds and their contents change outside
 // this repository, so deterministic fixtures remain the default CI contract.
 const LIVE_RSS_CHANNELS = [
-  ['AsmonTV', 'UCRCraKP10Q5fSAbCimkizIA'],
-  ['Mentour Pilot', 'UCQeRaTukNYft1_6AZPACnog'],
-  ['Nerdrotic Daily', 'UCwpHKudUkP5tNgmMdexB3ow']
+  ['AsmonTV', 'UCQeRaTukNYft1_6AZPACnog'],
+  ['Mentour Pilot', 'UCwpHKudUkP5tNgmMdexB3ow'],
+  ['Nerdrotic', 'UC5T0tXJN5CrMZUEJuz4oovw']
 ];
 
 const liveTest = process.env.RUN_LIVE_RSS === '1' ? test : test.skip;

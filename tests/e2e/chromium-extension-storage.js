@@ -65,8 +65,14 @@ async function seedStoredVideo(context, videoId, record) {
   });
 }
 
+async function getLocalSubscription(context, channelId) {
+  const serviceWorker = await getServiceWorker(context);
+  return serviceWorker.evaluate((id) => ytIndexedDBStorage.getSubscriptionRecord(id), channelId);
+}
+
 module.exports = {
   getExtensionStorage,
+  getLocalSubscription,
   getServiceWorker,
   getStoredVideo,
   removeExtensionStorage,

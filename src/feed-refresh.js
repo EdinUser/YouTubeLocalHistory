@@ -2,7 +2,7 @@
 async function loadData() {
     try {
         const settings = (await ytStorage.getSettings()) || {};
-        overlayTitle = 'Viewed';
+        overlayTitle = tFeed('feed_viewed', 'Viewed');
         applyFeedTheme(settings.themePreference || 'system');
         applyAccentColor(settings.accentColor || 'blue');
     } catch (_) { /* defaults */ }
@@ -114,10 +114,15 @@ function renderFeedNotice() {
     }
     status.textContent = '';
     status.style.display = '';
-    status.appendChild(document.createTextNode(`${pendingFeedVideoCount} new subscription videos available `));
+    status.appendChild(document.createTextNode(`${feedPlural(
+        'feed_new_videos_available',
+        pendingFeedVideoCount,
+        '$1 new subscription video available',
+        '$1 new subscription videos available'
+    )} `));
     const show = document.createElement('button');
     show.className = 'btn';
-    show.textContent = 'Show';
+    show.textContent = tFeed('feed_show', 'Show');
     show.addEventListener('click', async () => {
         await loadData();
         pendingFeedVideoCount = 0;
@@ -142,7 +147,7 @@ async function refresh() {
     try {
         const work = await requestPageActiveFeedWork();
         if (!work.result.insertedVideoCount && work.progress.pending === 0) {
-            setFeedSyncStatus('Up to date', false);
+            setFeedSyncStatus(tFeed('feed_up_to_date', 'Up to date'), false);
         }
     } catch (e) {
         setStatus(tFeed('feed_refresh_failed_status', 'Refresh failed: $1.', [e.message || tFeed('message_unknown_error', 'error')]), false);

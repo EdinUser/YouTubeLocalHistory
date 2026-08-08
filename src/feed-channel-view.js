@@ -36,7 +36,7 @@ function bestChannelInfoFromVideo(video) {
         channelId: info.channelId || video.channelId || info.ucid || info.handle || channelKey(video.channelName),
         ucid: info.ucid || video.ucid || null,
         handle: info.handle || video.handle || null,
-        channelName: video.channelName || info.channelName || 'Unknown channel',
+        channelName: video.channelName || info.channelName || '',
         thumbnail: video.channelThumbnail || info.thumbnail || null,
         url: info.url || video.channelUrl || video.url || ''
     };
@@ -47,7 +47,7 @@ function normalizeChannelInfo(info) {
         channelId: info.channelId || info.ucid || info.handle || channelKey(info.channelName),
         ucid: info.ucid || null,
         handle: info.handle || null,
-        channelName: info.channelName || 'Unknown channel',
+        channelName: info.channelName || '',
         thumbnail: info.thumbnail || info.channelThumbnail || null,
         url: info.url || ''
     };
@@ -99,11 +99,13 @@ function renderChannelPage(info) {
     if (!title || !meta || !avatar || !actions || !videos || !empty) return;
 
     renderChannelAvatar(avatar, activeChannelInfo);
-    title.textContent = decodeHtmlEntities(activeChannelInfo.channelName || 'Unknown channel');
+    title.textContent = decodeHtmlEntities(
+        activeChannelInfo.channelName || tFeed('analytics_unknown_channel', 'Unknown channel')
+    );
     const channelVideos = collectChannelVideos(activeChannelInfo);
     meta.textContent = [
         activeChannelInfo.handle || activeChannelInfo.ucid || '',
-        `${channelVideos.length} video${channelVideos.length === 1 ? '' : 's'} found`
+        feedPlural('feed_videos_found', channelVideos.length, '$1 video found', '$1 videos found')
     ].filter(Boolean).join(' • ');
 
     actions.textContent = '';
@@ -114,7 +116,7 @@ function renderChannelPage(info) {
         open.href = activeChannelInfo.url;
         open.target = '_blank';
         open.rel = 'noopener';
-        open.textContent = 'Open on YouTube';
+        open.textContent = tFeed('feed_open_on_youtube', 'Open on YouTube');
         actions.appendChild(open);
     }
 

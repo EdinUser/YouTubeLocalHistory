@@ -1,6 +1,6 @@
 {
   "feed_menu": {
-    "message": "Men?",
+    "message": "Menú",
     "description": "Menu button label"
   },
   "feed_back_to_feed": {
@@ -52,16 +52,8 @@
     "description": "Subscriptions navigation label"
   },
   "feed_nav_subscriptions_title": {
-    "message": "?ltimos videos de tus canales suscritos",
+    "message": "Vídeos más recientes de tus canales suscritos",
     "description": "Subscriptions navigation tooltip"
-  },
-  "feed_nav_shorts": {
-    "message": "Shorts",
-    "description": "Shorts navigation label"
-  },
-  "feed_nav_playlists": {
-    "message": "Listas",
-    "description": "Playlists navigation label"
   },
   "feed_nav_playlists_title": {
     "message": "Ver listas guardadas",
@@ -83,20 +75,12 @@
     "message": "Administrar canales suscritos localmente",
     "description": "Channels navigation tooltip"
   },
-  "feed_nav_analytics": {
-    "message": "Anal?ticas",
-    "description": "Analytics navigation label"
-  },
   "feed_nav_analytics_title": {
-    "message": "Ver tus anal?ticas de reproducci?n",
+    "message": "Ver tus analíticas de reproducción",
     "description": "Analytics navigation tooltip"
   },
-  "feed_nav_settings": {
-    "message": "Ajustes",
-    "description": "Settings navigation label"
-  },
   "feed_nav_settings_title": {
-    "message": "Abrir ajustes de la extensi?n",
+    "message": "Abrir los ajustes de la extensión",
     "description": "Settings navigation tooltip"
   },
   "feed_your_feed": {
@@ -104,7 +88,7 @@
     "description": "Main feed heading"
   },
   "feed_search_options": {
-    "message": "Opciones de b?squeda",
+    "message": "Opciones de búsqueda",
     "description": "Search options aria label"
   },
   "feed_filters": {
@@ -115,10 +99,6 @@
     "message": "Fecha de subida",
     "description": "Upload date filter label"
   },
-  "feed_today": {
-    "message": "Hoy",
-    "description": "Today filter label"
-  },
   "feed_this_week": {
     "message": "Esta semana",
     "description": "This week filter label"
@@ -128,11 +108,11 @@
     "description": "This month filter label"
   },
   "feed_this_year": {
-    "message": "Este a?o",
+    "message": "Este año",
     "description": "This year filter label"
   },
   "feed_duration": {
-    "message": "Duraci?n",
+    "message": "Duración",
     "description": "Duration filter label"
   },
   "feed_under_4_minutes": {
@@ -144,11 +124,11 @@
     "description": "4 to 20 minutes filter label"
   },
   "feed_over_20_minutes": {
-    "message": "M?s de 20 minutos",
+    "message": "Más de 20 minutos",
     "description": "Over 20 minutes filter label"
   },
   "feed_watch_status": {
-    "message": "Estado de visualizaci?n",
+    "message": "Estado de reproducción",
     "description": "Watch status filter label"
   },
   "feed_unwatched": {
@@ -172,23 +152,19 @@
     "description": "Sort filter label"
   },
   "feed_newest": {
-    "message": "M?s reciente",
+    "message": "Más recientes",
     "description": "Newest sort label"
   },
   "feed_oldest": {
-    "message": "M?s antiguo",
+    "message": "Más antiguos",
     "description": "Oldest sort label"
-  },
-  "feed_search_results_for": {
-    "message": "Resultados para",
-    "description": "Search results heading prefix"
   },
   "feed_back_to_results": {
     "message": "Volver a resultados",
     "description": "Back to results button label"
   },
   "feed_no_channel_videos": {
-    "message": "A?n no se encontraron videos para este canal.",
+    "message": "Aún no se encontraron vídeos para este canal.",
     "description": "Empty state for channel videos"
   },
   "feed_channels": {
@@ -196,15 +172,11 @@
     "description": "Channels label"
   },
   "feed_no_local_channels": {
-    "message": "A?n no hay canales suscritos localmente. Busca en la extensi?n y usa Suscribirse.",
+    "message": "Aún no hay canales suscritos localmente. Añade un canal arriba o usa «Suscribirse con re:Watch» en YouTube.",
     "description": "Empty state for local channels"
   },
-  "feed_playlists": {
-    "message": "Listas",
-    "description": "Playlists label"
-  },
   "feed_no_saved_playlists": {
-    "message": "A?n no hay listas guardadas.",
+    "message": "Aún no hay listas guardadas.",
     "description": "Empty state for saved playlists"
   },
   "feed_history": {
@@ -212,23 +184,19 @@
     "description": "History label"
   },
   "feed_no_history_matches": {
-    "message": "Ning?n historial coincide con estos filtros.",
+    "message": "Ningún elemento del historial coincide con estos filtros.",
     "description": "Empty state for filtered history"
   },
   "feed_load_more": {
-    "message": "Cargar m?s",
+    "message": "Cargar más",
     "description": "Load more button label"
   },
-  "feed_analytics": {
-    "message": "Anal?ticas",
-    "description": "Analytics label"
-  },
   "feed_analytics_subtitle": {
-    "message": "tus estad?sticas, guardadas localmente",
+    "message": "tus estadísticas de reproducción, guardadas localmente",
     "description": "Analytics heading subtitle"
   },
   "feed_watch_activity_7_days": {
-    "message": "Actividad de reproducci?n (?ltimos 7 d?as)",
+    "message": "Actividad de reproducción (últimos 7 días)",
     "description": "Watch activity chart title"
   },
   "feed_watch_time_by_hour": {
@@ -236,7 +204,7 @@
     "description": "Watch time by hour chart title"
   },
   "feed_how_much_finish": {
-    "message": "Cu?nto terminas",
+    "message": "Cuánto terminas",
     "description": "Completion analytics title"
   },
   "feed_top_channels": {
@@ -247,10 +215,6 @@
     "message": "Continuar viendo",
     "description": "Continue watching analytics title"
   },
-  "feed_settings": {
-    "message": "Ajustes",
-    "description": "Settings label"
-  },
   "feed_settings_subtitle": {
     "message": "Todo permanece local en este navegador.",
     "description": "Settings subtitle"
@@ -258,22 +222,6 @@
   "feed_settings_display": {
     "message": "Pantalla",
     "description": "Display settings section title"
-  },
-  "feed_settings_theme": {
-    "message": "Tema",
-    "description": "Theme setting label"
-  },
-  "feed_system_default": {
-    "message": "Predeterminado del sistema",
-    "description": "System default theme label"
-  },
-  "feed_dark": {
-    "message": "Oscuro",
-    "description": "Dark theme label"
-  },
-  "feed_light": {
-    "message": "Claro",
-    "description": "Light theme label"
   },
   "feed_accent_color": {
     "message": "Color de acento",
@@ -300,11 +248,11 @@
     "description": "Orange color label"
   },
   "feed_default_tab": {
-    "message": "Pesta?a predeterminada",
+    "message": "Pestaña predeterminada",
     "description": "Default tab setting label"
   },
   "feed_last_used_tab": {
-    "message": "?ltima pesta?a usada",
+    "message": "Última pestaña usada",
     "description": "Last used tab option label"
   },
   "feed_history_and_feed": {
@@ -340,7 +288,7 @@
     "description": "Every 12 hours interval label"
   },
   "feed_once_a_day": {
-    "message": "Una vez al d?a",
+    "message": "Una vez al día",
     "description": "Once a day interval label"
   },
   "feed_keep_watch_history": {
@@ -348,27 +296,23 @@
     "description": "Keep watch history setting label"
   },
   "feed_30_days": {
-    "message": "30 d?as",
+    "message": "30 días",
     "description": "30 days option label"
   },
   "feed_90_days": {
-    "message": "90 d?as",
+    "message": "90 días",
     "description": "90 days option label"
   },
   "feed_180_days": {
-    "message": "180 d?as",
+    "message": "180 días",
     "description": "180 days option label"
   },
   "feed_forever": {
     "message": "Para siempre",
     "description": "Forever option label"
   },
-  "feed_data": {
-    "message": "Datos",
-    "description": "Data settings section title"
-  },
   "feed_backup_restore": {
-    "message": "Copia y restauraci?n",
+    "message": "Copia de seguridad y restauración",
     "description": "Backup and restore title"
   },
   "feed_backup_restore_help": {
@@ -404,7 +348,7 @@
     "description": "Reset all button label"
   },
   "feed_add_to_playlist": {
-    "message": "A?adir a lista",
+    "message": "Añadir a una lista",
     "description": "Add to playlist dialog title"
   },
   "feed_close": {
@@ -420,7 +364,7 @@
     "description": "feed video options"
   },
   "feed_more_from_channel": {
-    "message": "M?s de este canal",
+    "message": "Más de este canal",
     "description": "feed more from channel"
   },
   "feed_less_from_channel": {
@@ -432,7 +376,7 @@
     "description": "feed hide this video"
   },
   "feed_unsubscribe": {
-    "message": "Cancelar suscripci?n",
+    "message": "Cancelar suscripción",
     "description": "feed unsubscribe"
   },
   "feed_not_subscribed": {
@@ -440,19 +384,19 @@
     "description": "feed not subscribed"
   },
   "feed_unsubscribed": {
-    "message": "Suscripci?n cancelada",
+    "message": "Suscripción cancelada",
     "description": "feed unsubscribed"
   },
   "feed_save_to_watch_later": {
-    "message": "Guardar en Ver m?s tarde",
+    "message": "Guardar en Ver más tarde",
     "description": "feed save to watch later"
   },
   "feed_saved_to_watch_later": {
-    "message": "Guardado en Ver m?s tarde",
+    "message": "Guardado en Ver más tarde",
     "description": "feed saved to watch later"
   },
   "feed_added_to_playlist": {
-    "message": "A?adido a la lista",
+    "message": "Añadido a la lista",
     "description": "feed added to playlist"
   },
   "feed_set_as_playlist_cover": {
@@ -476,15 +420,15 @@
     "description": "feed channel"
   },
   "feed_recommend_more_from_status": {
-    "message": "Recomendaremos m?s de $1.",
+    "message": "Recomendaremos más contenido de $1.",
     "description": "feed recommend more from status"
   },
   "feed_recommend_more_status": {
-    "message": "Recomendaremos m?s",
+    "message": "Recomendaremos más contenido",
     "description": "feed recommend more status"
   },
   "feed_unsubscribed_from_status": {
-    "message": "Suscripci?n cancelada a $1.",
+    "message": "Se canceló la suscripción a $1.",
     "description": "feed unsubscribed from status"
   },
   "feed_refreshing": {
@@ -494,10 +438,6 @@
   "feed_updated": {
     "message": "Feed actualizado.",
     "description": "feed updated"
-  },
-  "feed_no_videos_subscribe_first": {
-    "message": "No se encontraron videos. Suscr?bete primero a canales.",
-    "description": "feed no videos subscribe first"
   },
   "feed_refresh_failed_status": {
     "message": "Error al actualizar: $1. Si YouTube muestra una pantalla de consentimiento, abre youtube.com una vez en este navegador.",

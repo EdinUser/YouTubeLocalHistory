@@ -14,6 +14,7 @@ const VIDEO_ID = 'dQw4w9WgXcQ';
 const WATCH_URL = `https://www.youtube.com/watch?v=${VIDEO_ID}`;
 const TARGET_TIME = 45;
 const RESUME_TOLERANCE = 2;
+const PRIMARY_VIDEO_SELECTOR = '#movie_player video.html5-main-video, ytd-player video.html5-main-video';
 const DEFAULT_SETTINGS = {
   autoCleanPeriod: 90,
   paginationCount: 10,
@@ -39,7 +40,7 @@ async function openWatchPage(page) {
     await dismissYouTubeConsent(page);
   }
 
-  await page.waitForSelector('video', { timeout: 30000 });
+  await page.waitForSelector(PRIMARY_VIDEO_SELECTOR, { timeout: 30000 });
 }
 
 async function waitForPrimaryVideo(page) {
@@ -48,14 +49,14 @@ async function waitForPrimaryVideo(page) {
   await expect
     .poll(
       async () =>
-        page.evaluate(() => {
-          const video = document.querySelector('video');
+        page.evaluate((selector) => {
+          const video = document.querySelector(selector);
           return {
             found: !!video,
             duration: video && Number.isFinite(video.duration) ? video.duration : 0,
             readyState: video ? video.readyState : 0,
           };
-        }),
+        }, PRIMARY_VIDEO_SELECTOR),
       { timeout: 30000 }
     )
     .toMatchObject({ found: true, readyState: expect.any(Number) });
@@ -63,10 +64,10 @@ async function waitForPrimaryVideo(page) {
   while (Date.now() < deadline) {
     await skipYouTubeAdIfPossible(page);
 
-    const duration = await page.evaluate(() => {
-      const video = document.querySelector('video');
+    const duration = await page.evaluate((selector) => {
+      const video = document.querySelector(selector);
       return video && Number.isFinite(video.duration) ? video.duration : 0;
-    });
+    }, PRIMARY_VIDEO_SELECTOR);
 
     if (duration > TARGET_TIME + 20) {
       return;
@@ -75,10 +76,10 @@ async function waitForPrimaryVideo(page) {
     await page.waitForTimeout(1000);
   }
 
-  const finalDuration = await page.evaluate(() => {
-    const video = document.querySelector('video');
+  const finalDuration = await page.evaluate((selector) => {
+    const video = document.querySelector(selector);
     return video && Number.isFinite(video.duration) ? video.duration : 0;
-  });
+  }, PRIMARY_VIDEO_SELECTOR);
   expect(finalDuration).toBeGreaterThan(TARGET_TIME + 20);
 }
 
@@ -95,8 +96,8 @@ async function skipYouTubeAdIfPossible(page) {
 }
 
 async function setVideoTime(page, seconds) {
-  await page.evaluate((time) => {
-    const video = document.querySelector('video');
+  await page.evaluate(({ time, selector }) => {
+    const video = document.querySelector(selector);
     if (!video) {
       throw new Error('video element not found');
     }
@@ -104,21 +105,21 @@ async function setVideoTime(page, seconds) {
     video.muted = true;
     video.pause();
     video.currentTime = time;
-  }, seconds);
+  }, { time: seconds, selector: PRIMARY_VIDEO_SELECTOR });
 
   await expect
     .poll(
       () =>
-        page.evaluate(() => {
-          const video = document.querySelector('video');
+        page.evaluate((selector) => {
+          const video = document.querySelector(selector);
           return video ? video.currentTime : 0;
-        }),
+        }, PRIMARY_VIDEO_SELECTOR),
       { timeout: 15000 }
     )
     .toBeGreaterThanOrEqual(seconds - 1);
 
-  await page.evaluate(() => {
-    const video = document.querySelector('video');
+  await page.evaluate((selector) => {
+    const video = document.querySelector(selector);
     if (!video) {
       throw new Error('video element not found');
     }
@@ -126,7 +127,7 @@ async function setVideoTime(page, seconds) {
     video.dispatchEvent(new Event('timeupdate'));
     video.dispatchEvent(new Event('seeked'));
     video.dispatchEvent(new Event('pause'));
-  });
+  }, PRIMARY_VIDEO_SELECTOR);
 }
 
 async function saveVideoAtTime(context, page, seconds) {
@@ -148,12 +149,12 @@ async function saveVideoAtTime(context, page, seconds) {
 }
 
 async function pauseVideo(page) {
-  await page.evaluate(() => {
-    const video = document.querySelector('video');
+  await page.evaluate((selector) => {
+    const video = document.querySelector(selector);
     if (video) {
       video.pause();
     }
-  });
+  }, PRIMARY_VIDEO_SELECTOR);
 }
 
 async function clearYouTubeOriginState(context, page) {
@@ -169,10 +170,10 @@ async function expectPlayerAtOrAfterSavedTime(page) {
   await expect
     .poll(
       () =>
-        page.evaluate(() => {
-          const video = document.querySelector('video');
+        page.evaluate((selector) => {
+          const video = document.querySelector(selector);
           return video ? video.currentTime : 0;
-        }),
+        }, PRIMARY_VIDEO_SELECTOR),
       { timeout: 30000 }
     )
     .toBeGreaterThanOrEqual(TARGET_TIME - RESUME_TOLERANCE);
@@ -197,11 +198,11 @@ test.describe('Core resume contract (real YouTube)', () => {
       await waitForPrimaryVideo(page);
       await removeStoredVideo(context, VIDEO_ID);
 
-      const startingTime = await page.evaluate(() => {
-        const video = document.querySelector('video');
+      const startingTime = await page.evaluate((selector) => {
+        const video = document.querySelector(selector);
         video.pause();
         return video.currentTime;
-      });
+      }, PRIMARY_VIDEO_SELECTOR);
       expect(startingTime, 'fresh test profile should not inherit a significant YouTube resume time').toBeLessThan(10);
 
       const savedRecord = await saveVideoAtTime(context, page, TARGET_TIME);

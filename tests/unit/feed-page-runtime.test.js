@@ -30,6 +30,12 @@ function runtime({ progress, foreground, dormant } = {}) {
     localSubscriptions: [], watchedMap: {}, pendingFeedVideoCount: 0, sharedFeedScheduler: null,
     loadData: jest.fn(async () => {}), showNewFeedVideos: jest.fn(),
     setFeedSyncStatus: jest.fn(), setFeedSettingsMessage: jest.fn(),
+    setFeedSettingsInitializationProgress: jest.fn(),
+    tFeed: (_key, fallback, substitutions = []) => substitutions.reduce(
+      (message, value, index) => message.replace(`$${index + 1}`, value),
+      fallback
+    ),
+    feedFormatNumber: (value) => String(value),
     document: { getElementById: jest.fn(() => null) },
   };
   vm.runInNewContext(source, context);

@@ -24,7 +24,7 @@ async function renderHistory() {
         const remove = document.createElement('button');
         remove.className = 'btn history-remove';
         remove.type = 'button';
-        remove.textContent = 'Remove';
+        remove.textContent = tFeed('feed_remove', 'Remove');
         remove.addEventListener('click', async () => {
             remove.disabled = true;
             try {
@@ -42,13 +42,13 @@ async function renderHistory() {
         list.appendChild(row);
     });
 
-    count.textContent = `${records.length} history ${records.length === 1 ? 'entry' : 'entries'}`;
+    count.textContent = feedPlural('feed_history_entries', records.length, '$1 history entry', '$1 history entries');
     if (clearAll) clearAll.style.display = records.length ? '' : 'none';
     empty.style.display = records.length ? 'none' : 'block';
     loadMore.style.display = visible.length < records.length ? '' : 'none';
     loadMore.textContent = visible.length < records.length
-        ? `Load more (${records.length - visible.length} remaining)`
-        : 'Load more';
+        ? tFeed('feed_load_more_remaining', 'Load more ($1 remaining)', [feedFormatNumber(records.length - visible.length)])
+        : tFeed('feed_load_more', 'Load more');
 }
 
 function showHistory() {

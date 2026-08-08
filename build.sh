@@ -3,14 +3,19 @@
 # Use environment variables with fallbacks for security (paths not exposed in git)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Clean build directories - FIX: Remove quotes around globs to allow expansion
-rm -rf $PROJECT_ROOT/build/chrome/* $PROJECT_ROOT/build/firefox/*
-
-# Create dist directory if it doesn't exist
-mkdir -p "$PROJECT_ROOT/dist"
+# Recreate build directories so clean and repeated builds start from the same
+# empty filesystem state.
+rm -rf -- "$PROJECT_ROOT/build/chrome" "$PROJECT_ROOT/build/firefox"
+mkdir -p "$PROJECT_ROOT/build/chrome" "$PROJECT_ROOT/build/firefox" "$PROJECT_ROOT/dist"
 
 # Get current version from manifest
 VERSION=$(grep '"version"' "$PROJECT_ROOT/src/manifest.chrome.json" | cut -d'"' -f4)
+CHROME_ZIP_PATH="$PROJECT_ROOT/dist/youtube-local-history-chrome-v$VERSION.zip"
+FIREFOX_ZIP_PATH="$PROJECT_ROOT/dist/youtube-local-history-firefox-v$VERSION.zip"
+
+# zip updates existing archives in place, so remove only the exact outputs for
+# this version before packaging to prevent deleted files from surviving.
+rm -f -- "$CHROME_ZIP_PATH" "$FIREFOX_ZIP_PATH"
 
 # Merge locale files before copying - FIX: Use absolute path
 node "$PROJECT_ROOT/merge_locales.js"
@@ -48,7 +53,20 @@ copy_common_files() {
        "$PROJECT_ROOT/src/import.html" \
        "$PROJECT_ROOT/src/import.js" \
        "$PROJECT_ROOT/src/feed.html" \
+       "$PROJECT_ROOT/src/feed-async.js" \
+       "$PROJECT_ROOT/src/feed-contracts.js" \
+       "$PROJECT_ROOT/src/rss-parser.js" \
+       "$PROJECT_ROOT/src/rss-client.js" \
+       "$PROJECT_ROOT/src/feed-ingestion.js" \
+       "$PROJECT_ROOT/src/feed-enrichment.js" \
+       "$PROJECT_ROOT/src/feed-channel-metadata.js" \
+       "$PROJECT_ROOT/src/feed-retention.js" \
+       "$PROJECT_ROOT/src/feed-channel-classification.js" \
+       "$PROJECT_ROOT/src/feed-scheduler.js" \
+       "$PROJECT_ROOT/src/feed-view-data.js" \
+       "$PROJECT_ROOT/src/feed-subscription-import.js" \
        "$PROJECT_ROOT/src/feed-core.js" \
+       "$PROJECT_ROOT/src/feed-view-preference.js" \
        "$PROJECT_ROOT/src/feed-state-utils.js" \
        "$PROJECT_ROOT/src/feed-cards.js" \
        "$PROJECT_ROOT/src/feed-local-search.js" \
@@ -69,6 +87,7 @@ copy_common_files() {
        "$PROJECT_ROOT/src/feed-refresh.js" \
        "$PROJECT_ROOT/src/feed.js" \
        "$PROJECT_ROOT/src/storage.js" \
+       "$PROJECT_ROOT/src/local-subscription-actions.js" \
        "$PROJECT_ROOT/src/content-subscriptions.js" \
        "$PROJECT_ROOT/src/indexeddb-storage.js" \
        "$target_dir/"
@@ -113,7 +132,7 @@ fi
 
 # Create zip file (keeping existing process for compatibility)
 cd "$PROJECT_ROOT/build/chrome"
-zip -r "../../dist/youtube-local-history-chrome-v$VERSION.zip" ./* -x ".*"
+zip -r "$CHROME_ZIP_PATH" ./* -x ".*"
 cd ../..
 
 # Build Firefox extension
@@ -121,11 +140,12 @@ echo "Building Firefox extension..."
 copy_common_files "$PROJECT_ROOT/build/firefox"
 cp "$PROJECT_ROOT/src/manifest.firefox.json" "$PROJECT_ROOT/build/firefox/manifest.json"
 cd "$PROJECT_ROOT/build/firefox"
-# For Firefox, we need to zip the files directly, not the directory
-zip -j "../../dist/youtube-local-history-firefox-v$VERSION.zip" manifest.json background.js content.js content-css.js content-url.js content-import.js content-playlists.js content-info.js content-thumbnails.js content-messages.js popup.html popup-core.js popup-utils.js popup-import.js popup-settings.js popup-search.js popup-data-pages.js popup-history-display.js popup-video-pagination.js popup-analytics-core.js popup-analytics-charts.js popup-analytics-extra.js popup-playlists.js popup-subscriptions.js popup-theme.js popup-shorts.js popup-localization.js popup.js import.html import.js feed.html feed-core.js feed-state-utils.js feed-cards.js feed-local-search.js feed-home.js feed-analytics.js feed-subscriptions-view.js feed-playlist-import.js feed-playlists-view.js feed-history-view.js feed-settings.js feed-localization.js feed-backup.js feed-data-pipeline.js feed-subscribe-results.js feed-youtube-search-core.js feed-youtube-search-render.js feed-channel-view.js feed-refresh.js feed.js storage.js content-subscriptions.js indexeddb-storage.js icon*.png -x ".*"
+# Zip every file selected by copy_common_files so the archive cannot drift from
+# the Firefox build directory.
+zip -j "$FIREFOX_ZIP_PATH" ./* -x ".*"
 # Include _locales in the Firefox zip if it exists
 if [ -d _locales ]; then
-    zip -r "../../dist/youtube-local-history-firefox-v$VERSION.zip" _locales -x ".*"
+    zip -r "$FIREFOX_ZIP_PATH" _locales -x ".*"
 fi
 cd ../..
 

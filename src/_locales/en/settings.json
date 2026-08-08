@@ -75,21 +75,9 @@
     "message": "When playing from a playlist, don't save video progress",
     "description": "Help text for pause-in-playlists setting"
   },
-  "settings_data_management_label": {
-    "message": "Data Management",
-    "description": "Label for data management section"
-  },
   "settings_export": {
     "message": "Export",
     "description": "Button label for exporting history"
-  },
-  "settings_import": {
-    "message": "Import",
-    "description": "Button label for importing history"
-  },
-  "settings_export_help": {
-    "message": "Export or import your local history, subscriptions, playlists, settings, and caches",
-    "description": "Help text for export/import"
   },
   "settings_clear_help": {
     "message": "Clear removes all saved video history (this cannot be undone)",
@@ -150,10 +138,6 @@
   "settings_feed_refresh_help": {
     "message": "How often the local feed checks subscribed channels for new uploads",
     "description": "Help text for the feed refresh interval input"
-  },
-  "subscriptions_refresh": {
-    "message": "Refresh feed",
-    "description": "Button label to refresh the local subscriptions feed"
   },
   "subscriptions_open_feed": {
     "message": "Open YT re:Watch",

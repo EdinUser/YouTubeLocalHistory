@@ -22,7 +22,7 @@
     "test:e2e:all": "npm run test:e2e && npm run test:firefox:all",
     "test:e2e:ui": "playwright test --project=chromium-extension --ui",
     "fixtures:youtube:download": "node scripts/download-youtube-fixtures.js",
-    "test:local:full": "npm run fixtures:youtube:download -- --headless --with-rss && npm test && npm run test:e2e:all",
+    "test:local:full": "npm run fixtures:youtube:download -- --headless && npm test && npm run test:e2e:all",
     "test:firefox": "npm run test:firefox:all",
     "test:firefox:lint": "NO_UPDATE_NOTIFIER=1 web-ext lint --source-dir build/e2e/firefox --warnings-as-errors --no-input --no-config-discovery",
     "test:firefox:smoke": "node tests/firefox/extension-smoke.firefox.test.js",

@@ -199,6 +199,21 @@ async function getStoredVideo(session, videoId) {
   return items[`video_${videoId}`] || null;
 }
 
+async function getLocalSubscription(session, channelId) {
+  return withFirefoxExtensionPage(session, async () => {
+    const result = await session.driver.executeAsyncScript((id, done) => {
+      browser.runtime.getBackgroundPage()
+        .then((background) => background.ytIndexedDBStorage.getSubscriptionRecord(id))
+        .then((value) => done({ ok: true, value }))
+        .catch((error) => done({ ok: false, error: error && error.message ? error.message : String(error) }));
+    }, channelId);
+    if (!result || result.ok !== true) {
+      throw new Error(`Firefox local subscription read failed: ${result && result.error}`);
+    }
+    return result.value;
+  });
+}
+
 async function removeStoredVideo(session, videoId) {
   await removeExtensionStorage(session, [`video_${videoId}`]);
 }
@@ -275,6 +290,7 @@ module.exports = {
   firefoxXpiPath,
   getExtensionStorage,
   getFirefoxStorage,
+  getLocalSubscription,
   getStoredVideo,
   launchFirefoxWithExtension,
   openFirefoxExtensionPage,

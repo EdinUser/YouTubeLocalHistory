@@ -1,19 +1,7 @@
 {
-  "extensionName": {
-    "message": "Historial Local de YouTube",
-    "description": "The name of the extension"
-  },
   "popup_title": {
     "message": "YT re:Watch",
     "description": "Popup window title and main heading"
-  },
-  "theme_toggle": {
-    "message": "Tema",
-    "description": "Button label for toggling theme"
-  },
-  "theme_toggle_tooltip": {
-    "message": "Cambiar tema",
-    "description": "Tooltip for theme toggle button"
   },
   "theme_light": {
     "message": "Claro",
@@ -23,25 +11,9 @@
     "message": "Oscuro",
     "description": "Label for dark theme option"
   },
-  "theme_auto": {
-    "message": "Auto",
-    "description": "Label for auto/system theme option"
-  },
-  "theme_switch_to_dark": {
-    "message": "Cambiar a tema oscuro",
-    "description": "Tooltip for switching to dark theme"
-  },
-  "theme_switch_to_light": {
-    "message": "Cambiar a tema claro",
-    "description": "Tooltip for switching to light theme"
-  },
   "theme_system": {
     "message": "Predeterminado del sistema",
     "description": "Label for system default theme option"
-  },
-  "theme_currently_following_system": {
-    "message": "Siguiendo el tema del sistema - Clic para anular",
-    "description": "Tooltip for auto theme option"
   },
   "clear_label": {
     "message": "Limpiar",
@@ -126,10 +98,6 @@
   "date_unknown": {
     "message": "Desconocido",
     "description": "Label for unknown date"
-  },
-  "search_no_videos_found": {
-    "message": "No se encontraron videos que coincidan con su búsqueda.",
-    "description": "Message when no videos match the search"
   },
   "history_no_history_found": {
     "message": "No se encontró historial. ¡Comience a ver algunos videos!",

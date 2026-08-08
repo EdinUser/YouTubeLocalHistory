@@ -1,8 +1,4 @@
 {
-  "message_no_active_tab": {
-    "message": "Няма активен раздел.",
-    "description": "Error message when no active tab is found"
-  },
   "message_video_removed": {
     "message": "Видеото е премахнато от историята",
     "description": "Success message when a video is removed from history"
@@ -27,22 +23,6 @@
     "message": "Грешка при експортиране на историята: $1",
     "description": "Error message when exporting history fails, $1 is the error detail"
   },
-  "message_import_success": {
-    "message": "Историята $1 успешно: $2 видеа, $3 плейлисти",
-    "description": "Success message when history is imported, $1 is mode, $2 is video count, $3 is playlist count"
-  },
-  "message_error_importing_history": {
-    "message": "Грешка при импортиране на историята: $1",
-    "description": "Error message when importing history fails, $1 is the error detail"
-  },
-  "message_no_data_in_import": {
-    "message": "Не са намерени данни във файла за импортиране",
-    "description": "Error message when no data is found in import file"
-  },
-  "message_invalid_file_format": {
-    "message": "Невалиден файлов формат: $1",
-    "description": "Error message for invalid import file format, $1 is the detail"
-  },
   "message_confirm_clear_history": {
     "message": "Сигурни ли сте, че искате да изчистите цялата история? Това не може да се отмени.",
     "description": "Confirmation for clearing all history."
@@ -55,25 +35,9 @@
     "message": "Цялата история на видеа и плейлисти е изчистена успешно",
     "description": "Success message when all history and playlists are cleared"
   },
-  "message_export_completed": {
-    "message": "Експортирането е завършено успешно",
-    "description": "Success message when export is completed"
-  },
   "message_failed_to_initialize": {
     "message": "Неуспешно инициализиране на разширението: $1",
     "description": "Error message when extension initialization fails, $1 is the error detail"
-  },
-  "message_error_loading_history": {
-    "message": "Грешка при зареждане на историята: $1",
-    "description": "Error message when loading history fails, $1 is the error detail"
-  },
-  "message_no_playlists_found": {
-    "message": "Няма намерени плейлисти.",
-    "description": "Message when no playlists are found"
-  },
-  "message_error_loading_playlists": {
-    "message": "Грешка при зареждане на плейлистите: $1",
-    "description": "Error message when loading playlists fails, $1 is the error detail"
   },
   "message_playlist_removed": {
     "message": "Плейлистът е премахнат",
@@ -110,18 +74,6 @@
   "message_debug_mode_enabled": {
     "message": "Режимът за отстраняване на грешки е активиран",
     "description": "Message when debug mode is enabled"
-  },
-  "message_debug_mode_disabled": {
-    "message": "Режимът за отстраняване на грешки е деактивиран",
-    "description": "Message when debug mode is disabled"
-  },
-  "settings_convert_history": {
-    "message": "Конвертиране на YouTube история",
-    "description": "Button label to open the community converter tool"
-  },
-  "settings_convert_history_help": {
-    "message": "Отваря общностния инструмент за конвертиране на Google Takeout watch-history.json във файл за импорт в YT re:Watch.",
-    "description": "Help text for the community converter tool link"
   },
   "message_unknown_error": {
     "message": "Неизвестна грешка",

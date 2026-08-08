@@ -1,19 +1,7 @@
 {
-  "extensionName": {
-    "message": "YouTube Локална История",
-    "description": "The name of the extension"
-  },
   "popup_title": {
     "message": "YT re:Watch",
     "description": "Popup window title and main heading"
-  },
-  "theme_toggle": {
-    "message": "Тема",
-    "description": "Button label for toggling theme"
-  },
-  "theme_toggle_tooltip": {
-    "message": "Превключване на темата",
-    "description": "Tooltip for theme toggle button"
   },
   "theme_light": {
     "message": "Светла",
@@ -23,25 +11,9 @@
     "message": "Тъмна",
     "description": "Label for dark theme option"
   },
-  "theme_auto": {
-    "message": "Автоматично",
-    "description": "Label for auto/system theme option"
-  },
-  "theme_switch_to_dark": {
-    "message": "Превключване на тъмна тема",
-    "description": "Tooltip for switching to dark theme"
-  },
-  "theme_switch_to_light": {
-    "message": "Превключване на светла тема",
-    "description": "Tooltip for switching to light theme"
-  },
   "theme_system": {
     "message": "Системни настройки",
     "description": "Label for system default theme option"
-  },
-  "theme_currently_following_system": {
-    "message": "Следва системната тема - Кликнете за ръчно превключване",
-    "description": "Tooltip for auto theme option"
   },
   "clear_label": {
     "message": "Изчисти",
@@ -126,10 +98,6 @@
   "date_unknown": {
     "message": "Непозната",
     "description": "Label for unknown date"
-  },
-  "search_no_videos_found": {
-    "message": "Не са намерени видеа, отговарящи на търсенето ви.",
-    "description": "Message when no videos match the search"
   },
   "history_no_history_found": {
     "message": "Не е намерена история. Започнете да гледате видеа, за да се появи тук!",

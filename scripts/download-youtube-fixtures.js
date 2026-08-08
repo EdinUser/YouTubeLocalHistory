@@ -9,9 +9,9 @@ const defaultManifestPath = path.join(rootDir, 'tests', 'fixtures', 'youtube-pag
 const defaultOutputDir = path.join(rootDir, 'tests', 'fixtures', 'youtube-pages', 'captures');
 const defaultRssOutputDir = path.join(rootDir, 'tests', 'fixtures', 'feed', 'live');
 const liveRssChannels = [
-  { name: 'asmontv', handle: '@AsmonTV', channelId: 'UCRCraKP10Q5fSAbCimkizIA' },
-  { name: 'mentour-pilot', handle: '@MentourPilot', channelId: 'UCQeRaTukNYft1_6AZPACnog' },
-  { name: 'nerdrotic-daily', handle: '@NerdroticDaily', channelId: 'UCwpHKudUkP5tNgmMdexB3ow' },
+  { name: 'asmontv', handle: '@AsmonTV', channelId: 'UCQeRaTukNYft1_6AZPACnog' },
+  { name: 'mentour-pilot', handle: '@MentourPilot', channelId: 'UCwpHKudUkP5tNgmMdexB3ow' },
+  { name: 'nerdrotic', handle: '@Nerdrotic', channelId: 'UC5T0tXJN5CrMZUEJuz4oovw' },
 ];
 
 function parseArgs(argv) {

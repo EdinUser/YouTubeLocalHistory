@@ -13,16 +13,16 @@ YT re:Watch is a local-first YouTube history extension. It stores watch progress
 These files run directly on YouTube pages through the manifest `content_scripts` list. Load order matters because these are plain scripts, not ES modules.
 
 - `storage.js`: defines the global `ytStorage` API used by the rest of the extension.
-- `content-css.js`: injects shared content-script CSS for playlist ignore toggles, the active-info popup, and thumbnail viewed/progress overlays.
+- `content-css.js`: injects shared content-script CSS for playlist history controls, the active-info popup, and thumbnail viewed/progress overlays.
 - `content-url.js`: extracts YouTube video IDs and handles clean/timestamped YouTube URLs.
 - `content-import.js`: shows the in-page import overlay when YouTube opens with `#ytlh_import`.
-- `content-playlists.js`: reads playlist metadata from YouTube pages, saves playlist records, and adds the playlist “pause history” toggle.
+- `content-playlists.js`: reads playlist metadata from YouTube pages, saves playlist records, and adds the per-playlist History active/paused control. On playlist pages it creates a separate row below native actions and ignores hidden legacy headers; on playlist-backed watch pages it uses the playlist panel.
 - `content-info.js`: shows the one-time YT re:Watch active info popup.
 - `content-thumbnails.js`: adds viewed/progress overlays to extension-feed thumbnails and best-effort viewed labels on supported YouTube thumbnail layouts. YouTube page markup changes often, so native YouTube overlays are intentionally conservative.
 - `content-messages.js`: handles popup/import messages sent to the YouTube tab.
 - `content.js`: remaining bootstrap and video tracking logic. It wires the helpers together, tracks video elements, saves/restores timestamps, detects SPA navigation, and registers listeners.
 - `feed-core.js`: shared parser/selector helpers for local subscription feed data.
-- `content-subscriptions.js`: local subscription behavior inside YouTube pages, local Subscribe buttons, account UI hiding, and feed-cache refresh wiring.
+- `content-subscriptions.js`: local subscription behavior inside YouTube pages, compact/local Subscribe companions, account UI hiding, and feed-cache refresh wiring. Watch-page state is resolved through the extension-origin canonical subscription store, including an `@handle` to UC-ID fallback, and its observer is limited to real subscription-surface replacement to avoid Firefox remount blinking.
 
 Important: when adding another content helper file, update all manifests and `build.sh`, otherwise packaged builds can miss the file.
 

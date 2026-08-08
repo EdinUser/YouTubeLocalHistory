@@ -62,8 +62,12 @@ async function restoreFeedBackup(file) {
     const text = await file.text();
     let data;
     try { data = JSON.parse(text); }
-    catch (_) { throw new Error('This is not a valid JSON backup file.'); }
-    if (!data || typeof data !== 'object') throw new Error('Backup file is empty.');
+    catch (_) {
+        throw new Error(tFeed('feed_invalid_backup', 'This is not a valid JSON backup file.'));
+    }
+    if (!data || typeof data !== 'object') {
+        throw new Error(tFeed('feed_backup_empty', 'Backup file is empty.'));
+    }
 
     const history = Array.isArray(data.history) ? data.history : [];
     const playlists = Array.isArray(data.playlists) ? data.playlists : [];
@@ -158,7 +162,10 @@ function notifySubsChanged() {
 
 function setFeedSettingsMessage(text) {
     const message = document.getElementById('feedSettingsMessage');
-    if (message) message.textContent = text || '';
+    if (message) {
+        delete message.dataset.initializing;
+        message.textContent = text || '';
+    }
 }
 
 function refreshActiveFeedDataView() {
@@ -282,7 +289,10 @@ async function importYouTubeHistoryFile(file) {
     const text = await file.text();
     const records = parseWatchHistoryHtml(text);
     if (!records.length) {
-        throw new Error('No videos found. Use watch-history.html from Google Takeout.');
+        throw new Error(tFeed(
+            'feed_no_history_videos_found',
+            'No videos found. Use watch-history.html from Google Takeout.'
+        ));
     }
     const result = await ytStorage.importRecords(records, [], true);
     await loadData();
@@ -293,14 +303,21 @@ async function importYouTubeChannelsFile(file) {
     const text = await file.text();
     const subs = parseSubscriptionsExport(text, file.name);
     if (!subs.length) {
-        throw new Error('No channels found. Use subscriptions.csv from YouTube or Takeout.');
+        throw new Error(tFeed(
+            'feed_no_channels_found',
+            'No channels found. Use subscriptions.csv from YouTube or Takeout.'
+        ));
     }
     const { outcome, queuedChannelIds } = await ytvhtFeedSubscriptionImport.importCanonicalSubscriptions(ytIndexedDBStorage, subs);
     localSubscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
     const scheduler = ensureSharedFeedScheduler();
     if (scheduler && queuedChannelIds.length) {
         await scheduler.initializeSubscriptions(queuedChannelIds);
-        setFeedSettingsMessage(`Imported ${outcome.added} channels; preparing your local feed.`);
+        setFeedSettingsMessage(tFeed(
+            'feed_imported_channels_preparing',
+            'Imported $1 channels; preparing your local feed.',
+            [feedFormatNumber(outcome.added)]
+        ));
         requestPageActiveFeedWork().catch((error) => {
             console.warn('[feed] initialization after import failed', error);
         });
@@ -373,14 +390,14 @@ function initFeedDataSettings() {
 
     document.getElementById('exportFeedData')?.addEventListener('click', async () => {
         const button = document.getElementById('exportFeedData');
-        setFeedSettingsMessage('Creating backup…');
+        setFeedSettingsMessage(tFeed('feed_creating_backup', 'Creating backup…'));
         if (button) button.disabled = true;
         try {
             await exportFeedData();
-            setFeedSettingsMessage('Backup downloaded.');
+            setFeedSettingsMessage(tFeed('feed_backup_downloaded', 'Backup downloaded.'));
         } catch (error) {
             console.error('[settings] export failed', error);
-            setFeedSettingsMessage('Could not create backup.');
+            setFeedSettingsMessage(tFeed('feed_backup_create_failed', 'Could not create backup.'));
         } finally {
             if (button) button.disabled = false;
         }
@@ -395,20 +412,23 @@ function initFeedDataSettings() {
     restoreInput?.addEventListener('change', async () => {
         const file = restoreInput.files && restoreInput.files[0];
         if (!file) return;
-        if (!confirm('Restore this backup and merge it with your current local data?')) {
+        if (!confirm(tFeed(
+            'feed_confirm_restore_backup',
+            'Restore this backup and merge it with your current local data?'
+        ))) {
             restoreInput.value = '';
             return;
         }
         const button = document.getElementById('importFeedData');
-        setFeedSettingsMessage('Restoring backup…');
+        setFeedSettingsMessage(tFeed('feed_restoring_backup', 'Restoring backup…'));
         if (button) button.disabled = true;
         try {
             await restoreFeedBackup(file);
             refreshActiveFeedDataView();
-            setFeedSettingsMessage('Backup restored. Your local data is ready.');
+            setFeedSettingsMessage(tFeed('feed_backup_restored', 'Backup restored. Your local data is ready.'));
         } catch (error) {
             console.error('[settings] restore failed', error);
-            setFeedSettingsMessage(error.message || 'Could not restore backup.');
+            setFeedSettingsMessage(error.message || tFeed('feed_backup_restore_failed', 'Could not restore backup.'));
         } finally {
             if (button) button.disabled = false;
             restoreInput.value = '';
@@ -425,15 +445,19 @@ function initFeedDataSettings() {
         const file = historyInput.files && historyInput.files[0];
         if (!file) return;
         const button = document.getElementById('importYouTubeHistory');
-        setFeedSettingsMessage('Importing YouTube history…');
+        setFeedSettingsMessage(tFeed('feed_importing_history', 'Importing YouTube history…'));
         if (button) button.disabled = true;
         try {
             const count = await importYouTubeHistoryFile(file);
             refreshActiveFeedDataView();
-            setFeedSettingsMessage(`Imported ${count} videos into your history.`);
+            setFeedSettingsMessage(tFeed(
+                'feed_imported_history_videos',
+                'Imported $1 videos into your history.',
+                [feedFormatNumber(count)]
+            ));
         } catch (error) {
             console.error('[settings] history import failed', error);
-            setFeedSettingsMessage(error.message || 'Could not import history.');
+            setFeedSettingsMessage(error.message || tFeed('feed_history_import_failed', 'Could not import history.'));
         } finally {
             if (button) button.disabled = false;
             historyInput.value = '';
@@ -450,14 +474,18 @@ function initFeedDataSettings() {
         const file = channelsInput.files && channelsInput.files[0];
         if (!file) return;
         const button = document.getElementById('importYouTubeChannels');
-        setFeedSettingsMessage('Importing channels…');
+        setFeedSettingsMessage(tFeed('feed_importing_channels', 'Importing channels…'));
         if (button) button.disabled = true;
         try {
             const outcome = await importYouTubeChannelsFile(file);
-            setFeedSettingsMessage(`Imported ${outcome.added} channels; ${outcome.initializationQueued} queued to prepare your local feed.`);
+            setFeedSettingsMessage(tFeed(
+                'feed_imported_channels_queued',
+                'Imported $1 channels; $2 queued to prepare your local feed.',
+                [feedFormatNumber(outcome.added), feedFormatNumber(outcome.initializationQueued)]
+            ));
         } catch (error) {
             console.error('[settings] channels import failed', error);
-            setFeedSettingsMessage(error.message || 'Could not import channels.');
+            setFeedSettingsMessage(error.message || tFeed('feed_channels_import_failed', 'Could not import channels.'));
         } finally {
             if (button) button.disabled = false;
             channelsInput.value = '';
@@ -466,22 +494,21 @@ function initFeedDataSettings() {
 
     document.getElementById('resetAllData')?.addEventListener('click', async () => {
         const button = document.getElementById('resetAllData');
-        const confirmed = confirm(
-            'Reset all YT re:Watch data in this browser?\n\n' +
-            'This permanently deletes history, subscriptions, playlists, watch later, settings, stats, and caches.\n\n' +
-            'This cannot be undone.'
-        );
+        const confirmed = confirm(tFeed(
+            'feed_confirm_reset_all',
+            'Reset all YT re:Watch data in this browser?\n\nThis permanently deletes history, subscriptions, playlists, watch later, settings, stats, and caches.\n\nThis cannot be undone.'
+        ));
         if (!confirmed) return;
-        if (!confirm('Last chance: reset everything now?')) return;
+        if (!confirm(tFeed('feed_confirm_reset_last_chance', 'Last chance: reset everything now?'))) return;
 
         if (button) button.disabled = true;
-        setFeedSettingsMessage('Resetting all data…');
+        setFeedSettingsMessage(tFeed('feed_resetting_all_data', 'Resetting all data…'));
         try {
             await resetAllFeedData();
-            setFeedSettingsMessage('All local data has been reset.');
+            setFeedSettingsMessage(tFeed('feed_all_data_reset', 'All local data has been reset.'));
         } catch (error) {
             console.error('[settings] reset failed', error);
-            setFeedSettingsMessage('Could not reset all data.');
+            setFeedSettingsMessage(tFeed('feed_reset_all_failed', 'Could not reset all data.'));
         } finally {
             if (button) button.disabled = false;
         }

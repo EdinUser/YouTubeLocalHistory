@@ -49,6 +49,12 @@ test('packaged local search stays local and Show opens the chronological subscri
 
   await page.goto(`${extensionOrigin}/feed.html`, { waitUntil: 'domcontentloaded' });
   await page.evaluate(async () => {
+    clearPageFeedWorkTimer();
+    if (pageFeedWorkPromise) {
+      await pageFeedWorkPromise.catch(() => {});
+    }
+    clearPageFeedWorkTimer();
+
     const channelId = 'UC1234567890abcdefghijkl';
     await ytvhtFeedViewData.persistHomeImpressions(ytIndexedDBStorage, [], Date.now());
     await ytIndexedDBStorage.putSubscriptionRecord({ channelId, channelTitle: 'Fixture Channel', source: 'manual', followedAt: 1 });
@@ -92,8 +98,11 @@ test('packaged feed renders cached inventory before a controlled initialization 
   const extensionOrigin = `${new URL(worker.url()).protocol}//${new URL(worker.url()).host}`;
   const page = await context.newPage();
   await page.goto(`${extensionOrigin}/feed.html`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).not.toHaveClass(/app-loading/);
+  await expect(page.locator('#feedSyncStatus')).toHaveAttribute('aria-busy', 'false');
 
   await page.evaluate(async () => {
+    clearPageFeedWorkTimer();
     const channelId = 'UC1234567890abcdefghijkl';
     const thumbnailUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
     await ytIndexedDBStorage.putSubscriptionRecord({ channelId, channelTitle: 'Progress fixture', source: 'manual', followedAt: 1 });
@@ -112,6 +121,7 @@ test('packaged feed renders cached inventory before a controlled initialization 
 
   await expect(page.locator('#grid')).toContainText('Cached fixture upload');
   await expect(page.locator('#feedSyncStatus')).toContainText('Scanning channels');
+  await expect.poll(() => page.evaluate(() => typeof window.__releaseFixtureScan)).toBe('function');
   await page.evaluate(() => window.__releaseFixtureScan(ytvhtFeedContracts.createRssScanResult({
     channelId: 'UC1234567890abcdefghijkl', fetchedAt: Date.now(), entries: [{
       videoId: 'scanned-progress-video', title: 'Scanned fixture upload', publishedAt: Date.now(),

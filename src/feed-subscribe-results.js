@@ -25,7 +25,9 @@ function isSubbedCached(info) {
 }
 
 function paintSubscribeButton(button, subbed) {
-    button.textContent = subbed ? 'Unfollow re:Watch' : 'Subscribe with re:Watch';
+    button.textContent = subbed
+        ? tFeed('feed_unfollow_rewatch', 'Unfollow re:Watch')
+        : tFeed('feed_subscribe_with_rewatch', 'Subscribe with re:Watch');
     button.classList.toggle('subbed', subbed);
     button.classList.remove('loading');
     button.removeAttribute('aria-label');
@@ -49,7 +51,7 @@ function buildSubscribeButton(info) {
             const subbed = !!(await findSub(info));
             paintMatchingSubscribeButtons(info, subbed);
         } catch (_) {
-            btn.textContent = 'Subscribe with re:Watch';
+            btn.textContent = tFeed('feed_subscribe_with_rewatch', 'Subscribe with re:Watch');
             btn.classList.remove('loading');
         }
     }
@@ -64,10 +66,17 @@ function buildSubscribeButton(info) {
             } else {
                 const channelId = String(info.ucid || info.channelId || '');
                 if (!/^UC[\w-]+$/.test(channelId)) {
-                    throw new Error('A canonical channel ID is required before following a channel');
+                    throw new Error(tFeed(
+                        'feed_canonical_channel_required',
+                        'A canonical channel ID is required before following a channel.'
+                    ));
                 }
                 await ytvhtLocalSubscriptionActions.follow(ytIndexedDBStorage, { ...info, channelId });
-                setStatus(`Subscribed to ${info.channelName || 'channel'} with re:Watch — preparing local feed.`, false);
+                setStatus(tFeed(
+                    'feed_subscribed_to_preparing',
+                    'Subscribed to $1 with re:Watch — preparing local feed.',
+                    [info.channelName || tFeed('feed_channel', 'channel')]
+                ), false);
             }
             localSubscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
             await paint();
@@ -117,7 +126,7 @@ function buildResultRow(video, opts) {
     const title = document.createElement('a');
     title.className = 'yt-row-title';
     title.href = video.url; title.target = '_blank'; title.rel = 'noopener';
-    title.textContent = decodeHtmlEntities(video.title || '');
+    title.textContent = decodeHtmlEntities(feedVideoTitle(video.title));
     title.title = title.textContent;
 
     const meta = document.createElement('div');
@@ -137,7 +146,7 @@ function buildResultRow(video, opts) {
         chan.appendChild(a);
     }
     const cspan = document.createElement('span');
-    cspan.textContent = decodeHtmlEntities(video.channelName || '');
+    cspan.textContent = decodeHtmlEntities(feedChannelTitle(video.channelName));
     chan.appendChild(cspan);
 
     info.appendChild(title);

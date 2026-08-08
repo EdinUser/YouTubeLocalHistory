@@ -9,12 +9,14 @@ let historyVisibleLimit = 30;
 
 function formatWatchTotal(totalSec) {
     const s = Math.floor(totalSec || 0);
-    if (s <= 0) return '0m';
+    if (s <= 0) return tFeed('feed_duration_minutes', '$1m', ['0']);
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
-    if (h > 0) return `${h}h ${m}m`;
-    if (m > 0) return `${m}m`;
-    return `${s}s`;
+    if (h > 0) {
+        return tFeed('feed_duration_hours_minutes', '$1h $2m', [feedFormatNumber(h), feedFormatNumber(m)]);
+    }
+    if (m > 0) return tFeed('feed_duration_minutes', '$1m', [feedFormatNumber(m)]);
+    return tFeed('feed_duration_seconds', '$1s', [feedFormatNumber(s)]);
 }
 
 function renderBars(containerId, items) {
@@ -51,14 +53,17 @@ function renderCompletionBreakdown(videos) {
 
     const withDuration = videos.filter((video) => Number(video.duration || 0) > 0);
     if (!withDuration.length) {
-        wrap.innerHTML = '<div class="an-empty">Watch a few videos to see this breakdown.</div>';
+        const empty = document.createElement('div');
+        empty.className = 'an-empty';
+        empty.textContent = tFeed('feed_analytics_watch_prompt', 'Watch a few videos to see this breakdown.');
+        wrap.appendChild(empty);
         return;
     }
 
     const groups = [
-        { label: 'Finished', className: '', count: 0 },
-        { label: 'Partly watched', className: 'partial', count: 0 },
-        { label: 'Just started', className: 'started', count: 0 }
+        { label: tFeed('chart_completed', 'Finished'), className: '', count: 0 },
+        { label: tFeed('chart_partial', 'Partly watched'), className: 'partial', count: 0 },
+        { label: tFeed('feed_just_started', 'Just started'), className: 'started', count: 0 }
     ];
     withDuration.forEach((video) => {
         const ratio = Math.max(0, Number(video.time || 0) / Number(video.duration || 1));
@@ -76,7 +81,7 @@ function renderCompletionBreakdown(videos) {
         label.textContent = group.label;
         const count = document.createElement('span');
         const percent = Math.round((group.count / withDuration.length) * 100);
-        count.textContent = `${group.count} · ${percent}%`;
+        count.textContent = `${feedFormatNumber(group.count)} · ${feedFormatNumber(percent / 100, { style: 'percent' })}`;
         head.appendChild(label);
         head.appendChild(count);
 
@@ -110,7 +115,10 @@ function renderTopChannels(videos) {
         .sort((a, b) => b[1].seconds - a[1].seconds)
         .slice(0, 6);
     if (!top.length) {
-        wrap.innerHTML = '<div class="an-empty">Your most-watched channels will appear here.</div>';
+        const empty = document.createElement('div');
+        empty.className = 'an-empty';
+        empty.textContent = tFeed('feed_analytics_top_channels_empty', 'Your most-watched channels will appear here.');
+        wrap.appendChild(empty);
         return;
     }
     top.forEach(([channel, data]) => {
@@ -121,7 +129,7 @@ function renderTopChannels(videos) {
         name.textContent = channel;
         const stat = document.createElement('div');
         stat.className = 'an-channel-stat';
-        stat.textContent = `${formatWatchTotal(data.seconds)} · ${data.videos} video${data.videos === 1 ? '' : 's'}`;
+        stat.textContent = `${formatWatchTotal(data.seconds)} · ${feedPlural('feed_videos', data.videos, '$1 video', '$1 videos')}`;
         row.appendChild(name);
         row.appendChild(stat);
         wrap.appendChild(row);
@@ -142,7 +150,10 @@ function renderContinueWatching(videos) {
         .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
         .slice(0, 6);
     if (!unfinished.length) {
-        wrap.innerHTML = '<div class="an-empty">No unfinished videos right now.</div>';
+        const empty = document.createElement('div');
+        empty.className = 'an-empty';
+        empty.textContent = tFeed('feed_analytics_no_unfinished', 'No unfinished videos right now.');
+        wrap.appendChild(empty);
         return;
     }
 
@@ -172,10 +183,10 @@ function renderContinueWatching(videos) {
         info.className = 'an-continue-info';
         const title = document.createElement('div');
         title.className = 'an-continue-title';
-        title.textContent = decodeHtmlEntities(video.title || 'Untitled video');
+        title.textContent = decodeHtmlEntities(feedVideoTitle(video.title));
         const channel = document.createElement('div');
         channel.className = 'an-continue-channel';
-        channel.textContent = decodeHtmlEntities(video.channelName || 'Unknown channel');
+        channel.textContent = decodeHtmlEntities(feedChannelTitle(video.channelName));
         const progress = document.createElement('div');
         progress.className = 'an-progress';
         const fill = document.createElement('span');
@@ -184,7 +195,9 @@ function renderContinueWatching(videos) {
         const meta = document.createElement('div');
         meta.className = 'an-continue-meta';
         const watched = document.createElement('span');
-        watched.textContent = `${percent}% watched`;
+        watched.textContent = tFeed('feed_percent_watched', '$1 watched', [
+            feedFormatNumber(percent / 100, { style: 'percent' })
+        ]);
         const lastSeen = document.createElement('span');
         lastSeen.textContent = relativeTime(Number(video.timestamp || 0));
         meta.appendChild(watched);
@@ -218,12 +231,12 @@ async function renderAnalytics() {
     const playlistCount = Object.keys(playlists || {}).length;
 
     const cards = [
-        ['Total watch time', formatWatchTotal(stats.totalWatchSeconds)],
-        ['Videos watched', videos],
-        ['Shorts watched', shorts],
-        ['Avg. per item', formatWatchTotal(avg)],
-        ['Completion rate', completion + '%'],
-        ['Playlists saved', playlistCount]
+        [tFeed('analytics_total_watch_time', 'Total watch time'), formatWatchTotal(stats.totalWatchSeconds)],
+        [tFeed('analytics_videos_watched', 'Videos watched'), feedFormatNumber(videos)],
+        [tFeed('analytics_shorts_watched', 'Shorts watched'), feedFormatNumber(shorts)],
+        [tFeed('analytics_avg_duration', 'Avg. per item'), formatWatchTotal(avg)],
+        [tFeed('analytics_completion_rate', 'Completion rate'), feedFormatNumber(completion / 100, { style: 'percent' })],
+        [tFeed('analytics_playlists_saved', 'Playlists saved'), feedFormatNumber(playlistCount)]
     ];
     const anCards = document.getElementById('anCards');
     if (anCards) {
@@ -280,4 +293,3 @@ function setActiveNav(id) {
     const el = document.getElementById(id);
     if (el) el.classList.add('active');
 }
-

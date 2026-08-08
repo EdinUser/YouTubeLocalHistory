@@ -10,9 +10,9 @@
         const candidate = /^https?:\/\//i.test(raw) ? raw : (/^(?:www\.)?youtube\.com\//i.test(raw) ? `https://${raw}` : `https://www.youtube.com/${raw.replace(/^\//, '')}`);
         try { url = new URL(candidate); } catch (_) { throw new TypeError('Enter a valid YouTube channel URL, channel ID, or @handle.'); }
         if (!/(^|\.)youtube\.com$/i.test(url.hostname)) throw new TypeError('The channel URL must be on youtube.com.');
-        const channelMatch = url.pathname.match(/^\/channel\/(UC[\w-]+)\/?$/i);
+        const channelMatch = url.pathname.match(/^\/channel\/(UC[\w-]+)(?:\/.*)?$/i);
         if (channelMatch) return { channelId: channelMatch[1] };
-        const handleMatch = url.pathname.match(/^\/(@[\w.-]+)\/?$/);
+        const handleMatch = url.pathname.match(/^\/(@[\w.-]+)(?:\/.*)?$/);
         if (handleMatch) return { handle: handleMatch[1] };
         throw new TypeError('Use a /channel/UC… URL, a UC channel ID, or an @handle URL.');
     }

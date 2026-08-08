@@ -48,7 +48,9 @@ async function runPageActiveFeedWork() {
     if (pageFeedWorkPromise) return pageFeedWorkPromise;
     pageFeedWorkPromise = (async () => {
         const scheduler = ensureSharedFeedScheduler();
-        if (!scheduler) throw new Error('Feed scheduler is unavailable');
+        if (!scheduler) {
+            throw new Error(tFeed('feed_scheduler_unavailable', 'Feed scheduler is unavailable'));
+        }
         const intervalMs = await feedRefreshIntervalMs();
         scheduler.successfulCheckIntervalMs = intervalMs;
         if (!sharedFeedSchedulerStarted) {
@@ -59,7 +61,11 @@ async function runPageActiveFeedWork() {
         const before = await scheduler.getInitializationProgress();
         if (before.pending > 0) {
             activeInitializationProgress = { completed: before.completed, total: before.total };
-            setPageActiveSyncStatus(`Preparing local feed · ${before.completed} / ${before.total} channels`, true);
+            setPageActiveSyncStatus(tFeed(
+                'feed_preparing_progress',
+                'Preparing local feed · $1 / $2 channels',
+                [feedFormatNumber(before.completed), feedFormatNumber(before.total)]
+            ), true);
             const result = await scheduler.runInitialization();
             const after = await scheduler.getInitializationProgress();
             activeInitializationProgress = null;
@@ -69,26 +75,30 @@ async function runPageActiveFeedWork() {
             pendingFeedVideoCount += result.insertedVideoCount;
             if (result.insertedVideoCount) showNewFeedVideos(pendingFeedVideoCount);
             if (settingsActive && typeof setFeedSettingsMessage === 'function') {
-                setFeedSettingsMessage(`Preparing local feed: ${after.completed} of ${after.total} channels scanned; ${after.pending} remaining.`);
+                setFeedSettingsInitializationProgress(after);
             }
             if (after.pending > 0) {
-                setPageActiveSyncStatus(`Preparing local feed · ${after.completed} / ${after.total} channels`, false);
+                setPageActiveSyncStatus(tFeed(
+                    'feed_preparing_progress',
+                    'Preparing local feed · $1 / $2 channels',
+                    [feedFormatNumber(after.completed), feedFormatNumber(after.total)]
+                ), false);
                 schedulePageFeedWork(INITIALIZATION_CONTINUATION_DELAY_MS);
             } else {
-                setPageActiveSyncStatus('Local feed ready', false);
+                setPageActiveSyncStatus(tFeed('feed_local_ready', 'Local feed ready'), false);
                 schedulePageFeedWork(intervalMs);
             }
             return { result, progress: after };
         }
 
-        setPageActiveSyncStatus('Checking for new uploads', true);
+        setPageActiveSyncStatus(tFeed('feed_checking_uploads', 'Checking for new uploads'), true);
         const result = await scheduler.runForeground();
         await loadData();
         pendingFeedVideoCount += result.insertedVideoCount;
         if (result.insertedVideoCount) showNewFeedVideos(pendingFeedVideoCount);
         let dormant = null;
         if (result.total === 0) {
-            setPageActiveSyncStatus('Checking a low-activity channel', true);
+            setPageActiveSyncStatus(tFeed('feed_checking_low_activity', 'Checking a low-activity channel'), true);
             dormant = await scheduler.runDormantMaintenance({ pageActive: true });
         }
         const dormantInserted = Number(dormant && dormant.terminal && dormant.terminal.insertedVideoCount || 0);
@@ -97,7 +107,12 @@ async function runPageActiveFeedWork() {
             pendingFeedVideoCount += dormantInserted;
             showNewFeedVideos(pendingFeedVideoCount);
         }
-        setPageActiveSyncStatus(result.insertedVideoCount || dormantInserted ? 'New uploads found' : 'Up to date', false);
+        setPageActiveSyncStatus(
+            result.insertedVideoCount || dormantInserted
+                ? tFeed('feed_new_uploads_found', 'New uploads found')
+                : tFeed('feed_up_to_date', 'Up to date'),
+            false
+        );
         schedulePageFeedWork(dormant && dormant.ran ? DORMANT_MAINTENANCE_WAKE_DELAY_MS : intervalMs);
         return { result, progress: before };
     })().finally(() => {
@@ -378,7 +393,10 @@ function init() {
         renderHistory();
     });
     document.getElementById('clearHistoryPage')?.addEventListener('click', async () => {
-        if (!confirm('Are you sure you want to clear all local watch history? This cannot be undone.')) return;
+        if (!confirm(tFeed(
+            'feed_confirm_clear_history',
+            'Are you sure you want to clear all local watch history? This cannot be undone.'
+        ))) return;
         const button = document.getElementById('clearHistoryPage');
         button.disabled = true;
         try {
@@ -396,7 +414,10 @@ function init() {
     const saveCurrentFeedSettings = (context) => {
         saveFeedSettings().catch((error) => {
             console.error(`[settings] ${context} save failed`, error);
-            document.getElementById('feedSettingsMessage').textContent = 'Could not save settings.';
+            document.getElementById('feedSettingsMessage').textContent = tFeed(
+                'feed_settings_save_failed',
+                'Could not save settings.'
+            );
         });
     };
     document.getElementById('feedSettingTheme')?.addEventListener('change', (event) => {
@@ -430,7 +451,11 @@ function init() {
         clearSubscriptions.addEventListener('click', async () => {
             const subscriptions = await ytIndexedDBStorage.listSubscriptionRecords();
             if (!subscriptions.length) return;
-            if (!confirm(`Are you sure you want to remove all ${subscriptions.length} local subscriptions?`)) return;
+            if (!confirm(tFeed(
+                'feed_confirm_clear_subscriptions',
+                'Are you sure you want to remove all $1 local subscriptions?',
+                [feedFormatNumber(subscriptions.length)]
+            ))) return;
 
             clearSubscriptions.disabled = true;
             try {
@@ -438,7 +463,7 @@ function init() {
                     await ytIndexedDBStorage.deleteSubscriptionAndSyncState(subscription.channelId);
                 }));
                 await renderSubscriptions();
-                setStatus('All local subscriptions removed.', false);
+                setStatus(tFeed('feed_all_subscriptions_removed', 'All local subscriptions removed.'), false);
             } catch (error) {
                 console.error('[subscriptions] clear failed', error);
             } finally {

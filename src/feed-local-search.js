@@ -21,7 +21,9 @@ function historyToVideo(rec) {
         views: 0,
         duration: Number(rec.duration || durationCache[rec.videoId] || 0),
         isShort: rec.isShort === true || rec.isShorts === true,
-        _whenText: rec.timestamp ? `Watched ${relativeTime(rec.timestamp)}` : '',
+        _whenText: rec.timestamp
+            ? tFeed('feed_watched_relative', 'Watched $1', [relativeTime(rec.timestamp)])
+            : '',
         _historyOnly: true
     };
 }

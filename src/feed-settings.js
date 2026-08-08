@@ -92,7 +92,7 @@ async function saveFeedSettings() {
     await chrome.storage.local.set({ popupAccentColor: color });
     localStorage.setItem('ytvhtThemePreference', settings.themePreference);
     localStorage.setItem('ytvhtAccentColor', color);
-    overlayTitle = 'Viewed';
+    overlayTitle = tFeed('feed_viewed', 'Viewed');
     applyFeedTheme(settings.themePreference);
     applyAccentColor(settings.accentColor);
     notifySettingsChanged(settings);
@@ -138,15 +138,33 @@ function showSettings() {
 
 async function refreshFeedSettingsInitializationProgress() {
     const message = document.getElementById('feedSettingsMessage');
-    if (!message || !/^Preparing local feed/.test(message.textContent || '')) return;
+    if (!message || message.dataset.initializing !== 'true') return;
     try {
         const scheduler = typeof ensureSharedFeedScheduler === 'function' && ensureSharedFeedScheduler();
         if (!scheduler) return;
         const progress = await scheduler.getInitializationProgress();
-        message.textContent = progress.pending > 0
-            ? `Preparing local feed: ${progress.completed} of ${progress.total} channels scanned; ${progress.pending} remaining.`
-            : '';
+        if (progress.pending > 0) {
+            setFeedSettingsInitializationProgress(progress);
+        } else {
+            delete message.dataset.initializing;
+            message.textContent = '';
+        }
     } catch (error) {
         console.warn('[settings] could not refresh initialization progress', error && error.message);
     }
+}
+
+function setFeedSettingsInitializationProgress(progress) {
+    const message = document.getElementById('feedSettingsMessage');
+    if (!message) return;
+    message.dataset.initializing = 'true';
+    message.textContent = tFeed(
+        'feed_initialization_progress',
+        'Preparing local feed: $1 of $2 channels scanned; $3 remaining.',
+        [
+            feedFormatNumber(progress.completed),
+            feedFormatNumber(progress.total),
+            feedFormatNumber(progress.pending)
+        ]
+    );
 }

@@ -165,6 +165,44 @@
                 transition: opacity 0.15s ease-in-out !important;
                 user-select: none !important;
             }
+            .ytvht-playlist-history-toggle {
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 6px !important;
+                min-height: 32px !important;
+                margin: 4px 8px !important;
+                padding: 6px 10px !important;
+                border: 0 !important;
+                border-radius: 16px !important;
+                background: #3ea6ff !important;
+                color: #0f0f0f !important;
+                font-size: 13px !important;
+                font-weight: 600 !important;
+                cursor: pointer !important;
+                vertical-align: middle !important;
+            }
+            .ytvht-playlist-history-row {
+                display: flex !important;
+                width: 100% !important;
+                flex-basis: 100% !important;
+                align-items: center !important;
+                margin-top: 8px !important;
+            }
+            .ytvht-playlist-history-row .ytvht-playlist-history-toggle {
+                margin: 0 !important;
+            }
+            .ytvht-playlist-history-toggle[aria-pressed="true"] {
+                background: #666 !important;
+                color: #fff !important;
+            }
+            .ytvht-playlist-history-toggle:disabled {
+                opacity: .65 !important;
+                cursor: wait !important;
+            }
+            .ytvht-playlist-history-toggle img {
+                width: 16px !important;
+                height: 16px !important;
+            }
             ytd-thumbnail:hover .ytvht-remove-button,
             a#thumbnail:hover .ytvht-remove-button,
             ytd-playlist-video-renderer:hover .ytvht-remove-button,

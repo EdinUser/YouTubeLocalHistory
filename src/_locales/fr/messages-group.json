@@ -1,8 +1,4 @@
 {
-  "message_no_active_tab": {
-    "message": "Aucun onglet actif trouvé.",
-    "description": "Error message when no active tab is found"
-  },
   "message_video_removed": {
     "message": "Vidéo supprimée de l'historique",
     "description": "Success message when a video is removed from history"
@@ -27,22 +23,6 @@
     "message": "Erreur lors de l'exportation de l'historique : $1",
     "description": "Error message when exporting history fails, $1 is the error detail"
   },
-  "message_import_success": {
-    "message": "Historique $1 avec succès : $2 vidéos, $3 playlists",
-    "description": "Success message when history is imported, $1 is mode, $2 is video count, $3 is playlist count"
-  },
-  "message_error_importing_history": {
-    "message": "Erreur lors de l'importation de l'historique : $1",
-    "description": "Error message when importing history fails, $1 is the error detail"
-  },
-  "message_no_data_in_import": {
-    "message": "Aucune donnée trouvée dans le fichier d'importation",
-    "description": "Error message when no data is found in import file"
-  },
-  "message_invalid_file_format": {
-    "message": "Format de fichier invalide : $1",
-    "description": "Error message for invalid import file format, $1 is the detail"
-  },
   "message_confirm_clear_history": {
     "message": "Êtes-vous sûr de vouloir effacer tout l'historique ? Cette action est irréversible.",
     "description": "Confirmation message for clearing all history"
@@ -55,25 +35,9 @@
     "message": "Tout l'historique des vidéos et des playlists a été effacé avec succès",
     "description": "Success message when all history and playlists are cleared"
   },
-  "message_export_completed": {
-    "message": "Exportation terminée avec succès",
-    "description": "Success message when export is completed"
-  },
   "message_failed_to_initialize": {
     "message": "Échec de l'initialisation de l'extension : $1",
     "description": "Error message when extension initialization fails, $1 is the error detail"
-  },
-  "message_error_loading_history": {
-    "message": "Erreur lors du chargement de l'historique : $1",
-    "description": "Error message when loading history fails, $1 is the error detail"
-  },
-  "message_no_playlists_found": {
-    "message": "Aucune playlist trouvée.",
-    "description": "Message when no playlists are found"
-  },
-  "message_error_loading_playlists": {
-    "message": "Erreur lors du chargement des playlists : $1",
-    "description": "Error message when loading playlists fails, $1 is the error detail"
   },
   "message_playlist_removed": {
     "message": "Playlist supprimée",
@@ -110,18 +74,6 @@
   "message_debug_mode_enabled": {
     "message": "Mode débogage activé",
     "description": "Message when debug mode is enabled"
-  },
-  "message_debug_mode_disabled": {
-    "message": "Mode débogage désactivé",
-    "description": "Message when debug mode is disabled"
-  },
-  "settings_convert_history": {
-    "message": "Convertir l’historique YouTube",
-    "description": "Button label to open the community converter tool"
-  },
-  "settings_convert_history_help": {
-    "message": "Ouvre l’outil communautaire pour convertir le watch-history.json de Google Takeout en fichier d’import YT re:Watch.",
-    "description": "Help text for the community converter tool link"
   },
   "message_unknown_error": {
     "message": "Erreur inconnue",
