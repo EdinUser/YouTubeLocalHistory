@@ -1,19 +1,7 @@
 {
-  "extensionName": {
-    "message": "Historique Local YouTube",
-    "description": "The name of the extension"
-  },
   "popup_title": {
     "message": "YT re:Watch",
     "description": "Popup window title and main heading"
-  },
-  "theme_toggle": {
-    "message": "Thème",
-    "description": "Button label for toggling theme"
-  },
-  "theme_toggle_tooltip": {
-    "message": "Changer de thème",
-    "description": "Tooltip for theme toggle button"
   },
   "theme_light": {
     "message": "Clair",
@@ -23,25 +11,9 @@
     "message": "Sombre",
     "description": "Label for dark theme option"
   },
-  "theme_auto": {
-    "message": "Auto",
-    "description": "Label for auto/system theme option"
-  },
-  "theme_switch_to_dark": {
-    "message": "Passer au thème sombre",
-    "description": "Tooltip for switching to dark theme"
-  },
-  "theme_switch_to_light": {
-    "message": "Passer au thème clair",
-    "description": "Tooltip for switching to light theme"
-  },
   "theme_system": {
     "message": "Système par défaut",
     "description": "Label for system default theme option"
-  },
-  "theme_currently_following_system": {
-    "message": "Suit actuellement le thème système - Cliquez pour remplacer",
-    "description": "Tooltip for auto theme option"
   },
   "clear_label": {
     "message": "Effacer",
@@ -54,14 +26,6 @@
   "close_label": {
     "message": "Fermer",
     "description": "Button label for closing the popup"
-  },
-  "sync_status": {
-    "message": "Sync",
-    "description": "Label for sync status indicator"
-  },
-  "sync_status_tooltip": {
-    "message": "État de la synchronisation",
-    "description": "Tooltip for sync status indicator"
   },
   "instructions_script_disabled_title": {
     "message": "Exécution des scripts désactivée",
@@ -135,10 +99,6 @@
     "message": "Inconnu",
     "description": "Label for unknown date"
   },
-  "search_no_videos_found": {
-    "message": "Aucune vidéo ne correspond à votre recherche.",
-    "description": "Message when no videos match the search"
-  },
   "history_no_history_found": {
     "message": "Aucun historique trouvé. Commencez à regarder des vidéos !",
     "description": "Message when no history is found"
@@ -167,24 +127,8 @@
     "message": "La playlist sera suivie",
     "description": "Toast when ignore is disabled"
   },
-  "content_toggle_pause": {
-    "message": "re:Watch — Cliquez pour mettre l'historique en pause",
-    "description": "Button text when tracking is active"
-  },
-  "content_toggle_paused": {
-    "message": "re:Watch — Historique en pause. Cliquez pour activer",
-    "description": "Button text when tracking is paused"
-  },
-  "content_toggle_pause_title": {
-    "message": "re:Watch — Cliquez pour mettre l'historique en pause pour cette playlist",
-    "description": "Tooltip when tracking is active"
-  },
-  "content_toggle_paused_title": {
-    "message": "re:Watch — L'historique est en pause pour cette playlist. Cliquez pour activer",
-    "description": "Tooltip when tracking is paused"
-  },
   "global_search_placeholder": {
     "message": "Rechercher dans tout le contenu...",
     "description": "Placeholder text for the global search input"
   }
-} 
+}

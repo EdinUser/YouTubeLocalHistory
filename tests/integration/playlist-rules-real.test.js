@@ -14,7 +14,7 @@ global.ytStorage.setPlaylist = jest.fn().mockResolvedValue();
 
 require('../../src/content.js');
 
-const { loadSettings, savePlaylistInfo, saveTimestamp } = global.window.__YTVHT_TEST__.core;
+const { loadSettings, savePlaylistInfo, saveTimestamp, ensurePlaylistIgnoreToggles } = global.window.__YTVHT_TEST__.core;
 
 const PLAYLIST_ID = 'PL_TEST_PLAYLIST';
 const VIDEO_ID = 'playlist-video-1';
@@ -78,6 +78,33 @@ describe('playlist save rules (real content.js)', () => {
 
     expect(global.ytStorage.getPlaylist).toHaveBeenCalledWith(PLAYLIST_ID);
     expect(global.ytStorage.setVideo).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['playlist page', `https://www.youtube.com/playlist?list=${PLAYLIST_ID}`, '<ytd-playlist-sidebar-primary-info-renderer hidden><div id="menu"></div></ytd-playlist-sidebar-primary-info-renderer><yt-page-header-view-model><div class="ytFlexibleActionsViewModelActionRow"></div></yt-page-header-view-model>'],
+    ['playlist watch page', `https://www.youtube.com/watch?v=${VIDEO_ID}&list=${PLAYLIST_ID}`, '<ytd-playlist-panel-renderer><div id="header"></div></ytd-playlist-panel-renderer>'],
+  ])('shows and toggles the local playlist history control on a %s', async (_name, url, markup) => {
+    mockWindowLocation(url);
+    document.body.innerHTML = markup;
+    global.ytStorage.getPlaylist.mockResolvedValue({ playlistId: PLAYLIST_ID, ignoreVideos: false });
+
+    await ensurePlaylistIgnoreToggles(0);
+
+    const button = document.querySelector('.ytvht-playlist-history-toggle');
+    expect(button).not.toBeNull();
+    expect(button.closest('[hidden]')).toBeNull();
+    if (url.includes('/playlist')) {
+      expect(button.parentElement.classList.contains('ytvht-playlist-history-row')).toBe(true);
+    }
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    button.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(global.ytStorage.setPlaylist).toHaveBeenCalledWith(PLAYLIST_ID, expect.objectContaining({
+      playlistId: PLAYLIST_ID,
+      ignoreVideos: true,
+    }));
+    expect(button.getAttribute('aria-pressed')).toBe('true');
   });
 
   test('non-ignored playlist saves video progress', async () => {

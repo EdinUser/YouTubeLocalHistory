@@ -1,15 +1,15 @@
 {
     "manifest_version": 3,
     "name": "YT re:Watch",
-    "version": "4.0.3",
-    "description": "YouTube history extension for multiple accounts. Track progress with privacy: visual overlays, account switching, no login required",
+    "version": "5.0.0",
+    "description": "Private local YouTube history, watch progress, subscriptions, playlists, and a local feed. Everything stays in your browser.",
     "author": "Edin User",
     "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
     "permissions": [
         "storage",
         "unlimitedStorage",
-        "activeTab",
-        "scripting"
+        "scripting",
+        "contextMenus"
     ],
     "host_permissions": [
         "*://*.youtube.com/*"
@@ -23,8 +23,18 @@
                 "*://*.youtube.com/*"
             ],
             "js": [
+                "indexeddb-storage.js",
                 "storage.js",
-                "content.js"
+                "local-subscription-actions.js",
+                "content-css.js",
+                "content-url.js",
+                "content-import.js",
+                "content-playlists.js",
+                "content-info.js",
+                "content-thumbnails.js",
+                "content-messages.js",
+                "content.js",
+                "content-subscriptions.js"
             ],
             "run_at": "document_end"
         }
@@ -41,7 +51,7 @@
     ],
     "action": {
         "default_popup": "popup.html",
-        "default_title": "YouTube History"
+        "default_title": "YT re:Watch"
     },
     "icons": {
         "48": "icon48.png",

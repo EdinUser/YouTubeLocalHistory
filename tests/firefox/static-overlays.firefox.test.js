@@ -3,8 +3,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   getStoredVideo,
+  getStoredPlaylist,
+  getLocalSubscription,
   launchFirefoxWithExtension,
   seedStoredVideo: seedExtensionVideo,
+  withFirefoxExtensionPage,
 } = require('./firefox-fixture');
 const { startStaticFixtureServer } = require('./static-fixture-server');
 
@@ -13,6 +16,7 @@ const CAPTURE_DIR = path.join(ROOT_DIR, 'tests', 'fixtures', 'youtube-pages', 'c
 const SAVED_TIME = 45;
 const SAVED_DURATION = 180;
 const TEST_TIMEOUT_MS = 120000;
+const NERDROTIC_CHANNEL_ID = 'UCRCraKP10Q5fSAbCimkizIA';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -113,6 +117,22 @@ async function openFixturePage(driver, url) {
     const marker = await driver.executeScript(() => document.documentElement.dataset.ytlhFixture || '');
     return { ok: !!marker, marker };
   });
+}
+
+async function getPlaylistHistoryToggleState(driver) {
+  return driver.executeScript(() => {
+    const button = document.querySelector('.ytvht-playlist-history-toggle');
+    return {
+      present: Boolean(button),
+      visible: Boolean(button && !button.closest('[hidden]')),
+      separateRow: Boolean(button?.parentElement?.classList.contains('ytvht-playlist-history-row')),
+      pressed: button?.getAttribute('aria-pressed') || '',
+    };
+  });
+}
+
+async function clickPlaylistHistoryToggle(driver) {
+  await driver.executeScript(() => document.querySelector('.ytvht-playlist-history-toggle')?.click());
 }
 
 async function getOverlayState(driver, videoId) {
@@ -346,6 +366,62 @@ async function replacePageWithCapturedHtml(driver, url, html) {
   });
 }
 
+async function getFollowButtonState(driver) {
+  return driver.executeScript(() => {
+    const button = document.querySelector('.ytvht-sub-btn');
+    const nativeControl = button && button.previousElementSibling;
+    return {
+      text: button?.textContent.trim() || '',
+      ariaLabel: button?.getAttribute('aria-label') || '',
+      compact: button?.classList.contains('ytvht-sub-btn-compact') || false,
+      iconSrc: button?.querySelector('.ytvht-sub-btn-icon')?.src || '',
+      isRightOfNative: Boolean(
+        button && nativeControl && button.getBoundingClientRect().left > nativeControl.getBoundingClientRect().left
+      ),
+    };
+  });
+}
+
+async function clickFollowButton(driver) {
+  await driver.executeScript(() => {
+    const button = document.querySelector('.ytvht-sub-btn');
+    if (!button) throw new Error('re:Watch follow companion was not mounted');
+    button.click();
+  });
+}
+
+async function expectFollowIconStableAfterUnrelatedMutations(driver) {
+  await driver.executeScript(() => {
+    window.__ytvhtInitialFollowIcon = document.querySelector('.ytvht-sub-btn-icon');
+    for (let index = 0; index < 30; index += 1) {
+      document.body.append(document.createComment(`unrelated player mutation ${index}`));
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  const state = await driver.executeScript(() => ({
+    count: document.querySelectorAll('.ytvht-sub-btn-icon').length,
+    unchanged: document.querySelector('.ytvht-sub-btn-icon') === window.__ytvhtInitialFollowIcon,
+  }));
+  assert.deepEqual(state, { count: 1, unchanged: true });
+}
+
+async function invokeChannelContextAction(session, channelId) {
+  return withFirefoxExtensionPage(session, async () => {
+    const result = await session.driver.executeAsyncScript((id, done) => {
+      browser.runtime.getBackgroundPage()
+        .then((background) => background.handleChannelContextAction({
+          menuItemId: 'ytvht-toggle-channel-link',
+          linkUrl: `https://www.youtube.com/channel/${id}`,
+        }, { id: 1 }))
+        .then(() => done({ ok: true }))
+        .catch((error) => done({ ok: false, error: error && error.message ? error.message : String(error) }));
+    }, channelId);
+    if (!result || result.ok !== true) {
+      throw new Error(`Firefox channel context action failed: ${result && result.error}`);
+    }
+  });
+}
+
 async function runScenario(name, fn) {
   const timeout = setTimeout(() => {
     console.error(`Firefox static overlay test "${name}" exceeded ${TEST_TIMEOUT_MS}ms`);
@@ -367,13 +443,104 @@ async function main() {
   const playlist = readCapture('controlled-playlist');
   const channel = readCapture('controlled-channel-videos');
   const watch = readOptionalCapture('rick-watch');
+  const channelHeader = readOptionalCapture('controlled-channel-header');
   const server = await startStaticFixtureServer({
     '/playlist': playlist.html,
     '/channel-videos': channel.html,
     ...(watch ? { '/watch': watch.html } : {}),
+    ...(channelHeader ? { '/channel-header': channelHeader.html } : {}),
   });
 
   try {
+    if (channelHeader) {
+      await runScenario('channel follow companion SPA state', async (session) => {
+        await openFixturePage(session.driver, `${server.origin}/channel-header`);
+        await waitUntil('initial follow companion', 20000, async () => {
+          const state = await getFollowButtonState(session.driver);
+          return { ...state, ok: state.text === 'Subscribe with re:Watch' };
+        });
+
+        await clickFollowButton(session.driver);
+        await waitUntil('initial local subscription and label', 20000, async () => {
+          const subscription = await getLocalSubscription(session, NERDROTIC_CHANNEL_ID);
+          const state = await getFollowButtonState(session.driver);
+          return { ...state, subscription, ok: subscription?.channelId === NERDROTIC_CHANNEL_ID && state.text === 'Unfollow re:Watch' };
+        });
+
+        const secondChannelId = 'UC0FirefoxSecondFixture123';
+        const secondHtml = channelHeader.html
+          .replaceAll(NERDROTIC_CHANNEL_ID, secondChannelId)
+          .replaceAll('NerdroticDaily', 'FirefoxSecondFixture')
+          .replaceAll('Nerdrotic Daily', 'Firefox Second Fixture');
+        await replacePageWithCapturedHtml(session.driver, `${server.origin}/second-channel`, secondHtml);
+        await waitUntil('SPA follow companion rebinding', 20000, async () => {
+          const state = await getFollowButtonState(session.driver);
+          return { ...state, ok: state.text === 'Subscribe with re:Watch' && state.isRightOfNative };
+        });
+
+        await clickFollowButton(session.driver);
+        await waitUntil('second local subscription and label', 20000, async () => {
+          const subscription = await getLocalSubscription(session, secondChannelId);
+          const state = await getFollowButtonState(session.driver);
+          return { ...state, subscription, ok: subscription?.channelId === secondChannelId && state.text === 'Unfollow re:Watch' };
+        });
+      });
+    } else {
+      console.log('Firefox static follow companion skipped: Run: npm run fixtures:youtube:download -- --only controlled-channel-header --headless');
+    }
+
+    await runScenario('channel context action persists canonical subscription', async (session) => {
+      const channelId = 'UC0FirefoxContextFixture1234';
+      await invokeChannelContextAction(session, channelId);
+      await waitUntil('context local subscription', 10000, async () => {
+        const subscription = await getLocalSubscription(session, channelId);
+        return { subscription, ok: subscription?.channelId === channelId };
+      });
+    });
+
+    await runScenario('playlist reference detection', async (session) => {
+      const playlistId = 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR';
+      const url = `https://www.youtube.com/playlist?list=${playlistId}`;
+      const [videoId] = extractVideoIdsFromHtml(playlist.html);
+      assert.ok(videoId, 'controlled playlist fixture should contain a watch video');
+      await openFixturePage(session.driver, `${server.origin}/playlist?v=${videoId}&list=${playlistId}`);
+      await sleep(1500);
+      const fixtureUrl = await session.driver.getCurrentUrl();
+      await withFirefoxExtensionPage(session, async () => {
+        const result = await session.driver.executeAsyncScript((fixtureUrl, done) => {
+          browser.runtime.getBackgroundPage().then(async (background) => {
+            const tabs = await background.browser.tabs.query({});
+            const tab = tabs.find((candidate) => candidate.url === fixtureUrl);
+            if (!tab?.id) throw new Error(`controlled playlist tab not found: ${fixtureUrl}`);
+            await background.browser.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: () => {
+                const video = document.querySelector('#movie_player video, video.html5-main-video, video');
+                if (!video) throw new Error('controlled playlist fixture should expose a video element');
+                Object.defineProperty(video, 'duration', { configurable: true, value: 180 });
+                Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: 15 });
+                video.dispatchEvent(new Event('timeupdate'));
+                video.dispatchEvent(new Event('pause'));
+              },
+            });
+            done({ ok: true });
+          }).catch((error) => done({ ok: false, error: error.message }));
+        }, fixtureUrl);
+        assert.equal(result.ok, true, result.error);
+      });
+      const result = await waitUntil('stored playlist reference', 10000, async () => {
+        const record = await getStoredPlaylist(session, playlistId);
+        return { record, ok: Boolean(record) };
+      });
+
+      assert.equal(result.record.playlistId, playlistId);
+      assert.equal(result.record.url, url);
+      assert.equal(result.record.videoId, videoId);
+      assert.ok(result.record.title, 'stored playlist reference should retain its detected title');
+      assert.equal(Object.hasOwn(result.record, 'localItems'), false, 'playlist members must not be imported');
+      assert.equal(Object.hasOwn(result.record, 'videoCount'), false, 'reference detection must not count imported members');
+    });
+
     await runScenario('playlist overlay and remove', async (session) => {
       const [videoId, unsavedVideoId] = extractVideoIdsFromHtml(playlist.html);
       assert.ok(videoId, 'controlled playlist fixture should contain at least one watch video');
@@ -381,6 +548,16 @@ async function main() {
 
       await seedStoredVideo(session, videoId);
       await openFixturePage(session.driver, `${server.origin}/playlist?list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR`);
+
+      await waitUntil('playlist history toggle mounted', 10000, async () => {
+        const state = await getPlaylistHistoryToggleState(session.driver);
+        return { ...state, ok: state.present && state.visible && state.separateRow && state.pressed === 'false' };
+      });
+      await clickPlaylistHistoryToggle(session.driver);
+      await waitUntil('playlist history toggle paused', 10000, async () => {
+        const state = await getPlaylistHistoryToggleState(session.driver);
+        return { ...state, ok: state.pressed === 'true' };
+      });
 
       await expectSavedOverlayVisible(session.driver, videoId);
       await expectNoOverlayVisible(session.driver, unsavedVideoId);
@@ -422,8 +599,7 @@ async function main() {
         const [watchVideoId] = extractVideoIdsFromHtml(watch.html);
         assert.equal(watchVideoId, 'dQw4w9WgXcQ', 'watch fixture should contain the watched video ID');
 
-        await openFixturePage(session.driver, `${server.origin}/watch?v=dQw4w9WgXcQ`);
-
+        await openFixturePage(session.driver, `${server.origin}/watch?v=dQw4w9WgXcQ&list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR`);
         const [recommendationVideoId, unsavedRecommendationId] = await getRenderableVideoIds(session.driver, [
           watchVideoId,
         ]);
@@ -431,7 +607,7 @@ async function main() {
         assert.ok(unsavedRecommendationId, 'watch fixture should contain a second recommendation video');
 
         await seedStoredVideo(session, recommendationVideoId, { time: 60, duration: 200 });
-        await openFixturePage(session.driver, `${server.origin}/watch?v=dQw4w9WgXcQ`);
+        await openFixturePage(session.driver, `${server.origin}/watch?v=dQw4w9WgXcQ&list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR`);
 
         await expectSavedOverlayVisible(session.driver, recommendationVideoId, '30%', 'watch recommendation overlay visible');
         await expectNoOverlayVisible(session.driver, unsavedRecommendationId);
@@ -439,6 +615,14 @@ async function main() {
         await forceOverlayReprocess(session.driver);
         await expectNoDuplicateOverlays(session.driver, recommendationVideoId);
         await expectNoOverlayVisible(session.driver, unsavedRecommendationId);
+        await waitUntil('watch follow companion', 20000, async () => {
+          const state = await getFollowButtonState(session.driver);
+          return {
+            ...state,
+            ok: state.ariaLabel === 'Subscribe with re:Watch' && state.compact && state.isRightOfNative && state.iconSrc.startsWith('moz-extension://'),
+          };
+        });
+        await expectFollowIconStableAfterUnrelatedMutations(session.driver);
       });
     } else {
       console.log(

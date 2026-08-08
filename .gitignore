@@ -1,8 +1,8 @@
 # Build outputs
 build/
 dist/
-# Ignore helper/build artifacts; keep maintainer audit doc tracked
-helpers/**
+site/
+helpers/
 *.zip
 *.xpi
 
@@ -12,16 +12,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Playwright saved browser state (may contain cookies — never commit)
-yt-storage.json
-
 # Test outputs
 coverage/
 .nyc_output/
 test-results/
 playwright-report/
 playwright/.cache/
+yt-storage.json
 tests/fixtures/youtube-pages/captures/
+tests/fixtures/feed/live/
 
 # IDE and editor files
 .vscode/

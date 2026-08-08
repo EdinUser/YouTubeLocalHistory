@@ -454,9 +454,10 @@ await ytStorage.getAllVideos(); // Returns merged view
 ## 🛠️ Development Setup
 
 ### Prerequisites
-- Node.js 14+
-- NPM or Yarn
+- Node.js 18+
+- npm
 - Chrome/Firefox for testing
+- Git Bash, WSL, or another Bash-compatible shell for `build.sh`
 
 ### Local Development
 
@@ -468,11 +469,10 @@ cd YouTubeLocalHistory
 # Install dependencies
 npm install
 
-# Build extension
-./build.sh
+# Recommended Firefox temporary build
+npm run prepare:firefox
 
-# Built extensions will be in dist/
-# Load dist/chrome or dist/firefox in browser
+# Load build/firefox/manifest.json as a temporary Firefox add-on
 ```
 
 ### Testing
@@ -480,6 +480,12 @@ npm install
 ```bash
 # Run all tests
 npm test
+
+# Recommended PR checks
+npm run lint
+npm test -- --runInBand
+npm run prepare:firefox
+npx web-ext lint --source-dir=build/firefox
 
 # Run specific test suites
 npm run test:unit
@@ -494,11 +500,7 @@ npm run test:coverage
 
 ```bash
 # Build both Chrome and Firefox versions
-./build.sh
-
-# Build specific browser
-./build.sh chrome
-./build.sh firefox
+npm run build
 ```
 
 ---
@@ -570,8 +572,9 @@ console.log('[ythdb-content]', 'Content message', data);
 
 ### Data Protection
 - All data stored locally using secure browser APIs
-- No external server communication
-- Encryption at rest via browser storage
+- No extension-owned backend or upload of locally saved history
+- Browser-profile and operating-system access controls protect local storage;
+  the extension does not add application-level encryption
 - No sensitive data in console logs (production)
 
 ### ⚠️ Privacy Scope and Limitations
@@ -579,7 +582,7 @@ console.log('[ythdb-content]', 'Content message', data);
 **What YT re:Watch Does:**
 - Intercepts and stores video progress data locally
 - Replaces YouTube's history tracking with local storage
-- Prevents YouTube from knowing your viewing progress/completion
+- Keeps the extension's saved progress separate from YouTube account history
 - Operates independently of YouTube's account system
 - **Provides account-agnostic tracking** - same history regardless of YouTube login state
 
@@ -601,6 +604,20 @@ This extension only handles the **application-level history data**. Google/YouTu
 - Cookie-based tracking
 - IP-based geolocation
 
+**Extension network contract:**
+- Feed synchronization requests public channel RSS from `www.youtube.com`.
+- Resolving an `@handle` and refreshing channel presentation metadata may read
+  public YouTube channel pages.
+- These direct extension requests omit browser credentials.
+- Feed search reads only local history and cached feed records. Playlist
+  references and imports do not trigger remote search or background playlist
+  hydration.
+- Extension pages may load thumbnails, avatars, and banners from YouTube-owned
+  image hosts when those images are displayed.
+- Normal YouTube page, playback, cookie, analytics, and advertising traffic is
+  outside the extension's local-storage boundary and remains visible to
+  YouTube.
+
 **For developers:** YT re:Watch is a **history replacement tool**, not a comprehensive privacy solution. Users need additional tools (VPN, ad blockers, privacy browsers) for broader privacy protection.
 
 ### Content Security Policy
@@ -615,8 +632,15 @@ This extension only handles the **application-level history data**. Google/YouTu
 ### Permissions
 - Minimal required permissions
 - `storage` for local data storage
-- `tabs` for cross-tab communication
-- `activeTab` for YouTube page access
+- `unlimitedStorage` for large local history and IndexedDB datasets
+- `contextMenus` for the local Watch Later and Subscribe/Unfollow actions
+- `scripting` for context-menu metadata extraction on YouTube pages
+- YouTube host access for content scripts, public RSS, and explicitly requested
+  channel metadata or handle resolution
+
+The extension does not request the `cookies` or `activeTab` permissions and
+does not request access to `youtubei.googleapis.com`. Public feed and channel
+metadata requests omit browser credentials.
 
 ---
 

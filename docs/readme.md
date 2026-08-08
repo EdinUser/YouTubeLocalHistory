@@ -14,7 +14,8 @@ Welcome! Find the right guide for you:
 **[→ Start Here: Quick Setup Guide](./index.md)**
 - Same history across ALL YouTube accounts
 - Get the extension working in 5 minutes  
-- YouTube history privacy from Google tracking
+- Local history, subscriptions, playlists, and feed basics
+- What local storage protects, and what normal YouTube browsing still exposes
 
 ### ❓ **Have Questions?**
 **[→ Frequently Asked Questions](./faq.md)**
@@ -59,4 +60,4 @@ Welcome! Find the right guide for you:
 
 ## Multilanguage Support
 
-This extension is available in several languages. See the main [README](../README.md) and [technical.md](./technical.md) for details on translation and contributing improvements. 
+This extension is available in several languages. See the [documentation home](./index.md) and [technical guide](./technical.md) for details on translation and contributing improvements.

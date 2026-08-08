@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    // Browser detection and cross-browser storage wrapper - safer approach
+    // Cross-browser wrapper for storage calls made directly from the content script.
     const isFirefox = (function() {
         try {
             return typeof browser !== 'undefined' && typeof chrome !== 'undefined' && browser !== chrome;
@@ -20,7 +20,7 @@
                     return new Promise((resolve, reject) => {
                         chrome.storage.local.get(keys, (result) => {
                             if (chrome.runtime.lastError) {
-                                // Handle extension context invalidated error
+                                // YouTube tabs can outlive a reloaded extension context.
                                 if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
                                     log('[STORAGE] Extension context invalidated during get operation, returning empty result');
                                     resolve({});
@@ -50,7 +50,7 @@
                     return new Promise((resolve, reject) => {
                         chrome.storage.local.set(data, () => {
                             if (chrome.runtime.lastError) {
-                                // Handle extension context invalidated error
+                                // YouTube tabs can outlive a reloaded extension context.
                                 if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
                                     log('[STORAGE] Extension context invalidated during set operation, ignoring');
                                     resolve();
@@ -76,25 +76,30 @@
     const DB_NAME = 'YouTubeHistoryDB';
     const DB_VERSION = 3;
     const STORE_NAME = 'videoHistory';
-    const EXTENSION_VERSION = chrome.runtime.getManifest().version; // Get version from manifest
-    const SAVE_INTERVAL = 5000; // Save every 5 seconds
+    const EXTENSION_VERSION = chrome.runtime.getManifest().version;
+    const SAVE_INTERVAL = 5000;
 
     const DEFAULT_SETTINGS = {
-        autoCleanPeriod: 90, // days
+        autoCleanPeriod: 'forever',
         paginationCount: 10,
         overlayTitle: 'viewed',
+        accentColor: 'blue',
         overlayColor: 'blue',
         overlayLabelSize: 'medium',
-        debug: false, // Add debug setting
+        debug: false,
         pauseHistoryInPlaylists: false,
-        version: EXTENSION_VERSION // Add version to settings
+        localFeedEnabled: true,
+        hideAccountUI: false,
+        hideRecommendations: true,
+        feedRefreshMinutes: 60,
+        version: EXTENSION_VERSION
     };
     const OVERLAY_COLORS = {
-        blue: '#4285f4',
-        red: '#ea4335',
-        green: '#34a853',
-        purple: '#9c27b0',
-        orange: '#ff9800'
+        blue: '#3ea6ff',
+        red: '#ff4e45',
+        green: '#2ecc71',
+        purple: '#a970ff',
+        orange: '#ff9f2f'
     };
     const OVERLAY_LABEL_SIZE_MAP = {
         small: { fontSize: 12, bar: 2 },
@@ -114,6 +119,11 @@
     // Track event listeners for cleanup
     const videoEventListeners = new WeakMap();
 
+    function getAccentOverlayColor(settings = currentSettings) {
+        const colorName = settings?.accentColor || settings?.overlayColor || 'blue';
+        return OVERLAY_COLORS[colorName] || OVERLAY_COLORS.blue;
+    }
+
     // Track MutationObservers for cleanup
     const videoObservers = new WeakMap();
 
@@ -127,67 +137,129 @@
     let playlistNavigationCheckInterval = null;
     let historyApiTimeout = null;
 
-    // Track thumbnail processing state
+    // Batches thumbnail overlay work when many YouTube cards load at once.
     let isProcessingThumbnails = false;
     let thumbnailProcessingQueue = new Set();
     let processingTimeout = null;
 
-    // Track YouTube's content loading state
+    // Tracks batches of newly inserted YouTube content during SPA rendering.
     let contentLoadingBatch = new Set();
     let batchProcessingTimeout = null;
 
-    // Track pending operations
-    const pendingOperations = new Map(); // Map<Element, {timeout: number, rafId: number}>
+    // Debounces thumbnail overlay retries keyed by the YouTube card element.
+    const pendingOperations = new Map();
+    const ENABLE_NATIVE_THUMBNAIL_OVERLAYS = true;
+    let processExistingThumbnails = null;
 
-    // Track the last processed video ID to handle SPA navigation
+    // Last video handled by the tracker; prevents duplicate SPA setup.
     let lastProcessedVideoId = null;
 
-    // Track the last time SPA navigation occurred
+    // Keep the outgoing Short's identity and progress when YouTube changes the
+    // SPA route before the previous media element emits its final save event.
+    let latestShortsSnapshot = null;
+
+    // Used to decide whether a timestamp restore belongs to a fresh navigation.
     let lastSpaNavigationTime = 0;
 
-    // Track current URL for navigation detection
+    // Keep an in-flight restore across media and <video> element replacement
+    // while the watch URL still identifies the same YouTube video.
+    let pendingRestoreAfterMediaChange = null;
+    const RESTORE_MEDIA_SETTLE_MS = 500;
+
+    // Fallback for route changes YouTube does not report through events.
     let lastUrl = window.location.href;
 
-    // DRY-RUN LOGGING: Event-driven content change detection
-    let simulatedLastContentChangeTime = 0;
+    function videosWithinNode(node) {
+        if (!node || node.nodeType !== Node.ELEMENT_NODE) return [];
+        return [
+            ...(node.tagName === 'VIDEO' ? [node] : []),
+            ...node.querySelectorAll('video')
+        ];
+    }
 
-    // Track video changes in YouTube's SPA
-    let videoObserver = new MutationObserver((mutations) => {
+    function getPrimaryVideo() {
+        if (typeof document === 'undefined') return null;
+        const pathname = window.location?.pathname || '';
+
+        if (pathname.startsWith('/shorts/')) {
+            const shortsVideos = [...document.querySelectorAll('ytd-reel-video-renderer video')]
+                .filter(video => video.isConnected);
+            const isVisible = (video) => {
+                const rect = video.getBoundingClientRect?.();
+                return !!rect && rect.width > 0 && rect.height > 0;
+            };
+            const activeShort = shortsVideos.find(video => isVisible(video) && !video.paused && video.readyState >= 1)
+                || shortsVideos.find(video => isVisible(video) && video.readyState >= 1)
+                || shortsVideos.find(video => !video.paused && video.readyState >= 1);
+            if (activeShort) return activeShort;
+        }
+
+        const selectors = pathname.startsWith('/shorts/')
+            ? [
+                'ytd-reel-video-renderer[is-active] video',
+                'ytd-reel-video-renderer[active] video',
+                'video.html5-main-video'
+            ]
+            : [
+                '#movie_player video.html5-main-video',
+                '#movie_player video',
+                'ytd-player video.html5-main-video',
+                'video.html5-main-video'
+            ];
+
+        for (const selector of selectors) {
+            const candidate = document.querySelector(selector);
+            if (candidate?.isConnected) return candidate;
+        }
+
+        const connectedVideos = [...document.querySelectorAll('video')]
+            .filter(video => video.isConnected);
+        return connectedVideos.find(video => video.readyState >= 1) || connectedVideos[0] || null;
+    }
+
+    function isPrimaryVideo(video) {
+        return !!video && video.isConnected && getPrimaryVideo() === video;
+    }
+
+    function isYouTubeAdPlaying(video) {
+        const player = video?.closest?.('#movie_player') || document.querySelector('#movie_player');
+        return !!player && (
+            player.classList.contains('ad-showing')
+            || player.classList.contains('ad-interrupting')
+        );
+    }
+
+    // YouTube frequently reparents the same player. MutationObserver reports
+    // that as a removal plus an addition, but the element is connected again by
+    // the time this callback runs. Preserve its listeners and closure state.
+    function handleVideoMutations(mutations) {
+        const addedVideos = new Set();
+        const removedVideos = new Set();
+
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    // Check if this node is a video or contains a video
-                    const videos = [
-                        ...(node.tagName === 'VIDEO' ? [node] : []),
-                        ...node.querySelectorAll('video')
-                    ];
-
-                    videos.forEach(video => {
-                        if (!trackedVideos.has(video)) {
-                            log('[Debug] Found new video element to track');
-                            setupVideoTracking(video);
-                        }
-                    });
-                }
+                videosWithinNode(node).forEach(video => addedVideos.add(video));
             });
-
-            // Handle removed videos
             mutation.removedNodes.forEach((node) => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const videos = [
-                        ...(node.tagName === 'VIDEO' ? [node] : []),
-                        ...node.querySelectorAll('video')
-                    ];
-
-                    videos.forEach(video => {
-                        if (trackedVideos.has(video)) {
-                            cleanupVideoListeners(video);
-                        }
-                    });
-                }
+                videosWithinNode(node).forEach(video => removedVideos.add(video));
             });
         });
-    });
+
+        removedVideos.forEach((video) => {
+            if (!video.isConnected && trackedVideos.has(video)) {
+                cleanupVideoListeners(video);
+            }
+        });
+
+        const primaryVideo = getPrimaryVideo();
+        if (primaryVideo && addedVideos.has(primaryVideo) && !trackedVideos.has(primaryVideo)) {
+            log('[Debug] Found new primary video element to track');
+            setupVideoTracking(primaryVideo);
+        }
+    }
+
+    // YouTube often reuses the document and swaps video elements in-place.
+    let videoObserver = new MutationObserver(handleVideoMutations);
 
     function log(message, data) {
         if (currentSettings.debug) {
@@ -195,7 +267,98 @@
         }
     }
 
+    const RESTORE_TRACE_STORAGE_KEY = '__ytvht_e2e_restore_trace';
+    const restoreTraceEntries = [];
+    const restoreTraceVideoIds = new WeakMap();
+    let nextRestoreTraceVideoId = 1;
+
+    function getRestoreVideoTraceDetails(video) {
+        if (!video) return {};
+        if (!restoreTraceVideoIds.has(video)) {
+            restoreTraceVideoIds.set(video, nextRestoreTraceVideoId++);
+        }
+        return {
+            trackerId: restoreTraceVideoIds.get(video),
+            connected: video.isConnected,
+            primary: isPrimaryVideo(video),
+            className: video.className || '',
+            parentId: video.parentElement?.id || ''
+        };
+    }
+
+    function isRestoreTraceActive() {
+        try {
+            return window.location.hash.includes('ytvht_e2e_restore_trace');
+        } catch (_) {
+            return false;
+        }
+    }
+
+    // Only Firefox's diagnostic test adds this query parameter. Persist the
+    // trace in extension storage because YouTube can replace its document
+    // shell, which would discard a DOM-backed trace.
+    function traceRestore(event, details = {}) {
+        if (!isRestoreTraceActive()) return;
+
+        restoreTraceEntries.push({
+            at: Date.now(),
+            event,
+            videoId: new URL(window.location.href).searchParams.get('v') || '',
+            ...details
+        });
+        try {
+            const write = chrome.storage.local.set({
+                [RESTORE_TRACE_STORAGE_KEY]: restoreTraceEntries.slice(-100)
+            });
+            if (write && typeof write.catch === 'function') write.catch(() => {});
+        } catch (_) {
+            // Trace persistence must never affect content-script initialization.
+        }
+    }
+
+    traceRestore('content-script-loaded', { url: window.location.href });
     log('YouTube Video History Tracker script is running.');
+
+    function startNativeThumbnailOverlays() {
+        if (!ENABLE_NATIVE_THUMBNAIL_OVERLAYS) {
+            clearNativeThumbnailOverlayArtifacts();
+            return;
+        }
+        if (!ENABLE_NATIVE_THUMBNAIL_OVERLAYS || !document.body || !thumbnailObserver || !processExistingThumbnails) {
+            return;
+        }
+
+        try {
+            thumbnailObserver.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src', 'href', 'data-visibility-tracking']
+            });
+        } catch (error) {
+            log('[Overlay] Thumbnail observer already active or failed to start', error);
+        }
+
+        processExistingThumbnails();
+        setTimeout(processExistingThumbnails, 2000);
+    }
+
+    function clearNativeThumbnailOverlayArtifacts() {
+        document.querySelectorAll('.ytvht-viewed-label, .ytvht-progress-mask, .ytvht-progress-bar, .ytvht-native-progress-line, .ytvht-remove-button')
+            .forEach((node) => node.remove());
+        document.querySelectorAll('.ytvht-has-overlay, .ytvht-native-page-overlay, .ytvht-native-overlay-target, [data-ytvht-video-id], [data-ytvht-label]')
+            .forEach((node) => {
+                node.classList.remove('ytvht-has-overlay', 'ytvht-native-page-overlay', 'ytvht-native-overlay-target', 'ytvht-native-overlay-no-progress');
+                if (node.dataset?.ytvhtVideoId) delete node.dataset.ytvhtVideoId;
+                if (node.dataset?.ytvhtLabel) delete node.dataset.ytvhtLabel;
+                node.style?.removeProperty('--ytvht-overlay-color');
+                node.style?.removeProperty('--ytvht-label-font-size');
+                node.style?.removeProperty('--ytvht-label-padding');
+                node.style?.removeProperty('--ytvht-progress-height');
+                node.style?.removeProperty('--ytvht-progress-width');
+            });
+        document.documentElement.removeAttribute('ytvht-native-badge-only');
+    }
 
     // Enhanced cleanup function
     function cleanup() {
@@ -260,6 +423,7 @@
 
         // Reset state variables
         isInitialized = false;
+        latestShortsSnapshot = null;
         initRetryCount = 0;
         isProcessingThumbnails = false;
         thumbnailProcessingQueue.clear();
@@ -302,7 +466,7 @@
         log('Cleaned up event listeners and observers for video:', video);
     }
 
-    // Helper function to add tracked event listeners
+    // Register listeners so cleanup can detach them on page unload/reuse.
     function addTrackedEventListener(video, event, handler) {
         if (!videoEventListeners.has(video)) {
             videoEventListeners.set(video, []);
@@ -311,7 +475,7 @@
         video.addEventListener(event, handler);
     }
 
-    // Helper function to add tracked observers
+    // Keep per-video observers together with the video they belong to.
     function addTrackedObserver(video, observer) {
         if (!videoObservers.has(video)) {
             videoObservers.set(video, []);
@@ -322,479 +486,29 @@
     // Use 'pagehide' for reliable cleanup on page unload
     window.addEventListener('pagehide', cleanup);
 
-    // Inject CSS to avoid CSP issues with inline styles
-    function injectCSS() {
-        if (document.getElementById('ytvht-styles')) return; // Already injected
+    const { injectCSS, updateOverlayCSS } = window.YTVHTContentCss;
 
-        const style = document.createElement('style');
-        style.id = 'ytvht-styles';
-        style.textContent = `
-            .ytvht-viewed-label {
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                padding: 8px 4px !important;
-                background-color: #4285f4 !important;
-                color: #fff !important;
-                font-size: 16px !important;
-                font-weight: bold !important;
-                z-index: 9999 !important;
-                border-radius: 0 0 4px 0 !important;
-                pointer-events: none !important;
-            }
-            .ytvht-progress-bar {
-                position: absolute !important;
-                bottom: 0 !important;
-                left: 0 !important;
-                height: 3px !important;
-                background-color: #4285f4 !important;
-                z-index: 9999 !important;
-                pointer-events: none !important;
-            }
-            .ytvht-remove-button {
-                position: absolute !important;
-                bottom: 10px !important;
-                right: 10px !important;
-                width: 26px !important;
-                height: 26px !important;
-                line-height: 26px !important;
-                text-align: center !important;
-                font-size: 18px !important;
-                font-weight: 700 !important;
-                color: #fff !important;
-                background: #4285f4 !important;
-                border: none !important;
-                border-radius: 50% !important;
-                cursor: pointer !important;
-                z-index: 10000 !important;
-                pointer-events: auto !important;
-                opacity: 0 !important;
-                transition: opacity 0.15s ease-in-out !important;
-                user-select: none !important;
-            }
-            ytd-thumbnail:hover .ytvht-remove-button,
-            a#thumbnail:hover .ytvht-remove-button,
-            ytd-playlist-video-renderer:hover .ytvht-remove-button,
-            ytd-playlist-panel-video-renderer:hover .ytvht-remove-button,
-            yt-lockup-view-model:hover .ytvht-remove-button,
-            ytd-video-renderer:hover .ytvht-remove-button,
-            ytd-rich-item-renderer:hover .ytvht-remove-button,
-            ytd-grid-video-renderer:hover .ytvht-remove-button {
-                opacity: 0.95 !important;
-            }
-            .ytvht-info {
-                position: absolute !important;
-                top: -120px !important;
-                right: 0 !important;
-                background: var(--yt-spec-brand-background-primary, #0f0f0f) !important;
-                border: 1px solid var(--yt-spec-text-secondary, #aaa) !important;
-                border-radius: 8px !important;
-                padding: 12px !important;
-                width: 300px !important;
-                z-index: 9999 !important;
-                color: var(--yt-spec-text-primary, #fff) !important;
-                font-size: 14px !important;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
-            }
-            .ytvht-info-content {
-                display: flex !important;
-                align-items: start !important;
-                gap: 12px !important;
-            }
-            .ytvht-info-text {
-                flex-grow: 1 !important;
-            }
-            .ytvht-info-title {
-                font-weight: 500 !important;
-                margin-bottom: 8px !important;
-                color: #fff !important;
-            }
-            .ytvht-info-description {
-                color: #aaa !important;
-                line-height: 1.4 !important;
-            }
-            .ytvht-info-highlight {
-                color: #fff !important;
-                background: rgba(255,255,255,0.1) !important;
-                padding: 2px 6px !important;
-                border-radius: 4px !important;
-            }
-            .ytvht-close {
-                background: none !important;
-                border: none !important;
-                padding: 4px 8px !important;
-                cursor: pointer !important;
-                color: #aaa !important;
-                font-size: 20px !important;
-                opacity: 0.8 !important;
-                transition: opacity 0.2s !important;
-            }
-            .ytvht-close:hover {
-                opacity: 1 !important;
-            }
-            .ytvht-ignore-toggle {
-                position: absolute !important;
-                top: 8px !important;
-                right: 8px !important;
-                background: #4285f4 !important;
-                color: #fff !important;
-                border: none !important;
-                border-radius: 14px !important;
-                font-size: 12px !important;
-                line-height: 1 !important;
-                padding: 6px 10px !important;
-                cursor: pointer !important;
-                z-index: 10001 !important;
-                opacity: 0.9 !important;
-            }
-            .ytvht-ignore-toggle[aria-pressed="true"] {
-                background: #666 !important;
-            }
-            .ytvht-ignore-row {
-                margin-top: 8px !important;
-            }
-            .ytvht-ignore-toggle.header {
-                position: static !important;
-                display: inline-flex !important;
-            }
-            .ytvht-ignore-toggle.action {
-                position: static !important;
-                display: inline-flex !important;
-                margin-left: 8px !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
+    const {
+        getVideoId,
+        getCleanVideoUrl,
+        interceptVideoLinkClicks
+    } = window.YTVHTContentUrls.create({
+        log,
+        getStorage: () => ytStorage
+    });
 
-    // Update overlay CSS with current settings to avoid inline styles
-    function updateOverlayCSS(size, color) {
-        let styleElement = document.getElementById('ytvht-dynamic-styles');
-        if (!styleElement) {
-            styleElement = document.createElement('style');
-            styleElement.id = 'ytvht-dynamic-styles';
-            document.head.appendChild(styleElement);
+    const {
+        savePlaylistInfo,
+        tryToSavePlaylist,
+        ensurePlaylistIgnoreToggles
+    } = window.YTVHTContentPlaylists.create({
+        log,
+        getStorage: () => ytStorage,
+        getPlaylistRetryTimeout: () => playlistRetryTimeout,
+        setPlaylistRetryTimeout: (timeoutId) => {
+            playlistRetryTimeout = timeoutId;
         }
-
-        styleElement.textContent = `
-            .ytvht-viewed-label {
-                padding: ${size.fontSize / 2}px 4px !important;
-                background-color: ${color} !important;
-                font-size: ${size.fontSize}px !important;
-            }
-            .ytvht-progress-bar {
-                height: ${size.bar}px !important;
-                background-color: ${color} !important;
-            }
-            .ytvht-remove-button {
-                background: ${color} !important;
-            }
-            .ytvht-ignore-toggle {
-                background: ${color} !important;
-            }
-        `;
-    }
-
-    // Extract video ID from any YouTube URL format
-    function getVideoId() {
-        const url = window.location.href;
-
-        // Try to get from URL parameters first
-        const urlParams = new URLSearchParams(window.location.search);
-        const videoId = urlParams.get('v');
-        if (videoId) return videoId;
-
-        // Try to match various URL patterns
-        const patterns = [
-            /(?:youtube\.com\/watch\/([^\/\?]+))/i,  // youtube.com/watch/VIDEO_ID
-            /(?:youtube\.com\/embed\/([^\/\?]+))/i,  // youtube.com/embed/VIDEO_ID
-            /(?:youtube\.com\/v\/([^\/\?]+))/i,      // youtube.com/v/VIDEO_ID
-            /(?:youtu\.be\/([^\/\?]+))/i,            // youtu.be/VIDEO_ID
-            /(?:youtube\.com\/shorts\/([^\/\?]+))/i  // youtube.com/shorts/VIDEO_ID
-        ];
-
-        for (const pattern of patterns) {
-            const match = url.match(pattern);
-            if (match && match[1]) {
-                return match[1];
-            }
-        }
-
-        // If no pattern matches, try the last path segment
-        const pathSegments = window.location.pathname.split('/').filter(Boolean);
-        if (pathSegments.length > 0) {
-            const lastSegment = pathSegments[pathSegments.length - 1];
-            // Only return if it looks like a video ID (typically 11 characters)
-            if (/^[a-zA-Z0-9_-]{11}$/.test(lastSegment)) {
-                return lastSegment;
-            }
-        }
-
-        log('Could not extract video ID from URL:', url);
-        return null;
-    }
-
-    // Get clean video URL without any parameters
-    function getCleanVideoUrl() {
-        const videoId = getVideoId();
-        if (!videoId) return null;
-        return `https://www.youtube.com/watch?v=${videoId}`;
-    }
-
-    /**
-     * Clean YouTube URL by removing timestamp and other parameters
-     * @param {string} url - YouTube URL
-     * @returns {string} Clean URL with only video ID
-     */
-    function cleanVideoUrl(url) {
-        if (!url) return url;
-        
-        // Handle relative URLs by making them absolute
-        let absoluteUrl = url;
-        if (url.startsWith('/')) {
-            absoluteUrl = 'https://www.youtube.com' + url;
-        } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
-            // If it's not absolute and not relative, assume it's a YouTube URL
-            if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                absoluteUrl = 'https://' + url.replace(/^https?:\/\//, '');
-            } else {
-                // Can't parse, return as-is
-                return url;
-            }
-        }
-        
-        try {
-            const urlObj = new URL(absoluteUrl);
-            const videoId = urlObj.searchParams.get('v') || 
-                           (urlObj.pathname.includes('/shorts/') ? urlObj.pathname.split('/shorts/')[1]?.split('/')[0] : null);
-            
-            if (!videoId) return url; // Return original if we can't extract video ID
-            
-            // Return clean URL
-            if (urlObj.pathname.includes('/shorts/')) {
-                return `https://www.youtube.com/shorts/${videoId}`;
-            } else {
-                return `https://www.youtube.com/watch?v=${videoId}`;
-            }
-        } catch (e) {
-            // If URL parsing fails, try to extract video ID manually
-            const videoIdMatch = absoluteUrl.match(/[?&]v=([^&]+)/) || absoluteUrl.match(/\/shorts\/([^\/\?]+)/);
-            if (videoIdMatch) {
-                const videoId = videoIdMatch[1];
-                if (absoluteUrl.includes('/shorts/')) {
-                    return `https://www.youtube.com/shorts/${videoId}`;
-                } else {
-                    return `https://www.youtube.com/watch?v=${videoId}`;
-                }
-            }
-            // If all else fails, return original URL
-            return url;
-        }
-    }
-
-    /**
-     * Add timestamp parameter to YouTube URL
-     * @param {string} url - YouTube URL
-     * @param {number} timeSeconds - Time in seconds
-     * @returns {string} URL with timestamp parameter
-     */
-    function addTimestampToUrl(url, timeSeconds) {
-        if (!url || !timeSeconds || timeSeconds <= 0) return url;
-        
-        try {
-            // First clean the URL to remove any existing timestamp
-            const cleanUrl = cleanVideoUrl(url);
-            
-            // If cleaning failed or returned original, use original URL
-            const urlToUse = cleanUrl || url;
-            
-            try {
-                const urlObj = new URL(urlToUse);
-                // Add 't' parameter (YouTube accepts both 't=123' and 't=123s')
-                urlObj.searchParams.set('t', Math.floor(timeSeconds) + 's');
-                return urlObj.toString();
-            } catch (e) {
-                // If URL parsing fails, try simple string manipulation
-                if (urlToUse.includes('watch?v=') || urlToUse.includes('/shorts/')) {
-                    const separator = urlToUse.includes('?') ? '&' : '?';
-                    return `${urlToUse}${separator}t=${Math.floor(timeSeconds)}s`;
-                }
-                return urlToUse;
-            }
-        } catch (error) {
-            // If anything fails, return original URL without timestamp
-            log(`[Content] Failed to add timestamp to URL: ${error} (${url})`);
-            return url;
-        }
-    }
-
-    /**
-     * Add timestamp to a video link if we have saved progress
-     */
-    async function addTimestampToLink(anchor) {
-        const href = anchor.getAttribute('href');
-        if (!href) return;
-
-        log(`[Link Intercept] Processing anchor with href: ${href}`);
-
-        // Extract video ID from URL
-        let videoId = null;
-        if (href.includes('watch?v=')) {
-            const match = href.match(/[?&]v=([^&]+)/);
-            videoId = match ? match[1] : null;
-        } else if (href.includes('/shorts/')) {
-            const match = href.match(/\/shorts\/([^\/\?]+)/);
-            videoId = match ? match[1] : null;
-        }
-
-        if (!videoId) {
-            log(`[Link Intercept] No video ID found in href: ${href}`);
-            return;
-        }
-
-        log(`[Link Intercept] Found video ID: ${videoId}`);
-
-        // Check if we have saved progress for this video
-        try {
-            const record = await ytStorage.getVideo(videoId);
-            log(`[Link Intercept] Retrieved record for ${videoId}:`, record);
-
-            if (record && record.time && record.time > 0) {
-                // Modify the href to include timestamp
-                const newUrl = addTimestampToUrl(href, record.time);
-                log(`[Link Intercept] Original URL: ${href}`);
-                log(`[Link Intercept] Modified URL: ${newUrl}`);
-
-                if (newUrl !== href) {
-                    anchor.setAttribute('href', newUrl);
-                    log(`[Link Intercept] ✅ Added timestamp ${record.time}s to video ${videoId}`);
-                } else {
-                    log(`[Link Intercept] URL unchanged, timestamp not added`);
-                }
-            } else {
-                log(`[Link Intercept] No saved progress found for video ${videoId}`);
-            }
-        } catch (error) {
-            // Silently fail - don't break navigation if storage check fails
-            log(`[Link Intercept] ❌ Failed to check video ${videoId}:`, error);
-        }
-    }
-
-    /**
-     * Intercept clicks on video links and add timestamp if we have saved progress
-     */
-    function interceptVideoLinkClicks() {
-        // Intercept clicks on video links
-        document.addEventListener('click', async (e) => {
-            // Find the closest anchor element
-            let anchor = e.target.closest('a[href*="watch?v="], a[href*="/shorts/"]');
-            if (!anchor) {
-                // If no anchor found, check if we're clicking on an overlay element
-                // and try to find the anchor in the parent hierarchy
-                const overlayElement = e.target.closest('.ytvht-viewed-label, .ytvht-progress-bar');
-                if (overlayElement) {
-                    anchor = overlayElement.closest('a[href*="watch?v="], a[href*="/shorts/"]');
-                    log(`[Click Intercept] Click on overlay, found anchor: ${anchor ? anchor.href : 'none'}`);
-                }
-            }
-
-            if (!anchor) {
-                log(`[Click Intercept] No anchor found for click target:`, e.target);
-                return;
-            }
-
-            log(`[Click Intercept] Found anchor for video link: ${anchor.href}`);
-            await addTimestampToLink(anchor);
-        }, true); // Use capture phase to intercept before YouTube's handlers
-
-        // Also process links when thumbnails are processed (for dynamically loaded content)
-        // This is handled by the existing thumbnail processing logic
-    }
-
-    // Get playlist info from URL with better title detection
-    function getPlaylistInfo() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const playlistId = urlParams.get('list');
-        if (!playlistId) {
-            log('No playlist ID found in URL');
-            return null;
-        }
-
-        log('Found playlist ID:', playlistId);
-
-        // Try multiple selectors for playlist title with fallback
-        const selectors = [
-            'ytd-playlist-panel-renderer #playlist-title yt-formatted-string',
-            'ytd-playlist-panel-renderer #playlist-name yt-formatted-string',
-            'ytd-playlist-panel-renderer .title yt-formatted-string',
-            '.ytd-watch-flexy[playlist] .playlist-title',
-            '#secondary .title.ytd-playlist-panel-renderer',
-            'ytd-playlist-metadata-header-renderer yt-formatted-string.title',
-            'h3.ytd-playlist-panel-renderer',
-            '#playlist-title',
-            '#playlist-name',
-            // Additional selectors for newer YouTube layouts
-            'ytd-playlist-panel-renderer h3 yt-formatted-string',
-            'ytd-playlist-panel-renderer .title',
-            '#secondary-inner ytd-playlist-panel-renderer .title',
-            'ytd-playlist-header-renderer h1.ytd-playlist-header-renderer',
-            '.playlist-title yt-formatted-string',
-            '.ytd-playlist-panel-renderer .index-message + .title',
-            // New page header-based layouts
-            'yt-page-header-view-model h1.dynamicTextViewModelH1 span',
-            'yt-page-header-view-model .yt-page-header-view-model__page-header-title h1 span',
-            'yt-dynamic-text-view-model h1.dynamicTextViewModelH1 span'
-        ];
-
-        let playlistTitle = null;
-        for (const selector of selectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-                playlistTitle = element.textContent?.trim();
-                log(`Tried selector "${selector}": "${playlistTitle}"`);
-                if (playlistTitle && playlistTitle !== 'Unknown Playlist' && playlistTitle.length > 0) {
-                    log('Found valid playlist title:', playlistTitle);
-                    break;
-                }
-            }
-        }
-
-        if (!playlistTitle || playlistTitle === 'Unknown Playlist') {
-            log('No valid playlist title found');
-            return null;
-        }
-
-        const playlistInfo = {
-            playlistId,
-            title: playlistTitle,
-            url: `https://www.youtube.com/playlist?list=${playlistId}`,
-            timestamp: Date.now()
-        };
-
-        log('Created playlist info:', playlistInfo);
-        return playlistInfo;
-    }
-
-    // Save playlist info (merge with existing to preserve flags)
-    async function savePlaylistInfo(playlistInfo = null) {
-        const info = playlistInfo || getPlaylistInfo();
-        if (!info) return;
-
-        log('Saving playlist info:', info);
-
-        try {
-            const existing = await ytStorage.getPlaylist(info.playlistId);
-            const merged = {
-                ...(existing || {}),
-                ...info,
-                lastUpdated: Date.now()
-            };
-            // Ensure we don't drop custom flags like ignoreVideos from existing
-            await ytStorage.setPlaylist(info.playlistId, merged);
-            log('Playlist info saved successfully:', merged);
-        } catch (error) {
-            log('Error saving playlist info:', error);
-        }
-    }
+    });
 
     // Load settings from browser.storage.local
     async function loadSettings() {
@@ -808,6 +522,10 @@
                     settings[key] = DEFAULT_SETTINGS[key];
                     updated = true;
                 }
+            }
+            if (settings.autoCleanPeriod === 90 || settings.autoCleanPeriod === '90') {
+                settings.autoCleanPeriod = 'forever';
+                updated = true;
             }
 
             // Save updated settings if needed
@@ -824,91 +542,14 @@
         }
     }
 
-    // Load and set the saved timestamp with retries
-    async function loadTimestamp() {
-        const videoId = getVideoId();
-        if (!videoId) {
-            log('No video ID found in URL.');
-            return;
-        }
-
-        log(`Attempting to load timestamp for video ID: ${videoId} from URL: ${window.location.href}`);
-
-        try {
-            const record = await ytStorage.getVideo(videoId);
-            if (record) {
-                const video = document.querySelector('video');
-                if (video) {
-                    log(`Found record for video ID ${videoId}:`, record);
-
-                    // Wait for video to be ready with retries
-                    const setTime = async (retryCount = 0) => {
-                        const maxRetries = 10;
-                        const retryDelay = 500;
-
-                        if (retryCount >= maxRetries) {
-                            log(`Failed to set timestamp after ${maxRetries} retries`);
-                            return;
-                        }
-
-                        // Check if video duration is available and valid
-                        if (video.duration && !isNaN(video.duration) && video.duration > 0) {
-                            if (record.time > 0 && record.time < video.duration) {
-                                // Ensure we're not too close to the end
-                                const timeToSet = Math.min(record.time, video.duration - 1);
-                                video.currentTime = timeToSet;
-                                log(`Timestamp set for video ID ${videoId}: ${timeToSet} (duration: ${video.duration})`);
-
-                                // Verify the time was actually set
-                                setTimeout(() => {
-                                    if (Math.abs(video.currentTime - timeToSet) > 1) {
-                                        log('Time was not set correctly, retrying...');
-                                        setTime(retryCount + 1);
-                                    }
-                                }, 100);
-                            } else {
-                                log(`Invalid timestamp ${record.time} for video duration ${video.duration}, skipping`);
-                            }
-                        } else {
-                            log(`Video duration not ready (${video.duration}), retrying in ${retryDelay}ms...`);
-                            setTimeout(() => setTime(retryCount + 1), retryDelay);
-                        }
-                    };
-
-                    // Try to set time immediately if video is ready
-                    if (video.readyState >= 1) {
-                        setTime();
-                    } else {
-                        // Wait for metadata and then try
-                        log('Video not ready, waiting for loadedmetadata event');
-                        video.addEventListener('loadedmetadata', () => setTime(), { once: true });
-
-                        // Also set up a backup timeout in case the event doesn't fire
-                        setTimeout(() => {
-                            if (video.readyState >= 1) {
-                                setTime();
-                            }
-                        }, 1000);
-                    }
-                } else {
-                    log('No video element found.');
-                }
-            } else {
-                log('No record found for video ID:', videoId);
-            }
-        } catch (error) {
-            log('Error loading timestamp:', error);
-        }
-    }
-
     // Save the current video timestamp (regular videos)
-    async function saveTimestamp(forcedTime = null) {
+    async function saveTimestamp() {
         if (window.location.pathname.startsWith('/shorts/')) {
             await saveShortsTimestamp();
             return;
         }
 
-        const video = document.querySelector('video');
+        const video = getPrimaryVideo();
         if (!video) return;
 
         // Playlist-aware pause/ignore logic
@@ -934,7 +575,7 @@
             // ignore URL parsing errors
         }
 
-        let currentTime = typeof forcedTime === 'number' && forcedTime > 0 ? forcedTime : video.currentTime;
+        let currentTime = video.currentTime;
         const duration = video.duration;
         const videoId = getVideoId();
         if (!videoId) return;
@@ -997,6 +638,9 @@
             const delta = Math.max(0, Math.floor(record.time - prevTime));
 
             await ytStorage.setVideo(videoId, record);
+            if (new URLSearchParams(window.location.search).has('list')) {
+                await savePlaylistInfo();
+            }
             if (delta > 0 && typeof ytStorage.updateStats === 'function') {
                 const prevRatio = (previous && previous.duration) ? (previous.time || 0) / previous.duration : 0;
                 const newRatio = (record.duration ? record.time / record.duration : 0);
@@ -1017,17 +661,93 @@
         }
     }
 
-    // Save Shorts timestamp
-    async function saveShortsTimestamp() {
-        const videoId = getVideoId();
-        if (!videoId) {
-            log('No video ID found for Shorts.');
-            return;
+    function getShortsMetadata(video = getPrimaryVideo(), expectedVideoId = getVideoId()) {
+        const reel = video?.closest?.('ytd-reel-video-renderer') || null;
+        if (!reel) return { title: 'Unknown Title', channelName: 'Unknown', channelId: 'Unknown' };
+
+        const reelVideoId = [...reel.querySelectorAll('a[href*="/shorts/"]')]
+            .map(link => (link.getAttribute('href') || '').match(/\/shorts\/([\w-]+)/)?.[1] || '')
+            .find(Boolean);
+        if (expectedVideoId && reelVideoId && reelVideoId !== expectedVideoId) {
+            return { title: 'Unknown Title', channelName: 'Unknown', channelId: 'Unknown' };
         }
 
-        const video = document.querySelector('video');
-        if (!video) {
-            log('No video element found for Shorts.');
+        const titleEl = reel.querySelector([
+            'yt-shorts-video-title-view-model h1',
+            'yt-shorts-video-title-view-model h2',
+            'yt-shorts-video-title-view-model [aria-label]',
+            'a.ytp-title-link[href*="/shorts/"]',
+            'yt-shorts-video-title-view-model'
+        ].join(', '));
+        const title = (titleEl?.getAttribute?.('aria-label') || titleEl?.textContent || '').trim() || 'Unknown Title';
+
+        const channelLink = reel.querySelector([
+            'yt-reel-channel-bar-view-model a[href^="/@"]',
+            'yt-reel-channel-bar-view-model a[href^="/channel/"]',
+            'a[href^="/@"][href$="/shorts"]',
+            'a[href*="youtube.com/@"][href$="/shorts"]',
+            'a[href^="/channel/"]',
+            'a[href*="youtube.com/channel/"]',
+            'ytd-channel-name a',
+            '#owner-name a',
+            'a[href^="/@"]'
+        ].join(', '));
+        const href = channelLink?.getAttribute('href') || '';
+        const channelMatch = href.match(/\/channel\/([^/?#]+)/);
+        const handleMatch = href.match(/\/@([^/?#]+)/);
+        const channelId = (channelMatch?.[1] || handleMatch?.[1] || '').trim() || 'Unknown';
+        const channelName = (channelLink?.textContent || '').trim()
+            || (handleMatch ? `@${handleMatch[1]}` : '')
+            || 'Unknown';
+
+        if (title !== 'Unknown Title') log('Shorts title detected:', title);
+        if (channelName !== 'Unknown') log('Shorts channel detected:', channelName);
+        return { title, channelName, channelId };
+    }
+
+    function captureShortsSnapshot(video = getPrimaryVideo(), expectedVideoId = null) {
+        if (!window.location.pathname.startsWith('/shorts/')) return null;
+
+        const routeVideoId = getVideoId();
+        const videoId = expectedVideoId || routeVideoId;
+        const currentTime = video?.currentTime;
+        if (!videoId || routeVideoId !== videoId || !currentTime || currentTime <= 0) return null;
+
+        const priorMetadata = latestShortsSnapshot?.videoId === videoId
+            ? latestShortsSnapshot
+            : null;
+        const currentMetadata = getShortsMetadata(video, videoId);
+        const metadata = {
+            title: currentMetadata.title !== 'Unknown Title'
+                ? currentMetadata.title
+                : (priorMetadata?.title || 'Unknown Title'),
+            channelName: currentMetadata.channelName !== 'Unknown'
+                ? currentMetadata.channelName
+                : (priorMetadata?.channelName || 'Unknown'),
+            channelId: currentMetadata.channelId !== 'Unknown'
+                ? currentMetadata.channelId
+                : (priorMetadata?.channelId || 'Unknown')
+        };
+        latestShortsSnapshot = {
+            videoId,
+            time: currentTime,
+            duration: video.duration,
+            title: metadata.title,
+            url: `https://www.youtube.com/shorts/${videoId}`,
+            isShorts: true,
+            channelName: metadata.channelName,
+            channelId: metadata.channelId
+        };
+        return { ...latestShortsSnapshot };
+    }
+
+    // Save Shorts timestamp. A captured snapshot can be supplied during SPA
+    // navigation, after the URL already points at the next Short.
+    async function saveShortsTimestamp(snapshot = null) {
+        const currentSnapshot = snapshot || captureShortsSnapshot();
+        const videoId = currentSnapshot?.videoId;
+        if (!videoId) {
+            log('No video ID found for Shorts.');
             return;
         }
 
@@ -1054,8 +774,8 @@
             // ignore URL parsing errors
         }
 
-        let currentTime = video.currentTime;
-        const duration = video.duration;
+        const currentTime = currentSnapshot.time;
+        const duration = currentSnapshot.duration;
 
         // Do not update record if timestamp is 0. Allow duration to be unavailable for Shorts.
         if (!currentTime || currentTime === 0) {
@@ -1065,51 +785,29 @@
 
         log(`Saving Shorts timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
 
-        let title = 'Unknown Title';
-        const shortsTitleEl = document.querySelector('yt-shorts-video-title-view-model h2 span');
-        if (shortsTitleEl && shortsTitleEl.textContent?.trim()) {
-            title = shortsTitleEl.textContent.trim();
-            log('Shorts title detected:', title);
-        } else {
-            // Fallback: use document title, but clean up " - YouTube Shorts"
-            let docTitle = document.title.replace(/ - YouTube Shorts$/, '').trim();
-            if (docTitle && docTitle.length > 0 && docTitle !== 'YouTube') {
-                title = docTitle;
-                log('Shorts title fallback from document.title:', title);
-            }
-        }
-
-        // Extract channel name and channelId for Shorts
-        let channelName = 'Unknown';
-        let channelId = 'Unknown';
-        const channelLink = document.querySelector('ytd-channel-name a, #owner-name a');
-        if (channelLink) {
-            channelName = channelLink.textContent?.trim() || 'Unknown';
-            const href = channelLink.getAttribute('href') || '';
-            const match = href.match(/\/channel\/([a-zA-Z0-9_-]+)/) || href.match(/\/@([a-zA-Z0-9_\.-]+)/);
-            if (match) {
-                channelId = match[1];
-            } else {
-                channelId = href;
-            }
-        }
+        let previous = null;
+        try { previous = await ytStorage.getVideo(videoId); } catch (_) {}
 
         const record = {
-            videoId: videoId,
+            videoId,
             time: currentTime,
-            duration: duration,
+            duration,
             timestamp: Date.now(),
-            title: title,
-            url: getCleanVideoUrl(),
+            title: currentSnapshot.title !== 'Unknown Title'
+                ? currentSnapshot.title
+                : (previous?.title || 'Unknown Title'),
+            url: currentSnapshot.url,
             isShorts: true,
-            channelName,
-            channelId
+            channelName: currentSnapshot.channelName !== 'Unknown'
+                ? currentSnapshot.channelName
+                : (previous?.channelName || 'Unknown'),
+            channelId: currentSnapshot.channelId !== 'Unknown'
+                ? currentSnapshot.channelId
+                : (previous?.channelId || 'Unknown')
         };
 
         try {
             // Compute delta against previous saved time to update stats
-            let previous = null;
-            try { previous = await ytStorage.getVideo(videoId); } catch (_) {}
             const prevTime = previous && typeof previous.time === 'number' ? previous.time : 0;
             const delta = Math.max(0, Math.floor(record.time - prevTime));
 
@@ -1143,10 +841,9 @@
         });
     }
 
-    // Update cleanupOldRecords to use currentSettings.autoCleanPeriod
+    // Apply the user's retention setting to local watch history.
     async function cleanupOldRecords() {
         try {
-            // Skip cleanup if set to "forever"
             if (currentSettings.autoCleanPeriod === 'forever') {
                 log('Auto-clean disabled - keeping all records forever');
                 return;
@@ -1167,16 +864,16 @@
         }
     }
 
-    // Start periodic saving with shorter interval
+    // Start periodic progress saves while playback is active.
     function startSaveInterval(saveFn = saveTimestamp) {
         if (saveIntervalId) {
             clearInterval(saveIntervalId);
         }
-        saveFn(); // Save immediately
-        saveIntervalId = setInterval(saveFn, 5000); // Changed from SAVE_INTERVAL to fixed 5000ms
+        saveFn();
+        saveIntervalId = setInterval(saveFn, SAVE_INTERVAL);
     }
 
-    // Debounce helper function
+    // Coalesce rapid media events into one storage write.
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -1189,7 +886,7 @@
         };
     }
 
-    // Helper function for waiting for events with timeout
+    // Resolve when the media element fires an event, or fail fast if it stalls.
     function waitForEvent(target, event, timeout = 1000) {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
@@ -1215,45 +912,128 @@
         let timestampLoaded = false;
         let lastSaveTime = 0;
         const MIN_SAVE_INTERVAL = 1000;
-        const MIN_RESTORE_TIME = 30;
-        const RESTORE_GUARD_WINDOW = 20000;
-        const CONTENT_CHANGE_GUARD_WINDOW = 5000;
-        let restoreRetryTimeout = null;
+
+        // Once the user manually moves the playhead, stop auto-restoring the saved
+        // position. Without this, seeking backward (e.g. to rewatch a video that was
+        // saved near its end) gets yanked forward again, trapping the user in a loop.
+        let userInteracted = false;
+        let lastUserSeekIntentAt = 0;
+        let lastProgrammaticSeekAt = 0;
+        let pendingRestore = null;
+        let restoreAwaitingMediaChange = false;
+        let restoreAttemptInProgress = false;
+        // The video ID this closure last set up restoration for; used to detect when a
+        // reused <video> element switches to a different video (SPA navigation).
+        let trackedClosureVideoId = getVideoId();
+        if (pendingRestoreAfterMediaChange && pendingRestoreAfterMediaChange.videoId !== trackedClosureVideoId) {
+            pendingRestoreAfterMediaChange = null;
+        }
+        if (pendingRestoreAfterMediaChange?.ownerVideo && !pendingRestoreAfterMediaChange.ownerVideo.isConnected) {
+            pendingRestoreAfterMediaChange.ownerVideo = null;
+            pendingRestoreAfterMediaChange.phase = 'awaiting-media';
+        }
+        const hasPendingMediaTransition = () => (
+            pendingRestoreAfterMediaChange && pendingRestoreAfterMediaChange.videoId === getVideoId()
+        );
+        let restoringPendingMedia = false;
+        let restoreAfterMediaLoadScheduled = false;
+        const restoreAfterNextMediaMetadata = () => {
+            if (!hasPendingMediaTransition() || restoreAfterMediaLoadScheduled) return;
+            restoreAfterMediaLoadScheduled = true;
+            traceRestore('restore-media-change-detected');
+            const restoreAfterMetadata = () => {
+                video.removeEventListener('loadedmetadata', restoreAfterMetadata);
+                restoreAfterMediaLoadScheduled = false;
+                if (!hasPendingMediaTransition()) return;
+                const transition = pendingRestoreAfterMediaChange;
+                if (transition.ownerVideo && transition.ownerVideo !== video) {
+                    if (transition.ownerVideo.isConnected) return;
+                    transition.ownerVideo = null;
+                }
+                if (!isPrimaryVideo(video)) return;
+                const pendingTarget = transition.targetTime;
+                if (Number.isFinite(video.duration) && video.duration < pendingTarget - 2) {
+                    traceRestore('restore-media-still-short', {
+                        duration: video.duration,
+                        targetTime: pendingTarget
+                    });
+                    transition.ownerVideo = null;
+                    transition.phase = 'awaiting-media';
+                    return;
+                }
+                restoreAwaitingMediaChange = false;
+                timestampLoaded = false;
+                restoringPendingMedia = true;
+                transition.ownerVideo = video;
+                transition.phase = 'restoring';
+                ensureVideoReady().catch(error => log('[RESTORE] Failed after media change:', error));
+            };
+            if (video.readyState >= 1) {
+                restoreAfterMetadata();
+            } else {
+                video.addEventListener('loadedmetadata', restoreAfterMetadata);
+            }
+        };
+        // All extension-initiated seeks go through this so we don't mistake our own
+        // restore for a user seek in the 'seeking' handler below.
+        const restoreVideoTime = (t, reason = 'restore') => {
+            traceRestore('restore-seek-requested', {
+                currentTime: video.currentTime || 0,
+                targetTime: t,
+                reason,
+                ...getRestoreVideoTraceDetails(video)
+            });
+            pendingRestore = { targetTime: t, reason };
+            pendingRestoreAfterMediaChange = {
+                videoId: getVideoId(),
+                targetTime: t,
+                reason,
+                ownerVideo: video,
+                phase: 'seeking'
+            };
+            lastProgrammaticSeekAt = Date.now();
+            video.currentTime = t;
+        };
+
+        traceRestore('tracker-attached', {
+            currentTime: video.currentTime || 0,
+            readyState: video.readyState || 0,
+            ...getRestoreVideoTraceDetails(video)
+        });
+        if (isRestoreTraceActive()) {
+            [
+                'loadedmetadata', 'loadeddata', 'canplay', 'playing',
+                'waiting', 'stalled', 'suspend', 'abort', 'emptied', 'error'
+            ].forEach((event) => {
+                addTrackedEventListener(video, event, () => traceRestore(`video-${event}`, {
+                    currentTime: video.currentTime || 0,
+                    duration: Number.isFinite(video.duration) ? video.duration : 0,
+                    readyState: video.readyState || 0,
+                    ...getRestoreVideoTraceDetails(video)
+                }));
+            });
+        }
+
         const trackingStartedAt = Date.now();
-
-        const getLowerResetSaveDeferral = async (candidateTime = null) => {
+        const guardedSaveTimestamp = async (candidateTime = null) => {
+            // A seek into a short pre-roll can be clamped. Do not overwrite the
+            // saved position or issue another seek until YouTube loads the next
+            // media item and its metadata is available.
+            if (pendingRestore || restoreAwaitingMediaChange || (hasPendingMediaTransition() && !restoringPendingMedia)) return;
             const videoId = getVideoId();
-            if (!videoId) return null;
-
-            const currentTime = typeof candidateTime === 'number' && candidateTime > 0 ? candidateTime : video.currentTime || 0;
-            if (currentTime <= 0) return null;
+            const currentTime = typeof candidateTime === 'number' && candidateTime > 0 ? candidateTime : video.currentTime;
+            if (!videoId || currentTime <= 0) return;
+            if (window.location.pathname.startsWith('/shorts/') && trackedClosureVideoId && videoId !== trackedClosureVideoId) return;
 
             try {
                 const record = await ytStorage.getVideo(videoId);
                 const savedTime = record && typeof record.time === 'number' ? record.time : 0;
-                if (savedTime < MIN_RESTORE_TIME || currentTime >= savedTime - 2) {
-                    return null;
+                if (savedTime >= 30 && currentTime < savedTime - 2 && Date.now() - trackingStartedAt < 20000) {
+                    restoreVideoTime(savedTime, 'save-guard');
+                    return;
                 }
-
-                const now = Date.now();
-                const recentlyStartedTracking = now - trackingStartedAt < RESTORE_GUARD_WINDOW;
-                const recentContentChange = now - simulatedLastContentChangeTime < CONTENT_CHANGE_GUARD_WINDOW;
-
-                return recentlyStartedTracking || recentContentChange ? savedTime : null;
             } catch (error) {
                 log('[RESTORE-GUARD] Failed to inspect saved timestamp before saving:', error);
-                return null;
-            }
-        };
-
-        const guardedSaveTimestamp = async (candidateTime = null) => {
-            const deferredSavedTime = await getLowerResetSaveDeferral(candidateTime);
-            if (deferredSavedTime) {
-                const currentTime = typeof candidateTime === 'number' && candidateTime > 0 ? candidateTime : video.currentTime || 0;
-                log(`[RESTORE-GUARD] Deferring save at ${currentTime.toFixed(2)}s and reapplying saved timestamp ${deferredSavedTime.toFixed(2)}s after player reset`);
-                video.currentTime = deferredSavedTime;
-                timestampLoaded = true;
-                return;
             }
 
             await saveTimestamp(candidateTime);
@@ -1267,10 +1047,30 @@
         }, 500);
 
         const ensureVideoReady = async () => {
-            if (timestampLoaded) return;
+            if (timestampLoaded || userInteracted || pendingRestore || restoreAwaitingMediaChange || restoreAttemptInProgress || (hasPendingMediaTransition() && !restoringPendingMedia)) {
+                traceRestore('restore-skipped', {
+                    timestampLoaded,
+                    userInteracted,
+                    pendingRestore: !!pendingRestore,
+                    restoreAwaitingMediaChange,
+                    restoreAttemptInProgress,
+                    pendingMediaTransition: !!hasPendingMediaTransition(),
+                    restoringPendingMedia
+                });
+                return;
+            }
 
             const videoId = getVideoId();
-            if (!video || !videoId) return;
+            if (!video || !videoId) {
+                traceRestore('restore-skipped', { hasVideo: !!video, hasVideoId: !!videoId });
+                return;
+            }
+
+            traceRestore('restore-attempt-started', {
+                currentTime: video.currentTime || 0,
+                readyState: video.readyState || 0
+            });
+            restoreAttemptInProgress = true;
 
             // Enhanced playlist context detection
             const isPlaylistContext = !!new URLSearchParams(window.location.search).get('list');
@@ -1291,19 +1091,31 @@
                 for (let attempt = 0; attempt < retries; attempt++) {
                     try {
                         record = await ytStorage.getVideo(videoId);
+                        traceRestore('storage-read', {
+                            attempt: attempt + 1,
+                            found: !!record,
+                            savedTime: record && typeof record.time === 'number' ? record.time : null
+                        });
                         if (record && record.time && record.time > 0) {
                             break; // Success, exit retry loop
                         }
                     } catch (error) {
+                        traceRestore('storage-read-error', {
+                            attempt: attempt + 1,
+                            message: error && error.message ? error.message : String(error)
+                        });
                         log(`[ensureVideoReady] getVideo attempt ${attempt + 1} failed:`, error.message);
-                        if (attempt < retries - 1) {
-                            // Wait before retry (exponential backoff)
-                            await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
-                        }
+                    }
+                    if (attempt < retries - 1) {
+                        // A waking MV3 worker can return no record before its
+                        // storage migration/read is ready, so retry empty reads
+                        // as well as rejected reads.
+                        await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
                     }
                 }
                 
                 if (!record || !record.time || record.time <= 0) {
+                    traceRestore('restore-no-record');
                     log(`[ensureVideoReady] No valid record found for ${videoId} after ${retries} attempts`);
                     return;
                 }
@@ -1314,100 +1126,196 @@
                 // Enhanced debug logging using existing log function
                 log(`[ensureVideoReady] videoId=${videoId} | current=${currentTime.toFixed(2)}s | saved=${savedTime.toFixed(2)}s`);
 
+                // An ad can be longer than the saved timestamp and accept the seek,
+                // which would falsely mark restoration complete before the real
+                // video starts. Keep the restore pending until YouTube ends the ad.
+                if (isYouTubeAdPlaying(video)) {
+                    restoreAwaitingMediaChange = true;
+                    restoringPendingMedia = false;
+                    pendingRestoreAfterMediaChange = {
+                        videoId,
+                        targetTime: savedTime,
+                        reason: 'youtube-ad-playing',
+                        ownerVideo: video,
+                        phase: 'awaiting-ad-end'
+                    };
+                    traceRestore('restore-waiting-for-ad-end', {
+                        currentTime,
+                        duration: Number.isFinite(video.duration) ? video.duration : 0,
+                        targetTime: savedTime
+                    });
+                    return;
+                }
+
                 const tolerance = 2; // 2-second tolerance window
 
                 // CASE 1: YouTube already restored correctly (within tolerance)
                 if (Math.abs(currentTime - savedTime) <= tolerance) {
+                    traceRestore('restore-already-at-saved-time', { currentTime, savedTime });
                     log(`YouTube already restored timestamp correctly (diff=${(currentTime - savedTime).toFixed(2)}s)`);
                     timestampLoaded = true;
+                    restoringPendingMedia = false;
+                    pendingRestoreAfterMediaChange = null;
                     return;
                 }
 
                 // CASE 2: YouTube did not restore or restored incorrectly
                 // Wait until metadata is fully loaded to safely set currentTime
                 if (video.readyState < 1) {
+                    traceRestore('restore-waiting-for-metadata', { readyState: video.readyState || 0 });
                     await waitForEvent(video, "loadedmetadata", 1000);
                 }
 
-                // Double-check after metadata is loaded
+                // Pre-roll media has valid metadata but cannot contain the
+                // saved position. Seeking it causes Firefox/YouTube to churn
+                // through replacement video elements. Keep the restore pending
+                // until a media item with a sufficient duration arrives.
+                if (Number.isFinite(video.duration) && video.duration > 0 && video.duration < savedTime - 2) {
+                    restoreAwaitingMediaChange = true;
+                    pendingRestoreAfterMediaChange = {
+                        videoId,
+                        targetTime: savedTime,
+                        reason: 'media-too-short',
+                        ownerVideo: null,
+                        phase: 'awaiting-media'
+                    };
+                    traceRestore('restore-media-too-short', {
+                        duration: video.duration,
+                        targetTime: savedTime
+                    });
+                    return;
+                }
+
+                // Firefox can accept currentTime at HAVE_METADATA while
+                // YouTube is still attaching its MediaSource, then replace the
+                // player with an empty element. Wait for canplay so the seek is
+                // applied only after the selected media is actually usable.
+                if (video.readyState < 3) {
+                    traceRestore('restore-waiting-for-playable-media', {
+                        readyState: video.readyState || 0,
+                        duration: Number.isFinite(video.duration) ? video.duration : 0
+                    });
+                    await waitForEvent(video, 'canplay', 5000);
+                }
+
+                if (!isPrimaryVideo(video)) {
+                    traceRestore('restore-player-changed-before-seek', {
+                        ...getRestoreVideoTraceDetails(video)
+                    });
+                    return;
+                }
+
+                // A main video can reach canplay while YouTube is still
+                // finishing an ad/pre-roll handoff. Seeking in that narrow
+                // window makes Firefox discard the player. Only carried-over
+                // restores need this stability window.
+                if (restoringPendingMedia) {
+                    const playableDuration = video.duration;
+                    traceRestore('restore-waiting-for-media-settle', {
+                        duration: Number.isFinite(playableDuration) ? playableDuration : 0,
+                        waitMs: RESTORE_MEDIA_SETTLE_MS
+                    });
+                    await new Promise(resolve => setTimeout(resolve, RESTORE_MEDIA_SETTLE_MS));
+
+                    const durationChanged = Number.isFinite(playableDuration) && (
+                        !Number.isFinite(video.duration)
+                        || video.duration <= 0
+                        || Math.abs(video.duration - playableDuration) > 0.5
+                    );
+                    if (!isPrimaryVideo(video) || video.readyState < 3 || durationChanged) {
+                        traceRestore('restore-media-changed-during-settle', {
+                            duration: Number.isFinite(video.duration) ? video.duration : 0,
+                            readyState: video.readyState || 0,
+                            ...getRestoreVideoTraceDetails(video)
+                        });
+                        return;
+                    }
+                }
+
+                // Double-check after the media becomes playable because
+                // YouTube may have applied its own resume position meanwhile.
                 const currentTimeAfterMetadata = video.currentTime || 0;
 
-                // Check if we're within a short time window of SPA navigation
+                // Right after SPA navigation YouTube often starts the new video from 0,
+                // so a restore there is expected. Outside that window, a video that's
+                // playing past the saved point is usually a quality/mode change rather
+                // than a fresh load — restoring then would yank the user backward.
                 const timeSinceSpaNavigation = Date.now() - lastSpaNavigationTime;
                 const isRecentSpaNavigation = timeSinceSpaNavigation < 2000; // 2 seconds
 
-                // DRY-RUN: Simulate event-driven content change detection
-                const timeSinceSimulatedContentChange = Date.now() - simulatedLastContentChangeTime;
-                const isRecentSimulatedContentChange = timeSinceSimulatedContentChange < 1000; // 1 second for events
-
-                // Enhanced logging for analysis
-                log(`[DRY-RUN] Video state: paused=${video.paused}, currentTime=${currentTimeAfterMetadata.toFixed(2)}s, savedTime=${savedTime.toFixed(2)}s`);
-                log(`[DRY-RUN] Time windows: SPA=${timeSinceSpaNavigation}ms ago (${isRecentSpaNavigation ? 'RECENT' : 'OLD'}), ContentChange=${timeSinceSimulatedContentChange}ms ago (${isRecentSimulatedContentChange ? 'RECENT' : 'OLD'})`);
-
-                const setSavedTime = () => {
-                    video.currentTime = savedTime;
-
-                    // YouTube can swap/reset the media element after preroll ads or player reloads.
-                    // Keep retrying briefly while the real content is still before the saved point.
-                    if (restoreRetryTimeout) clearTimeout(restoreRetryTimeout);
-                    restoreRetryTimeout = setTimeout(() => {
-                        if (!video.isConnected) return;
-                        const latestTime = video.currentTime || 0;
-                        const latestDuration = video.duration || 0;
-                        if (
-                            savedTime >= MIN_RESTORE_TIME &&
-                            latestDuration > savedTime &&
-                            latestTime > 0 &&
-                            latestTime < savedTime - tolerance
-                        ) {
-                            log(`[RESTORE-RETRY] Reapplying saved timestamp ${savedTime.toFixed(2)}s after player reset (current=${latestTime.toFixed(2)}s)`);
-                            video.currentTime = savedTime;
-                        }
-                    }, 2000);
-                };
-
                 if (Math.abs(currentTimeAfterMetadata - savedTime) > tolerance) {
-                    // CURRENT LOGIC (time-based SPA navigation)
                     if (isRecentSpaNavigation) {
-                        log(`[CURRENT] Recent SPA navigation (${timeSinceSpaNavigation}ms ago), restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
-                        setSavedTime();
-                    } else {
-                        // Not recent SPA navigation - check if it's a mode change
-                        if (!video.paused && currentTimeAfterMetadata > savedTime) {
-                            log(`[CURRENT] Video is playing and ahead of saved time, likely mode change - skipping restore`);
-                        } else {
-                            log(`[CURRENT] Restoring from storage → ${savedTime.toFixed(2)}s (YouTube current=${currentTimeAfterMetadata.toFixed(2)}s)`);
-                            setSavedTime();
-                        }
-                    }
-
-                    // PROPOSED LOGIC (event-driven content change)
-                    if (isRecentSimulatedContentChange) {
-                        log(`[PROPOSED] Recent content change (${timeSinceSimulatedContentChange}ms ago), would restore → ${savedTime.toFixed(2)}s`);
+                        log(`Recent SPA navigation (${timeSinceSpaNavigation}ms ago), restoring → ${savedTime.toFixed(2)}s (current=${currentTimeAfterMetadata.toFixed(2)}s)`);
+                        restoreVideoTime(savedTime, 'initial-restore');
                     } else if (!video.paused && currentTimeAfterMetadata > savedTime) {
-                        log(`[PROPOSED] Video playing and ahead, likely mode change - would skip restore`);
+                        log('Video playing and ahead of saved time, likely mode change - skipping restore');
                     } else {
-                        log(`[PROPOSED] Would restore from storage → ${savedTime.toFixed(2)}s`);
+                        log(`Restoring → ${savedTime.toFixed(2)}s (current=${currentTimeAfterMetadata.toFixed(2)}s)`);
+                        restoreVideoTime(savedTime);
                     }
                 } else {
-                    log(`[BOTH] Skipping manual restore; already near target position (diff=${(currentTimeAfterMetadata - savedTime).toFixed(2)}s)`);
+                    log(`Already near target position (diff=${(currentTimeAfterMetadata - savedTime).toFixed(2)}s), skipping restore`);
                 }
 
-                timestampLoaded = true;
+                // A requested seek is only a restore after `seeked` confirms
+                // the media accepted the target. A short pre-roll can clamp it.
+                if (!pendingRestore) timestampLoaded = true;
 
                 if (!video.paused) {
                     startSaveInterval(guardedSaveTimestamp);
                 }
             } catch (err) {
+                traceRestore('restore-attempt-error', {
+                    message: err && err.message ? err.message : String(err)
+                });
                 log(`[ensureVideoReady] Error:`, err);
                 // Don't set timestampLoaded = true on error, so we can retry
+            } finally {
+                restoreAttemptInProgress = false;
             }
         };
+
+        const resumePendingRestoreAfterAd = () => {
+            const transition = pendingRestoreAfterMediaChange;
+            if (
+                !restoreAwaitingMediaChange
+                || !hasPendingMediaTransition()
+                || transition?.reason !== 'youtube-ad-playing'
+                || isYouTubeAdPlaying(video)
+                || restoreAttemptInProgress
+            ) {
+                return false;
+            }
+
+            restoreAwaitingMediaChange = false;
+            restoringPendingMedia = true;
+            transition.ownerVideo = video;
+            transition.phase = 'restoring';
+            traceRestore('restore-ad-ended', {
+                currentTime: video.currentTime || 0,
+                targetTime: transition.targetTime
+            });
+            ensureVideoReady().catch(error => log('[RESTORE] Failed after ad ended:', error));
+            return true;
+        };
+
+        const player = video.closest?.('#movie_player');
+        if (player) {
+            const adStateObserver = new MutationObserver(resumePendingRestoreAfterAd);
+            adStateObserver.observe(player, { attributes: true, attributeFilter: ['class'] });
+            addTrackedObserver(video, adStateObserver);
+        }
 
         // Initial attempt
         ensureVideoReady().catch(error => {
             log(`[setupVideoTracking] ensureVideoReady failed:`, error);
         });
+        // A replacement video can be inserted after its loadstart already
+        // fired. In that case, wait directly for its metadata rather than
+        // requiring another loadstart event that may never arrive.
+        if (hasPendingMediaTransition()) {
+            restoreAfterNextMediaMetadata();
+        }
         
         // Fallback: If video starts playing from 0:00 but we have a saved time, restore it
         // This handles cases where getVideo() failed initially but the video started playing
@@ -1415,20 +1323,19 @@
             // Wait a bit for video to start playing
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Check if we still haven't loaded the timestamp and video is at/near 0:00
-            if (!timestampLoaded && video.currentTime < 5 && video.readyState >= 1) {
+            // YouTube may apply its own partial resume before extension storage
+            // is ready. Restore whenever that position is still behind ours.
+            if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia) && video.readyState >= 3) {
                 try {
                     const videoId = getVideoId();
                     if (!videoId) return;
-                    
-                    log(`[fallbackRestore] Video playing from ${video.currentTime.toFixed(1)}s, attempting restore...`);
+
                     const record = await ytStorage.getVideo(videoId);
-                    
-                    if (record && record.time && record.time > 30) {
+
+                    if (record && record.time && record.time > 30 && video.currentTime < record.time - 2) {
                         // Only restore if saved time is significant (>30s)
-                        log(`[fallbackRestore] Restoring to ${record.time.toFixed(1)}s`);
-                        video.currentTime = record.time;
-                        timestampLoaded = true;
+                        log(`[fallbackRestore] Restoring from ${video.currentTime.toFixed(1)}s to ${record.time.toFixed(1)}s`);
+                        restoreVideoTime(record.time, 'fallback-restore');
                     }
                 } catch (error) {
                     log(`[fallbackRestore] Failed:`, error);
@@ -1441,13 +1348,19 @@
             log(`[setupVideoTracking] fallbackRestore failed:`, error);
         });
 
-        // Event handlers with minimal logging
+        // Retry after a readiness timeout without racing the initial attempt.
+        addTrackedEventListener(video, 'canplay', () => {
+            if (resumePendingRestoreAfterAd()) return;
+            if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia)) {
+                ensureVideoReady().catch(error => log('[RESTORE] Failed on canplay retry:', error));
+            }
+        });
+
         addTrackedEventListener(video, 'play', async () => {
-            // Start save interval as usual
             startSaveInterval(guardedSaveTimestamp);
 
-            // ENHANCED PLAYLIST AUTOPLAY DETECTION
-            // Check if this might be playlist autoplay that bypassed URL timestamp
+            // Playlist autoplay can bypass normal URL/timestamp restoration, so
+            // give the player a moment to settle before restoring saved progress.
             const isPlaylistContext = !!new URLSearchParams(window.location.search).get('list');
             const timeSinceNavigation = Date.now() - lastSpaNavigationTime;
             const videoId = getVideoId();
@@ -1464,91 +1377,129 @@
             const hasSignificantHistory = !!(record && typeof record.time === 'number' && record.time > 30);
 
             if (isPlaylistContext && timeSinceNavigation < 5000 && hasSignificantHistory) {
-                // This might be playlist autoplay with meaningful history - delay timing restoration
                 log(`[PLAYLIST] Detected potential autoplay in playlist context (${timeSinceNavigation}ms after navigation) with saved time ${record.time.toFixed(1)}s`);
 
-                // Wait a bit for autoplay to settle, then restore timing if still near start
                 setTimeout(async () => {
                     if (!timestampLoaded && video.currentTime < 10) {
                         log('[PLAYLIST] Autoplay detected, attempting delayed timing restoration via ensureVideoReady');
                         await ensureVideoReady();
                     }
-                }, 1500); // Wait 1.5s for autoplay to complete
+                }, 1500);
             }
 
-            // Fallback restoration check: only when we have significant saved time
-            if (hasSignificantHistory) {
+            // Fallback restoration check: only when we have significant saved time,
+            // and only if the user hasn't manually moved the playhead. Otherwise a
+            // user who seeks back to the start gets yanked to the saved position.
+            if (hasSignificantHistory && !timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && (!hasPendingMediaTransition() || restoringPendingMedia)) {
                 const savedTime = record.time;
                 const currentTime = video.currentTime;
-                
-                // If playing from near beginning (0-5s) but saved time is much higher
+
                 if (currentTime < 5) {
                     log(`[FALLBACK] Video playing from ${currentTime.toFixed(1)}s but saved time is ${savedTime.toFixed(1)}s, considering restoration`);
-                    // Small delay to avoid interrupting YouTube's own restoration
                     setTimeout(() => {
-                        if (video.currentTime < 5) { // Double-check it wasn't restored
-                            video.currentTime = savedTime;
-                            log(`[FALLBACK] Restored to ${savedTime.toFixed(1)}s`);
+                        if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && (!hasPendingMediaTransition() || restoringPendingMedia) && video.currentTime < 5) {
+                            restoreVideoTime(savedTime);
+                            log(`[FALLBACK] Requested restore to ${savedTime.toFixed(1)}s`);
                         }
                     }, 500);
                 }
             }
         });
-        addTrackedEventListener(video, 'loadstart', async () => {
-            const videoId = getVideoId();
-            if (!videoId) return;
-
-            try {
-                const record = await ytStorage.getVideo(videoId);
-                const savedTime = record && typeof record.time === 'number' ? record.time : 0;
-                if (savedTime < MIN_RESTORE_TIME) return;
-
-                setTimeout(() => {
-                    if (!video.isConnected) return;
-                    const currentTime = video.currentTime || 0;
-                    const duration = video.duration || 0;
-                    if (duration > savedTime && currentTime > 0 && currentTime < savedTime - 2) {
-                        log(`[LOADSTART-RESTORE] Reapplying saved timestamp ${savedTime.toFixed(2)}s after video loadstart reset (current=${currentTime.toFixed(2)}s)`);
-                        video.currentTime = savedTime;
-                    }
-                }, 1500);
-            } catch (error) {
-                log('[LOADSTART-RESTORE] Failed to restore after loadstart:', error);
-            }
-        });
         addTrackedEventListener(video, 'pause', () => {
+            captureShortsSnapshot(video, trackedClosureVideoId);
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
             }
-            debouncedSave(video.currentTime || 0);
+            debouncedSave();
         });
         addTrackedEventListener(video, 'timeupdate', () => {
+            captureShortsSnapshot(video, trackedClosureVideoId);
             const currentTime = Math.floor(video.currentTime);
             const interval = window.location.pathname.startsWith('/shorts/') ? 5 : 15;
-            if (currentTime > 0 && currentTime % interval === 0) debouncedSave(video.currentTime || currentTime);
+            if (currentTime > 0 && currentTime % interval === 0) debouncedSave();
+        });
+        addTrackedEventListener(video, 'pointerdown', () => {
+            lastUserSeekIntentAt = Date.now();
+        });
+        addTrackedEventListener(video, 'keydown', () => {
+            lastUserSeekIntentAt = Date.now();
         });
         addTrackedEventListener(video, 'seeking', () => {
+            // YouTube emits seeking events while selecting its initial position
+            // and while resetting media after navigation. Only a seek preceded
+            // by user input may opt out of restoring extension history.
+            const hasRecentUserSeekIntent = Date.now() - lastUserSeekIntentAt < 1000;
+            if (hasRecentUserSeekIntent && Date.now() - lastProgrammaticSeekAt > 800) {
+                userInteracted = true;
+                pendingRestoreAfterMediaChange = null;
+            }
+            traceRestore('video-seeking', {
+                currentTime: video.currentTime || 0,
+                hasRecentUserSeekIntent,
+                userInteracted,
+                millisecondsSinceProgrammaticSeek: Date.now() - lastProgrammaticSeekAt,
+                ...getRestoreVideoTraceDetails(video)
+            });
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
             }
         });
         addTrackedEventListener(video, 'seeked', () => {
-            debouncedSave(video.currentTime || 0);
+            captureShortsSnapshot(video, trackedClosureVideoId);
+            traceRestore('video-seeked', {
+                currentTime: video.currentTime || 0,
+                ...getRestoreVideoTraceDetails(video)
+            });
+            if (pendingRestore) {
+                const { targetTime, reason } = pendingRestore;
+                pendingRestore = null;
+                if (video.currentTime >= targetTime - 2 && isPrimaryVideo(video)) {
+                    timestampLoaded = true;
+                    restoringPendingMedia = false;
+                    pendingRestoreAfterMediaChange = null;
+                    traceRestore('restore-seek-confirmed', { currentTime: video.currentTime, targetTime, reason });
+                } else {
+                    restoringPendingMedia = false;
+                    restoreAwaitingMediaChange = true;
+                    pendingRestoreAfterMediaChange = {
+                        videoId: getVideoId(),
+                        targetTime,
+                        reason,
+                        ownerVideo: null,
+                        phase: 'awaiting-media'
+                    };
+                    traceRestore('restore-seek-clamped', { currentTime: video.currentTime || 0, targetTime, reason });
+                    log(`[RESTORE] Seek to ${targetTime.toFixed(2)}s was clamped at ${video.currentTime.toFixed(2)}s; waiting for the next media load.`);
+                }
+            }
+            debouncedSave();
             if (!video.paused) startSaveInterval(guardedSaveTimestamp);
         });
 
-        // ENHANCED VIDEO CHANGE DETECTION
         // Detect video content changes (especially for playlist navigation)
         addTrackedEventListener(video, 'loadstart', () => {
-            simulatedLastContentChangeTime = Date.now();
-            log(`[VIDEO] Video loadstart detected - content change at ${simulatedLastContentChangeTime}`);
-
+            traceRestore('video-loadstart', {
+                currentTime: video.currentTime || 0,
+                readyState: video.readyState || 0,
+                ...getRestoreVideoTraceDetails(video)
+            });
             // Check if this is a playlist video change
             const urlParams = new URLSearchParams(window.location.search);
             const playlistId = urlParams.get('list');
             const currentVideoId = getVideoId();
+
+            // New video loaded into a reused <video> element: clear the manual-seek
+            // guard so the next video can restore its own saved position.
+            if (currentVideoId && currentVideoId !== trackedClosureVideoId) {
+                trackedClosureVideoId = currentVideoId;
+                userInteracted = false;
+                timestampLoaded = false;
+            }
+
+            restoreAfterNextMediaMetadata();
+
 
             if (playlistId && currentVideoId && currentVideoId !== lastProcessedVideoId) {
                 log(`[VIDEO] Playlist video change detected: ${lastProcessedVideoId} → ${currentVideoId} in playlist ${playlistId}`);
@@ -1556,25 +1507,7 @@
             }
         });
 
-        addTrackedEventListener(video, 'emptied', () => {
-            simulatedLastContentChangeTime = Date.now();
-            log(`[DRY-RUN] Video emptied detected - content change at ${simulatedLastContentChangeTime}`);
-        });
-
-        // Add src attribute observer for dry-run logging
-        const dryRunSrcObserver = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'attributes' && mutation.attributeName === 'src') {
-                    simulatedLastContentChangeTime = Date.now();
-                    log(`[DRY-RUN] Video src changed - content change at ${simulatedLastContentChangeTime}`);
-                }
-            });
-        });
-        dryRunSrcObserver.observe(video, { attributes: true, attributeFilter: ['src'] });
-        addTrackedObserver(video, dryRunSrcObserver);
-
-        // FIX: Start save interval immediately if video is already playing
-        // This handles SPA navigation where video auto-starts before listeners are attached
+        // SPA navigation can attach listeners after autoplay already started.
         if (!video.paused && !saveIntervalId) {
             log('[SPA] Video already playing during setup, starting save interval immediately');
             startSaveInterval(guardedSaveTimestamp);
@@ -1610,12 +1543,11 @@
     function handlePlaylistNavigation(newVideoId) {
         log(`[PLAYLIST] Handling playlist navigation to video: ${newVideoId}`);
 
-        // Update processed video ID
         lastProcessedVideoId = newVideoId;
         lastSpaNavigationTime = Date.now();
 
-        // CRITICAL: Clear any inherited timing from previous playlist video
-        const existingVideo = document.querySelector('video');
+        // Playlist autoplay may reuse the previous video's playback position.
+        const existingVideo = getPrimaryVideo();
         if (existingVideo) {
             const currentTime = existingVideo.currentTime || 0;
             if (currentTime > 5) {
@@ -1626,24 +1558,12 @@
             }
             // Force reload of video data by clearing cached state
             existingVideo.dataset.lastVideoId = '';
-            existingVideo.dataset.timestampLoaded = 'false';
         }
 
-        // Reset initialization state to allow re-initialization for the new video
+        // Reset initialization state to allow re-initialization for the new video.
+        // The per-video restore flag (timestampLoaded) is reset inside the tracker's
+        // own 'loadstart' handler when the video id changes, so nothing to do here.
         isInitialized = false;
-
-        // Reset timestampLoaded flags for all tracked videos
-        trackedVideos.forEach(video => {
-            if (!video) return;
-            // Clear any explicit timestampLoaded property used by older logic
-            if (video.timestampLoaded !== undefined) {
-                video.timestampLoaded = false;
-            }
-            // Clear dataset flag so restoration logic can run again
-            if (video.dataset) {
-                video.dataset.timestampLoaded = 'false';
-            }
-        });
 
         // Stop any existing initialization interval
         if (initChecker) {
@@ -1652,7 +1572,7 @@
         }
 
         // Try to find and initialize the video element immediately
-        const video = document.querySelector('video');
+        const video = getPrimaryVideo();
         if (video && !trackedVideos.has(video)) {
             log('[PLAYLIST] Video element found immediately, initializing...');
             initializeWithVideo(video);
@@ -1668,7 +1588,7 @@
                             ];
 
                             videos.forEach(video => {
-                                if (!trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
+                                if (video === getPrimaryVideo() && !trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
                                     log('[PLAYLIST] Video element detected by observer, initializing...');
 
                                     // Disconnect the observer
@@ -1723,19 +1643,34 @@
     // This function is called when YouTube's SPA navigation is complete.
     function handleSpaNavigation() {
         const videoId = getVideoId();
+        const previousVideoId = lastProcessedVideoId;
 
         // If we're not on a video page, or it's the same video, do nothing.
-        if (!videoId || videoId === lastProcessedVideoId) {
+        if (!videoId || videoId === previousVideoId) {
             return;
         }
+
+        const outgoingShortsSnapshot = previousVideoId
+            && latestShortsSnapshot?.videoId === previousVideoId
+            ? { ...latestShortsSnapshot }
+            : null;
+        if (outgoingShortsSnapshot) {
+            saveShortsTimestamp(outgoingShortsSnapshot)
+                .catch(error => log('[SPA] Failed to save outgoing Shorts timestamp:', error));
+        }
+
         log(`[SPA] Navigation to new video detected: ${videoId}`);
         lastProcessedVideoId = videoId;
-        lastSpaNavigationTime = Date.now(); // Track when navigation occurred
+        lastSpaNavigationTime = Date.now();
 
-        // CRITICAL: Clear any inherited timing from previous video immediately
-        // This prevents new videos from appearing with the previous video's timing
-        const existingVideo = document.querySelector('video');
-        if (existingVideo) {
+        // Only a real SPA video-to-video transition can inherit a previous
+        // video's time. On the first document video, yt-navigate-finish may
+        // arrive after the extension restored progress; resetting then erases
+        // the valid restore.
+        const existingVideo = getPrimaryVideo();
+        const isShortsToShortsNavigation = !!outgoingShortsSnapshot
+            && window.location.pathname.startsWith('/shorts/');
+        if (previousVideoId && existingVideo && !isShortsToShortsNavigation) {
             const currentTime = existingVideo.currentTime || 0;
             if (currentTime > 5) {
                 log(`[SPA] Clearing inherited timing from previous video (${currentTime}s)`);
@@ -1743,35 +1678,24 @@
             } else {
                 log('[SPA] Skipping timing reset; currentTime already near 0s');
             }
-            // Force reload of video data by clearing cached state
             existingVideo.dataset.lastVideoId = '';
-            existingVideo.dataset.timestampLoaded = 'false';
-            // Also reset any timestampLoaded state
-            if (existingVideo.timestampLoaded !== undefined) {
-                existingVideo.timestampLoaded = false;
-            }
         }
 
-        // Track playlist context for enhanced autoplay handling
+        if (window.location.pathname.startsWith('/shorts/') && existingVideo && !trackedVideos.has(existingVideo)) {
+            log('[SPA] Attaching Shorts tracking immediately to the active video.');
+            setupVideoTracking(existingVideo);
+        }
+
+        // Playlist navigation uses delayed restore because autoplay races setup.
         const isPlaylistNavigation = !!new URLSearchParams(window.location.search).get('list');
         if (isPlaylistNavigation) {
             log(`[SPA] Playlist navigation detected - will use enhanced autoplay timing restoration`);
         }
 
         // Reset the main initialization flag to allow re-initialization for the new page.
+        // The per-video restore flag (timestampLoaded) is reset inside the tracker's own
+        // 'loadstart' handler when the video id changes.
         isInitialized = false;
-        
-        // Reset timestampLoaded flags for all tracked videos to allow restoration retry.
-        // This is critical for SPA navigation where videos might load before getVideo() succeeds.
-        trackedVideos.forEach(video => {
-            if (!video) return;
-            if (video.timestampLoaded !== undefined) {
-                video.timestampLoaded = false;
-            }
-            if (video.dataset) {
-                video.dataset.timestampLoaded = 'false';
-            }
-        });
 
         // Stop any existing initialization interval
         if (initChecker) {
@@ -1790,7 +1714,7 @@
                         ];
 
                         videos.forEach(video => {
-                            if (!trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
+                            if (video === getPrimaryVideo() && !trackedVideos.has(video) && video.offsetWidth > 0 && video.offsetHeight > 0) {
                                 log('[SPA] Video element detected immediately by observer, initializing...');
 
                                 // Enhanced playlist handling: Ensure timing is cleared for new videos
@@ -1798,7 +1722,6 @@
                                     log('[SPA] Playlist context: Forcing timing reset for new video element');
                                     video.currentTime = 0;
                                     video.dataset.lastVideoId = '';
-                                    video.dataset.timestampLoaded = 'false';
                                 }
 
                                 // Disconnect the SPA observer since we found the video
@@ -1812,6 +1735,9 @@
                                 }
 
                                 // Initialize immediately
+                                if (window.location.pathname.startsWith('/shorts/')) {
+                                    setupVideoTracking(video);
+                                }
                                 initializeWithVideo(video);
                             }
                         });
@@ -1827,15 +1753,21 @@
             attributes: false // We only care about new elements, not attribute changes
         });
 
+        const currentSpaVideo = getPrimaryVideo();
+        if (window.location.pathname.startsWith('/shorts/') && currentSpaVideo && !trackedVideos.has(currentSpaVideo)) {
+            log('[SPA] Active Shorts video was already present; attaching tracking immediately.');
+            setupVideoTracking(currentSpaVideo);
+        }
+
         // Fallback timeout-based checking (reduced frequency since observer is primary)
         let spaCheckCount = 0;
         const maxSpaChecks = 3; // Reduced from 5 since observer is primary
 
-        initChecker = setInterval(() => {
+        initChecker = setInterval(async () => {
             spaCheckCount++;
             log(`[SPA] Fallback check for video element (${spaCheckCount}/${maxSpaChecks})...`);
 
-            if (initializeIfNeeded()) {
+            if (await initializeIfNeeded()) {
                 log('Fallback initialization successful after SPA navigation.');
                 cleanupSpaObserver();
             } else if (spaCheckCount >= maxSpaChecks) {
@@ -1859,44 +1791,13 @@
     // Initialize and set up event listeners
     async function initializeIfNeeded() {
         if (isInitialized) {
-            const video = document.querySelector('video');
-            if (video && !trackedVideos.has(video)) {
-                log('Page initialized before video element; attaching video tracking now...');
-                try {
-                    await ytStorage.ensureMigrated();
-                    setupVideoTracking(video);
-                    tryToSavePlaylist();
-                    showExtensionInfo();
-
-                    if (document.body) {
-                        videoObserver.observe(document.body, {
-                            childList: true,
-                            subtree: true
-                        });
-                    }
-                } catch (error) {
-                    log('Error initializing delayed video tracking:', error);
-                    return false;
-                }
-            }
-
-            if (!video && getVideoId()) {
-                return false;
-            }
-
             return true;
         }
 
-        const video = document.querySelector('video');
+        const video = getPrimaryVideo();
         if (video) {
             log('Found video element, initializing...');
             try {
-                // If the video element is being reused from a previous page, clean up old listeners first.
-                if (trackedVideos.has(video)) {
-                    log('[SPA] Reused video element detected. Cleaning up listeners before re-initializing.');
-                    cleanupVideoListeners(video);
-                }
-
                 // Ensure storage is ready
                 await ytStorage.ensureMigrated();
                 log('Storage initialized successfully');
@@ -1904,7 +1805,11 @@
                 // Inject CSS to avoid CSP issues
                 injectCSS();
 
-                setupVideoTracking(video);
+                if (!trackedVideos.has(video)) {
+                    setupVideoTracking(video);
+                } else {
+                    log('[SPA] Reused video element is already tracked; preserving its listeners and restore state.');
+                }
                 tryToSavePlaylist();
                 showExtensionInfo();
 
@@ -1914,10 +1819,7 @@
                     subtree: true
                 });
 
-                // Start observing for thumbnails and process existing ones
-                log('Starting thumbnail observer and processing existing thumbnails.');
-                thumbnailObserver.observe(document.body, { childList: true, subtree: true });
-                processExistingThumbnails();
+                startNativeThumbnailOverlays();
 
                 isInitialized = true;
             } catch (error) {
@@ -1930,7 +1832,7 @@
         if (window.location.pathname.startsWith('/shorts/')) {
             // Shorts pages may load video after script runs, so observe for it
             shortsVideoObserver = new MutationObserver(() => {
-                const shortsVideo = document.querySelector('video');
+                const shortsVideo = getPrimaryVideo();
                 if (shortsVideo && !trackedVideos.has(shortsVideo)) {
                     log('Shorts video element detected by observer, initializing tracking...');
                     setupVideoTracking(shortsVideo);
@@ -1943,300 +1845,10 @@
         return false;
     }
 
-    // Try to save playlist with optimized retry mechanism
-    function tryToSavePlaylist(retries = 3) {
-        // First check if we're even on a page that could have a playlist
-        const urlParams = new URLSearchParams(window.location.search);
-        const playlistId = urlParams.get('list');
-
-        if (!playlistId) {
-            // No playlist ID in URL, no need to retry
-            log('No playlist ID in URL, skipping playlist save');
-            return;
-        }
-
-        log(`Trying to save playlist (${retries} retries left)...`);
-        const playlistInfo = getPlaylistInfo();
-
-        if (playlistInfo) {
-            log('Playlist info found, saving...');
-            savePlaylistInfo(playlistInfo);
-            // Attach UI toggle if possible
-            attachPlaylistIgnoreToggles();
-        } else if (retries > 0) {
-            // Only retry if we have a playlist ID but couldn't get the title
-            // This means the UI probably hasn't loaded yet
-            log(`Playlist title not found for ID ${playlistId}, will retry in 3 seconds... (${retries} retries left)`);
-            clearTimeout(playlistRetryTimeout);
-
-            // Exponential backoff: wait longer between retries
-            const delay = Math.min(3000 * (4 - retries), 5000);
-            playlistRetryTimeout = setTimeout(() => {
-                // Check if we're still on the same playlist before retrying
-                const currentPlaylistId = new URLSearchParams(window.location.search).get('list');
-                if (currentPlaylistId === playlistId) {
-                    tryToSavePlaylist(retries - 1);
-                    attachPlaylistIgnoreToggles();
-                } else {
-                    log('Playlist ID changed, stopping retry attempts');
-                }
-            }, delay);
-        } else {
-            // If we've run out of retries but have a playlist ID, save with a default title
-            if (playlistId) {
-                log('Failed to get playlist title after retries, saving with default title');
-                const defaultInfo = {
-                    playlistId,
-                    title: 'Untitled Playlist',
-                    url: `https://www.youtube.com/playlist?list=${playlistId}`,
-                    timestamp: Date.now()
-                };
-                savePlaylistInfo(defaultInfo);
-                attachPlaylistIgnoreToggles();
-            } else {
-                log('Failed to save playlist after all retries');
-            }
-        }
-    }
-
-    // Attach playlist ignore toggle in playlist header and sidebar panel
-    async function attachPlaylistIgnoreToggles() {
-        try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const playlistId = urlParams.get('list');
-            if (!playlistId) return;
-
-            const playlistRecord = await ytStorage.getPlaylist(playlistId);
-            const isIgnored = !!playlistRecord?.ignoreVideos;
-            log('[Toggle] Preparing toggles for playlist', { playlistId, isIgnored });
-
-            const headerSelectors = [
-                'ytd-playlist-header-renderer',
-                'ytd-playlist-metadata-header-renderer',
-                'yt-page-header-view-model'
-            ];
-            const panelSelector = 'ytd-playlist-panel-renderer';
-
-            // Utility: search inside possible shadow hosts
-            const queryDeep = (root, selector) => {
-                try {
-                    const el = root.querySelector(selector);
-                    if (el) return el;
-                } catch (_) {}
-                return null;
-            };
-
-            const findActionsRow = () => {
-                // 1) Try in document
-                let row = document.querySelector('.ytFlexibleActionsViewModelActionRow');
-                if (row) return row;
-
-                // 2) Try in yt-flexible-actions-view-model shadow
-                const flexHost = document.querySelector('yt-flexible-actions-view-model');
-                if (flexHost && flexHost.shadowRoot) {
-                    row = queryDeep(flexHost.shadowRoot, '.ytFlexibleActionsViewModelActionRow');
-                    if (row) return row;
-                }
-
-                // 3) Try under yt-page-header-view-model shadow
-                const headerHost = document.querySelector('yt-page-header-view-model');
-                if (headerHost && headerHost.shadowRoot) {
-                    row = queryDeep(headerHost.shadowRoot, '.ytFlexibleActionsViewModelActionRow');
-                    if (row) return row;
-                }
-
-                return null;
-            };
-
-            // Helper to create or update a toggle inside a container
-            const ensureToggleIn = (container) => {
-                if (!container) return;
-                try {
-                    // Make container positioned so absolute child works
-                    const stylePos = window.getComputedStyle(container).position;
-                    if (stylePos === 'static') {
-                        container.style.position = 'relative';
-                    }
-                    log('[Toggle] ensureToggleIn container matched', container.tagName || 'node');
-                    let btn = container.querySelector('.ytvht-ignore-toggle');
-                    if (!btn) {
-                        btn = document.createElement('button');
-                        btn.className = 'ytvht-ignore-toggle';
-                        btn.type = 'button';
-                        container.appendChild(btn);
-                        log('[Toggle] Inserted sidebar/context button');
-                    }
-                    const setBtnState = (pressed) => {
-                        btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-                        btn.textContent = pressed ? (chrome.i18n?.getMessage('content_toggle_paused') || 're:Watch — History paused. Click to activate') : (chrome.i18n?.getMessage('content_toggle_pause') || 're:Watch — Click to pause history');
-                        btn.title = pressed ? (chrome.i18n?.getMessage('content_toggle_paused_title') || 're:Watch — History is paused for this playlist. Click to activate tracking') : (chrome.i18n?.getMessage('content_toggle_pause_title') || 're:Watch — Click to pause history for this playlist');
-                    };
-                    setBtnState(isIgnored);
-
-                    btn.onclick = async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        try {
-                            const existing = await ytStorage.getPlaylist(playlistId);
-                            const toggled = !(existing?.ignoreVideos);
-                            const merged = {
-                                ...(existing || {}),
-                                playlistId,
-                                url: `https://www.youtube.com/playlist?list=${playlistId}`,
-                                ignoreVideos: toggled,
-                                lastUpdated: Date.now(),
-                                timestamp: existing?.timestamp || Date.now()
-                            };
-                            await ytStorage.setPlaylist(playlistId, merged);
-                            setBtnState(toggled);
-                        } catch (err) {
-                            // no-op on failure
-                        }
-                    };
-                } catch (err) {
-                    // silent
-                }
-            };
-
-            // Helper to create/update a header-row toggle placed under YT buttons
-            const ensureHeaderToggle = (headerEl) => {
-                if (!headerEl) return;
-                try {
-                    // Prefer placing after actions row if we can find it
-                    let actionsEl = findActionsRow();
-                    if (!actionsEl) {
-                        // Fallback selectors in light DOM
-                        const actionSelectors = [
-                            '#primary-actions',
-                            '#actions',
-                            '#top-level-buttons-computed',
-                            '.actions'
-                        ];
-                        for (const sel of actionSelectors) {
-                            const el = headerEl.querySelector(sel);
-                            if (el) { actionsEl = el; log('[Toggle] Actions row matched selector', sel); break; }
-                        }
-                    }
-
-                    let btn;
-                    if (actionsEl) {
-                        // Place on its own line AFTER the actions row
-                        let row = actionsEl.parentNode?.querySelector('.ytvht-ignore-row');
-                        if (!row) {
-                            row = document.createElement('div');
-                            row.className = 'ytvht-ignore-row';
-                            if (actionsEl.parentNode) {
-                                actionsEl.parentNode.insertBefore(row, actionsEl.nextSibling);
-                            } else {
-                                headerEl.appendChild(row);
-                            }
-                            log('[Toggle] Inserted header row after actions');
-                        }
-                        btn = row.querySelector('.ytvht-ignore-toggle');
-                        if (!btn) {
-                            btn = document.createElement('button');
-                            btn.className = 'ytvht-ignore-toggle header';
-                            btn.type = 'button';
-                            row.appendChild(btn);
-                            log('[Toggle] Inserted header button in its own row');
-                        }
-                    } else {
-                        // Fallback: dedicated row below actions
-                        let row = headerEl.querySelector('.ytvht-ignore-row');
-                        if (!row) {
-                            row = document.createElement('div');
-                            row.className = 'ytvht-ignore-row';
-                            headerEl.appendChild(row);
-                            log('[Toggle] Inserted header row at end of header (no actions found)');
-                        }
-                        btn = row.querySelector('.ytvht-ignore-toggle');
-                        if (!btn) {
-                            btn = document.createElement('button');
-                            btn.className = 'ytvht-ignore-toggle header';
-                            btn.type = 'button';
-                            row.appendChild(btn);
-                            log('[Toggle] Inserted header button in fallback row');
-                        }
-                    }
-
-                    const setBtnState = (pressed) => {
-                        btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-                        btn.textContent = pressed ? (chrome.i18n?.getMessage('content_toggle_paused') || 're:Watch — History paused. Click to activate') : (chrome.i18n?.getMessage('content_toggle_pause') || 're:Watch — Click to pause history');
-                        btn.title = pressed ? (chrome.i18n?.getMessage('content_toggle_paused_title') || 're:Watch — History is paused for this playlist. Click to activate tracking') : (chrome.i18n?.getMessage('content_toggle_pause_title') || 're:Watch — Click to pause history for this playlist');
-                    };
-                    setBtnState(isIgnored);
-
-                    btn.onclick = async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        try {
-                            const existing = await ytStorage.getPlaylist(playlistId);
-                            const toggled = !(existing?.ignoreVideos);
-                            const merged = {
-                                ...(existing || {}),
-                                playlistId,
-                                url: `https://www.youtube.com/playlist?list=${playlistId}`,
-                                ignoreVideos: toggled,
-                                lastUpdated: Date.now(),
-                                timestamp: existing?.timestamp || Date.now()
-                            };
-                            await ytStorage.setPlaylist(playlistId, merged);
-                            setBtnState(toggled);
-                        } catch (err) {
-                            // silent
-                        }
-                    };
-                } catch (err) {
-                    // silent
-                }
-            };
-
-            // Playlist page header(s) — place below the action buttons
-            for (const sel of headerSelectors) {
-                const header = document.querySelector(sel);
-                if (header) { log('[Toggle] Header matched selector', sel); ensureHeaderToggle(header); }
-            }
-
-            // Right sidebar playlist panel on watch page
-            const panel = document.querySelector(panelSelector);
-            if (panel) { log('[Toggle] Sidebar panel found'); ensureToggleIn(panel); }
-
-            // If still no header toggle, try absolute insertion into yt-page-header-view-model content
-            const pageHeader = document.querySelector('yt-page-header-view-model');
-            if (pageHeader && !pageHeader.querySelector('.ytvht-ignore-toggle')) {
-                log('[Toggle] Fallback inserting into page header');
-                ensureHeaderToggle(pageHeader);
-            }
-        } catch (_) {
-            // silent
-        }
-    }
-
-    // Ensure toggles exist on playlist pages (where no video element may exist)
-    function ensurePlaylistIgnoreToggles(retries = 12) {
-        try {
-            const hasList = new URLSearchParams(window.location.search).get('list');
-            if (!hasList) return;
-
-            attachPlaylistIgnoreToggles();
-
-            if (retries > 0) {
-                const header = document.querySelector('yt-page-header-view-model, ytd-playlist-header-renderer, ytd-playlist-metadata-header-renderer');
-                const headerToggle = header ? header.querySelector('.ytvht-ignore-toggle') : null;
-                if (!headerToggle) {
-                    const delay = 500;
-                    setTimeout(() => ensurePlaylistIgnoreToggles(retries - 1), delay);
-                }
-            }
-        } catch (e) {
-            // silent
-        }
-    }
-
     // Start observing for video element and playlist changes
-    initChecker = setInterval(() => {
+    initChecker = setInterval(async () => {
         log('Checking for video element...');
-        if (initializeIfNeeded()) {
+        if (await initializeIfNeeded()) {
             log('Initialization successful. Stopping checker.');
             clearInterval(initChecker);
             initChecker = null;
@@ -2246,706 +1858,54 @@
     // Initialize immediately and also retry if needed
     initializeIfNeeded();
 
-    // Update overlays to use currentSettings.overlayTitle and overlayColor
-    function getVideoIdFromThumbnail(thumbnail) {
-        // Check for playlist panel video renderers first (most specific)
-        if (thumbnail.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' || thumbnail.closest('ytd-playlist-panel-video-renderer')) {
-            // Try to get from the video ID from the href attribute
-            const videoLink = thumbnail.querySelector('a#wc-endpoint[href*="watch?v="]');
-            if (videoLink) {
-                return videoLink.href.match(/[?&]v=([^&]+)/)?.[1];
-            }
-
-            // Try to get from the thumbnail link
-            const thumbnailLink = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
-            if (thumbnailLink) {
-                return thumbnailLink.href.match(/[?&]v=([^&]+)/)?.[1];
-            }
-        }
-
-        // Check for regular playlist video renderers
-        if (thumbnail.tagName === 'YTD-PLAYLIST-VIDEO-RENDERER' || thumbnail.closest('ytd-playlist-video-renderer')) {
-            const videoId = thumbnail.getAttribute('data-video-id') || thumbnail.getAttribute('video-id');
-            if (videoId) return videoId;
-
-            const playlistLink = thumbnail.querySelector('a#video-title[href*="watch?v="], a#thumbnail[href*="watch?v="]');
-            if (playlistLink) {
-                return playlistLink.href.match(/[?&]v=([^&]+)/)?.[1];
-            }
-        }
-
-        // Check for compact video renderer (right column)
-        if (thumbnail.tagName === 'YTD-COMPACT-VIDEO-RENDERER' || thumbnail.closest('ytd-compact-video-renderer')) {
-            const videoId = thumbnail.getAttribute('video-id');
-            if (videoId) return videoId;
-
-            const compactLink = thumbnail.querySelector('a#thumbnail[href*="watch?v="]');
-            if (compactLink) {
-                return compactLink.href.match(/[?&]v=([^&]+)/)?.[1];
-            }
-        }
-
-        if (thumbnail.tagName === 'YT-LOCKUP-VIEW-MODEL' || thumbnail.closest('yt-lockup-view-model')) {
-            const lockupLink = thumbnail.querySelector('a[href*="watch?v="]');
-            if (lockupLink) {
-                const videoId = lockupLink.href.match(/[?&]v=([^&]+)/)?.[1];
-                return videoId;
-            }
-        }
-
-        // Check for regular video links (legacy ids) and generic anchors
-        let anchor = thumbnail.querySelector('a#thumbnail[href*="watch?v="], a#video-title[href*="watch?v="]');
-        if (anchor) {
-            return anchor.href.match(/[?&]v=([^&]+)/)?.[1];
-        }
-
-        // New home layout often uses anchors without ids
-        anchor = thumbnail.querySelector('a[href*="/watch?v="]');
-        if (anchor) {
-            return anchor.href.match(/[?&]v=([^&]+)/)?.[1];
-        }
-
-        // Some containers expose a data attribute with the id
-        const dataVideoId = thumbnail.getAttribute('data-video-id') ||
-                            thumbnail.getAttribute('data-context-item-id') ||
-                            thumbnail.getAttribute('data-content-id');
-        if (dataVideoId && /^[a-zA-Z0-9_-]{11}$/.test(dataVideoId)) {
-            return dataVideoId;
-        }
-
-        // Check if the thumbnail itself is the anchor
-        if (thumbnail.tagName === 'A' && (thumbnail.id === 'thumbnail' || thumbnail.id === 'video-title')) {
-            if (thumbnail.href.includes('watch?v=')) {
-                return thumbnail.href.match(/[?&]v=([^&]+)/)?.[1];
-            }
-            // Check for Shorts
-            if (thumbnail.href.includes('/shorts/')) {
-                return thumbnail.href.match(/\/shorts\/([^\/\?]+)/)?.[1];
-            }
-        }
-
-        // Check for Shorts links in nested elements
-        anchor = thumbnail.querySelector('a[href*="/shorts/"]');
-        if (anchor) {
-            return anchor.href.match(/\/shorts\/([^\/\?]+)/)?.[1];
-        }
-
-        return null;
-    }
-
-    function addViewedLabelToThumbnail(thumbnailElement, videoId) {
-        if (!thumbnailElement || !videoId) return;
-
-        // For playlist items, we need to target the thumbnail container
-        let targetElement = thumbnailElement;
-
-        if (thumbnailElement.tagName === 'YT-LOCKUP-VIEW-MODEL' || thumbnailElement.closest('yt-lockup-view-model')) {
-            const thumbnailContainer = thumbnailElement.querySelector('.yt-lockup-view-model-wiz__content-image') ||
-                                       thumbnailElement.querySelector('a[href*="/watch?v="]') ||
-                                       thumbnailElement.querySelector('ytd-thumbnail') ||
-                                       thumbnailElement.querySelector('#thumbnail');
-            if (thumbnailContainer) {
-                targetElement = thumbnailContainer;
-            } else {
-                // Fallback to the entire tile to ensure visibility on new layouts
-                targetElement = thumbnailElement;
-            }
-        }
-        // If we're in a playlist panel video renderer, find the thumbnail container
-        else if (thumbnailElement.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' || thumbnailElement.closest('ytd-playlist-panel-video-renderer')) {
-            const thumbnailContainer = thumbnailElement.querySelector('#thumbnail-container ytd-thumbnail') ||
-                                    thumbnailElement.querySelector('ytd-thumbnail') ||
-                                    thumbnailElement.querySelector('#thumbnail-container');
-            if (thumbnailContainer) {
-                targetElement = thumbnailContainer;
-            } else {
-                return; // Can't find a suitable container
-            }
-        }
-        // For regular playlist items
-        else if (thumbnailElement.tagName === 'YTD-PLAYLIST-VIDEO-RENDERER' || thumbnailElement.closest('ytd-playlist-video-renderer')) {
-            const thumbnailContainer = thumbnailElement.querySelector('ytd-thumbnail') ||
-                                    thumbnailElement.querySelector('a#thumbnail');
-            if (thumbnailContainer) {
-                targetElement = thumbnailContainer;
-            } else {
-                return;
-            }
-        }
-        // For other video types, keep existing logic
-        else if (thumbnailElement.tagName !== 'YTD-THUMBNAIL' && !(thumbnailElement.tagName === 'A' && thumbnailElement.id === 'thumbnail')) {
-            const inner = thumbnailElement.querySelector('ytd-thumbnail, a#thumbnail, a[href*="/watch?v="]');
-            if (inner) {
-                targetElement = inner;
-            } else {
-                // As a last resort, overlay the element itself
-                targetElement = thumbnailElement;
-            }
-        }
-
-        // Ensure the target element has relative positioning
-        targetElement.style.position = 'relative';
-
-        const videoContainer =
-            thumbnailElement.closest('ytd-rich-item-renderer') ||
-            thumbnailElement.closest('ytd-grid-video-renderer') ||
-            thumbnailElement.closest('ytd-video-renderer') ||
-            thumbnailElement.closest('ytd-playlist-video-renderer') ||
-            thumbnailElement.closest('ytd-playlist-panel-video-renderer') ||
-            thumbnailElement.closest('ytd-compact-video-renderer') ||
-            thumbnailElement.closest('yt-lockup-view-model') ||
-            thumbnailElement;
-        videoContainer.querySelectorAll('.ytvht-viewed-label, .ytvht-progress-bar, .ytvht-remove-button').forEach(existingOverlay => {
-            if (!targetElement.contains(existingOverlay)) {
-                existingOverlay.remove();
-            }
-        });
-
-        let label = targetElement.querySelector('.ytvht-viewed-label');
-        let progress = targetElement.querySelector('.ytvht-progress-bar');
-        let removeBtn = targetElement.querySelector('.ytvht-remove-button');
-
-        ytStorage.getVideo(videoId).then(record => {
-            videoContainer.querySelectorAll('.ytvht-viewed-label, .ytvht-progress-bar, .ytvht-remove-button').forEach(existingOverlay => {
-                if (!targetElement.contains(existingOverlay)) {
-                    existingOverlay.remove();
-                }
-            });
-
-            label = targetElement.querySelector('.ytvht-viewed-label');
-            progress = targetElement.querySelector('.ytvht-progress-bar');
-            removeBtn = targetElement.querySelector('.ytvht-remove-button');
-
-            if (record) {
-                const size = OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium;
-                const color = OVERLAY_COLORS[currentSettings.overlayColor];
-
-                updateOverlayCSS(size, color);
-
-                if (!label) {
-                    label = document.createElement('div');
-                    label.className = 'ytvht-viewed-label';
-                    targetElement.appendChild(label);
-                }
-
-                if (label.textContent !== currentSettings.overlayTitle) {
-                    label.textContent = currentSettings.overlayTitle;
-                }
-
-                if (!progress) {
-                    progress = document.createElement('div');
-                    progress.className = 'ytvht-progress-bar';
-                    targetElement.appendChild(progress);
-                }
-
-                const newWidth = `${(record.time / record.duration) * 100}%`;
-                if (progress.style.width !== newWidth) {
-                    progress.style.width = newWidth;
-                }
-
-                if (!removeBtn) {
-                    removeBtn = document.createElement('button');
-                    removeBtn.className = 'ytvht-remove-button';
-                    removeBtn.setAttribute('type', 'button');
-                    removeBtn.setAttribute('title', 'Remove from YT re:Watch history');
-                    removeBtn.textContent = '×';
-                    removeBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        ytStorage.removeVideo(videoId).then(() => {
-                            label?.remove();
-                            progress?.remove();
-                            removeBtn?.remove();
-                        }).catch(() => {
-                            // no-op: silent fail
-                        });
-                    }, { once: false });
-                    targetElement.appendChild(removeBtn);
-                }
-            } else {
-                label?.remove();
-                progress?.remove();
-                removeBtn?.remove();
-            }
-        }).catch(error => {
-            log('[Error] Failed to process thumbnail', { videoId, error });
-            label?.remove();
-            progress?.remove();
-        });
-    }
-
-    // Update the mutation observer to include playlist panel items
-    thumbnailObserver = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            // Handle attribute changes that might indicate content loading
-            if (mutation.type === 'attributes') {
-                const target = mutation.target;
-                if (target.tagName === 'IMG' && target.id === 'img') {
-                    const videoElement = target.closest('ytd-playlist-panel-video-renderer, ytd-playlist-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer, yt-lockup-view-model');
-                    if (videoElement) {
-                        processVideoElement(videoElement);
-                    }
-                }
-                return;
-            }
-
-            // Handle added nodes
-            mutation.addedNodes.forEach((node) => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    // Process the node itself if it's a video element
-                    if (node.tagName && (
-                        node.tagName === 'YTD-PLAYLIST-PANEL-VIDEO-RENDERER' ||
-                        node.tagName === 'YTD-PLAYLIST-VIDEO-RENDERER' ||
-                        node.tagName === 'YTD-RICH-ITEM-RENDERER' ||
-                        node.tagName === 'YTD-GRID-VIDEO-RENDERER' ||
-                        node.tagName === 'YTD-VIDEO-RENDERER' ||
-                        node.tagName === 'YTD-COMPACT-VIDEO-RENDERER' ||
-                        node.tagName === 'YTD-COMPACT-RADIO-RENDERER' ||
-                        node.tagName === 'YT-LOCKUP-VIEW-MODEL'
-                    )) {
-                        processVideoElement(node);
-                    }
-
-                    // Also check for video elements inside the added node
-                    const videoElements = node.querySelectorAll('ytd-playlist-panel-video-renderer, ytd-playlist-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-compact-radio-renderer, yt-lockup-view-model');
-                    if (videoElements.length > 0) {
-                        videoElements.forEach(element => processVideoElement(element));
-                    }
-                }
-            });
-        });
+    const thumbnailHelpers = window.YTVHTContentThumbnails.create({
+        log,
+        getStorage: () => ytStorage,
+        getCurrentSettings: () => currentSettings,
+        updateOverlayCSS,
+        overlayColors: OVERLAY_COLORS,
+        overlayLabelSizeMap: OVERLAY_LABEL_SIZE_MAP,
+        getAccentOverlayColor,
+        pendingOperations
     });
+    thumbnailObserver = thumbnailHelpers.thumbnailObserver;
+    processExistingThumbnails = thumbnailHelpers.processExistingThumbnails;
+    thumbnailHelpers.startRemovedElementCleanupObserver();
+    startNativeThumbnailOverlays();
 
-    // Add processing for playlist panel items
-    function processExistingThumbnails() {
-        // Process playlist panel videos first (most specific)
-        const playlistPanelVideos = document.querySelectorAll('ytd-playlist-panel-video-renderer');
-        playlistPanelVideos.forEach(element => processVideoElement(element));
-
-        // Process regular playlist videos
-        const playlistVideos = document.querySelectorAll('ytd-playlist-video-renderer');
-        playlistVideos.forEach(element => processVideoElement(element));
-
-        // Process main feed thumbnails
-        // Include new lockup-based tiles on home page
-        const mainThumbnails = document.querySelectorAll('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, yt-lockup-view-model');
-        mainThumbnails.forEach(element => processVideoElement(element));
-
-        // Process right column recommendations
-        const rightColumnThumbnails = document.querySelectorAll('ytd-compact-video-renderer, ytd-compact-radio-renderer, yt-lockup-view-model');
-        rightColumnThumbnails.forEach(element => processVideoElement(element));
-    }
-
-    // Enhanced processVideoElement with improved cleanup and debug logging
-    function processVideoElement(element) {
-        if (!element || !element.isConnected) {
-            if (currentSettings?.debug) log('[Overlay] Skipping invalid or disconnected element');
-            return;
+    messageListener = window.YTVHTContentMessages.create({
+        log,
+        getStorage: () => ytStorage,
+        isInitialized: () => isInitialized,
+        initializeIfNeeded,
+        injectCSS,
+        updateOverlayCSS,
+        overlayColors: OVERLAY_COLORS,
+        overlayLabelSizeMap: OVERLAY_LABEL_SIZE_MAP,
+        getAccentOverlayColor,
+        setCurrentSettings: (settings) => {
+            currentSettings = settings;
+        },
+        processExistingThumbnails: () => {
+            if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS) processExistingThumbnails();
         }
-
-        // Clean up any existing pending operations for this element
-        if (pendingOperations.has(element)) {
-            const ops = pendingOperations.get(element);
-            if (ops.timeout) {
-                if (currentSettings?.debug) log('[Overlay] Clearing existing timeout for element');
-                clearTimeout(ops.timeout);
-            }
-            if (ops.rafId) {
-                if (currentSettings?.debug) log('[Overlay] Cancelling existing animation frame for element');
-                cancelAnimationFrame(ops.rafId);
-            }
-            pendingOperations.delete(element);
-        }
-
-        const ops = {};
-
-        const process = (retryCount = 0) => {
-            if (!element.isConnected) {
-                if (currentSettings?.debug) log('[Overlay] Element no longer connected, aborting');
-                return;
-            }
-
-            const videoId = getVideoIdFromThumbnail(element);
-            if (videoId) {
-                // YouTube home uses templated/shadow DOM; skip strict HTML containment check
-                addViewedLabelToThumbnail(element, videoId);
-                return;
-            }
-
-            // Retry logic with exponential backoff
-            if (retryCount < 2) {
-                const delay = 100 * (retryCount + 1);
-                // Don't log retry attempts - they're normal behavior
-                ops.timeout = setTimeout(() => {
-                    ops.timeout = null;
-                    process(retryCount + 1);
-                }, delay);
-                pendingOperations.set(element, ops);
-            } // No logging for max retries - normal behavior with YouTube's dynamic content
-        };
-
-        // Initial processing - no need to log this
-        ops.rafId = requestAnimationFrame(() => {
-            ops.rafId = null;
-            process();
-        });
-
-        pendingOperations.set(element, ops);
-    }
-
-    // Add cleanup observer for removed elements
-    if (typeof MutationObserver !== 'undefined' && !window.ytvhtCleanupObserver) {
-        window.ytvhtCleanupObserver = new MutationObserver((mutations) => {
-            if (!currentSettings?.debug) return;
-
-            mutations.forEach((mutation) => {
-                mutation.removedNodes.forEach((node) => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        const elements = [node, ...node.querySelectorAll('*')];
-                        elements.forEach(el => {
-                            if (pendingOperations.has(el)) {
-                                // Don't log cleanup of removed elements by default
-                                const ops = pendingOperations.get(el);
-                                if (ops.timeout) clearTimeout(ops.timeout);
-                                if (ops.rafId) cancelAnimationFrame(ops.rafId);
-                                pendingOperations.delete(el);
-                            }
-                        });
-                    }
-                });
-            });
-        });
-
-        window.ytvhtCleanupObserver.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-
-        // Don't log observer startup
-    }
-
-    // Handle messages from popup
-    messageListener = function(message, sender, sendResponse) {
-        if (message.type === 'getHistory') {
-            if (!isInitialized) {
-                log('Not initialized yet, initializing now');
-                initializeIfNeeded();
-            }
-            ytStorage.getAllVideos().then(allVideos => {
-                const history = Object.values(allVideos);
-                log('Sending history to popup:', history);
-                sendResponse({history: history});
-            }).catch(error => {
-                log('Error getting history:', error);
-                sendResponse({history: []});
-            });
-            return true;
-        } else if (message.type === 'exportHistory') {
-            if (!isInitialized) {
-                log('Not initialized yet, initializing now');
-                initializeIfNeeded();
-            }
-            Promise.all([
-                ytStorage.getAllVideos(),
-                ytStorage.getAllPlaylists()
-            ]).then(([allVideos, allPlaylists]) => {
-                const history = Object.values(allVideos);
-                const playlists = Object.values(allPlaylists);
-                log('Sending export data to popup:', { history, playlists });
-                sendResponse({history: history, playlists: playlists});
-            }).catch(error => {
-                log('Error getting export data:', error);
-                sendResponse({history: [], playlists: []});
-            });
-            return true;
-        } else if (message.type === 'pauseVideoForImport') {
-            try {
-                const video = document.querySelector('video');
-                if (video && !video.paused) {
-                    video.pause();
-                    log('Paused video for import flow');
-                }
-                sendResponse({ status: 'success' });
-            } catch (error) {
-                log('Error pausing video for import:', error);
-                sendResponse({ status: 'error', error: error && error.message ? error.message : String(error) });
-            }
-            return true;
-        } else if (message.type === 'clearHistory') {
-            ytStorage.clear().then(() => {
-                log('History cleared successfully');
-                sendResponse({status: 'success'});
-            }).catch(error => {
-                log('Error clearing history:', error);
-                sendResponse({status: 'error'});
-            });
-            return true;
-        } else if (message.type === 'deleteRecord') {
-            const videoId = message.videoId;
-            ytStorage.removeVideo(videoId).then(() => {
-                log('Record deleted successfully:', videoId);
-                sendResponse({status: 'success'});
-            }).catch(error => {
-                log('Error deleting record:', videoId);
-                sendResponse({status: 'error'});
-            });
-            return true;
-        } else if (message.type === 'getPlaylists') {
-            ytStorage.getAllPlaylists().then(allPlaylists => {
-                const playlists = Object.values(allPlaylists);
-                log('Sending playlists to popup:', playlists);
-                sendResponse({playlists: playlists});
-            }).catch(error => {
-                log('Error getting playlists:', error);
-                sendResponse({playlists: []});
-            });
-            return true;
-        } else if (message.type === 'deletePlaylist') {
-            const playlistId = message.playlistId;
-            ytStorage.removePlaylist(playlistId).then(() => {
-                log('Playlist deleted successfully:', playlistId);
-                sendResponse({status: 'success'});
-            }).catch(error => {
-                log('Error deleting playlist:', playlistId);
-                sendResponse({status: 'error'});
-            });
-            return true;
-        } else if (message.type === 'updateSettings') {
-            currentSettings = message.settings;
-            // If debug was toggled, log the change
-            if (currentSettings.debug) {
-                console.log('[ythdb] Debug mode enabled');
-            }
-            injectCSS();
-            updateOverlayCSS(
-                OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium,
-                OVERLAY_COLORS[currentSettings.overlayColor] || OVERLAY_COLORS.blue
-            );
-            // Reprocess thumbnails with new settings
-            processExistingThumbnails();
-            sendResponse({status: 'success'});
-            return true;
-        }
-        return false;
-    };
+    });
 
     chrome.runtime.onMessage.addListener(messageListener);
 
-    function showExtensionInfo() {
-        // Check if we've already shown the info
-        storage.get(['infoShown']).then(result => {
-            if (!result.infoShown) {
-                const topLevelButtons = document.querySelector('#top-level-buttons-computed');
-                if (!topLevelButtons) return;
+    const { showExtensionInfo } = window.YTVHTContentInfo.create({
+        log,
+        storage
+    });
 
-                // Create info container
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'ytvht-info';
+    const {
+        maybeShowImportOverlayFromHash
+    } = window.YTVHTContentImport.create({
+        log,
+        getStorage: () => ytStorage
+    });
 
-                // Create content structure using CSS classes
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'ytvht-info-content';
-
-                const textDiv = document.createElement('div');
-                textDiv.className = 'ytvht-info-text';
-
-                const titleDiv = document.createElement('div');
-                titleDiv.className = 'ytvht-info-title';
-                titleDiv.textContent = '📺 YouTube History Tracker Active';
-
-                const descDiv = document.createElement('div');
-                descDiv.className = 'ytvht-info-description';
-                descDiv.innerHTML = 'Your video progress is being tracked! Click the extension icon <span class="ytvht-info-highlight">↗️</span> in the toolbar to view your history.';
-
-                const closeButton = document.createElement('button');
-                closeButton.className = 'ytvht-close';
-                closeButton.textContent = '×';
-
-                // Assemble the structure
-                textDiv.appendChild(titleDiv);
-                textDiv.appendChild(descDiv);
-                contentDiv.appendChild(textDiv);
-                contentDiv.appendChild(closeButton);
-                infoDiv.appendChild(contentDiv);
-
-                // Add close button functionality
-                closeButton.addEventListener('click', () => {
-                    infoDiv.style.display = 'none';
-                    // Remember that we've shown the info
-                    storage.set({ infoShown: true });
-                });
-
-                // Insert the info div
-                const container = topLevelButtons.closest('#actions');
-                if (container) {
-                    container.style.position = 'relative';
-                    container.appendChild(infoDiv);
-                } else {
-                    topLevelButtons.parentElement.style.position = 'relative';
-                    topLevelButtons.parentElement.appendChild(infoDiv);
-                }
-
-                // Log that we're showing the info
-                log('Info div added to page');
-            }
-        }).catch(error => {
-            log('Error checking infoShown status:', error);
-        });
-    }
-
-    // Import overlay functionality
-    async function runImport(records, playlists, mergeMode) {
-        return ytStorage.importRecords(records || [], playlists || [], !!mergeMode);
-    }
-
-    function maybeShowImportOverlayFromHash() {
-        if (window.location.hash === '#ytlh_import') {
-            showImportOverlay();
-        }
-    }
-
-    function showImportOverlay() {
-        if (document.getElementById('ytvhtImportOverlay')) {
-            return;
-        }
-        if (!document.body) {
-            return;
-        }
-
-        const overlay = document.createElement('div');
-        overlay.id = 'ytvhtImportOverlay';
-        overlay.style.position = 'fixed';
-        overlay.style.inset = '0';
-        overlay.style.background = 'rgba(0,0,0,0.4)';
-        overlay.style.zIndex = '999999';
-        overlay.style.display = 'flex';
-        overlay.style.alignItems = 'center';
-        overlay.style.justifyContent = 'center';
-
-        const modal = document.createElement('div');
-        modal.style.background = '#222';
-        modal.style.color = '#fff';
-        modal.style.padding = '20px';
-        modal.style.borderRadius = '8px';
-        modal.style.minWidth = '360px';
-        modal.style.maxWidth = '480px';
-        modal.style.boxShadow = '0 4px 16px rgba(0,0,0,0.5)';
-
-        modal.innerHTML = `
-            <h3 style="margin-top:0;margin-bottom:12px;">Choose a file to import:</h3>
-            <input id="ytvhtImportFile" type="file" accept=".json" style="margin: 10px 0; width: 100%;">
-            <div style="margin: 10px 0; font-size: 13px;">
-                <label style="margin-right:12px;">
-                    <input id="ytvhtImportMerge" type="radio" name="ytvhtImportMode" checked>
-                    Merge with existing data
-                </label>
-                <label>
-                    <input id="ytvhtImportReplace" type="radio" name="ytvhtImportMode">
-                    Replace existing data
-                </label>
-            </div>
-            <div style="margin-top: 12px; text-align: right;">
-                <button id="ytvhtImportCancel" style="margin-right:8px;">Cancel</button>
-                <button id="ytvhtImportStart">Import</button>
-            </div>
-            <div id="ytvhtImportStatus" style="margin-top: 10px; font-size: 12px;"></div>
-        `;
-
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
-
-        const fileInput = modal.querySelector('#ytvhtImportFile');
-        const mergeRadio = modal.querySelector('#ytvhtImportMerge');
-        const statusEl = modal.querySelector('#ytvhtImportStatus');
-
-        modal.querySelector('#ytvhtImportCancel').onclick = () => {
-            overlay.remove();
-            if (window.location.hash === '#ytlh_import') {
-                try {
-                    history.replaceState(null, '', window.location.pathname + window.location.search);
-                } catch (e) {
-                    log('Error clearing import hash:', e);
-                }
-            }
-        };
-
-        modal.querySelector('#ytvhtImportStart').onclick = async () => {
-            const file = fileInput.files && fileInput.files[0];
-            if (!file) {
-                statusEl.textContent = 'Please choose a JSON file.';
-                return;
-            }
-
-            try {
-                statusEl.textContent = 'Reading file...';
-                const text = await file.text();
-                const data = JSON.parse(text);
-
-                let records = [];
-                let playlists = [];
-                let mergeMode = !!mergeRadio.checked;
-
-                if (data && typeof data === 'object' && data.history) {
-                    if (Array.isArray(data.history)) {
-                        records = data.history;
-                    } else if (typeof data.history === 'object') {
-                        records = Object.values(data.history);
-                    } else {
-                        throw new Error('Invalid file format: unexpected history structure');
-                    }
-
-                    if (Array.isArray(data.playlists)) {
-                        playlists = data.playlists;
-                    } else if (data.playlists && typeof data.playlists === 'object') {
-                        playlists = Object.values(data.playlists);
-                    }
-                } else if (Array.isArray(data)) {
-                    records = data;
-                    mergeMode = false;
-                } else {
-                    throw new Error('Invalid file format: expected an array of videos or an object with history/playlists');
-                }
-
-                if (!records.length && !playlists.length) {
-                    statusEl.textContent = 'No videos or playlists found in file.';
-                    return;
-                }
-
-                statusEl.textContent = 'Importing...';
-
-                try {
-                    const response = await runImport(records, playlists, mergeMode);
-
-                    if (response && response.status === 'success') {
-                        statusEl.textContent =
-                            `Import complete: ${response.importedVideos} videos, ` +
-                            `${response.importedPlaylists} playlists.`;
-                    } else {
-                        const errorMsg = response && response.error ? response.error : 'Unknown error';
-                        statusEl.textContent = `Import failed: ${errorMsg}`;
-                        console.error('Import failed:', errorMsg);
-                    }
-                } catch (importError) {
-                    console.error('Import overlay error:', importError);
-                    let errorMsg = importError.message || 'Unknown error';
-                    
-                    // Provide user-friendly error messages
-                    if (errorMsg.includes('Extension context invalidated') || errorMsg.includes('Background script')) {
-                        errorMsg = 'Extension context lost. Please reload the extension and try again.';
-                    } else if (errorMsg.includes('IndexedDB')) {
-                        errorMsg = 'IndexedDB not available. Please reload the extension.';
-                    }
-                    
-                    statusEl.textContent = `Error: ${errorMsg}`;
-                }
-            } catch (err) {
-                console.error('Import overlay error:', err);
-                statusEl.textContent = `Error: ${err.message || 'Unknown error'}`;
-            }
-        };
-    }
-
-    // Update initialize() to handle version updates
+    // Initialize the content script once per YouTube document lifecycle.
     async function initialize() {
         if (isInitialized) {
             return true;
@@ -2955,7 +1915,6 @@
             injectCSS();
             const settings = await loadSettings() || DEFAULT_SETTINGS;
 
-            // Check for version update
             if (settings.version !== EXTENSION_VERSION) {
                 log('Version updated:', { old: settings.version, new: EXTENSION_VERSION });
                 settings.version = EXTENSION_VERSION;
@@ -2965,26 +1924,18 @@
             currentSettings = settings;
             updateOverlayCSS(
                 OVERLAY_LABEL_SIZE_MAP[currentSettings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium,
-                OVERLAY_COLORS[currentSettings.overlayColor] || OVERLAY_COLORS.blue
+                getAccentOverlayColor(currentSettings)
             );
 
-            // Start observing immediately
-            if (document.body) {
-                thumbnailObserver.observe(document.body, {
-                    childList: true,
-                    subtree: true,
-                    attributes: true,
-                    attributeFilter: ['src', 'href', 'data-visibility-tracking']
-                });
-
-                processExistingThumbnails();
-
-                // Set up a backup check for lazy-loaded content
-                setTimeout(processExistingThumbnails, 2000);
-            }
+            startNativeThumbnailOverlays();
 
             // Intercept video link clicks to add timestamps
             interceptVideoLinkClicks();
+
+            const primaryVideo = getPrimaryVideo();
+            if (primaryVideo && !trackedVideos.has(primaryVideo)) {
+                setupVideoTracking(primaryVideo);
+            }
 
             isInitialized = true;
             
@@ -3014,15 +1965,13 @@
         checkUrlChange();
     });
 
-    // ENHANCED PLAYLIST NAVIGATION DETECTION
-    // Detect playlist video changes that don't trigger yt-navigate-finish
+    // Poll playlist videos because some autoplay hops skip YouTube navigation events.
     let lastPlaylistVideoId = null;
     playlistNavigationCheckInterval = setInterval(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const playlistId = urlParams.get('list');
         const currentVideoId = getVideoId();
 
-        // Only monitor if we're in a playlist
         if (playlistId && currentVideoId) {
             if (currentVideoId !== lastPlaylistVideoId) {
                 if (lastPlaylistVideoId) {
@@ -3033,21 +1982,20 @@
                 lastPlaylistVideoId = currentVideoId;
             }
         } else {
-            // Not in a playlist anymore
             lastPlaylistVideoId = null;
         }
-    }, 500); // Check every 500ms for playlist changes
+    }, 500);
 
-    // Periodic URL checking as fallback (every 500ms)
+    // Periodic URL checking catches route changes missed by YouTube events.
     urlCheckIntervalId = setInterval(checkUrlChange, 500);
 
-    // Try additional YouTube navigation events
+    // YouTube emits this on some route updates but not consistently.
     window.addEventListener('yt-page-data-updated', () => {
         log('[NAVIGATION] yt-page-data-updated event detected');
         checkUrlChange();
     });
 
-    // Debounced URL check for history API changes
+    // Coalesce pushState/replaceState bursts into one route check.
     function debouncedUrlCheck() {
         if (historyApiTimeout) clearTimeout(historyApiTimeout);
         historyApiTimeout = setTimeout(() => {
@@ -3056,7 +2004,7 @@
         }, 10);
     }
 
-    // Listen for history API changes
+    // YouTube routing often goes through History API calls.
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
 
@@ -3072,18 +2020,17 @@
         debouncedUrlCheck();
     };
 
-    // Also ensure playlist toggles on direct playlist pages
+    // Direct playlist URLs may not trigger the normal page-data event.
     ensurePlaylistIgnoreToggles();
 
-    // Update the storage change listener to use the improved thumbnail processing
+    // Refresh extension-feed overlays when local history/playlists change.
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area === 'local') {
                 const hasVideoChanges = Object.keys(changes).some(key =>
                     key.startsWith('video_') || key.startsWith('playlist_')
                 );
-                if (hasVideoChanges) {
-                    // Use the improved processing function
+                if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS && hasVideoChanges) {
                     processExistingThumbnails();
                 }
             }
@@ -3094,7 +2041,7 @@
                 const hasVideoChanges = Object.keys(changes).some(key =>
                     key.startsWith('video_') || key.startsWith('playlist_')
                 );
-                if (hasVideoChanges) {
+                if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS && hasVideoChanges) {
                     // Use the improved processing function
                     processExistingThumbnails();
                 }
@@ -3105,6 +2052,11 @@
     // Expose internal navigation helpers for tests only.
     // This is a no-op in production because __YTVHT_TEST__ is not defined.
     if (typeof window !== 'undefined' && window.__YTVHT_TEST__) {
+        const resetVideoTrackingForTests = () => {
+            [...trackedVideos].forEach(video => cleanupVideoListeners(video));
+            pendingRestoreAfterMediaChange = null;
+            latestShortsSnapshot = null;
+        };
         window.__YTVHT_TEST__.navigation = {
             handleSpaNavigation,
             handlePlaylistNavigation,
@@ -3112,10 +2064,18 @@
             getLastProcessedVideoId: () => lastProcessedVideoId
         };
         window.__YTVHT_TEST__.core = {
+            loadSettings,
             saveTimestamp,
             saveShortsTimestamp,
             savePlaylistInfo,
-            loadSettings
+            ensurePlaylistIgnoreToggles,
+            setupVideoTracking,
+            getPrimaryVideo,
+            getShortsMetadata,
+            captureShortsSnapshot,
+            handleVideoMutations,
+            getPendingRestoreForTests: () => pendingRestoreAfterMediaChange,
+            resetVideoTrackingForTests
         };
     }
 })();

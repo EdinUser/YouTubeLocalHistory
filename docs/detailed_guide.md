@@ -6,7 +6,7 @@ If you find YT re:Watch helpful, you can support ongoing development on [Patreon
 
 # 📖 YT re:Watch YouTube History Extension Guide (Multi-Account & Privacy)
 
-Your step-by-step guide to a privacy-first YouTube history extension that keeps progress consistent across multiple accounts (or no account), stores data locally, and helps you track and resume videos without Google access.
+Your step-by-step guide to a privacy-first YouTube history extension that keeps progress consistent across multiple accounts (or no account), stores data locally, and helps you track and resume videos without relying on Google account history.
 
 ---
 
@@ -26,12 +26,12 @@ Your step-by-step guide to a privacy-first YouTube history extension that keeps 
 3. Click "Add" when prompted
 4. You'll see the YT re:Watch icon appear in your browser toolbar
 
-### Step 2: Start Using YouTube Anonymously
+### Step 2: Start Using YouTube Without an Account
 1. Go to [youtube.com](https://youtube.com)
 2. **No need to log in** - browse YouTube without an account
 3. Start watching any video
 4. Watch for at least 10 seconds
-5. That's it! You're getting history tracking without Google surveillance
+5. That's it! You're getting local history tracking independent from Google account history
 
 ### 🔄 **Bonus: Account Independence**
 **Here's the amazing part:** Your history works the same whether you:
@@ -48,27 +48,59 @@ Your step-by-step guide to a privacy-first YouTube history extension that keeps 
 - **Ad blocker** (block tracking scripts)
 - **Privacy browser** (Firefox with strict settings, or Brave)
 
-YT re:Watch stops YouTube from getting your viewing progress data, but Google still knows you visited their site.
+YT re:Watch keeps its saved viewing progress in extension storage, but Google/YouTube can still see normal YouTube page requests when you browse the site.
 
-### Step 3: View Your History
+### Step 3: Open Your Local Feed and History
 1. Click the YT re:Watch icon in your browser toolbar
-2. You'll see your watched videos with progress indicators
-3. Explore the different tabs to see all features
+2. Use the quick actions or open the full feed page
+3. Explore Home, Subscriptions, Shorts, Playlists, History, Channels, Analytics, and Settings
 
 ---
 
 ## 🎯 Understanding the Interface
 
-### Extension Popup Overview
-When you click the extension icon, you'll see 5 tabs:
+### Extension Interface Overview
+The extension icon opens quick actions, while the full feed page contains the main tabs:
 
 | Tab | What It Shows |
 |-----|---------------|
-| **Videos** | Regular YouTube videos you've watched |
+| **Home** | Local recommendations from subscribed channels |
+| **Subscriptions** | Latest videos from locally subscribed channels |
 | **Shorts** | YouTube Shorts you've watched |
-| **Playlists** | Playlists you've discovered |
+| **Playlists** | Saved references to YouTube playlists encountered by the extension |
+| **History** | Regular YouTube videos you've watched |
+| **Channels** | Channels you subscribed to locally |
 | **Analytics** | Charts and statistics about your viewing |
 | **Settings** | Customization options |
+
+### Popup { #popup }
+
+The popup is the compact re:Watch surface for resuming unfinished videos, opening locally saved Watch Later items, and moving into the full feed.
+
+<figure markdown="span">
+  ![The re:Watch popup showing unfinished videos with progress bars and an Open Feed button.](assets/guide/popup-continue-watching.png){ width="600" height="480" }
+  <figcaption>Continue unfinished videos directly from the compact popup, or open the full local feed.</figcaption>
+</figure>
+
+Older popup tabs are intentionally absent. The maintained Home, Subscriptions, Shorts, Playlists, History, Channels, Analytics, and Settings workflows belong in the full feed window.
+
+### Home Tab { #home }
+
+<figure markdown="span">
+  ![The re:Watch Home feed displaying locally personalized video cards.](assets/guide/feed-home.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Home arranges the locally cached feed using watch activity and local feedback.</figcaption>
+</figure>
+
+Home is a locally arranged discovery view. It uses cached uploads and local signals; it is not the YouTube recommendation service and does not reproduce a YouTube account's homepage.
+
+### Subscriptions Tab { #subscriptions }
+
+<figure markdown="span">
+  ![The re:Watch Subscriptions tab showing recent cached uploads from locally followed channels.](assets/guide/feed-subscriptions.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Subscriptions lists cached uploads from locally followed channels in chronological order.</figcaption>
+</figure>
+
+Subscriptions shows regular videos from locally followed channels. Its contents reflect the last successful local feed initialization or refresh, rather than a continuously live YouTube account feed.
 
 ### What You See on YouTube
 After watching videos, you'll notice:
@@ -76,30 +108,56 @@ After watching videos, you'll notice:
 - **Progress bar**: Shows how much of the video you've watched
 - **Percentage indicator**: Shows completion percentage (e.g., "75%")
 
-### Videos Tab (Your Main History)
+### History Tab (Your Main History) { #history }
 
-![Videos tab interface](./images/ytrw_videos.jpg)
-*The Videos tab shows your complete YouTube watch history, with progress, search, and delete options.*
-  
+<figure markdown="span">
+  ![The re:Watch History tab listing locally stored viewing activity and progress.](assets/guide/feed-history.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>History provides a dedicated view of locally recorded viewing activity.</figcaption>
+</figure>
+
 Your history list shows the channel name under each video title to help you scan quickly.
 
-### 🎬 Shorts Tab (YouTube Shorts)
+### 🎬 Shorts Tab (YouTube Shorts) { #shorts }
 
-![Shorts tab interface](./images/ytrw_shorts.jpg)
-*The Shorts tab tracks your YouTube Shorts viewing separately, helping you understand your short-form content habits.*
-  
+<figure markdown="span">
+  ![The re:Watch Shorts tab showing short-form videos from the local feed cache.](assets/guide/feed-shorts.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Shorts separates locally cached short-form videos from the regular feed.</figcaption>
+</figure>
+
 Shorts saves are now more reliable: the save cadence is 5 seconds and duration checks are relaxed to avoid missed saves.
 
-### 📝 Playlists Tab
+### 📝 Playlists Tab { #playlists }
 
-![Playlists tab interface](./images/ytrw_playlists.jpg)
-*The Playlists tab lists all playlists you've discovered, with quick access and management options.*
+<figure markdown="span">
+  ![The re:Watch Playlists tab showing saved references that open their playlists on YouTube.](assets/guide/feed-playlists.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Saved playlist references keep useful details locally and open the original playlist on YouTube.</figcaption>
+</figure>
+
+The stable V5 purpose of this tab is to retain YouTube playlist references detected while the extension is in use. Selecting a saved playlist opens the corresponding playlist on YouTube; the extension does not hydrate a local copy of all its videos.
 
 **Playlist Controls:**
 - **Ignore videos (per‑playlist toggle):** When enabled for a specific playlist, YT re:Watch will not save watch progress for videos watched while viewing that playlist.
 - **Works with global pause:** If either the global "Pause history in playlists" setting is enabled or a playlist's "Ignore" toggle is on, progress in that playlist won't be recorded.
 
-### 📊 Analytics Tab (Statistics Dashboard)
+!!! note "Extension-managed playlists"
+
+    Creating and managing playlists inside the extension is a separate future feature. Any prerelease controls for it should not be interpreted as part of the stable V5 playlist-reference workflow.
+
+### Channels Tab { #channels }
+
+<figure markdown="span">
+  ![The re:Watch Channels tab showing channels followed locally by the extension.](assets/guide/feed-channels.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Channels manages the explicit channel list followed by re:Watch.</figcaption>
+</figure>
+
+Channels owns the local list used by the subscription feed. Following a channel here does not subscribe the active YouTube account.
+
+### 📊 Analytics Tab (Statistics Dashboard) { #analytics }
+
+<figure markdown="span">
+  ![The re:Watch Analytics tab summarizing locally calculated viewing activity.](assets/guide/feed-analytics.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Analytics summarizes watch time and activity calculated from local extension data.</figcaption>
+</figure>
 
 **Overview Cards:**
 - **Total Watch Time**: How much time you've spent watching videos
@@ -123,28 +181,25 @@ Shorts saves are now more reliable: the save cadence is 5 seconds and duration c
 - Each bar shows the count of long videos that were skipped, partially watched, or completed
 - The legend to the right shows the color, label, and percentage for each segment
 
-![Analytics dashboard summary and top channels](./images/ytrw_stats1.jpg)
-*Summary cards and top channels in the Analytics tab.*
 
-![Analytics completion bar and unfinished videos](./images/ytrw_stats2.jpg)
-*Completion bar chart, unfinished videos, and skipped channels.*
 
-![Analytics activity by day and hour](./images/ytrw_stats3.jpg)
-*Watch activity by day and by hour in the Analytics tab.*
 
-![Analytics detailed view](./images/ytrw_stats4.jpg)
-*Additional analytics showing watch time patterns and channel statistics*
   
 These charts now prefer locally persisted, privacy‑preserving statistics for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets.
 
-### ⚙️ Settings Tab (Customization)
+### ⚙️ Settings Tab (Customization) { #settings }
+
+<figure markdown="span">
+  ![The re:Watch Settings tab showing appearance, feed, import, backup, and data controls.](assets/guide/feed-settings.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Settings collects appearance, local-feed, import, backup, and data-management controls.</figcaption>
+</figure>
 
 **Theme Settings:**
 - **Theme Preference**: Choose System, Light, or Dark
   - *System*: Follows your computer's theme
   - *Light*: Always use light theme
   - *Dark*: Always use dark theme
-- **Quick toggle**: Click the theme button in the popup header to switch between light and dark modes instantly.
+- **System default**: Choose System to follow your computer's theme automatically.
 
 **Overlay Customization:**
 - **Overlay Title**: Text shown on video thumbnails (max 12 characters)
@@ -162,13 +217,16 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 **Data Management:**
 - **Auto-clean Period**: Automatically remove old history
   - Range: 1–180 days, or **Forever** to keep all history without age-based cleanup
-  - Default: 90 days
+  - Default: Forever
   - Helps keep your history manageable while still allowing "forever history" if desired
 - **Items per Page**: How many videos to show per page
   - Range: 5-20 items
   - Larger numbers = less scrolling, smaller numbers = faster loading
--- **Export History**: Back up your data to a file
--- **Import History**: Restore or merge data from a backup
+- **Backup**: Back up history, legacy and canonical local subscriptions,
+  YouTube playlist references, local playlists, Watch Later, settings,
+  statistics, preferences, and selected caches to a JSON file. Rebuildable
+  feed inventory and scheduler/maintenance state are not included.
+- **Restore**: Merge data from a backup with the data already stored in the extension
 -- **Robust Deletion System**: Deleted videos stay deleted with tombstone protection
   - Videos deleted from history use tombstone protection so they don't reappear from archives or imports
   - 30-day protection period ensures deletions persist across migrations and imports
@@ -176,8 +234,8 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
  - **Persistent Statistics**: Analytics use a local stats snapshot (total, last 7 daily totals, 24 hourly totals). Seeded from your existing history after upgrade.
 
 **Data Management:**
-- **Export History**: Download complete history as JSON backup
-- **Import History**: Restore data from backup files (Merge or Replace modes)
+- **Backup**: Download a complete JSON backup
+- **Restore**: Restore data from backup files
 - **Migration Status**: Monitor hybrid storage migration progress
 - **Cross-device usage**: There is **no automatic sync** – use Export/Import to move history between browsers or devices manually
 
@@ -185,35 +243,29 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 - **Debug Mode**: Enable detailed logging for troubleshooting
 - **Version Info**: Shows current extension version
 
-![Settings tab interface](./images/ytrw_settings.jpg)
-*Customize your experience in the Settings tab, including theme, overlays, and data management.*
 
-![Settings advanced options](./images/ytrw_settings2.jpg)
-*Additional settings for data management, privacy, and advanced features*
 
 **Playlist Settings:**
 - **Pause history in playlists (global):** When enabled, the extension does not save watch progress for videos played while you are browsing within any playlist. Use this if you generally don't want playlist sessions to affect your history.
 
 ### What You See on YouTube
 
-![YouTube overlay showing viewed videos](./images/ytrw_overlay.jpg)
-*Visual overlays on YouTube show which videos you've watched and your progress at a glance.*
 
 ---
 
 ## 🔄 Data Management & Transfer
 
 ### Exporting Your History
-1. **Open Settings**: Click the Settings tab in the extension popup
+1. **Open Settings**: Open the full feed page and click Settings
 2. **Data Management**: Scroll to the "Data Management" section
-3. **Export History**: Click the "Export History" button
+3. **Backup**: Click the "Backup" button
 4. **Download**: Your complete history will download as a JSON file
 5. **Storage**: The file includes videos, playlists, and analytics data
 
 ### Importing History to Another Device
 1. **Transfer File**: Move the exported JSON file to your other device
 2. **Open Settings**: In the extension on the target device
-3. **Import History**: Click "Import History" and select the JSON file
+3. **Restore**: Click "Restore" and select the JSON file
 4. **Choose Mode**:
    - **Merge**: Combines with existing data (recommended)
    - **Replace**: Completely replaces existing history
@@ -232,13 +284,8 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 ### Theme Customization
 
-**Quick Theme Toggle:**
-1. Click the theme button in the popup header
-2. Toggles between light and dark themes
-3. Bypasses system theme preference
-
-**Detailed Theme Settings:**
-1. Go to Settings tab
+**Theme Settings:**
+1. Go to Settings
 2. Choose "Theme Preference"
 3. Select your preferred option:
    - **System**: Matches your OS theme automatically
@@ -293,9 +340,9 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 **How to Export:**
 1. Go to Settings tab
-2. Click "Export History"
+2. Click "Backup"
 3. Choose a location to save the file
-4. File will be named: `youtube-history-[date].json`
+4. File will be named as a YT re:Watch backup JSON file
 
 ### Importing Data
 
@@ -306,20 +353,28 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 
 **How to Import:**
 1. Go to Settings tab
-2. Click "Import History"
+2. Click "Restore"
 3. Select your backup file
-4. Choose import mode:
-   - **Merge**: Combines with existing data
-   - **Replace**: Overwrites existing data
-5. Import will begin automatically
+4. Confirm that you want to merge the backup with your current local data
+5. Restore will begin automatically
+
+Canonical local subscriptions are matched by YouTube channel ID. Existing
+non-empty subscription metadata is retained, missing metadata is filled from
+the backup, and the earliest valid follow date is preserved. Restoring the same
+backup more than once does not create duplicate subscriptions.
 
 ### Understanding Export Format
 The export file contains:
 - **Metadata**: Export date, extension version, data counts
 - **Video History**: All your watched videos with timestamps
 - **Playlists**: All saved playlists
+- **Local subscriptions**: Canonical v5 channel follows and their available metadata
 - **Settings**: Your customization preferences
 - **Stats**: Aggregated watch‑time snapshot powering Analytics (from dataVersion 1.1) with last‑7‑days `daily` buckets and a 24‑slot `hourly` distribution to keep the snapshot compact.
+
+Backups with `dataVersion` 2.1 store canonical v5 channel follows in
+`canonicalSubscriptions`. The older `subscriptions` field remains supported,
+and backups created before 2.1 can still be restored.
 
 ---
 
@@ -339,7 +394,7 @@ The export file contains:
 - Disable other YouTube extensions temporarily
 
 **Issue: History not showing**
-- Close and reopen the extension popup
+- Refresh the feed page or close and reopen the extension popup
 - Refresh the YouTube page
 - Check if you're logged into the same browser profile
 - Try exporting and importing your data

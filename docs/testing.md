@@ -12,6 +12,18 @@ npm test
 
 Runs **Jest** (unit, integration, memory). Playwright E2E is separate: `npm run test:e2e` (see End-to-End section below).
 
+For the complete local extension suite, including fresh ignored YouTube HTML and public RSS captures, run:
+
+```bash
+npm run test:local:full
+```
+
+This command uses a clean browser context for the HTML captures, then runs Jest
+and the Chromium/Firefox packaged-extension suites. It is intentionally
+local-only: the default `npm test` and GitHub Actions do not make these external
+requests. Refresh public RSS captures separately with
+`npm run fixtures:youtube:download -- --headless --with-rss`.
+
 ---
 
 ## 🛠️ Frameworks
@@ -30,7 +42,8 @@ Real Chromium loads the **unpacked E2E** extension from `build/e2e/chrome`.
 ```bash
 npx playwright install chromium   # one-time
 
-npm run test:e2e         # live + static Chromium extension E2E
+npm run test:e2e         # build + all Chromium extension E2E
+npm run test:e2e:all     # build Chrome + Firefox, then run every browser E2E check
 npm run test:e2e:live    # live YouTube Chromium extension E2E
 npm run test:e2e:static  # captured-DOM Chromium extension E2E
 npm run test:e2e:ui      # Playwright UI
@@ -39,7 +52,9 @@ npm run test:e2e:all     # all Playwright projects
 
 If `build/e2e/chrome/manifest.json` is missing, global setup runs `npm run build:e2e`.
 
-Set **`PW_HEADLESS=1`** only if you must run headless (extension behavior may differ; on Linux pair with `xvfb-run`).
+Chromium and Firefox extension E2E runs are headless by default. Set
+**`PW_HEADED=1`** only when you need a visible browser for debugging, for
+example `PW_HEADED=1 npm run test:e2e:live`.
 
 Optional **yt-storage.json** in the repo root (loaded by `extension-fixture.js` when present) saves cookies after you accept consent once—**best way to avoid flaky CMP dialogs**; keep it **gitignored**. **`tests/e2e/youtube-consent.js`** also walks **every frame** (Google CMP often uses iframes), tries **button** and **link** roles, several **locales**, `tp-yt-paper-button` / `ytd-button-renderer` fallbacks, **Escape**, and multiple passes for stacked dialogs. Use `dismissYouTubeConsent(page, { preferReject: true })` if you want “reject all” first.
 
@@ -47,9 +62,15 @@ GitHub: run **E2E (Playwright)** manually via Actions (`workflow_dispatch`) — 
 
 - **`core-resume.spec.js`**: live YouTube save/resume contract.
 - **`core-overlays.spec.js`**: live playlist/channel overlay contracts.
-- **`static-overlays.spec.js`**: captured playlist/channel DOM overlay contracts.
+- **`static-overlays.spec.js`**: captured playlist/channel DOM overlay contracts, local follow companion SPA/identity behavior, context-menu command routing, and visible playlist-history controls.
 
-Local Chromium extension tests are headed by default unless `PW_HEADLESS=1`; CI uses `xvfb-run` (see `.github/workflows/e2e.yml`). Headless Chromium can still be useful for debugging, but live YouTube may show anti-bot / CAPTCHA interstitials on watch pages.
+The Firefox static suite mirrors these installed-extension contracts. In
+particular, playlist controls must be tested for visibility (not only DOM
+presence), because YouTube may retain hidden legacy playlist headers.
+
+Local Chromium and Firefox extension tests are headless by default. Use
+`PW_HEADED=1` for a visible debugging session. Live YouTube may show anti-bot /
+CAPTCHA interstitials on watch pages in either mode.
 
 ### Testing YouTube DOM changes
 

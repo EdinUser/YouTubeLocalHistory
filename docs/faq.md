@@ -12,14 +12,12 @@ Quick answers about the privacy-first YouTube history extension that keeps progr
 - Log out completely and still keep your viewing history
 - **Perfect for multi-account users!**
 
-![Extension interface showing consistent history](./images/ytrw_videos.jpg)
-*Your viewing history works the same across all accounts*
 
 ### Q: Can I use this without a YouTube account?
 **A:** YES! This is one of our biggest advantages:
 - No YouTube login required
 - No Google account needed  
-- Watch YouTube completely anonymously
+- Watch YouTube without signing in, while still keeping local history
 - Still get full history tracking and progress saving
 - Perfect for privacy-conscious users
 
@@ -44,9 +42,12 @@ The extension will start working immediately - no setup required!
 
 ### Q: How do I see my watch history?
 **A:** Click the extension icon in your browser's toolbar (looks like a play button). You'll see tabs for:
-- **Videos**: Your regular YouTube videos
+- **Home**: Local recommendations from subscribed channels
+- **Subscriptions**: Latest uploads from locally subscribed channels
 - **Shorts**: YouTube Shorts you've watched
-- **Playlists**: Playlists you've discovered
+- **Playlists**: Local playlists you create and manage
+- **History**: Your regular YouTube videos
+- **Channels**: Channels you subscribed to locally
 - **Analytics**: Charts showing your viewing patterns
 
 ### Q: Why don't I see the "viewed" label on videos?
@@ -69,7 +70,7 @@ The extension will start working immediately - no setup required!
 ### Q: The extension isn't working, what should I do?
 **A:** Try these steps in order:
 1. **Refresh the YouTube page** - this fixes 90% of issues
-2. **Close and reopen the extension popup**
+2. **Close and reopen the extension popup or refresh the feed page**
 3. **Check if you're on youtube.com** (not mobile YouTube or YouTube TV)
 4. **Disable and re-enable the extension**
 5. **Restart your browser**
@@ -80,7 +81,7 @@ The extension will start working immediately - no setup required!
 - You cleared your browser data
 - You're using incognito/private browsing mode
 
-Check the extension popup - your history should still be there.
+Check the extension popup or feed page - your history should still be there.
 
 ### Q: Videos aren't saving automatically
 **A:** Make sure:
@@ -92,9 +93,9 @@ Check the extension popup - your history should still be there.
 
 ## 📱 Features & Functionality
 
-### Q: What's the difference between Videos and Shorts tabs?
+### Q: What's the difference between History and Shorts tabs?
 **A:** 
-- **Videos Tab**: Regular YouTube videos (usually longer content)
+- **History view**: Regular YouTube videos (usually longer content)
 - **Shorts Tab**: YouTube Shorts (vertical videos under 60 seconds)
 - They're separated to help you track different types of content
 
@@ -108,7 +109,7 @@ Check the extension popup - your history should still be there.
 - Completion bar chart for long videos (skipped, partial, completed, with legend)
 
 ### Q: Can I search through my history?
-**A:** Yes! Use the search box at the top of the Videos tab to find specific videos by title.
+**A:** Yes! Use the search box in the History tab to find specific videos by title.
 
 ### Q: Can I delete individual videos from my history?
 **A:** Yes, click the "Delete" button next to any video to remove it from your history.
@@ -141,48 +142,57 @@ This solves the common problem where deleted videos would reappear in searches.
 **A:** YES! This is one of our biggest advantages:
 - No YouTube login required
 - No Google account needed  
-- Watch YouTube completely anonymously
+- Watch YouTube without signing in, while still keeping local history
 - Still get full history tracking and progress saving
 - Perfect for privacy-conscious users
 
 ### Q: How is this different from YouTube's built-in history?
-**A:** More convenient AND your history stays private:
+**A:** re:Watch keeps its own history record locally and independently:
 - **YouTube's history**: Stored on Google's servers, tied to your account, used for ads/recommendations, **inaccessible when you switch accounts**
-- **YT re:Watch**: Stored only on your device, history data stays private, Google doesn't get your progress, **works across ALL accounts**
-- Google doesn't get your viewing progress data!
+- **YT re:Watch**: Its saved copy stays in your browser profile and **works across ALL accounts**
+- YT re:Watch does not upload saved viewing progress to an extension-owned server.
 - Never lose your progress when switching between accounts!
 
 ### Q: Is my viewing history private?
-**A:** Yes, your history data is private! 
-- Your viewing progress stays on your device only
-- We don't collect, see, or store any of your history information
-- No external servers are involved in history tracking
-- Your viewing progress is yours alone
-- Google doesn't get your progress data
-- Even we can't access your history data
+**A:** The history copy saved by re:Watch stays local to your browser profile.
+- The extension does not upload its saved viewing progress
+- The maintainers don't collect, see, or store your history information
+- No extension-owned server receives your saved history or progress
+- Only someone or software with access to your browser profile or exported
+  backup can read that local copy
+
+This is local data storage, not network anonymity. Normal YouTube playback is
+still visible to YouTube. The local feed also makes credential-omitted public
+RSS and channel-page requests when synchronization, handle resolution, or
+channel metadata requires them, and displayed YouTube images may load from
+YouTube-owned image hosts. Feed search itself stays local.
 
 ### Q: Can I backup my data?
-**A:** Yes! Go to Settings tab and click "Export History" to download a backup file. You can import it later if needed.
+**A:** Yes! Go to Settings and use **Backup** to download a JSON backup file.
+It includes your canonical local channel subscriptions as well as history,
+playlists, settings, statistics, and other local extension data. You can merge
+it back into the extension later with **Restore**.
 
 ### Q: Does this affect my YouTube recommendations?
-**A:** No, this extension doesn't interact with YouTube's recommendation system at all. Your private viewing stays private!
+**A:** YT re:Watch does not write to YouTube's recommendation system or account
+history. However, watching YouTube normally can still affect recommendations
+through your account, cookies, and YouTube's ordinary playback analytics. The
+extension does not prevent that.
 
-### Q: Can I research sensitive topics privately?
-**A:** Absolutely! This is perfect for:
-- Academic research without creating a "profile"
-- Exploring topics without affecting recommendations
-- Learning about subjects privately
-- Medical research without health profiling
+### Q: Can this make sensitive research anonymous?
+**A:** The extension can keep its own saved history separate from your Google
+account, but it cannot make sensitive browsing anonymous. YouTube, the
+embedding page, your network provider, cookies, and other trackers may still
+observe normal browsing and playback traffic. Use appropriate browser and
+network privacy tools for sensitive research.
 
-![Analytics showing private viewing patterns](./images/ytrw_stats3.jpg)
-*Track your research privately - no Google profiling*
 
 ### Q: Does this extension block ALL Google tracking?
 **A:** ⚠️ **NO - Important limitation to understand:**
 
 **What YT re:Watch protects:**
-- ✅ Your YouTube viewing history (stored locally, not on Google servers)
-- ✅ Video progress tracking (private, not shared with Google)
+- ✅ The extension's separate history record (stored locally in your browser profile)
+- ✅ The progress record saved by re:Watch (not uploaded by the extension)
 - ✅ Playlist discovery (local only)
 
 **What YT re:Watch DOES NOT protect against:**
@@ -208,9 +218,9 @@ This solves the common problem where deleted videos would reappear in searches.
 
 ### Q: Can I transfer my history between devices?
 **A:** Yes! Use the export/import feature to manually transfer your history between devices. There is **no automatic cloud sync** – export/import is the official way to move your data:
-1. Go to Settings tab → Data Management → Export History
+1. Go to Settings → Data Management → Backup
 2. Download the JSON file to your computer
-3. On the other device, go to Settings → Import History
+3. On the other device, go to Settings → Restore
 4. Select the JSON file and choose "Merge" or "Replace"
 
 ### Q: How much data can the extension store?
@@ -237,8 +247,6 @@ This solves the common problem where deleted videos would reappear in searches.
 ### Q: Can I customize the visual overlays?
 **A:** Yes! The overlays are fully customizable. In the Settings tab, you can change:
 
-![YouTube overlay showing viewed videos](./images/ytrw_overlay.jpg)
-*Example of overlay customization - change colors, text, and size*
 
 - **Overlay Title**: Change "viewed" to any text you prefer (max 12 characters)
 - **Overlay Color**: Choose from blue, red, green, purple, or orange
@@ -247,8 +255,7 @@ This solves the common problem where deleted videos would reappear in searches.
 
 ### Q: How do I switch between light and dark theme?
 **A:** 
-- **Quick way**: Click the theme button in the extension popup
-- **Settings way**: Go to Settings tab and choose your preferred theme
+- **Settings way**: Go to Settings and choose your preferred theme
 
 ### Q: Can I hide the progress bars?
 **A:** The extension is designed to be minimal and non-intrusive. You can make the labels smaller in Settings, but they can't be completely hidden since that's the main feature.
@@ -323,6 +330,11 @@ For accuracy and responsiveness:
 
 ### Q: Did the export format change?
 **A:** Yes. Starting with dataVersion 1.1, exports include a `stats` object containing your aggregated watch‑time snapshot used for Analytics. This is optional data used solely to speed up and stabilize charts. Imports accept files with or without `stats`.
+
+Starting with dataVersion 2.1, exports also include a
+`canonicalSubscriptions` array containing v5 local channel follows. Restore
+deduplicates these records by canonical channel ID. Older backups without this
+array remain supported.
 
 ### Q: How do I interpret the completion bar chart?
 **A:** It shows the number of long videos you skipped, partially watched, or completed. The legend explains each category. 

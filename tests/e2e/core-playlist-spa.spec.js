@@ -4,10 +4,16 @@
 
 const { test, expect } = require('./extension-fixture');
 const { dismissYouTubeConsent } = require('./youtube-consent');
-const { getStoredVideo, removeStoredVideo, setExtensionSettings } = require('./chromium-extension-storage');
+const {
+  getStoredPlaylist,
+  getStoredVideo,
+  removeStoredVideo,
+  setExtensionSettings,
+} = require('./chromium-extension-storage');
 
 const PLAYLIST_ID = 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR';
 const PLAYLIST_URL = `https://www.youtube.com/playlist?list=${PLAYLIST_ID}`;
+const PRIMARY_VIDEO_SELECTOR = '#movie_player video.html5-main-video, ytd-player video.html5-main-video';
 const SAVE_TIME = 20;
 const DEFAULT_SETTINGS = {
   autoCleanPeriod: 90,
@@ -72,7 +78,16 @@ async function clickPlaylistItem(page, item) {
     .poll(() => page.url(), { timeout: 30000 })
     .toContain(`watch?v=${item.videoId}`);
   await expect.poll(() => page.url(), { timeout: 30000 }).toContain(`list=${PLAYLIST_ID}`);
-  await page.waitForSelector('video', { timeout: 30000 });
+  await expect
+    .poll(
+      () => page.evaluate(() => {
+        const player = document.querySelector('#movie_player');
+        return typeof player?.getVideoData === 'function' ? player.getVideoData()?.video_id || '' : '';
+      }),
+      { timeout: 30000 }
+    )
+    .toBe(item.videoId);
+  await page.waitForSelector(PRIMARY_VIDEO_SELECTOR, { timeout: 30000 });
 }
 
 async function saveCurrentPlaylistVideo(context, page, videoId) {
@@ -80,30 +95,64 @@ async function saveCurrentPlaylistVideo(context, page, videoId) {
     .poll(
       () =>
         page.evaluate(() => {
-          const video = document.querySelector('video');
+          const video = document.querySelector('#movie_player video.html5-main-video, ytd-player video.html5-main-video');
           return video && Number.isFinite(video.duration) ? video.duration : 0;
         }),
       { timeout: 60000 }
     )
     .toBeGreaterThan(SAVE_TIME + 10);
 
-  await page.evaluate((time) => {
-    const video = document.querySelector('video');
-    video.muted = true;
-    video.pause();
-    video.currentTime = time;
-    video.dispatchEvent(new Event('timeupdate'));
-    video.dispatchEvent(new Event('seeked'));
-    video.dispatchEvent(new Event('pause'));
-  }, SAVE_TIME);
+  let lastSavedTime = 0;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    await page.evaluate(({ time, selector }) => {
+      const video = document.querySelector(selector);
+      if (!video) throw new Error('Playlist video element not found');
+      video.muted = true;
+      video.pause();
+      video.currentTime = time;
+      video.dispatchEvent(new Event('timeupdate'));
+      video.dispatchEvent(new Event('seeked'));
+      video.dispatchEvent(new Event('pause'));
+    }, { time: SAVE_TIME, selector: PRIMARY_VIDEO_SELECTOR });
+    await page.waitForTimeout(900);
 
+    const record = await getStoredVideo(context, videoId);
+    lastSavedTime = record && typeof record.time === 'number' ? record.time : 0;
+    if (lastSavedTime >= SAVE_TIME - 1) return;
+  }
+
+  throw new Error(`Expected Chromium to save ${videoId} at ${SAVE_TIME}s; last saved time was ${lastSavedTime}s`);
+}
+
+async function expectPlaylistReference(context, videoId) {
   await expect
-    .poll(async () => getStoredVideo(context, videoId), { timeout: 30000 })
-    .toMatchObject({ videoId, time: expect.any(Number) });
+    .poll(async () => {
+      const record = await getStoredPlaylist(context, PLAYLIST_ID);
+      return record && {
+        playlistId: record.playlistId,
+        title: typeof record.title === 'string' ? record.title.trim() : '',
+        url: record.url,
+        timestamp: record.timestamp,
+        lastUpdated: record.lastUpdated,
+        videoId: record.videoId,
+        hasLocalItems: Object.prototype.hasOwnProperty.call(record, 'localItems'),
+        hasVideoCount: Object.prototype.hasOwnProperty.call(record, 'videoCount'),
+      };
+    }, { timeout: 30000 })
+    .toMatchObject({
+      playlistId: PLAYLIST_ID,
+      title: expect.stringMatching(/\S/),
+      url: PLAYLIST_URL,
+      timestamp: expect.any(Number),
+      lastUpdated: expect.any(Number),
+      videoId,
+      hasLocalItems: false,
+      hasVideoCount: false,
+    });
 }
 
 test.describe('Controlled playlist SPA canary (live YouTube)', () => {
-  test.setTimeout(180000);
+  test.setTimeout(240000);
 
   test('clicking another playlist item tracks the new video ID', async ({ context, page }) => {
     await setExtensionSettings(context, DEFAULT_SETTINGS);
@@ -117,9 +166,11 @@ test.describe('Controlled playlist SPA canary (live YouTube)', () => {
 
     await clickPlaylistItem(page, firstItem);
     await saveCurrentPlaylistVideo(context, page, firstItem.videoId);
+    await expectPlaylistReference(context, firstItem.videoId);
 
     await clickPlaylistItem(page, secondItem);
     await saveCurrentPlaylistVideo(context, page, secondItem.videoId);
+    await expectPlaylistReference(context, secondItem.videoId);
 
     await expect.poll(() => getStoredVideo(context, firstItem.videoId), { timeout: 15000 }).toMatchObject({
       videoId: firstItem.videoId,
