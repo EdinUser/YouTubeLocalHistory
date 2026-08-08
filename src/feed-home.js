@@ -5,6 +5,7 @@
 const SHORTS_MAX_SECONDS = 180;
 function isShort(v) {
     if (v && v.isShort === true) return true;
+    if (v && v.videoId && watchedMap[v.videoId]?.isShorts === true) return true;
     if (v && v.videoId && shortsCache[v.videoId] === true) return true;
     if (v && v.source === 'rss') return false;
     const d = Number((v && v.duration) || (v && v.videoId && durationCache[v.videoId]) || 0);
@@ -25,6 +26,18 @@ const HOME_AGE_BUCKET_PATTERN = [
 function applyShortsFilter(list) {
     // Home never shows Shorts; the Shorts view shows only Shorts.
     return shortsOnly ? dedupeShorts(list.filter((v) => isShort(v))) : list.filter((v) => !isShort(v));
+}
+
+function sortShortsByLastWatched(list) {
+    const watchedAt = (video) => Number(
+        (video && video.videoId && watchedMap[video.videoId]?.timestamp)
+        || (video && video.watchedAt)
+        || 0
+    );
+    return list.sort((a, b) =>
+        (watchedAt(b) - watchedAt(a))
+        || (effectivePublishedTime(b) - effectivePublishedTime(a))
+    );
 }
 
 function hasHomeDurationBadge(video) {
@@ -54,6 +67,9 @@ function dedupeShorts(list) {
         if (video.videoId) {
             if (seenIds.has(video.videoId)) return false;
             seenIds.add(video.videoId);
+            // Watch history is keyed by the canonical video ID. Never collapse
+            // two distinct watched Shorts because transient metadata matches.
+            if (watchedMap[video.videoId]) return true;
         }
         const key = shortDedupeKey(video);
         if (key) {
@@ -392,13 +408,16 @@ function currentView() {
 
     // No query: browse the feed, honoring the sort dropdown.
     if (!q) {
-        let list = (!shortsOnly && !subscriptionsChronological)
-            ? buildHomeIndex()
-            : allVideos.slice();
+        let list = shortsOnly
+            ? buildLocalIndex()
+            : (!subscriptionsChronological ? buildHomeIndex() : allVideos.slice());
         list = applyHiddenFilter(list);
         if (unwatchedOnly) list = list.filter((v) => !watchedMap[v.videoId]);
         list = applyMemberFilter(list);
         list = applyShortsFilter(list);
+        if (shortsOnly) {
+            return { list: sortShortsByLastWatched(list).slice(0, VISIBLE_FEED_LIMIT), q };
+        }
         if (!shortsOnly && !subscriptionsChronological) {
             const homeList = rankHomeVideos(list).slice(0, VISIBLE_FEED_LIMIT);
             rememberHomeRecommendations(homeList);
@@ -606,7 +625,7 @@ function render() {
         ytvhtFeedViewData.persistHomeImpressions(ytIndexedDBStorage, list, Date.now()).catch(() => {});
     }
 
-    if (allVideos.length === 0 && !q) {
+    if (allVideos.length === 0 && !q && !shortsOnly) {
         grid.style.display = 'none';
         if (searchResults) searchResults.style.display = 'none';
         empty.style.display = 'block';

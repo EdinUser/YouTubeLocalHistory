@@ -152,7 +152,7 @@ function onStorageChanged(changes, area) {
         });
         if (historyActive) renderHistory();
         else if (channelActive && activeChannelInfo) renderChannelPage(activeChannelInfo);
-        else if (isFeedContentViewActive() && document.getElementById('unwatched')?.checked) render();
+        else if (isFeedContentViewActive() && (shortsOnly || document.getElementById('unwatched')?.checked)) render();
     }
     if (subscriptionsActive && changes && Object.keys(changes).some((key) => key.startsWith('sub_'))) {
         renderSubscriptions();

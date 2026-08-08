@@ -28,7 +28,8 @@ function historyToVideo(rec) {
     };
 }
 
-// Feed records win on duplicate video IDs because they carry RSS metadata.
+// Feed records win on duplicate video IDs because they carry RSS metadata,
+// while history-owned playback and Shorts fields remain authoritative.
 function buildLocalIndex() {
     const byId = {};
     Object.values(watchedMap || {}).forEach((rec) => {
@@ -36,9 +37,19 @@ function buildLocalIndex() {
     });
     allVideos.forEach((video) => {
         if (!video || !video.videoId) return;
-        if (!video.duration && durationCache[video.videoId]) video.duration = durationCache[video.videoId];
-        if (!video.published && releaseDateCache[video.videoId]) video.published = releaseDateCache[video.videoId];
-        byId[video.videoId] = video;
+        const historyVideo = byId[video.videoId] || null;
+        const watchedAsShort = historyVideo?.isShort === true;
+        byId[video.videoId] = {
+            ...(historyVideo || {}),
+            ...video,
+            url: watchedAsShort ? historyVideo.url : (video.url || historyVideo?.url),
+            duration: Number(video.duration || historyVideo?.duration || durationCache[video.videoId] || 0),
+            published: Number(video.published || historyVideo?.published || releaseDateCache[video.videoId] || 0),
+            isShort: watchedAsShort ? true : video.isShort,
+            watchedAt: Number(historyVideo?.watchedAt || video.watchedAt || 0),
+            _whenText: historyVideo?._whenText || video._whenText || '',
+            _historyOnly: false
+        };
     });
     return Object.values(byId);
 }

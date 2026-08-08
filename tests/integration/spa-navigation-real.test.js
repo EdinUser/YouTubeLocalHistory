@@ -18,8 +18,49 @@ if (!global.window.__YTVHT_TEST__) {
 require('../../src/content.js');
 
 const navigation = global.window.__YTVHT_TEST__.navigation;
+const core = global.window.__YTVHT_TEST__.core;
 
 describe('SPA / playlist navigation (real content.js)', () => {
+  test('Shorts metadata stays scoped to the active reel and refreshes after the DOM settles', () => {
+    mockWindowLocation('https://www.youtube.com/shorts/FEIUzuptkME');
+    document.title = 'No CGI—Just a Real Miniature Tsunami - YouTube';
+    document.body.innerHTML = `
+      <ytd-reel-video-renderer id="stale-reel">
+        <video></video>
+        <yt-shorts-video-title-view-model><h1>No CGI—Just a Real Miniature Tsunami</h1></yt-shorts-video-title-view-model>
+        <a href="/@stale_channel/shorts">@stale_channel</a>
+      </ytd-reel-video-renderer>
+      <ytd-reel-video-renderer id="active-reel">
+        <video id="active-short"></video>
+        <yt-shorts-video-title-view-model><h1 id="active-title">HORRIBLE Chinese Car Quality!</h1></yt-shorts-video-title-view-model>
+        <a id="active-channel" href="/@ACM_Cars/shorts">@ACM_Cars</a>
+      </ytd-reel-video-renderer>`;
+
+    const video = document.getElementById('active-short');
+    Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: 3 });
+    Object.defineProperty(video, 'duration', { configurable: true, value: 15 });
+
+    expect(core.getShortsMetadata(video, 'FEIUzuptkME')).toEqual({
+      title: 'HORRIBLE Chinese Car Quality!',
+      channelName: '@ACM_Cars',
+      channelId: 'ACM_Cars',
+    });
+    expect(core.captureShortsSnapshot(video, 'FEIUzuptkME')).toMatchObject({
+      title: 'HORRIBLE Chinese Car Quality!',
+      channelName: '@ACM_Cars',
+    });
+
+    document.getElementById('active-title').textContent = 'Updated active title';
+    document.getElementById('active-channel').textContent = '@UpdatedChannel';
+    document.getElementById('active-channel').setAttribute('href', '/@UpdatedChannel/shorts');
+
+    expect(core.captureShortsSnapshot(video, 'FEIUzuptkME')).toMatchObject({
+      title: 'Updated active title',
+      channelName: '@UpdatedChannel',
+      channelId: 'UpdatedChannel',
+    });
+  });
+
   test('handleSpaNavigation does not throw for new video', () => {
     document.body.innerHTML = '';
     mockWindowLocation('https://www.youtube.com/watch?v=video1');

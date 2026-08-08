@@ -42,6 +42,9 @@
         function getCleanVideoUrl() {
             const videoId = getVideoId();
             if (!videoId) return null;
+            if (window.location.pathname.startsWith('/shorts/')) {
+                return `https://www.youtube.com/shorts/${videoId}`;
+            }
             return `https://www.youtube.com/watch?v=${videoId}`;
         }
 

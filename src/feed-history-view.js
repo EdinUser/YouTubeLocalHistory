@@ -11,6 +11,7 @@ async function renderHistory() {
     let records = Object.entries(videoMap || {})
         .map(([videoId, value]) => ({ ...(value || {}), videoId: (value && value.videoId) || videoId }))
         .filter(isVisibleHistoryRecord)
+        .filter((video) => !isShortsHistoryRecord(video))
         .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
 
     const visible = records.slice(0, historyVisibleLimit);
@@ -86,4 +87,8 @@ function isVisibleHistoryRecord(video) {
     if (Number(video.time || 0) > 0) return true;
     if (video.importedHistory) return true;
     return Number(video.timestamp || 0) > 0 && !!(video.title || video.url);
+}
+
+function isShortsHistoryRecord(video) {
+    return video?.isShorts === true || String(video?.url || '').includes('/shorts/');
 }

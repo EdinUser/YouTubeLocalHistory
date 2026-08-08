@@ -154,6 +154,10 @@
     // Last video handled by the tracker; prevents duplicate SPA setup.
     let lastProcessedVideoId = null;
 
+    // Keep the outgoing Short's identity and progress when YouTube changes the
+    // SPA route before the previous media element emits its final save event.
+    let latestShortsSnapshot = null;
+
     // Used to decide whether a timestamp restore belongs to a fresh navigation.
     let lastSpaNavigationTime = 0;
 
@@ -176,6 +180,20 @@
     function getPrimaryVideo() {
         if (typeof document === 'undefined') return null;
         const pathname = window.location?.pathname || '';
+
+        if (pathname.startsWith('/shorts/')) {
+            const shortsVideos = [...document.querySelectorAll('ytd-reel-video-renderer video')]
+                .filter(video => video.isConnected);
+            const isVisible = (video) => {
+                const rect = video.getBoundingClientRect?.();
+                return !!rect && rect.width > 0 && rect.height > 0;
+            };
+            const activeShort = shortsVideos.find(video => isVisible(video) && !video.paused && video.readyState >= 1)
+                || shortsVideos.find(video => isVisible(video) && video.readyState >= 1)
+                || shortsVideos.find(video => !video.paused && video.readyState >= 1);
+            if (activeShort) return activeShort;
+        }
+
         const selectors = pathname.startsWith('/shorts/')
             ? [
                 'ytd-reel-video-renderer[is-active] video',
@@ -405,6 +423,7 @@
 
         // Reset state variables
         isInitialized = false;
+        latestShortsSnapshot = null;
         initRetryCount = 0;
         isProcessingThumbnails = false;
         thumbnailProcessingQueue.clear();
@@ -642,17 +661,93 @@
         }
     }
 
-    // Save Shorts timestamp
-    async function saveShortsTimestamp() {
-        const videoId = getVideoId();
-        if (!videoId) {
-            log('No video ID found for Shorts.');
-            return;
+    function getShortsMetadata(video = getPrimaryVideo(), expectedVideoId = getVideoId()) {
+        const reel = video?.closest?.('ytd-reel-video-renderer') || null;
+        if (!reel) return { title: 'Unknown Title', channelName: 'Unknown', channelId: 'Unknown' };
+
+        const reelVideoId = [...reel.querySelectorAll('a[href*="/shorts/"]')]
+            .map(link => (link.getAttribute('href') || '').match(/\/shorts\/([\w-]+)/)?.[1] || '')
+            .find(Boolean);
+        if (expectedVideoId && reelVideoId && reelVideoId !== expectedVideoId) {
+            return { title: 'Unknown Title', channelName: 'Unknown', channelId: 'Unknown' };
         }
 
-        const video = getPrimaryVideo();
-        if (!video) {
-            log('No video element found for Shorts.');
+        const titleEl = reel.querySelector([
+            'yt-shorts-video-title-view-model h1',
+            'yt-shorts-video-title-view-model h2',
+            'yt-shorts-video-title-view-model [aria-label]',
+            'a.ytp-title-link[href*="/shorts/"]',
+            'yt-shorts-video-title-view-model'
+        ].join(', '));
+        const title = (titleEl?.getAttribute?.('aria-label') || titleEl?.textContent || '').trim() || 'Unknown Title';
+
+        const channelLink = reel.querySelector([
+            'yt-reel-channel-bar-view-model a[href^="/@"]',
+            'yt-reel-channel-bar-view-model a[href^="/channel/"]',
+            'a[href^="/@"][href$="/shorts"]',
+            'a[href*="youtube.com/@"][href$="/shorts"]',
+            'a[href^="/channel/"]',
+            'a[href*="youtube.com/channel/"]',
+            'ytd-channel-name a',
+            '#owner-name a',
+            'a[href^="/@"]'
+        ].join(', '));
+        const href = channelLink?.getAttribute('href') || '';
+        const channelMatch = href.match(/\/channel\/([^/?#]+)/);
+        const handleMatch = href.match(/\/@([^/?#]+)/);
+        const channelId = (channelMatch?.[1] || handleMatch?.[1] || '').trim() || 'Unknown';
+        const channelName = (channelLink?.textContent || '').trim()
+            || (handleMatch ? `@${handleMatch[1]}` : '')
+            || 'Unknown';
+
+        if (title !== 'Unknown Title') log('Shorts title detected:', title);
+        if (channelName !== 'Unknown') log('Shorts channel detected:', channelName);
+        return { title, channelName, channelId };
+    }
+
+    function captureShortsSnapshot(video = getPrimaryVideo(), expectedVideoId = null) {
+        if (!window.location.pathname.startsWith('/shorts/')) return null;
+
+        const routeVideoId = getVideoId();
+        const videoId = expectedVideoId || routeVideoId;
+        const currentTime = video?.currentTime;
+        if (!videoId || routeVideoId !== videoId || !currentTime || currentTime <= 0) return null;
+
+        const priorMetadata = latestShortsSnapshot?.videoId === videoId
+            ? latestShortsSnapshot
+            : null;
+        const currentMetadata = getShortsMetadata(video, videoId);
+        const metadata = {
+            title: currentMetadata.title !== 'Unknown Title'
+                ? currentMetadata.title
+                : (priorMetadata?.title || 'Unknown Title'),
+            channelName: currentMetadata.channelName !== 'Unknown'
+                ? currentMetadata.channelName
+                : (priorMetadata?.channelName || 'Unknown'),
+            channelId: currentMetadata.channelId !== 'Unknown'
+                ? currentMetadata.channelId
+                : (priorMetadata?.channelId || 'Unknown')
+        };
+        latestShortsSnapshot = {
+            videoId,
+            time: currentTime,
+            duration: video.duration,
+            title: metadata.title,
+            url: `https://www.youtube.com/shorts/${videoId}`,
+            isShorts: true,
+            channelName: metadata.channelName,
+            channelId: metadata.channelId
+        };
+        return { ...latestShortsSnapshot };
+    }
+
+    // Save Shorts timestamp. A captured snapshot can be supplied during SPA
+    // navigation, after the URL already points at the next Short.
+    async function saveShortsTimestamp(snapshot = null) {
+        const currentSnapshot = snapshot || captureShortsSnapshot();
+        const videoId = currentSnapshot?.videoId;
+        if (!videoId) {
+            log('No video ID found for Shorts.');
             return;
         }
 
@@ -679,8 +774,8 @@
             // ignore URL parsing errors
         }
 
-        let currentTime = video.currentTime;
-        const duration = video.duration;
+        const currentTime = currentSnapshot.time;
+        const duration = currentSnapshot.duration;
 
         // Do not update record if timestamp is 0. Allow duration to be unavailable for Shorts.
         if (!currentTime || currentTime === 0) {
@@ -690,51 +785,29 @@
 
         log(`Saving Shorts timestamp for video ID ${videoId} at time ${currentTime} (duration: ${duration}) from URL: ${window.location.href}`);
 
-        let title = 'Unknown Title';
-        const shortsTitleEl = document.querySelector('yt-shorts-video-title-view-model h2 span');
-        if (shortsTitleEl && shortsTitleEl.textContent?.trim()) {
-            title = shortsTitleEl.textContent.trim();
-            log('Shorts title detected:', title);
-        } else {
-            // Fallback: use document title, but clean up " - YouTube Shorts"
-            let docTitle = document.title.replace(/ - YouTube Shorts$/, '').trim();
-            if (docTitle && docTitle.length > 0 && docTitle !== 'YouTube') {
-                title = docTitle;
-                log('Shorts title fallback from document.title:', title);
-            }
-        }
-
-        // Extract channel name and channelId for Shorts
-        let channelName = 'Unknown';
-        let channelId = 'Unknown';
-        const channelLink = document.querySelector('ytd-channel-name a, #owner-name a');
-        if (channelLink) {
-            channelName = channelLink.textContent?.trim() || 'Unknown';
-            const href = channelLink.getAttribute('href') || '';
-            const match = href.match(/\/channel\/([a-zA-Z0-9_-]+)/) || href.match(/\/@([a-zA-Z0-9_\.-]+)/);
-            if (match) {
-                channelId = match[1];
-            } else {
-                channelId = href;
-            }
-        }
+        let previous = null;
+        try { previous = await ytStorage.getVideo(videoId); } catch (_) {}
 
         const record = {
-            videoId: videoId,
+            videoId,
             time: currentTime,
-            duration: duration,
+            duration,
             timestamp: Date.now(),
-            title: title,
-            url: getCleanVideoUrl(),
+            title: currentSnapshot.title !== 'Unknown Title'
+                ? currentSnapshot.title
+                : (previous?.title || 'Unknown Title'),
+            url: currentSnapshot.url,
             isShorts: true,
-            channelName,
-            channelId
+            channelName: currentSnapshot.channelName !== 'Unknown'
+                ? currentSnapshot.channelName
+                : (previous?.channelName || 'Unknown'),
+            channelId: currentSnapshot.channelId !== 'Unknown'
+                ? currentSnapshot.channelId
+                : (previous?.channelId || 'Unknown')
         };
 
         try {
             // Compute delta against previous saved time to update stats
-            let previous = null;
-            try { previous = await ytStorage.getVideo(videoId); } catch (_) {}
             const prevTime = previous && typeof previous.time === 'number' ? previous.time : 0;
             const delta = Math.max(0, Math.floor(record.time - prevTime));
 
@@ -950,6 +1023,7 @@
             const videoId = getVideoId();
             const currentTime = typeof candidateTime === 'number' && candidateTime > 0 ? candidateTime : video.currentTime;
             if (!videoId || currentTime <= 0) return;
+            if (window.location.pathname.startsWith('/shorts/') && trackedClosureVideoId && videoId !== trackedClosureVideoId) return;
 
             try {
                 const record = await ytStorage.getVideo(videoId);
@@ -1332,6 +1406,7 @@
             }
         });
         addTrackedEventListener(video, 'pause', () => {
+            captureShortsSnapshot(video, trackedClosureVideoId);
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
                 saveIntervalId = null;
@@ -1339,6 +1414,7 @@
             debouncedSave();
         });
         addTrackedEventListener(video, 'timeupdate', () => {
+            captureShortsSnapshot(video, trackedClosureVideoId);
             const currentTime = Math.floor(video.currentTime);
             const interval = window.location.pathname.startsWith('/shorts/') ? 5 : 15;
             if (currentTime > 0 && currentTime % interval === 0) debouncedSave();
@@ -1371,6 +1447,7 @@
             }
         });
         addTrackedEventListener(video, 'seeked', () => {
+            captureShortsSnapshot(video, trackedClosureVideoId);
             traceRestore('video-seeked', {
                 currentTime: video.currentTime || 0,
                 ...getRestoreVideoTraceDetails(video)
@@ -1572,6 +1649,16 @@
         if (!videoId || videoId === previousVideoId) {
             return;
         }
+
+        const outgoingShortsSnapshot = previousVideoId
+            && latestShortsSnapshot?.videoId === previousVideoId
+            ? { ...latestShortsSnapshot }
+            : null;
+        if (outgoingShortsSnapshot) {
+            saveShortsTimestamp(outgoingShortsSnapshot)
+                .catch(error => log('[SPA] Failed to save outgoing Shorts timestamp:', error));
+        }
+
         log(`[SPA] Navigation to new video detected: ${videoId}`);
         lastProcessedVideoId = videoId;
         lastSpaNavigationTime = Date.now();
@@ -1581,7 +1668,9 @@
         // arrive after the extension restored progress; resetting then erases
         // the valid restore.
         const existingVideo = getPrimaryVideo();
-        if (previousVideoId && existingVideo) {
+        const isShortsToShortsNavigation = !!outgoingShortsSnapshot
+            && window.location.pathname.startsWith('/shorts/');
+        if (previousVideoId && existingVideo && !isShortsToShortsNavigation) {
             const currentTime = existingVideo.currentTime || 0;
             if (currentTime > 5) {
                 log(`[SPA] Clearing inherited timing from previous video (${currentTime}s)`);
@@ -1590,6 +1679,11 @@
                 log('[SPA] Skipping timing reset; currentTime already near 0s');
             }
             existingVideo.dataset.lastVideoId = '';
+        }
+
+        if (window.location.pathname.startsWith('/shorts/') && existingVideo && !trackedVideos.has(existingVideo)) {
+            log('[SPA] Attaching Shorts tracking immediately to the active video.');
+            setupVideoTracking(existingVideo);
         }
 
         // Playlist navigation uses delayed restore because autoplay races setup.
@@ -1641,6 +1735,9 @@
                                 }
 
                                 // Initialize immediately
+                                if (window.location.pathname.startsWith('/shorts/')) {
+                                    setupVideoTracking(video);
+                                }
                                 initializeWithVideo(video);
                             }
                         });
@@ -1656,15 +1753,21 @@
             attributes: false // We only care about new elements, not attribute changes
         });
 
+        const currentSpaVideo = getPrimaryVideo();
+        if (window.location.pathname.startsWith('/shorts/') && currentSpaVideo && !trackedVideos.has(currentSpaVideo)) {
+            log('[SPA] Active Shorts video was already present; attaching tracking immediately.');
+            setupVideoTracking(currentSpaVideo);
+        }
+
         // Fallback timeout-based checking (reduced frequency since observer is primary)
         let spaCheckCount = 0;
         const maxSpaChecks = 3; // Reduced from 5 since observer is primary
 
-        initChecker = setInterval(() => {
+        initChecker = setInterval(async () => {
             spaCheckCount++;
             log(`[SPA] Fallback check for video element (${spaCheckCount}/${maxSpaChecks})...`);
 
-            if (initializeIfNeeded()) {
+            if (await initializeIfNeeded()) {
                 log('Fallback initialization successful after SPA navigation.');
                 cleanupSpaObserver();
             } else if (spaCheckCount >= maxSpaChecks) {
@@ -1743,9 +1846,9 @@
     }
 
     // Start observing for video element and playlist changes
-    initChecker = setInterval(() => {
+    initChecker = setInterval(async () => {
         log('Checking for video element...');
-        if (initializeIfNeeded()) {
+        if (await initializeIfNeeded()) {
             log('Initialization successful. Stopping checker.');
             clearInterval(initChecker);
             initChecker = null;
@@ -1952,6 +2055,7 @@
         const resetVideoTrackingForTests = () => {
             [...trackedVideos].forEach(video => cleanupVideoListeners(video));
             pendingRestoreAfterMediaChange = null;
+            latestShortsSnapshot = null;
         };
         window.__YTVHT_TEST__.navigation = {
             handleSpaNavigation,
@@ -1967,6 +2071,8 @@
             ensurePlaylistIgnoreToggles,
             setupVideoTracking,
             getPrimaryVideo,
+            getShortsMetadata,
+            captureShortsSnapshot,
             handleVideoMutations,
             getPendingRestoreForTests: () => pendingRestoreAfterMediaChange,
             resetVideoTrackingForTests

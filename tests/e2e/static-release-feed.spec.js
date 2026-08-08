@@ -1,4 +1,5 @@
 const { test, expect } = require('./extension-fixture');
+const { getServiceWorker, seedStoredVideo } = require('./chromium-extension-storage');
 
 const LOCALES = ['en', 'bg', 'de', 'es', 'fr'];
 const PLAYLIST_ID = 'PLv4ReferenceFixture123';
@@ -8,6 +9,11 @@ const LEGACY_CHANNEL_ID = 'UCbackupfixture000000000002';
 const LIVE_RSS_CHANNEL_ID = 'UCuAXFkgsw1L7xaCfnd5JJOw';
 const LIVE_CHANNEL_HANDLE = '@TodorKirilov';
 const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+const FIRST_WATCHED_SHORT_ID = 'ShortWatch1';
+const SECOND_WATCHED_SHORT_ID = 'ShortWatch2';
+const DUPLICATE_TITLE_SHORT_A = 'ShortDuplicateA';
+const DUPLICATE_TITLE_SHORT_B = 'ShortDuplicateB';
+const REGULAR_HISTORY_ID = 'RegularWatch1';
 
 async function extensionOrigin(context) {
   const worker = context.serviceWorkers().find((item) => item.url().includes('background.js'))
@@ -78,6 +84,102 @@ for (const locale of LOCALES) {
     });
   });
 }
+
+test('Shorts renders watched Shorts and updates without a feed reload', async ({ context }) => {
+  const firstUrl = `https://www.youtube.com/shorts/${FIRST_WATCHED_SHORT_ID}`;
+  const secondUrl = `https://www.youtube.com/shorts/${SECOND_WATCHED_SHORT_ID}`;
+  await seedStoredVideo(context, FIRST_WATCHED_SHORT_ID, {
+    title: 'First watched Shorts fixture',
+    time: 8,
+    duration: 24,
+    timestamp: 1700000000000,
+    url: firstUrl,
+    isShorts: true,
+    channelName: 'Fixture Shorts Channel',
+    channelId: '@fixture-shorts',
+  });
+  for (const [videoId, timestamp] of [
+    [DUPLICATE_TITLE_SHORT_A, 1600000000000],
+    [DUPLICATE_TITLE_SHORT_B, 1600000001000],
+  ]) {
+    await seedStoredVideo(context, videoId, {
+      title: 'Stale duplicated Shorts title',
+      time: 2,
+      duration: 15,
+      timestamp,
+      url: `https://www.youtube.com/shorts/${videoId}`,
+      isShorts: true,
+      channelName: 'Unknown',
+      channelId: 'Unknown',
+    });
+  }
+  const worker = await getServiceWorker(context);
+  await worker.evaluate(async (videoId) => {
+    await ytIndexedDBStorage.putSubscriptionFeedVideo({
+      videoId,
+      channelId: 'UCShortsCollisionFixture',
+      title: 'RSS copy without Shorts classification',
+      thumbnailUrl: 'https://i.ytimg.com/vi/ShortWatch1/hqdefault.jpg',
+      publishedAt: 2000000000000,
+      discoveredAt: 2000000000000,
+      lastSeenInFeedAt: 2000000000000,
+      durationSeconds: null,
+      isShort: null,
+      source: 'rss',
+    });
+  }, FIRST_WATCHED_SHORT_ID);
+
+  const { page, pageErrors } = await openFeed(context);
+  await page.locator('#navShorts').click();
+
+  const firstCard = page.locator(
+    `.ytvht-feed-card[data-ytvht-video-id="${FIRST_WATCHED_SHORT_ID}"]`
+  );
+  await expect(firstCard).toBeVisible();
+  await expect(firstCard.locator('.ytvht-card-title')).toHaveAttribute('href', firstUrl);
+  await expect(page.locator(
+    `.ytvht-feed-card[data-ytvht-video-id="${DUPLICATE_TITLE_SHORT_A}"]`
+  )).toBeVisible();
+  await expect(page.locator(
+    `.ytvht-feed-card[data-ytvht-video-id="${DUPLICATE_TITLE_SHORT_B}"]`
+  )).toBeVisible();
+
+  await seedStoredVideo(context, SECOND_WATCHED_SHORT_ID, {
+    title: 'Second watched Shorts fixture',
+    time: 3,
+    duration: 18,
+    timestamp: 1700000001000,
+    url: secondUrl,
+    isShorts: true,
+    channelName: 'Fixture Shorts Channel',
+    channelId: '@fixture-shorts',
+  });
+
+  const secondCard = page.locator(
+    `.ytvht-feed-card[data-ytvht-video-id="${SECOND_WATCHED_SHORT_ID}"]`
+  );
+  await expect(secondCard).toBeVisible();
+  await expect(page.locator('.ytvht-feed-card').first())
+    .toHaveAttribute('data-ytvht-video-id', SECOND_WATCHED_SHORT_ID);
+
+  await seedStoredVideo(context, REGULAR_HISTORY_ID, {
+    title: 'Regular history fixture',
+    time: 30,
+    duration: 300,
+    timestamp: 1700000002000,
+    url: `https://www.youtube.com/watch?v=${REGULAR_HISTORY_ID}`,
+    channelName: 'Regular Fixture Channel',
+    channelId: '@regular-fixture',
+  });
+  await page.locator('#navHistory').click();
+  await expect(page.locator(
+    `.history-row[data-ytvht-video-id="${REGULAR_HISTORY_ID}"]`
+  )).toBeVisible();
+  await expect(page.locator('.history-row[data-ytvht-video-id^="Short"]')).toHaveCount(0);
+  await expect(page.locator('#historyCount')).toContainText('1 history entry');
+  expect(pageErrors).toEqual([]);
+  await page.close();
+});
 
 test('saved YouTube playlist renders as an outbound reference without hydration', async ({ context }) => {
   const youtubeRequests = [];
