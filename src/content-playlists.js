@@ -73,49 +73,13 @@
                 }
             }
 
-            const localItems = {};
-            document.querySelectorAll(
-                'ytd-playlist-video-renderer, ytd-playlist-panel-video-renderer'
-            ).forEach((row) => {
-                const link = row.querySelector('a[href*="watch?v="]');
-                if (!link) return;
-                let videoId = '';
-                try { videoId = new URL(link.href, location.origin).searchParams.get('v') || ''; } catch (_) { return; }
-                if (!videoId || localItems[videoId]) return;
-                const titleElement = row.querySelector(
-                    '#video-title, #video-title-link, .title, yt-formatted-string.title'
-                );
-                const channelElement = row.querySelector(
-                    'ytd-channel-name a, #byline a, .byline a, .channel-name a'
-                );
-                const durationElement = row.querySelector(
-                    'ytd-thumbnail-overlay-time-status-renderer, #text.ytd-thumbnail-overlay-time-status-renderer'
-                );
-                localItems[videoId] = {
-                    videoId,
-                    title: titleElement?.textContent?.trim() || link.title || 'YouTube video',
-                    channelName: channelElement?.textContent?.trim() || '',
-                    channelUrl: channelElement?.href || '',
-                    thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-                    url: `https://www.youtube.com/watch?v=${videoId}`,
-                    _durationText: (durationElement?.textContent || '')
-                        .replace(/\s+/g, ' ')
-                        .match(/\b(?:\d+:)?\d{1,2}:\d{2}\b/)?.[0] || '',
-                    savedAt: Date.now()
-                };
-            });
-
             const playlistInfo = {
                 playlistId,
                 title: playlistTitle,
                 url: `https://www.youtube.com/playlist?list=${playlistId}`,
                 timestamp: Date.now(),
                 ...(currentVideoId ? { videoId: currentVideoId } : {}),
-                ...(thumbnail ? { thumbnail } : {}),
-                ...(Object.keys(localItems).length ? {
-                    localItems,
-                    videoCount: Object.keys(localItems).length
-                } : {})
+                ...(thumbnail ? { thumbnail } : {})
             };
 
             log('Created playlist info:', playlistInfo);
@@ -133,15 +97,8 @@
                 const merged = {
                     ...(existing || {}),
                     ...info,
-                    ...((existing?.localItems || info.localItems) ? {
-                        localItems: {
-                            ...((existing && existing.localItems) || {}),
-                            ...(info.localItems || {})
-                        }
-                    } : {}),
                     lastUpdated: Date.now()
                 };
-                if (merged.localItems) merged.videoCount = Object.keys(merged.localItems).length;
                 await getStorage().setPlaylist(info.playlistId, merged);
                 log('Playlist info saved successfully:', merged);
             } catch (error) {

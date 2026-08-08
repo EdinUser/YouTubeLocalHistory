@@ -4,7 +4,12 @@
 
 const { test, expect } = require('./extension-fixture');
 const { dismissYouTubeConsent } = require('./youtube-consent');
-const { getStoredVideo, removeStoredVideo, setExtensionSettings } = require('./chromium-extension-storage');
+const {
+  getStoredPlaylist,
+  getStoredVideo,
+  removeStoredVideo,
+  setExtensionSettings,
+} = require('./chromium-extension-storage');
 
 const PLAYLIST_ID = 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR';
 const PLAYLIST_URL = `https://www.youtube.com/playlist?list=${PLAYLIST_ID}`;
@@ -102,6 +107,33 @@ async function saveCurrentPlaylistVideo(context, page, videoId) {
     .toMatchObject({ videoId, time: expect.any(Number) });
 }
 
+async function expectPlaylistReference(context, videoId) {
+  await expect
+    .poll(async () => {
+      const record = await getStoredPlaylist(context, PLAYLIST_ID);
+      return record && {
+        playlistId: record.playlistId,
+        title: typeof record.title === 'string' ? record.title.trim() : '',
+        url: record.url,
+        timestamp: record.timestamp,
+        lastUpdated: record.lastUpdated,
+        videoId: record.videoId,
+        hasLocalItems: Object.prototype.hasOwnProperty.call(record, 'localItems'),
+        hasVideoCount: Object.prototype.hasOwnProperty.call(record, 'videoCount'),
+      };
+    }, { timeout: 30000 })
+    .toMatchObject({
+      playlistId: PLAYLIST_ID,
+      title: expect.stringMatching(/\S/),
+      url: PLAYLIST_URL,
+      timestamp: expect.any(Number),
+      lastUpdated: expect.any(Number),
+      videoId,
+      hasLocalItems: false,
+      hasVideoCount: false,
+    });
+}
+
 test.describe('Controlled playlist SPA canary (live YouTube)', () => {
   test.setTimeout(180000);
 
@@ -117,9 +149,11 @@ test.describe('Controlled playlist SPA canary (live YouTube)', () => {
 
     await clickPlaylistItem(page, firstItem);
     await saveCurrentPlaylistVideo(context, page, firstItem.videoId);
+    await expectPlaylistReference(context, firstItem.videoId);
 
     await clickPlaylistItem(page, secondItem);
     await saveCurrentPlaylistVideo(context, page, secondItem.videoId);
+    await expectPlaylistReference(context, secondItem.videoId);
 
     await expect.poll(() => getStoredVideo(context, firstItem.videoId), { timeout: 15000 }).toMatchObject({
       videoId: firstItem.videoId,

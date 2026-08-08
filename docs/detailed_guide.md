@@ -6,7 +6,7 @@ If you find YT re:Watch helpful, you can support ongoing development on [Patreon
 
 # 📖 YT re:Watch YouTube History Extension Guide (Multi-Account & Privacy)
 
-Your step-by-step guide to a privacy-first YouTube history extension that keeps progress consistent across multiple accounts (or no account), stores data locally, and helps you track and resume videos without Google access.
+Your step-by-step guide to a privacy-first YouTube history extension that keeps progress consistent across multiple accounts (or no account), stores data locally, and helps you track and resume videos without relying on Google account history.
 
 ---
 
@@ -26,12 +26,12 @@ Your step-by-step guide to a privacy-first YouTube history extension that keeps 
 3. Click "Add" when prompted
 4. You'll see the YT re:Watch icon appear in your browser toolbar
 
-### Step 2: Start Using YouTube Anonymously
+### Step 2: Start Using YouTube Without an Account
 1. Go to [youtube.com](https://youtube.com)
 2. **No need to log in** - browse YouTube without an account
 3. Start watching any video
 4. Watch for at least 10 seconds
-5. That's it! You're getting history tracking without Google surveillance
+5. That's it! You're getting local history tracking independent from Google account history
 
 ### 🔄 **Bonus: Account Independence**
 **Here's the amazing part:** Your history works the same whether you:
@@ -156,8 +156,11 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 - **Items per Page**: How many videos to show per page
   - Range: 5-20 items
   - Larger numbers = less scrolling, smaller numbers = faster loading
-- **Backup**: Back up all local data to a JSON file
-- **Restore**: Restore or merge data from a backup
+- **Backup**: Back up history, legacy and canonical local subscriptions,
+  YouTube playlist references, local playlists, Watch Later, settings,
+  statistics, preferences, and selected caches to a JSON file. Rebuildable
+  feed inventory and scheduler/maintenance state are not included.
+- **Restore**: Merge data from a backup with the data already stored in the extension
 -- **Robust Deletion System**: Deleted videos stay deleted with tombstone protection
   - Videos deleted from history use tombstone protection so they don't reappear from archives or imports
   - 30-day protection period ensures deletions persist across migrations and imports
@@ -286,18 +289,26 @@ These charts now prefer locally persisted, privacy‑preserving statistics for b
 1. Go to Settings tab
 2. Click "Restore"
 3. Select your backup file
-4. Choose import mode:
-   - **Merge**: Combines with existing data
-   - **Replace**: Overwrites existing data
-5. Import will begin automatically
+4. Confirm that you want to merge the backup with your current local data
+5. Restore will begin automatically
+
+Canonical local subscriptions are matched by YouTube channel ID. Existing
+non-empty subscription metadata is retained, missing metadata is filled from
+the backup, and the earliest valid follow date is preserved. Restoring the same
+backup more than once does not create duplicate subscriptions.
 
 ### Understanding Export Format
 The export file contains:
 - **Metadata**: Export date, extension version, data counts
 - **Video History**: All your watched videos with timestamps
 - **Playlists**: All saved playlists
+- **Local subscriptions**: Canonical v5 channel follows and their available metadata
 - **Settings**: Your customization preferences
 - **Stats**: Aggregated watch‑time snapshot powering Analytics (from dataVersion 1.1) with last‑7‑days `daily` buckets and a 24‑slot `hourly` distribution to keep the snapshot compact.
+
+Backups with `dataVersion` 2.1 store canonical v5 channel follows in
+`canonicalSubscriptions`. The older `subscriptions` field remains supported,
+and backups created before 2.1 can still be restored.
 
 ---
 

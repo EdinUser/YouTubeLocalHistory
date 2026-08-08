@@ -33,6 +33,7 @@ copy_common_files() {
        "$PROJECT_ROOT/src/content-thumbnails.js" \
        "$PROJECT_ROOT/src/content-messages.js" \
        "$PROJECT_ROOT/src/popup.html" \
+       "$PROJECT_ROOT/src/popup-preload.js" \
        "$PROJECT_ROOT/src/popup-core.js" \
        "$PROJECT_ROOT/src/popup-utils.js" \
        "$PROJECT_ROOT/src/popup-import.js" \
@@ -65,7 +66,6 @@ copy_common_files() {
        "$PROJECT_ROOT/src/feed-scheduler.js" \
        "$PROJECT_ROOT/src/feed-view-data.js" \
        "$PROJECT_ROOT/src/feed-subscription-import.js" \
-       "$PROJECT_ROOT/src/feed-core.js" \
        "$PROJECT_ROOT/src/feed-view-preference.js" \
        "$PROJECT_ROOT/src/feed-state-utils.js" \
        "$PROJECT_ROOT/src/feed-cards.js" \
@@ -79,10 +79,7 @@ copy_common_files() {
        "$PROJECT_ROOT/src/feed-settings.js" \
        "$PROJECT_ROOT/src/feed-localization.js" \
        "$PROJECT_ROOT/src/feed-backup.js" \
-       "$PROJECT_ROOT/src/feed-data-pipeline.js" \
        "$PROJECT_ROOT/src/feed-subscribe-results.js" \
-       "$PROJECT_ROOT/src/feed-youtube-search-core.js" \
-       "$PROJECT_ROOT/src/feed-youtube-search-render.js" \
        "$PROJECT_ROOT/src/feed-channel-view.js" \
        "$PROJECT_ROOT/src/feed-refresh.js" \
        "$PROJECT_ROOT/src/feed.js" \

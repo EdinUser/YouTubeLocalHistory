@@ -8,6 +8,7 @@ const path = require('path');
 const { test, expect } = require('./extension-fixture');
 const {
   getStoredVideo,
+  getStoredPlaylist,
   getLocalSubscription,
   getServiceWorker,
   seedStoredVideo: seedExtensionVideo,
@@ -399,6 +400,67 @@ test.describe('Static overlays (captured YouTube DOM)', () => {
       count: document.querySelectorAll('.ytvht-sub-btn-icon').length,
       unchanged: document.querySelector('.ytvht-sub-btn-icon') === window.__ytvhtInitialFollowIcon,
     }))).toEqual({ count: 1, unchanged: true });
+  });
+
+  test('captured playlist is stored as a reference without importing its members', async ({ context, page }) => {
+    const capture = readCapture('controlled-playlist');
+    test.skip(!capture, 'Run `npm run fixtures:youtube:download -- --only controlled-playlist` first.');
+    const [videoId] = extractVideoIdsFromHtml(capture.html);
+    expect(videoId, 'controlled playlist fixture should contain a watch video').toBeTruthy();
+
+    await openCapturedPage(
+      page,
+      `https://www.youtube.com/watch?v=${videoId}&list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR`,
+      capture.html
+    );
+    await page.waitForTimeout(1500);
+    const serviceWorker = await getServiceWorker(context);
+    const detectedInfo = await serviceWorker.evaluate(async (fixtureUrl) => {
+      const tabs = await chrome.tabs.query({});
+      const tab = tabs.find((candidate) => candidate.url === fixtureUrl);
+      if (!tab?.id) throw new Error(`controlled playlist tab not found: ${fixtureUrl}`);
+      const [execution] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          const video = document.querySelector('#movie_player video, video.html5-main-video, video');
+          if (!video) throw new Error('controlled playlist fixture should expose a video element');
+          Object.defineProperty(video, 'duration', { configurable: true, value: 180 });
+          Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: 15 });
+          video.dispatchEvent(new Event('timeupdate'));
+          video.dispatchEvent(new Event('pause'));
+          return window.YTVHTContentPlaylists.create({
+            log: () => {},
+            getStorage: () => null,
+            getPlaylistRetryTimeout: () => null,
+            setPlaylistRetryTimeout: () => {},
+          }).getPlaylistInfo();
+        },
+      });
+      return execution.result;
+    }, page.url());
+    expect(detectedInfo).toMatchObject({
+      playlistId: 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR',
+      url: PLAYLIST_URL,
+      videoId,
+    });
+    expect(detectedInfo.title).toBeTruthy();
+    await expect.poll(
+      async () => ({
+        playlistSaved: Boolean(await getStoredPlaylist(context, 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR')),
+        videoProgressSaved: Boolean(await getStoredVideo(context, videoId)),
+      }),
+      { timeout: 10000 }
+    ).toEqual({ playlistSaved: true, videoProgressSaved: true });
+    const record = await getStoredPlaylist(context, 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR');
+
+    expect(record).toMatchObject({
+      playlistId: 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR',
+      url: PLAYLIST_URL,
+      videoId,
+    });
+    expect(record.title).toBeTruthy();
+    expect(record).not.toHaveProperty('localItems');
+    expect(record).not.toHaveProperty('videoCount');
   });
 
 

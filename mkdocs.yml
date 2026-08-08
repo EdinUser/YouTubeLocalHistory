@@ -13,6 +13,7 @@ plugins:
 nav:
   - Home: index.md
   - Detailed Guide: detailed_guide.md
+  - Roadmap: roadmap.md
   - Changelog: ../CHANGELOG.md
   - FAQ: faq.md
   - Technical: technical.md
@@ -28,4 +29,3 @@ markdown_extensions:
       permalink: true
   - tables
   - attr_list
-

@@ -611,6 +611,9 @@
             const delta = Math.max(0, Math.floor(record.time - prevTime));
 
             await ytStorage.setVideo(videoId, record);
+            if (new URLSearchParams(window.location.search).has('list')) {
+                await savePlaylistInfo();
+            }
             if (delta > 0 && typeof ytStorage.updateStats === 'function') {
                 const prevRatio = (previous && previous.duration) ? (previous.time || 0) / previous.duration : 0;
                 const newRatio = (record.duration ? record.time / record.duration : 0);
@@ -1764,6 +1767,11 @@
 
             // Intercept video link clicks to add timestamps
             interceptVideoLinkClicks();
+
+            const primaryVideo = getPrimaryVideo();
+            if (primaryVideo && !trackedVideos.has(primaryVideo)) {
+                setupVideoTracking(primaryVideo);
+            }
 
             isInitialized = true;
             

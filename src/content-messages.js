@@ -17,63 +17,7 @@
         return function contentMessageListener(message, sender, sendResponse) {
             const storage = getStorage();
 
-            if (message.type === 'fetchYouTubeSearchPageInTab') {
-                const query = String(message.query || '').trim();
-                if (!query) {
-                    sendResponse({ error: 'Missing YouTube search query' });
-                    return true;
-                }
-                fetch(`/results?search_query=${encodeURIComponent(query)}`, {
-                    credentials: 'include'
-                }).then(async (response) => {
-                    if (!response.ok) throw new Error(`YouTube returned ${response.status}`);
-                    sendResponse({ html: await response.text() });
-                }).catch((error) => {
-                    sendResponse({ error: error && error.message ? error.message : String(error) });
-                });
-                return true;
-            } else if (message.type === 'fetchYouTubeSearchContinuationInTab') {
-                const token = String(message.token || '');
-                const config = message.config || {};
-                if (!token || !config.clientVersion) {
-                    sendResponse({ error: 'Missing YouTube search continuation data' });
-                    return true;
-                }
-                const key = config.apiKey ? `?key=${encodeURIComponent(config.apiKey)}` : '';
-                const headers = {
-                    'Content-Type': 'application/json',
-                    'X-YouTube-Client-Name': '1',
-                    'X-YouTube-Client-Version': String(config.clientVersion)
-                };
-                if (config.visitorData) headers['X-Goog-Visitor-Id'] = String(config.visitorData);
-                const context = {
-                    client: {
-                        clientName: 'WEB',
-                        clientVersion: String(config.clientVersion),
-                        visitorData: String(config.visitorData || ''),
-                        hl: 'en',
-                        gl: 'US'
-                    }
-                };
-                if (config.clickTrackingParams) {
-                    context.clickTracking = { clickTrackingParams: String(config.clickTrackingParams) };
-                }
-                fetch(`/youtubei/v1/search${key}`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers,
-                    body: JSON.stringify({
-                        context,
-                        continuation: token
-                    })
-                }).then(async (response) => {
-                    if (!response.ok) throw new Error(`YouTube returned ${response.status}`);
-                    sendResponse({ data: await response.json() });
-                }).catch((error) => {
-                    sendResponse({ error: error && error.message ? error.message : String(error) });
-                });
-                return true;
-            } else if (message.type === 'getHistory') {
+            if (message.type === 'getHistory') {
                 if (!isInitialized()) {
                     log('Not initialized yet, initializing now');
                     initializeIfNeeded();

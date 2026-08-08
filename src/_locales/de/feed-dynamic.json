@@ -56,7 +56,6 @@
   "feed_last_upload": { "message": "Letzter Upload $1" },
   "feed_live": { "message": "LIVE" },
   "feed_load_more_remaining": { "message": "Mehr laden ($1 verbleiben)" },
-  "feed_loading_video_details": { "message": "Videodetails werden geladen…" },
   "feed_loading_videos": { "message": "Videos werden geladen…" },
   "feed_local_count": { "message": "$1 lokal" },
   "feed_local_ready": { "message": "Lokaler Feed ist bereit" },

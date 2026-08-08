@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   getStoredVideo,
+  getStoredPlaylist,
   getLocalSubscription,
   launchFirefoxWithExtension,
   seedStoredVideo: seedExtensionVideo,
@@ -495,6 +496,49 @@ async function main() {
         const subscription = await getLocalSubscription(session, channelId);
         return { subscription, ok: subscription?.channelId === channelId };
       });
+    });
+
+    await runScenario('playlist reference detection', async (session) => {
+      const playlistId = 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR';
+      const url = `https://www.youtube.com/playlist?list=${playlistId}`;
+      const [videoId] = extractVideoIdsFromHtml(playlist.html);
+      assert.ok(videoId, 'controlled playlist fixture should contain a watch video');
+      await openFixturePage(session.driver, `${server.origin}/playlist?v=${videoId}&list=${playlistId}`);
+      await sleep(1500);
+      const fixtureUrl = await session.driver.getCurrentUrl();
+      await withFirefoxExtensionPage(session, async () => {
+        const result = await session.driver.executeAsyncScript((fixtureUrl, done) => {
+          browser.runtime.getBackgroundPage().then(async (background) => {
+            const tabs = await background.browser.tabs.query({});
+            const tab = tabs.find((candidate) => candidate.url === fixtureUrl);
+            if (!tab?.id) throw new Error(`controlled playlist tab not found: ${fixtureUrl}`);
+            await background.browser.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: () => {
+                const video = document.querySelector('#movie_player video, video.html5-main-video, video');
+                if (!video) throw new Error('controlled playlist fixture should expose a video element');
+                Object.defineProperty(video, 'duration', { configurable: true, value: 180 });
+                Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: 15 });
+                video.dispatchEvent(new Event('timeupdate'));
+                video.dispatchEvent(new Event('pause'));
+              },
+            });
+            done({ ok: true });
+          }).catch((error) => done({ ok: false, error: error.message }));
+        }, fixtureUrl);
+        assert.equal(result.ok, true, result.error);
+      });
+      const result = await waitUntil('stored playlist reference', 10000, async () => {
+        const record = await getStoredPlaylist(session, playlistId);
+        return { record, ok: Boolean(record) };
+      });
+
+      assert.equal(result.record.playlistId, playlistId);
+      assert.equal(result.record.url, url);
+      assert.equal(result.record.videoId, videoId);
+      assert.ok(result.record.title, 'stored playlist reference should retain its detected title');
+      assert.equal(Object.hasOwn(result.record, 'localItems'), false, 'playlist members must not be imported');
+      assert.equal(Object.hasOwn(result.record, 'videoCount'), false, 'reference detection must not count imported members');
     });
 
     await runScenario('playlist overlay and remove', async (session) => {

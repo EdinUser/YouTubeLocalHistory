@@ -56,7 +56,6 @@
   "feed_last_upload": { "message": "Última subida $1" },
   "feed_live": { "message": "EN DIRECTO" },
   "feed_load_more_remaining": { "message": "Cargar más (quedan $1)" },
-  "feed_loading_video_details": { "message": "Cargando detalles de los vídeos…" },
   "feed_loading_videos": { "message": "Cargando vídeos…" },
   "feed_local_count": { "message": "$1 locales" },
   "feed_local_ready": { "message": "El feed local está listo" },

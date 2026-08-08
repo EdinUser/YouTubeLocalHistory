@@ -14,31 +14,6 @@ test('packaged feed page exposes one live scheduler-status surface beside Refres
   await page.close();
 });
 
-test('packaged playlists view enriches missing artwork without a page error', async ({ context }) => {
-  const worker = context.serviceWorkers().find((item) => item.url().includes('background.js'))
-    || await context.waitForEvent('serviceworker', { predicate: (item) => item.url().includes('background.js') });
-  const extensionOrigin = `${new URL(worker.url()).protocol}//${new URL(worker.url()).host}`;
-  const page = await context.newPage();
-  const pageErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  await context.route('https://www.youtube.com/playlist?list=PLmissing-artwork', (route) => route.fulfill({ status: 404, body: '' }));
-  await page.goto(`${extensionOrigin}/feed.html`, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(async () => {
-    await ytStorage.setPlaylist('PLmissing-artwork', {
-      playlistId: 'PLmissing-artwork',
-      title: 'Artwork fixture',
-      timestamp: 1,
-      items: {},
-      order: []
-    });
-  });
-
-  await page.locator('#navPlaylists').click();
-  await expect(page.locator('#playlistsList')).toContainText('Artwork fixture');
-  expect(pageErrors).toEqual([]);
-  await page.close();
-});
-
 test('packaged local search stays local and Show opens the chronological subscription inventory', async ({ context }) => {
   const worker = context.serviceWorkers().find((item) => item.url().includes('background.js'))
     || await context.waitForEvent('serviceworker', { predicate: (item) => item.url().includes('background.js') });

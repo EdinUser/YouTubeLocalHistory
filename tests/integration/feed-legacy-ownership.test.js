@@ -3,13 +3,41 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
 const read = (relativePath) => fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
+const exists = (relativePath) => fs.existsSync(path.join(ROOT, relativePath));
+const REMOVED_LEGACY_MODULES = [
+  'src/feed-core.js',
+  'src/feed-data-pipeline.js',
+  'src/feed-youtube-search-core.js',
+  'src/feed-youtube-search-render.js',
+];
 
-test('the feed page does not load the aggregate cache pipeline or remote YouTube search modules', () => {
+test('legacy aggregate, backfill, and remote-search modules are absent from source and feed packaging', () => {
   const html = read('src/feed.html');
-  expect(html).not.toContain('feed-data-pipeline.js');
-  expect(html).not.toContain('feed-youtube-search-core.js');
-  expect(html).not.toContain('feed-youtube-search-render.js');
+  const build = read('build.sh');
+  REMOVED_LEGACY_MODULES.forEach((modulePath) => {
+    expect(exists(modulePath)).toBe(false);
+    expect(html).not.toContain(path.basename(modulePath));
+    expect(build).not.toContain(path.basename(modulePath));
+  });
   expect(html).toContain('feed-scheduler.js');
+});
+
+test('dormant playlist hydration and remote-search message endpoints are removed', () => {
+  const background = read('src/background.js');
+  const contentMessages = read('src/content-messages.js');
+  const removedEndpoints = [
+    'getPlaylistMetadata',
+    'fetchYouTubeSearchPage',
+    'fetchYouTubeSearchContinuation',
+    'fetchYouTubeSearchPageInTab',
+    'fetchYouTubeSearchContinuationInTab',
+  ];
+  removedEndpoints.forEach((endpoint) => {
+    expect(background).not.toContain(endpoint);
+    expect(contentMessages).not.toContain(endpoint);
+  });
+  expect(background).not.toContain('youtubei.googleapis.com');
+  expect(background).not.toContain('/youtubei/v1/');
 });
 
 test('the page-overlay subscription control has no feed inventory, RSS, or network ownership', () => {
@@ -24,14 +52,30 @@ test('the page-overlay subscription control has no feed inventory, RSS, or netwo
   expect(actions).not.toContain('videos.xml');
 });
 
-test('extension content-script manifests no longer load the old feed-core worker dependency', () => {
+test('both manifests expose only the permissions and host needed by shipped behavior', () => {
   ['src/manifest.chrome.json', 'src/manifest.firefox.json'].forEach((manifestPath) => {
     const manifest = JSON.parse(read(manifestPath));
     const scripts = manifest.content_scripts[0].js;
+    expect(manifest.permissions).toEqual([
+      'storage',
+      'unlimitedStorage',
+      'scripting',
+      'contextMenus',
+    ]);
+    expect(manifest.host_permissions).toEqual(['*://*.youtube.com/*']);
     expect(scripts).toContain('indexeddb-storage.js');
     expect(scripts).toContain('content-subscriptions.js');
     expect(scripts).not.toContain('feed-core.js');
   });
+});
+
+test('retained privileged capabilities have active local-feed or context-menu callers', () => {
+  const background = read('src/background.js');
+  expect(background).toContain('chrome.contextMenus.create');
+  expect(background).toContain('chrome.scripting.executeScript');
+  expect(read('src/rss-client.js')).toContain("credentials: 'omit'");
+  expect(read('src/feed-channel-metadata.js')).toContain("credentials: 'omit'");
+  expect(read('src/local-subscription-actions.js')).toContain("credentials: 'omit'");
 });
 
 test('feed views do not depend on the removed aggregate-pipeline refresh global', () => {

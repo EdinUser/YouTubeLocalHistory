@@ -8,14 +8,11 @@
     "permissions": [
         "storage",
         "unlimitedStorage",
-        "activeTab",
         "scripting",
-        "contextMenus",
-        "cookies"
+        "contextMenus"
     ],
     "host_permissions": [
-        "*://*.youtube.com/*",
-        "https://youtubei.googleapis.com/*"
+        "*://*.youtube.com/*"
     ],
     "background": {
         "service_worker": "background.js"

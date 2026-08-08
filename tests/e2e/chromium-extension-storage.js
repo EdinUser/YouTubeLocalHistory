@@ -70,9 +70,15 @@ async function getLocalSubscription(context, channelId) {
   return serviceWorker.evaluate((id) => ytIndexedDBStorage.getSubscriptionRecord(id), channelId);
 }
 
+async function getStoredPlaylist(context, playlistId) {
+  const serviceWorker = await getServiceWorker(context);
+  return serviceWorker.evaluate((id) => ytStorage.getPlaylist(id), playlistId);
+}
+
 module.exports = {
   getExtensionStorage,
   getLocalSubscription,
+  getStoredPlaylist,
   getServiceWorker,
   getStoredVideo,
   removeExtensionStorage,

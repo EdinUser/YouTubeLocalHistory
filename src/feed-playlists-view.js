@@ -1,5 +1,3 @@
-const playlistAsync = globalThis.ytvhtFeedAsync;
-
 function playlistMetaText(record) {
     const count = Number(record.videoCount || 0);
     const videoPart = count
@@ -455,14 +453,17 @@ async function renderPlaylists() {
     let localPlaylists = {};
     try {
         const stored = await ytStorage.getAllPlaylists();
-        records = Object.entries(stored || {}).map(([id, value]) => ({
-            ...(value || {}),
-            playlistId: (value && value.playlistId) || id,
-            _hasLocalItems: Object.keys((value && value.localItems) || {}).length > 0,
-            items: (value && value.localItems) || {},
-            order: (value && value.localOrder) || [],
-            videoCount: Object.keys((value && value.localItems) || {}).length
-        }));
+        records = Object.entries(stored || {}).map(([id, value]) => {
+            const reference = { ...(value || {}) };
+            delete reference.localItems;
+            delete reference.localOrder;
+            return {
+                ...reference,
+                playlistId: (value && value.playlistId) || id,
+                items: {},
+                order: []
+            };
+        });
     } catch (_) { /* show empty */ }
     try {
         const localStored = await chrome.storage.local.get(['localVideoPlaylists']);
@@ -493,10 +494,6 @@ async function renderPlaylists() {
     }
 
     records.sort((a, b) => Number(b.timestamp || b.lastUpdated || 0) - Number(a.timestamp || a.lastUpdated || 0));
-    const missingArtwork = records.filter((record) => !record._local && !record.thumbnail).slice(0, 30);
-    if (missingArtwork.length) {
-        await playlistAsync.runPool(missingArtwork, 4, enrichPlaylistCard);
-    }
     list.textContent = '';
     list.classList.remove('playlists-list-detail');
     count.textContent = feedPlural('feed_playlists_count', records.length, '$1 playlist', '$1 playlists');
@@ -511,10 +508,20 @@ async function renderPlaylists() {
             renderLocalPlaylistDetail(record);
         };
 
+        const configureLink = (link) => {
+            if (record._local) {
+                link.href = '#';
+                link.addEventListener('click', openDetail);
+                return;
+            }
+            link.href = `https://www.youtube.com/playlist?list=${encodeURIComponent(record.playlistId)}`;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+        };
+
         const thumbLink = document.createElement('a');
         thumbLink.className = 'playlist-link playlist-thumb-link';
-        thumbLink.href = '#';
-        thumbLink.addEventListener('click', openDetail);
+        configureLink(thumbLink);
 
         const titleText = decodeHtmlEntities(record.title || tFeed('feed_unknown_playlist', 'Unknown playlist'));
 
@@ -558,9 +565,8 @@ async function renderPlaylists() {
 
         const name = document.createElement('a');
         name.className = 'playlist-name';
-        name.href = '#';
         name.textContent = titleText;
-        name.addEventListener('click', openDetail);
+        configureLink(name);
 
         titleRow.appendChild(name);
         titleRow.appendChild(buildPlaylistCardMenu(titleText, {
@@ -581,11 +587,6 @@ async function renderPlaylists() {
         row.appendChild(text);
         list.appendChild(row);
     });
-}
-
-function setPlaylistDetailLoadingMessage(root, message) {
-    const text = root && root.querySelector('.playlist-detail-loading-text');
-    if (text) text.textContent = message;
 }
 
 function setPlaylistsNavBackMode(enabled) {
@@ -658,7 +659,7 @@ function buildPlaylistDetailLoading(record) {
     return detail;
 }
 
-async function renderLocalPlaylistDetail(record, allowImport = true) {
+async function renderLocalPlaylistDetail(record) {
     const list = document.getElementById('playlistsList');
     const section = document.getElementById('playlistsSection');
     if (!list) return;
@@ -672,20 +673,8 @@ async function renderLocalPlaylistDetail(record, allowImport = true) {
     const loadingDetail = buildPlaylistDetailLoading(record);
     list.appendChild(loadingDetail);
 
-    const importedItems = allowImport ? await importSavedPlaylistVideos(record) : (record.items || {});
+    const videos = orderedPlaylistVideos(record, record.items || {});
     if (renderToken !== playlistDetailRenderToken || activePlaylistDetailId !== record.playlistId) return;
-    const playlistItems = Object.keys(record.items || {}).length ? record.items : importedItems;
-    const videos = orderedPlaylistVideos(record, playlistItems);
-    if (videos.some((video) => !video.published || !video.duration)) {
-        setPlaylistDetailLoadingMessage(
-            loadingDetail,
-            tFeed('feed_loading_video_details', 'Loading video details…')
-        );
-        const meta = loadingDetail.querySelector('.local-playlist-count');
-        if (meta) meta.textContent = tFeed('feed_loading_video_details', 'Loading video details…');
-        await enrichLocalPlaylistMetadata(record, videos);
-        if (renderToken !== playlistDetailRenderToken || activePlaylistDetailId !== record.playlistId) return;
-    }
 
     list.textContent = '';
     const detail = document.createElement('div');

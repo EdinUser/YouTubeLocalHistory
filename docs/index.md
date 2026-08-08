@@ -5,7 +5,7 @@ A private YouTube history extension that keeps multi-account progress local, add
 [![Chrome Web Store](https://img.shields.io/badge/Get_it_on-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba)
 [![Firefox Add-ons](https://img.shields.io/badge/Get_it_on-Firefox_Add--ons-FF7139?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/yt-rewatch/)
 
-*Keep track of your YouTube journey — your data stays private on your device*
+*Keep track of your YouTube journey — your re:Watch history stays on your device*
 
 YT re:Watch is a privacy-first YouTube history extension that works across multiple accounts (or no account), tracks your progress locally, and keeps your watch history independent from your Google account so you can resume without losing data. It also includes a local feed, local channel subscriptions, playlists, history, analytics, and settings.
 
@@ -64,14 +64,14 @@ Need a deeper walkthrough? Read the [Detailed Guide](./detailed_guide.md). Quick
 *See your progress on any account - or no account at all*
 
 ### 🔒 **Privacy-Conscious Users**
-- "I want to use YouTube without Google tracking my viewing habits"
+- "I want the extension's saved progress kept separate from my Google account history"
 - "I need a private alternative to YouTube's built-in history"
-- "I want to explore content without affecting my recommendations"
-- "I want to research sensitive topics without creating a profile"
+- "I want one local history while switching accounts or watching logged out"
+- "I want control over the history record stored by the extension"
 
 ### 👨‍🎓 **Students & Researchers**
 - "I watch educational content across different accounts/devices"
-- "I want to track my video watching without Google profiling"
+- "I want to track videos without an extension-owned profiling service"
 - "I need consistent history for research projects"
 
 
@@ -138,26 +138,32 @@ Because the extension stores its own history locally:
 - ✅ **No progress data collection by YT re:Watch** - we cannot see what you watch
 
 ### 🏠 **Your Data, Your Rules**
-- **Local storage only** - stays on your device
+- **Local extension storage** - re:Watch's saved data stays on your device
 - **Export anytime** - your data, your backup
-- **No cloud dependency** - works offline
+- **No re:Watch cloud dependency** - saved records remain locally available
 - **Account-agnostic** - same experience regardless of login status
 
 ### ⚠️ **Important Privacy Disclaimer**
-**What this extension protects:** Your YouTube viewing history and progress tracking  
+**What this extension protects:** The separate history and progress record saved by re:Watch
 **What it DOESN'T protect:** This extension only handles YouTube history data. Google/YouTube still tracks you through:
 - IP address tracking
 - Browser fingerprinting  
 - Cookies and other tracking mechanisms
 - Analytics and advertising networks
 
-**For complete privacy:** Use with VPN, privacy-focused browsers, ad blockers, and other privacy tools.
+For the local feed, the extension requests public YouTube RSS and, when needed,
+public channel pages for handle resolution or metadata. Those direct requests
+omit browser credentials. Displayed thumbnails, avatars, and banners may load
+from YouTube-owned image hosts. Local feed search and saved playlist references
+do not perform remote search or background playlist hydration.
+
+**For broader privacy:** Use with VPN, privacy-focused browsers, ad blockers, and other privacy tools.
 
 ## 💡 Pro Tips
 
 - **Dark Mode**: The extension automatically matches your system theme
-- **Search**: Use the feed search for YouTube results, or search local history in the History view
-- **Export Data**: Back up all local data from the Settings tab
+- **Search**: Use the feed search across saved history and locally cached feed records
+- **Export Data**: Back up the documented profile data from the Settings tab
 - **Export/Import Data**: Manually transfer your history between devices via JSON files
 
 ## 🤝 Need Help?

@@ -147,41 +147,52 @@ This solves the common problem where deleted videos would reappear in searches.
 - Perfect for privacy-conscious users
 
 ### Q: How is this different from YouTube's built-in history?
-**A:** More convenient AND your history stays private:
+**A:** re:Watch keeps its own history record locally and independently:
 - **YouTube's history**: Stored on Google's servers, tied to your account, used for ads/recommendations, **inaccessible when you switch accounts**
-- **YT re:Watch**: Stored only on your device, history data stays in your browser profile, **works across ALL accounts**
+- **YT re:Watch**: Its saved copy stays in your browser profile and **works across ALL accounts**
 - YT re:Watch does not upload saved viewing progress to an extension-owned server.
 - Never lose your progress when switching between accounts!
 
 ### Q: Is my viewing history private?
-**A:** Yes, your history data is private! 
-- Your viewing progress stays on your device only
-- We don't collect, see, or store any of your history information
-- No external servers are involved in history tracking
-- Your viewing progress is yours alone
-- YT re:Watch does not send your saved progress to an extension-owned server
-- Even we can't access your history data
+**A:** The history copy saved by re:Watch stays local to your browser profile.
+- The extension does not upload its saved viewing progress
+- The maintainers don't collect, see, or store your history information
+- No extension-owned server receives your saved history or progress
+- Only someone or software with access to your browser profile or exported
+  backup can read that local copy
+
+This is local data storage, not network anonymity. Normal YouTube playback is
+still visible to YouTube. The local feed also makes credential-omitted public
+RSS and channel-page requests when synchronization, handle resolution, or
+channel metadata requires them, and displayed YouTube images may load from
+YouTube-owned image hosts. Feed search itself stays local.
 
 ### Q: Can I backup my data?
-**A:** Yes! Go to Settings and use **Backup** to download a JSON backup file. You can restore it later if needed.
+**A:** Yes! Go to Settings and use **Backup** to download a JSON backup file.
+It includes your canonical local channel subscriptions as well as history,
+playlists, settings, statistics, and other local extension data. You can merge
+it back into the extension later with **Restore**.
 
 ### Q: Does this affect my YouTube recommendations?
-**A:** No, this extension doesn't interact with YouTube's recommendation system at all. Your private viewing stays private!
+**A:** YT re:Watch does not write to YouTube's recommendation system or account
+history. However, watching YouTube normally can still affect recommendations
+through your account, cookies, and YouTube's ordinary playback analytics. The
+extension does not prevent that.
 
-### Q: Can I research sensitive topics privately?
-**A:** Absolutely! This is perfect for:
-- Academic research without creating a "profile"
-- Exploring topics without affecting recommendations
-- Learning about subjects privately
-- Medical research without health profiling
+### Q: Can this make sensitive research anonymous?
+**A:** The extension can keep its own saved history separate from your Google
+account, but it cannot make sensitive browsing anonymous. YouTube, the
+embedding page, your network provider, cookies, and other trackers may still
+observe normal browsing and playback traffic. Use appropriate browser and
+network privacy tools for sensitive research.
 
 
 ### Q: Does this extension block ALL Google tracking?
 **A:** ⚠️ **NO - Important limitation to understand:**
 
 **What YT re:Watch protects:**
-- ✅ Your YouTube viewing history (stored locally, not on Google servers)
-- ✅ Video progress tracking (private, not shared with Google)
+- ✅ The extension's separate history record (stored locally in your browser profile)
+- ✅ The progress record saved by re:Watch (not uploaded by the extension)
 - ✅ Playlist discovery (local only)
 
 **What YT re:Watch DOES NOT protect against:**
@@ -319,6 +330,11 @@ For accuracy and responsiveness:
 
 ### Q: Did the export format change?
 **A:** Yes. Starting with dataVersion 1.1, exports include a `stats` object containing your aggregated watch‑time snapshot used for Analytics. This is optional data used solely to speed up and stabilize charts. Imports accept files with or without `stats`.
+
+Starting with dataVersion 2.1, exports also include a
+`canonicalSubscriptions` array containing v5 local channel follows. Restore
+deduplicates these records by canonical channel ID. Older backups without this
+array remain supported.
 
 ### Q: How do I interpret the completion bar chart?
 **A:** It shows the number of long videos you skipped, partially watched, or completed. The legend explains each category. 

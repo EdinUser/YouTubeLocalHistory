@@ -1,9 +1,53 @@
-async function exportFeedData() {
+function mergeCanonicalBackupSubscription(existing, incoming) {
+    const channelId = String(incoming && incoming.channelId || '').trim();
+    const allowedSources = ['takeout_csv', 'oauth', 'manual'];
+    const existingSource = String(existing && existing.source || '').trim();
+    const incomingSource = String(incoming && incoming.source || '').trim();
+    const source = allowedSources.includes(existingSource)
+        ? existingSource
+        : (allowedSources.includes(incomingSource) ? incomingSource : '');
+    if (!/^UC[\w-]+$/.test(channelId) || !source) return null;
+
+    const merged = { ...(incoming || {}) };
+    Object.entries(existing || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') merged[key] = value;
+    });
+    const followedAtValues = [existing && existing.followedAt, incoming && incoming.followedAt]
+        .map(Number)
+        .filter((value) => Number.isFinite(value) && value > 0);
+    return {
+        ...merged,
+        channelId,
+        source,
+        followedAt: followedAtValues.length ? Math.min(...followedAtValues) : Date.now()
+    };
+}
+
+async function restoreCanonicalBackupSubscriptions(subscriptions) {
+    const result = { restored: 0, skipped: 0 };
+    for (const incoming of (Array.isArray(subscriptions) ? subscriptions : [])) {
+        const channelId = String(incoming && incoming.channelId || '').trim();
+        const existing = /^UC[\w-]+$/.test(channelId)
+            ? await ytIndexedDBStorage.getSubscriptionRecord(channelId)
+            : null;
+        const merged = mergeCanonicalBackupSubscription(existing, incoming);
+        if (!merged) {
+            result.skipped += 1;
+            continue;
+        }
+        await ytIndexedDBStorage.putSubscriptionRecord(merged);
+        result.restored += 1;
+    }
+    return result;
+}
+
+async function createFeedBackupData() {
     const [
         videos,
         playlists,
         stats,
-        subscriptions,
+        legacySubscriptions,
+        canonicalSubscriptions,
         watchLater,
         settings,
         localData
@@ -12,6 +56,7 @@ async function exportFeedData() {
         ytStorage.getAllPlaylists(),
         ytStorage.getStats(),
         ytStorage.getSubscriptionList(),
+        ytIndexedDBStorage.listSubscriptionRecords(),
         ytStorage.getAllWatchLater(),
         ytStorage.getSettings(),
         chrome.storage.local.get([
@@ -28,13 +73,14 @@ async function exportFeedData() {
             exportDate: new Date().toISOString(),
             extensionVersion: chrome.runtime.getManifest().version,
             exportFormat: 'json',
-            dataVersion: '2.0',
+            dataVersion: '2.1',
             type: 'yt-rewatch-full-backup'
         },
         history: Object.values(videos || {}),
         playlists: Object.values(playlists || {}),
         localPlaylists: localData.localVideoPlaylists || {},
-        subscriptions: subscriptions || [],
+        subscriptions: legacySubscriptions || [],
+        canonicalSubscriptions: canonicalSubscriptions || [],
         watchLater: Object.values(watchLater || {}),
         settings: settings || {},
         stats,
@@ -48,6 +94,11 @@ async function exportFeedData() {
             popupAccentColor: localData.popupAccentColor || ''
         }
     };
+    return data;
+}
+
+async function exportFeedData() {
+    const data = await createFeedBackupData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -65,7 +116,11 @@ async function restoreFeedBackup(file) {
     catch (_) {
         throw new Error(tFeed('feed_invalid_backup', 'This is not a valid JSON backup file.'));
     }
-    if (!data || typeof data !== 'object') {
+    return restoreFeedBackupData(data);
+}
+
+async function restoreFeedBackupData(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
         throw new Error(tFeed('feed_backup_empty', 'Backup file is empty.'));
     }
 
@@ -78,6 +133,7 @@ async function restoreFeedBackup(file) {
     for (const subscription of (Array.isArray(data.subscriptions) ? data.subscriptions : [])) {
         if (subscription) await ytStorage.addSubscription(subscription);
     }
+    await restoreCanonicalBackupSubscriptions(data.canonicalSubscriptions);
     for (const item of (Array.isArray(data.watchLater) ? data.watchLater : [])) {
         if (item && item.videoId) await ytStorage.setWatchLater(item.videoId, item);
     }
