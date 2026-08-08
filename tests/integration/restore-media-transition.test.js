@@ -108,6 +108,32 @@ describe('restore through replacement media', () => {
     expect(mainVideo.currentTime).toBe(SAVED_TIME);
   });
 
+  test('defers a restore during a long YouTube ad and resumes when the ad ends', async () => {
+    const player = document.createElement('div');
+    player.id = 'movie_player';
+    player.classList.add('ad-showing');
+    const video = createVideo({ duration: 120, readyState: 4 });
+    video.className = 'video-stream html5-main-video';
+    player.append(video);
+    document.body.append(player);
+
+    setupVideoTracking(video);
+    await settle();
+
+    expect(video.currentTime).toBe(0);
+    expect(getPendingRestoreForTests()).toMatchObject({
+      reason: 'youtube-ad-playing',
+      targetTime: SAVED_TIME
+    });
+
+    player.classList.remove('ad-showing');
+    await settleMediaTransition();
+
+    expect(video.currentTime).toBe(SAVED_TIME);
+    video.dispatchEvent(new Event('seeked'));
+    expect(getPendingRestoreForTests()).toBeNull();
+  });
+
   test('allows only one replacement tracker to claim the pending restore', async () => {
     const preRoll = createVideo({ duration: 15, readyState: 1 });
     document.body.append(preRoll);

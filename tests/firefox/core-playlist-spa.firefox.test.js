@@ -180,13 +180,21 @@ async function clickPlaylistItem(driver, item) {
     const url = new URL(await driver.getCurrentUrl());
     const video = await driver.executeScript((selector) => {
       const element = document.querySelector(selector);
-      return { found: !!element, readyState: element ? element.readyState : 0 };
+      const player = document.querySelector('#movie_player');
+      return {
+        found: !!element,
+        readyState: element ? element.readyState : 0,
+        playerVideoId: typeof player?.getVideoData === 'function'
+          ? player.getVideoData()?.video_id || ''
+          : '',
+      };
     }, PRIMARY_VIDEO_SELECTOR);
     return {
       ok: url.pathname === '/watch'
         && url.searchParams.get('v') === item.videoId
         && url.searchParams.get('list') === PLAYLIST_ID
-        && video.found,
+        && video.found
+        && video.playerVideoId === item.videoId,
       url: url.href,
       video,
     };

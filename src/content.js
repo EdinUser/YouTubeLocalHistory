@@ -203,6 +203,14 @@
         return !!video && video.isConnected && getPrimaryVideo() === video;
     }
 
+    function isYouTubeAdPlaying(video) {
+        const player = video?.closest?.('#movie_player') || document.querySelector('#movie_player');
+        return !!player && (
+            player.classList.contains('ad-showing')
+            || player.classList.contains('ad-interrupting')
+        );
+    }
+
     // YouTube frequently reparents the same player. MutationObserver reports
     // that as a removal plus an addition, but the element is connected again by
     // the time this callback runs. Preserve its listeners and closure state.
@@ -1044,6 +1052,27 @@
                 // Enhanced debug logging using existing log function
                 log(`[ensureVideoReady] videoId=${videoId} | current=${currentTime.toFixed(2)}s | saved=${savedTime.toFixed(2)}s`);
 
+                // An ad can be longer than the saved timestamp and accept the seek,
+                // which would falsely mark restoration complete before the real
+                // video starts. Keep the restore pending until YouTube ends the ad.
+                if (isYouTubeAdPlaying(video)) {
+                    restoreAwaitingMediaChange = true;
+                    restoringPendingMedia = false;
+                    pendingRestoreAfterMediaChange = {
+                        videoId,
+                        targetTime: savedTime,
+                        reason: 'youtube-ad-playing',
+                        ownerVideo: video,
+                        phase: 'awaiting-ad-end'
+                    };
+                    traceRestore('restore-waiting-for-ad-end', {
+                        currentTime,
+                        duration: Number.isFinite(video.duration) ? video.duration : 0,
+                        targetTime: savedTime
+                    });
+                    return;
+                }
+
                 const tolerance = 2; // 2-second tolerance window
 
                 // CASE 1: YouTube already restored correctly (within tolerance)
@@ -1172,6 +1201,37 @@
             }
         };
 
+        const resumePendingRestoreAfterAd = () => {
+            const transition = pendingRestoreAfterMediaChange;
+            if (
+                !restoreAwaitingMediaChange
+                || !hasPendingMediaTransition()
+                || transition?.reason !== 'youtube-ad-playing'
+                || isYouTubeAdPlaying(video)
+                || restoreAttemptInProgress
+            ) {
+                return false;
+            }
+
+            restoreAwaitingMediaChange = false;
+            restoringPendingMedia = true;
+            transition.ownerVideo = video;
+            transition.phase = 'restoring';
+            traceRestore('restore-ad-ended', {
+                currentTime: video.currentTime || 0,
+                targetTime: transition.targetTime
+            });
+            ensureVideoReady().catch(error => log('[RESTORE] Failed after ad ended:', error));
+            return true;
+        };
+
+        const player = video.closest?.('#movie_player');
+        if (player) {
+            const adStateObserver = new MutationObserver(resumePendingRestoreAfterAd);
+            adStateObserver.observe(player, { attributes: true, attributeFilter: ['class'] });
+            addTrackedObserver(video, adStateObserver);
+        }
+
         // Initial attempt
         ensureVideoReady().catch(error => {
             log(`[setupVideoTracking] ensureVideoReady failed:`, error);
@@ -1216,6 +1276,7 @@
 
         // Retry after a readiness timeout without racing the initial attempt.
         addTrackedEventListener(video, 'canplay', () => {
+            if (resumePendingRestoreAfterAd()) return;
             if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia)) {
                 ensureVideoReady().catch(error => log('[RESTORE] Failed on canplay retry:', error));
             }

@@ -180,7 +180,7 @@ async function expectPlayerAtOrAfterSavedTime(page) {
 }
 
 test.describe('Core resume contract (real YouTube)', () => {
-  test.setTimeout(180000);
+  test.setTimeout(240000);
 
   test('saved timestamp resumes after leaving the video and after a clean reload', async ({ context, page }, testInfo) => {
     const extensionLogs = [];
@@ -194,16 +194,17 @@ test.describe('Core resume contract (real YouTube)', () => {
     await enableExtensionDebug(context);
 
     try {
+      await removeStoredVideo(context, VIDEO_ID);
       await openWatchPage(page);
       await waitForPrimaryVideo(page);
-      await removeStoredVideo(context, VIDEO_ID);
 
       const startingTime = await page.evaluate((selector) => {
         const video = document.querySelector(selector);
         video.pause();
         return video.currentTime;
       }, PRIMARY_VIDEO_SELECTOR);
-      expect(startingTime, 'fresh test profile should not inherit a significant YouTube resume time').toBeLessThan(10);
+      expect(startingTime, 'fresh test profile should start below the saved-time range')
+        .toBeLessThan(TARGET_TIME - RESUME_TOLERANCE);
 
       const savedRecord = await saveVideoAtTime(context, page, TARGET_TIME);
       expect(savedRecord.videoId).toBe(VIDEO_ID);

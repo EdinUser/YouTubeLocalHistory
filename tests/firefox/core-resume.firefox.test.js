@@ -410,8 +410,8 @@ async function main() {
       return { currentTime: video.currentTime, duration: video.duration };
     }, PRIMARY_VIDEO_SELECTOR);
     assert.ok(
-      startingState.currentTime < 10,
-      `fresh Firefox profile should not inherit YouTube resume time, got ${startingState.currentTime}s`
+      startingState.currentTime < TARGET_TIME - RESUME_TOLERANCE,
+      `fresh Firefox profile should start below the saved-time range, got ${startingState.currentTime}s`
     );
 
     const savedRecord = await saveVideoAtTime(session, TARGET_TIME);
