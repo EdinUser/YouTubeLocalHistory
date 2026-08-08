@@ -67,11 +67,40 @@ The extension icon opens quick actions, while the full feed page contains the ma
 | **Home** | Local recommendations from subscribed channels |
 | **Subscriptions** | Latest videos from locally subscribed channels |
 | **Shorts** | YouTube Shorts you've watched |
-| **Playlists** | Local playlists you create and manage |
+| **Playlists** | Saved references to YouTube playlists encountered by the extension |
 | **History** | Regular YouTube videos you've watched |
 | **Channels** | Channels you subscribed to locally |
 | **Analytics** | Charts and statistics about your viewing |
 | **Settings** | Customization options |
+
+### Popup { #popup }
+
+The popup is the compact re:Watch surface for resuming unfinished videos, opening locally saved Watch Later items, and moving into the full feed.
+
+<figure markdown="span">
+  ![The re:Watch popup showing unfinished videos with progress bars and an Open Feed button.](assets/guide/popup-continue-watching.png){ width="600" height="480" }
+  <figcaption>Continue unfinished videos directly from the compact popup, or open the full local feed.</figcaption>
+</figure>
+
+Older popup tabs are intentionally absent. The maintained Home, Subscriptions, Shorts, Playlists, History, Channels, Analytics, and Settings workflows belong in the full feed window.
+
+### Home Tab { #home }
+
+<figure markdown="span">
+  ![The re:Watch Home feed displaying locally personalized video cards.](assets/guide/feed-home.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Home arranges the locally cached feed using watch activity and local feedback.</figcaption>
+</figure>
+
+Home is a locally arranged discovery view. It uses cached uploads and local signals; it is not the YouTube recommendation service and does not reproduce a YouTube account's homepage.
+
+### Subscriptions Tab { #subscriptions }
+
+<figure markdown="span">
+  ![The re:Watch Subscriptions tab showing recent cached uploads from locally followed channels.](assets/guide/feed-subscriptions.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Subscriptions lists cached uploads from locally followed channels in chronological order.</figcaption>
+</figure>
+
+Subscriptions shows regular videos from locally followed channels. Its contents reflect the last successful local feed initialization or refresh, rather than a continuously live YouTube account feed.
 
 ### What You See on YouTube
 After watching videos, you'll notice:
@@ -79,24 +108,56 @@ After watching videos, you'll notice:
 - **Progress bar**: Shows how much of the video you've watched
 - **Percentage indicator**: Shows completion percentage (e.g., "75%")
 
-### History Tab (Your Main History)
+### History Tab (Your Main History) { #history }
 
-  
+<figure markdown="span">
+  ![The re:Watch History tab listing locally stored viewing activity and progress.](assets/guide/feed-history.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>History provides a dedicated view of locally recorded viewing activity.</figcaption>
+</figure>
+
 Your history list shows the channel name under each video title to help you scan quickly.
 
-### 🎬 Shorts Tab (YouTube Shorts)
+### 🎬 Shorts Tab (YouTube Shorts) { #shorts }
 
-  
+<figure markdown="span">
+  ![The re:Watch Shorts tab showing short-form videos from the local feed cache.](assets/guide/feed-shorts.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Shorts separates locally cached short-form videos from the regular feed.</figcaption>
+</figure>
+
 Shorts saves are now more reliable: the save cadence is 5 seconds and duration checks are relaxed to avoid missed saves.
 
-### 📝 Playlists Tab
+### 📝 Playlists Tab { #playlists }
 
+<figure markdown="span">
+  ![The re:Watch Playlists tab showing saved references that open their playlists on YouTube.](assets/guide/feed-playlists.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Saved playlist references keep useful details locally and open the original playlist on YouTube.</figcaption>
+</figure>
+
+The stable V5 purpose of this tab is to retain YouTube playlist references detected while the extension is in use. Selecting a saved playlist opens the corresponding playlist on YouTube; the extension does not hydrate a local copy of all its videos.
 
 **Playlist Controls:**
 - **Ignore videos (per‑playlist toggle):** When enabled for a specific playlist, YT re:Watch will not save watch progress for videos watched while viewing that playlist.
 - **Works with global pause:** If either the global "Pause history in playlists" setting is enabled or a playlist's "Ignore" toggle is on, progress in that playlist won't be recorded.
 
-### 📊 Analytics Tab (Statistics Dashboard)
+!!! note "Extension-managed playlists"
+
+    Creating and managing playlists inside the extension is a separate future feature. Any prerelease controls for it should not be interpreted as part of the stable V5 playlist-reference workflow.
+
+### Channels Tab { #channels }
+
+<figure markdown="span">
+  ![The re:Watch Channels tab showing channels followed locally by the extension.](assets/guide/feed-channels.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Channels manages the explicit channel list followed by re:Watch.</figcaption>
+</figure>
+
+Channels owns the local list used by the subscription feed. Following a channel here does not subscribe the active YouTube account.
+
+### 📊 Analytics Tab (Statistics Dashboard) { #analytics }
+
+<figure markdown="span">
+  ![The re:Watch Analytics tab summarizing locally calculated viewing activity.](assets/guide/feed-analytics.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Analytics summarizes watch time and activity calculated from local extension data.</figcaption>
+</figure>
 
 **Overview Cards:**
 - **Total Watch Time**: How much time you've spent watching videos
@@ -126,7 +187,12 @@ Shorts saves are now more reliable: the save cadence is 5 seconds and duration c
   
 These charts now prefer locally persisted, privacy‑preserving statistics for better accuracy and responsiveness. Keys are local‑day `YYYY-MM-DD` and 24 hourly buckets.
 
-### ⚙️ Settings Tab (Customization)
+### ⚙️ Settings Tab (Customization) { #settings }
+
+<figure markdown="span">
+  ![The re:Watch Settings tab showing appearance, feed, import, backup, and data controls.](assets/guide/feed-settings.png){ width="1440" height="960" loading="lazy" }
+  <figcaption>Settings collects appearance, local-feed, import, backup, and data-management controls.</figcaption>
+</figure>
 
 **Theme Settings:**
 - **Theme Preference**: Choose System, Light, or Dark

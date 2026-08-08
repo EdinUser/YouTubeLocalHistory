@@ -14,18 +14,21 @@ nav:
   - Home: index.md
   - Detailed Guide: detailed_guide.md
   - Roadmap: roadmap.md
-  - Changelog: ../CHANGELOG.md
+  - Changelog: changelog.md
   - FAQ: faq.md
   - Technical: technical.md
+  - Code Notes: code-notes.md
   - Build: build.md
   - Testing: testing.md
   - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md
+  - Project Overview: readme.md
   - Live chat: https://t.me/+eFftKWGVvSpiZjZk
   - Community: https://community.kirilov.dev/t/re-watch
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - toc:
       permalink: true
   - tables
-  - attr_list

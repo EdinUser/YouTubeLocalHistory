@@ -1,6 +1,7 @@
 # Build outputs
 build/
 dist/
+site/
 helpers/
 *.zip
 *.xpi

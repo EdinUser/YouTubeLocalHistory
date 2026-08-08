@@ -51,7 +51,7 @@ YT re:Watch solves both problems with **Account Independence + YouTube History P
 - The extension works automatically in the background
 - Click the extension icon for quick actions, or open the full feed page for Home, Subscriptions, Shorts, Playlists, History, Channels, Analytics, and Settings
 
-Need a deeper walkthrough? Read the [Detailed Guide](./detailed_guide.md). Quick answers live in the [FAQ](./faq.md), fixes are in [Troubleshooting](./troubleshooting.md), and release notes are in the [Changelog](../CHANGELOG.md).
+Need a deeper walkthrough? Read the [Detailed Guide](./detailed_guide.md). Quick answers live in the [FAQ](./faq.md), fixes are in [Troubleshooting](./troubleshooting.md), and release notes are in the [Changelog](./changelog.md).
 
 ## 🎯 Who is This For?
 
@@ -183,7 +183,7 @@ do not perform remote search or background playlist hydration.
 ## 📈 What's New
 
 - **v5.0.0**: Adds the full local feed, local subscriptions, channel pages, playlists, analytics updates, backup/restore improvements, and Firefox temporary build support
-- **See all updates**: [CHANGELOG.md](../CHANGELOG.md)
+- **See all updates**: [CHANGELOG.md](./changelog.md)
 
 ## 🌟 Love YT re:Watch?
 

@@ -5,7 +5,7 @@ It is not a promise of dates or final scope. Priorities may change when design,
 privacy, browser-policy, or technical findings require it.
 
 Only completed work belongs in the
-[changelog](../CHANGELOG.md). Work listed here is not part of the current stable
+[changelog](changelog.md). Work listed here is not part of the current stable
 release unless its release notes say otherwise.
 
 ## v5.1 — Optional OAuth and expanded YouTube imports

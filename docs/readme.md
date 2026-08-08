@@ -60,4 +60,4 @@ Welcome! Find the right guide for you:
 
 ## Multilanguage Support
 
-This extension is available in several languages. See the main [README](../README.md) and [technical.md](./technical.md) for details on translation and contributing improvements. 
+This extension is available in several languages. See the [documentation home](./index.md) and [technical guide](./technical.md) for details on translation and contributing improvements.
