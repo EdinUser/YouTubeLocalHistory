@@ -5,6 +5,7 @@ const {
   launchFirefoxWithExtension,
   seedStoredVideo: seedExtensionVideo,
 } = require('./firefox-fixture');
+const { isConsentActionLabel } = require('../e2e/youtube-consent-labels');
 
 const PLAYLIST_URL = 'https://www.youtube.com/playlist?list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR';
 const CHANNEL_VIDEOS_URL = 'https://www.youtube.com/@TodorKirilov/videos';
@@ -47,26 +48,13 @@ async function withFrame(driver, frame, fn) {
 }
 
 async function clickConsentCandidate(driver) {
-  const patterns = [
-    /accept all/i,
-    /i agree/i,
-    /^agree$/i,
-    /got it/i,
-    /^ok$/i,
-    /consent/i,
-    /reject all/i,
-    /alle akzeptieren/i,
-    /alle ablehnen/i,
-    /acceptez tout/i,
-    /refuser tout/i,
-    /aceptar todo/i,
-    /rechazar todo/i,
-  ];
-
   const elements = await driver.findElements(By.css('button, a, tp-yt-paper-button, ytd-button-renderer'));
   for (const element of elements) {
-    const text = `${await element.getText().catch(() => '')} ${await element.getAttribute('aria-label').catch(() => '')}`.trim();
-    if (!text || !patterns.some((pattern) => pattern.test(text))) {
+    const labels = [
+      await element.getText().catch(() => ''),
+      await element.getAttribute('aria-label').catch(() => ''),
+    ];
+    if (!labels.some(isConsentActionLabel)) {
       continue;
     }
 

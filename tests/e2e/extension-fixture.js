@@ -8,19 +8,25 @@ const os = require('os');
 const path = require('path');
 
 const rootDir = path.resolve(__dirname, '../..');
-const extensionPath = path.resolve(rootDir, 'build', 'e2e', 'chrome');
+const extensionPath = process.env.YTLH_CHROME_EXTENSION_DIR
+  ? path.resolve(rootDir, process.env.YTLH_CHROME_EXTENSION_DIR)
+  : path.resolve(rootDir, 'build', 'e2e', 'chrome');
 const storageStatePath = path.join(rootDir, 'yt-storage.json');
 
 const test = base.extend({
-  context: async ({}, use) => {
+  browserLocale: ['en', { option: true }],
+  context: async ({ browserLocale }, use) => {
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yt-rewatch-e2e-'));
     /** @type {import('@playwright/test').BrowserContextOptions} */
     const opts = {
       channel: 'chromium',
-      headless: process.env.PW_HEADLESS === '1',
+      // Default to headless; PW_HEADED=1 is the explicit debugging override.
+      headless: process.env.PW_HEADED !== '1',
+      locale: browserLocale,
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,
+        `--lang=${browserLocale}`,
       ],
     };
     if (fs.existsSync(storageStatePath)) {

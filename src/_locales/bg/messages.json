@@ -1,192 +1,134 @@
 {
-  "extensionName": {
-      "message": "YouTube Локална История",
-      "description": "The name of the extension"
+  "popup_title": {
+    "message": "YT re:Watch",
+    "description": "Popup window title and main heading"
   },
-  "popup_title" : {
-      "message": "YT re:Watch",
-      "description": "Popup window title and main heading"
+  "theme_light": {
+    "message": "Светла",
+    "description": "Label for light theme option"
   },
-  "theme_toggle" : {
-      "message": "Тема",
-      "description": "Button label for toggling theme"
+  "theme_dark": {
+    "message": "Тъмна",
+    "description": "Label for dark theme option"
   },
-  "theme_toggle_tooltip" : {
-      "message": "Превключване на темата",
-      "description": "Tooltip for theme toggle button"
+  "theme_system": {
+    "message": "Системни настройки",
+    "description": "Label for system default theme option"
   },
-  "theme_light" : {
-      "message": "Светла",
-      "description": "Label for light theme option"
+  "clear_label": {
+    "message": "Изчисти",
+    "description": "Button label for clearing all history"
   },
-  "theme_dark" : {
-      "message": "Тъмна",
-      "description": "Label for dark theme option"
+  "clear_tooltip": {
+    "message": "Изчисти цялата история",
+    "description": "Tooltip for clear history button"
   },
-  "theme_auto" : {
-      "message": "Автоматично",
-      "description": "Label for auto/system theme option"
+  "close_label": {
+    "message": "Затвори",
+    "description": "Button label for closing the popup"
   },
-  "theme_switch_to_dark" : {
-      "message": "Превключване на тъмна тема",
-      "description": "Tooltip for switching to dark theme"
+  "instructions_script_disabled_title": {
+    "message": "Изпълнението на скриптове е изключено",
+    "description": "Title for script execution disabled instructions"
   },
-  "theme_switch_to_light" : {
-      "message": "Превключване на светла тема",
-      "description": "Tooltip for switching to light theme"
+  "instructions_script_disabled_body": {
+    "message": "Ако виждате това съобщение, изпълнението на скриптове е изключено за това разширение. Моля, следвайте тези стъпки, за да го активирате:",
+    "description": "Body text for script execution disabled instructions"
   },
-  "theme_system" : {
-      "message": "Системни настройки",
-      "description": "Label for system default theme option"
+  "instructions_script_disabled_step1": {
+    "message": "Отидете в настройките на Firefox: about:preferences#privacy",
+    "description": "Step 1 for enabling script execution"
   },
-  "theme_currently_following_system" : {
-      "message": "Следва системната тема - Кликнете за ръчно превключване",
-      "description": "Tooltip for auto theme option"
+  "instructions_script_disabled_step2": {
+    "message": "Уверете се, че \"Enhanced Tracking Protection\" е на \"Standard\" или \"Custom\" и не блокира скриптове",
+    "description": "Step 2 for enabling script execution"
   },
-  "clear_label" : {
-      "message": "Изчисти",
-      "description": "Button label for clearing all history"
+  "instructions_script_disabled_step3": {
+    "message": "Проверете за блокиране на съдържание: кликнете върху иконата на щит в адресната лента, когато прозорецът е отворен, и се уверете, че няма блокирани скриптове",
+    "description": "Step 3 for enabling script execution"
   },
-  "clear_tooltip" : {
-      "message": "Изчисти цялата история",
-      "description": "Tooltip for clear history button"
+  "delete_label": {
+    "message": "Изтрий",
+    "description": "Button label for deleting an item (video, playlist, short)"
   },
-  "close_label" : {
-      "message": "Затвори",
-      "description": "Button label for closing the popup"
+  "pagination_page_info": {
+    "message": "Страница $1 от $2",
+    "description": "Pagination info, e.g. Page 1 of 11"
   },
-  "sync_status" : {
-      "message": "Синхронизация",
-      "description": "Label for sync status indicator"
+  "chart_skipped": {
+    "message": "Пропуснато",
+    "description": "Chart label: Skipped"
   },
-  "sync_status_tooltip" : {
-      "message": "Състояние на синхронизацията",
-      "description": "Tooltip for sync status indicator"
+  "chart_partial": {
+    "message": "Частично",
+    "description": "Chart label: Partial"
   },
-
-  "instructions_script_disabled_title" : {
-      "message": "Изпълнението на скриптове е изключено",
-      "description": "Title for script execution disabled instructions"
+  "chart_completed": {
+    "message": "Завършено",
+    "description": "Chart label: Completed"
   },
-  "instructions_script_disabled_body" : {
-      "message": "Ако виждате това съобщение, изпълнението на скриптове е изключено за това разширение. Моля, следвайте тези стъпки, за да го активирате:",
-      "description": "Body text for script execution disabled instructions"
+  "chart_skipped_legend": {
+    "message": "Пропуснато (<10%)",
+    "description": "Chart legend: Skipped (<10%)"
   },
-  "instructions_script_disabled_step1" : {
-      "message": "Отидете в настройките на Firefox: about:preferences#privacy",
-      "description": "Step 1 for enabling script execution"
+  "chart_partial_legend": {
+    "message": "Частично (10-90%)",
+    "description": "Chart legend: Partial (10-90%)"
   },
-  "instructions_script_disabled_step2" : {
-      "message": "Уверете се, че \"Enhanced Tracking Protection\" е на \"Standard\" или \"Custom\" и не блокира скриптове",
-      "description": "Step 2 for enabling script execution"
+  "chart_completed_legend": {
+    "message": "Завършено (>=90%)",
+    "description": "Chart legend: Completed (>=90%)"
   },
-  "instructions_script_disabled_step3" : {
-      "message": "Проверете за блокиране на съдържание: кликнете върху иконата на щит в адресната лента, когато прозорецът е отворен, и се уверете, че няма блокирани скриптове",
-      "description": "Step 3 for enabling script execution"
+  "chart_minutes": {
+    "message": "Минути",
+    "description": "Chart axis label: Minutes"
   },
-  "delete_label" : {
-      "message": "Изтрий",
-      "description": "Button label for deleting an item (video, playlist, short)"
+  "chart_hour_of_day": {
+    "message": "Час от деня",
+    "description": "Chart axis label: Hour of Day"
   },
-  "pagination_page_info" : {
-      "message": "Страница $1 от $2",
-      "description": "Pagination info, e.g. Page 1 of 11"
+  "date_today": {
+    "message": "Днес",
+    "description": "Label for today's date"
   },
-  "chart_skipped" : {
-      "message": "Пропуснато",
-      "description": "Chart label: Skipped"
+  "date_yesterday": {
+    "message": "Вчера",
+    "description": "Label for yesterday's date"
   },
-  "chart_partial" : {
-      "message": "Частично",
-      "description": "Chart label: Partial"
+  "date_unknown": {
+    "message": "Непозната",
+    "description": "Label for unknown date"
   },
-  "chart_completed" : {
-      "message": "Завършено",
-      "description": "Chart label: Completed"
-  },
-  "chart_skipped_legend" : {
-      "message": "Пропуснато (<10%)",
-      "description": "Chart legend: Skipped (<10%)"
-  },
-  "chart_partial_legend" : {
-      "message": "Частично (10-90%)",
-      "description": "Chart legend: Partial (10-90%)"
-  },
-  "chart_completed_legend" : {
-      "message": "Завършено (>=90%)",
-      "description": "Chart legend: Completed (>=90%)"
-  },
-  "chart_minutes" : {
-      "message": "Минути",
-      "description": "Chart axis label: Minutes"
-  },
-  "chart_hour_of_day" : {
-      "message": "Час от деня",
-      "description": "Chart axis label: Hour of Day"
-  },
-
-  "date_today" : {
-      "message": "Днес",
-      "description": "Label for today's date"
-  },
-  "date_yesterday" : {
-      "message": "Вчера",
-      "description": "Label for yesterday's date"
-  },
-  "date_unknown" : {
-      "message": "Непозната",
-      "description": "Label for unknown date"
-  },
-  "search_no_videos_found" : {
-      "message": "Не са намерени видеа, отговарящи на търсенето ви.",
-      "description": "Message when no videos match the search"
-  },
-  "history_no_history_found" : {
-      "message": "Не е намерена история. Започнете да гледате видеа, за да се появи тук!",
-      "description": "Message when no history is found"
+  "history_no_history_found": {
+    "message": "Не е намерена история. Започнете да гледате видеа, за да се появи тук!",
+    "description": "Message when no history is found"
   },
   "message_pause_in_playlists_enabled": {
-      "message": "Пауза на историята в плейлисти е включена",
-      "description": "Toast when global pause in playlists is enabled"
+    "message": "Пауза на историята в плейлисти е включена",
+    "description": "Toast when global pause in playlists is enabled"
   },
   "message_pause_in_playlists_disabled": {
-      "message": "Пауза на историята в плейлисти е изключена",
-      "description": "Toast when global pause in playlists is disabled"
+    "message": "Пауза на историята в плейлисти е изключена",
+    "description": "Toast when global pause in playlists is disabled"
   },
   "playlists_ignore_toggle_label": {
-      "message": "Игнорирай",
-      "description": "Label next to playlist ignore checkbox"
+    "message": "Игнорирай",
+    "description": "Label next to playlist ignore checkbox"
   },
   "playlists_ignore_toggle_tooltip": {
-      "message": "Игнорирай видеата в този плейлист",
-      "description": "Tooltip for playlist ignore checkbox"
+    "message": "Игнорирай видеата в този плейлист",
+    "description": "Tooltip for playlist ignore checkbox"
   },
   "playlists_ignore_enabled": {
-      "message": "Плейлистът ще бъде игнориран",
-      "description": "Toast when ignore is enabled"
+    "message": "Плейлистът ще бъде игнориран",
+    "description": "Toast when ignore is enabled"
   },
   "playlists_ignore_disabled": {
-      "message": "Плейлистът ще бъде проследяван",
-      "description": "Toast when ignore is disabled"
-  },
-  "content_toggle_pause": {
-      "message": "re:Watch — Кликнете за пауза на историята",
-      "description": "Button text when tracking is active"
-  },
-  "content_toggle_paused": {
-      "message": "re:Watch — Историята е на пауза. Кликнете за активиране",
-      "description": "Button text when tracking is paused"
-  },
-  "content_toggle_pause_title": {
-      "message": "re:Watch — Кликнете за пауза на историята за този плейлист",
-      "description": "Tooltip when tracking is active"
-  },
-  "content_toggle_paused_title": {
-      "message": "re:Watch — Историята е на пауза за този плейлист. Кликнете за активиране",
-      "description": "Tooltip when tracking is paused"
+    "message": "Плейлистът ще бъде проследяван",
+    "description": "Toast when ignore is disabled"
   },
   "global_search_placeholder": {
-      "message": "Търсене във всички съдържание...",
-      "description": "Placeholder text for the global search input"
+    "message": "Търсене във всички съдържание...",
+    "description": "Placeholder text for the global search input"
   }
 }

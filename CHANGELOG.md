@@ -2,6 +2,111 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [5.0.0] - 2026-08-09
+
+Version 5 turns YT re:Watch from a popup-centered history tracker into a full local YouTube companion while preserving its local-first privacy boundary. The release adds explicit local channel subscriptions, an RSS-backed feed, channel and history management, richer analytics, durable import/backup contracts, and matching Chromium/Firefox coverage.
+
+### Major highlights
+
+- Added a full-page re:Watch application with Home, Subscriptions, Shorts, Playlists, History, Channels, Analytics, and Settings.
+- Added explicit local channel follows. Following or unfollowing in re:Watch never changes the active YouTube account.
+- Added an RSS-backed local feed whose cached inventory remains available without an account or a continuously open YouTube tab.
+- Added deterministic packaged-extension coverage for Chromium and Firefox, with live YouTube behavior isolated into a separate canary suite.
+
+### Local subscriptions and feed
+
+- Added canonical local subscription, cached feed-video, channel sync-state, Home impression, scheduler-run, and local-unsubscribe stores.
+- Added local Follow/Unfollow controls beside supported YouTube Subscribe surfaces, in channel context menus, on re:Watch channel pages, and in video menus.
+- Added Google Takeout channel import with explicit added, updated, unchanged, invalid, ignored, and initialization-queued outcomes.
+- Added resumable first-time channel initialization and a shared scheduler for foreground checks, retries, and low-priority dormant-channel maintenance.
+- Added a locally ranked Home view. Home regeneration uses only cached inventory and does not own a network request.
+- Added a chronological Subscriptions view using stable keyset pagination.
+- Added stable 50-card incremental rendering for Home and Subscriptions without duplicates or mid-scroll reranking.
+- Added a Shorts view backed by known cached Shorts and local watch records.
+- Added local search across saved history, cached feed videos, and channels. Search queries are not sent to YouTube.
+- Added in-extension channel pages using locally available channel and video information.
+- Added public channel metadata hydration for titles, handles, avatars, banners, subscriber counts, and video counts when available.
+
+### Clear feed actions and refresh behavior
+
+- Replaced the ambiguous Refresh interaction with separate **Check for new videos** and **Reload view** actions.
+- Upload checks no longer replace or reorder the visible feed while they run.
+- New upload discoveries are recorded by video ID and exposed through a deliberate **Show** action.
+- Pending discoveries survive feed-page reloads and are cleared only after the canonical inventory is successfully reloaded.
+- Opening Home regenerates only local ranking state and does not start a Home-owned request.
+- Cached inventory is rendered before initialization progress, reducing empty or jumping feed states.
+
+### Local unsubscribe and ignored channels
+
+- Local unfollow is now a durable soft delete keyed by canonical channel ID.
+- Unfollowing immediately stops scans, removes that channel's cached feed inventory, and preserves independent watch history.
+- Later Takeout imports and backup restores do not silently reactivate an ignored channel.
+- Channels now contains **Following** and conditional **Ignored** internal tabs. Ignored appears only when exclusions exist and provides an explicit follow-again action.
+- Import results can open the Ignored tab directly for review.
+
+### History, progress, and YouTube integration
+
+- Improved video and Shorts tracking across reused media elements, direct loads, scrolling, and YouTube single-page navigation.
+- Fixed a Shorts identity race where a reused player could retain the previous Short ID and reject saves for the newly active Short.
+- Improved saved-position restoration through ads, short pre-roll media, player replacement, playlist navigation, and Firefox media handoffs.
+- Added stable local follow controls that retain identity across YouTube SPA navigation without remount flicker.
+- Improved overlay behavior across captured and live channel, playlist, watch recommendation, and dynamically inserted YouTube layouts.
+- History progress updates now refresh metadata, duration, and watched overlays without replacing the Remove button or video menu.
+- Added duration badges wherever duration is already present in feed, cache, or history data.
+
+### Playlists and Watch Later
+
+- Saved YouTube playlists are represented as outbound references with public metadata and open on YouTube.
+- Playlist references do not trigger background member hydration.
+- Improved playlist identity handling across playlist pages, playlist-backed watch pages, SPA item changes, and dynamically replaced layouts.
+- Retained per-playlist history controls and Watch Later support.
+- Extension-managed playlist creation is not part of the stable v5 playlist-reference contract.
+
+### Analytics
+
+- Moved the maintained analytics experience into the full feed page.
+- Restored Top Skipped Channels and Longest Unfinished Videos.
+- Added switchable Top Channels sorting by local watch time or videos watched.
+- Retained completion, daily activity, hourly activity, Continue Watching, and summary metrics with clearer definitions.
+- Fixed hourly chart columns so labelled and unlabelled hours share one visual baseline.
+- Kept analytics calculations local and reconstructable from local watch records.
+
+### Backup, restore, imports, and reset
+
+- Added canonical v5 local subscriptions and local-unsubscribe tombstones to the documented backup format.
+- Tombstones win conflicts during restore so a local unfollow is not silently undone.
+- Retained compatibility with older backups that do not contain canonical subscriptions or exclusions.
+- Added direct Google Takeout history and channel import entry points to Settings.
+- Clarified that restore merges supported records with the current profile.
+- **Reset all data** now clears history, playlists, deletion markers, canonical subscriptions, feed inventory, sync state, Home impressions, scheduler runs, and ignored-channel tombstones.
+- **Clear history** remains scoped to history-related stores and does not remove canonical feed state.
+
+### Privacy and network behavior
+
+- Feed discovery uses public YouTube channel RSS with browser credentials omitted.
+- Public channel/handle pages may be requested without credentials when canonical identity or presentation metadata is needed.
+- Thumbnails, avatars, and banners may load from YouTube-owned image hosts when displayed.
+- No OAuth connection, automatic cloud synchronization, remote feed search, or YouTube-account mutation is included in v5.
+- Local recommendations, feedback, history, progress, analytics, and search text remain inside the browser profile.
+
+### Browser support, packaging, and tests
+
+- Added separate Chrome and Firefox unpacked builds and release-artifact checks.
+- Fixed release packaging so every runtime module referenced by shipped HTML and manifests is included.
+- Made release archives clean and repeatable so removed files cannot survive a same-version rebuild.
+- Added localized packaged-feed verification for English, Bulgarian, German, Spanish, and French.
+- Added deterministic unit, integration, captured-DOM, IndexedDB upgrade, backup, pagination, analytics, refresh, subscription, and browser-level regression coverage.
+- Added matched live Chromium and Firefox canaries for overlays, playlists, saved-position resume, Shorts SPA tracking, and retained YouTube host permission.
+- Separated commands into deterministic offline coverage, live canaries, and a complete local/full run.
+
+### Upgrade notes and deliberate limits
+
+- Existing watch history remains available to v5. Users enter the canonical local-feed model by explicitly following channels or importing `subscriptions.csv`; legacy subscription keys are not silently promoted.
+- The local feed is best-effort public RSS discovery, not a mirror of a signed-in YouTube account feed.
+- YouTube applies membership, age, regional, removal, and other access rules when a listed video is opened.
+- There is no automatic cloud sync. Manual backup and restore remain the supported portability mechanism.
+- v5 stores YouTube playlist references; it does not crawl entire playlists or promise extension-managed playlist creation.
+
 ## [4.0.3] - 2025-11-27
 
 ### 🐛 Playback & Navigation Fixes

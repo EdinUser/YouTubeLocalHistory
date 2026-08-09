@@ -39,6 +39,51 @@ npm install
 npm test
 ```
 
+### Run the Deterministic Local Gate
+```bash
+npm run test:local:offline
+```
+
+This is the release-blocking local command. It runs Jest, the packaged Chromium
+feed/runtime tests, captured/static Chromium DOM tests, Firefox package lint,
+Firefox extension smoke tests, and captured/static Firefox tests. It does not
+make live YouTube requests, so a failure should represent repository behavior
+rather than current YouTube content, consent, throttling, or SPA timing.
+Independent test groups continue after a failure, and the command returns
+nonzero after every group has reported.
+
+### Run Every Available Test Locally
+```bash
+npm run test:local:full
+```
+
+This deliberately includes everything: fixture refresh, all Jest tests with the
+opt-in RSS and channel-metadata readings enabled, every Chromium project, every
+Firefox scenario, and both retained-host-permission canaries. It therefore uses
+live YouTube and can fail because the external site, consent flow, throttling,
+or network changed. Use it when you explicitly want the complete inventory,
+not as the deterministic release gate. A failed group does not prevent later
+Chromium or Firefox groups from running; the final exit code remains nonzero.
+
+### Run Live YouTube Canaries
+```bash
+npm run test:canary
+```
+
+This runs only the external contracts: public RSS and channel metadata, live
+Chromium overlays/playlist/resume/Shorts/permission checks, and their Firefox
+counterparts. It is intended for scheduled monitoring and early warning when
+YouTube changes HTML, CSS, SPA behavior, feeds, permissions, or player behavior.
+It runs every canary even when an earlier one reports an alert, then exits
+nonzero with a summary of failed groups. It is not a substitute for
+`test:local:offline`.
+
+Example crontab entry (replace the repository and npm paths for the machine):
+
+```cron
+0 6 * * * cd /absolute/path/to/YouTubeLocalHistory && /usr/bin/npm run test:canary >> /tmp/ytlh-canary.log 2>&1
+```
+
 ### Run Specific Test Types
 ```bash
 # Unit tests only
@@ -59,12 +104,21 @@ npm run test:watch
 
 ### Run E2E Tests (if configured)
 ```bash
-npm run test:e2e       # Chromium live + static
+npm run test:e2e       # build + Chromium live and static
+npm run test:e2e:all   # build Chrome + Firefox, then run all browser E2E checks
+npm run test:e2e:offline  # deterministic packaged Chromium + captured/static DOM
 npm run test:e2e:live  # Chromium live only
 npm run test:e2e:static
+npm run test:firefox:offline
 npm run test:firefox:all
 npm run test:e2e:ui  # Opens Playwright UI
+npm run test:rss:live
+npm run test:channel-metadata:live  # opt-in public YouTube Channels metadata contract
 ```
+
+Chromium and Firefox extension E2E runs are headless by default. To use a
+visible browser while debugging, prefix the command with `PW_HEADED=1`, for
+example `PW_HEADED=1 npm run test:e2e:live`.
 
 ## Test Types Explained
 

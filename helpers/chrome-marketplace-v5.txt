@@ -1,0 +1,90 @@
+YT RE:WATCH — CHROME WEB STORE V5 COPY
+
+NAME
+
+YT re:Watch — Local YouTube History
+
+SHORT DESCRIPTION
+
+Keep YouTube history and progress locally, follow channels, and browse a private feed independent from your YouTube account.
+
+DETAILED DESCRIPTION
+
+Keep your YouTube viewing progress in your browser, independent from whichever Google account is active — or use it while logged out.
+
+YT re:Watch records meaningful playback locally so you can find watched videos, see progress, and resume unfinished videos. Version 5 adds a complete local browsing companion built around channels you choose to follow in re:Watch.
+
+WHAT YOU CAN DO
+
+• Keep an account-independent history of regular videos and Shorts
+• Resume videos from locally saved playback positions
+• See viewed indicators, progress, and available video durations
+• Follow channels locally without changing your YouTube subscriptions
+• Browse a locally arranged Home feed and chronological Subscriptions inventory
+• Search saved history and cached feed records without remote YouTube search
+• Review channels ignored by a subscription import and restore or forget them
+• Save YouTube playlists as references that open the original playlist
+• Explore local watch-time, completion, activity, and channel analytics
+• Export and restore supported profile data with JSON backups
+• Customize theme, overlay text, color, size, and retention
+
+HOW THE LOCAL FEED WORKS
+
+re:Watch retrieves public upload feeds for the channels you follow locally. Home arranges cached uploads using local viewing and feedback signals. Subscriptions shows the cached inventory chronologically. Both views use stable 50-video pages.
+
+Check scans eligible channel feeds. Reload redraws the current local data without starting a scan. Show opens the full chronological subscription inventory.
+
+PRIVACY AND ACCOUNT BOUNDARIES
+
+History, progress, local subscriptions, feed state, analytics, settings, and playlist references are stored in the current browser profile. YT re:Watch does not operate an account system or cloud-sync service.
+
+Direct public RSS and channel-metadata requests omit browser credentials. Displayed thumbnails and channel artwork may load from YouTube-owned image hosts. The extension does not use OAuth in version 5, perform remote search, or change subscriptions, playlists, or history in your YouTube account.
+
+YT re:Watch is not an anonymity tool. YouTube, your browser, and your network can still observe normal browsing activity.
+
+PLAYLISTS IN VERSION 5
+
+Saved YouTube playlists are outbound references. re:Watch does not fetch their member videos in the background and does not yet provide extension-managed local playlists.
+
+DATA PORTABILITY
+
+Use Backup and Restore to move supported data manually between browser profiles or devices. There is no automatic cross-device synchronization. Backup files can reveal viewing habits and should be kept private.
+
+Available in English, Bulgarian, German, Spanish, and French. Non-English translations are machine-generated and corrections are welcome.
+
+VERSION 5.0.0 RELEASE NOTES
+
+Version 5 introduces the full local feed experience: local channel subscriptions, RSS-backed Home and Subscriptions views, stable 50-card pagination, ignored-channel review, local search, Shorts and History improvements, playlist references, expanded analytics, complete backup/reset handling, and equivalent Chrome and Firefox release coverage.
+
+It also improves SPA resume and Shorts identity tracking, keeps History card actions stable during metadata updates, shows available video durations, and makes feed scan, reload, and chronological-inventory actions explicit.
+
+SCREENSHOT UPLOAD ORDER AND CAPTIONS
+
+1. chrome_home.png
+   A locally arranged Home feed built from channels followed in re:Watch.
+
+2. chrome_subscriptions.png
+   A chronological subscription inventory with stable 50-video pagination.
+
+3. chrome_channels.png
+   Manage local channel follows without changing the active YouTube account.
+
+4. chrome_history.png
+   Local watch history with progress, duration, resume, and per-video controls.
+
+5. chrome_analytics.png
+   Private local activity, watch-time, completion, and channel insights.
+
+CHROME PRIVACY FORM NOTES
+
+Single purpose: Keep a local, account-independent YouTube history and provide related local feed, subscription, resume, playlist-reference, and analytics tools.
+
+Data handling: Extension feature data is stored locally in the browser profile. There is no re:Watch backend, account, advertising profile, sale of data, or cloud synchronization.
+
+Host access: Required for YouTube content-script integration and public channel feed/metadata retrieval. Direct feed and metadata requests use credentials omitted.
+
+Remote code: None.
+
+Authentication: No OAuth or re:Watch account in version 5.
+
+Account mutation: The extension does not change the user's YouTube subscriptions, playlists, or history.

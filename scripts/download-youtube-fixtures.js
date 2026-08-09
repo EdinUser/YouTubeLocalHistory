@@ -7,6 +7,12 @@ const { chromium } = require('@playwright/test');
 const rootDir = path.resolve(__dirname, '..');
 const defaultManifestPath = path.join(rootDir, 'tests', 'fixtures', 'youtube-pages', 'pages.json');
 const defaultOutputDir = path.join(rootDir, 'tests', 'fixtures', 'youtube-pages', 'captures');
+const defaultRssOutputDir = path.join(rootDir, 'tests', 'fixtures', 'feed', 'live');
+const liveRssChannels = [
+  { name: 'asmontv', handle: '@AsmonTV', channelId: 'UCQeRaTukNYft1_6AZPACnog' },
+  { name: 'mentour-pilot', handle: '@MentourPilot', channelId: 'UCwpHKudUkP5tNgmMdexB3ow' },
+  { name: 'nerdrotic', handle: '@Nerdrotic', channelId: 'UC5T0tXJN5CrMZUEJuz4oovw' },
+];
 
 function parseArgs(argv) {
   const args = {
@@ -17,6 +23,8 @@ function parseArgs(argv) {
     screenshot: true,
     sanitize: true,
     timeoutMs: 60000,
+    withRss: false,
+    rssOutputDir: defaultRssOutputDir,
   };
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -38,6 +46,10 @@ function parseArgs(argv) {
       args.sanitize = false;
     } else if (arg === '--timeout') {
       args.timeoutMs = Number(argv[++index]);
+    } else if (arg === '--with-rss') {
+      args.withRss = true;
+    } else if (arg === '--rss-out') {
+      args.rssOutputDir = path.resolve(argv[++index]);
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -63,7 +75,47 @@ Options:
   --no-screenshot         Do not write screenshot.png.
   --preserve-scripts      Keep page scripts/iframes in page.html. Default strips them.
   --timeout <ms>          Per-page timeout. Default: 60000.
+  --with-rss              Also download the three credential-free public RSS fixtures.
+  --rss-out <path>        RSS fixture directory. Default: tests/fixtures/feed/live
 `);
+}
+
+function fetchPublicRss(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const request = require('https').get(url, {
+      headers: { Accept: 'application/atom+xml' },
+    }, (response) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          reject(new Error(`RSS request failed with HTTP ${response.statusCode}`));
+          return;
+        }
+        resolve(Buffer.concat(chunks).toString('utf8'));
+      });
+    });
+    request.setTimeout(timeoutMs, () => request.destroy(new Error('RSS request timed out')));
+    request.on('error', reject);
+  });
+}
+
+async function captureRssFixtures(outputDir, timeoutMs) {
+  fs.mkdirSync(outputDir, { recursive: true });
+  for (const channel of liveRssChannels) {
+    const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channel.channelId)}`;
+    console.log(`[fixtures] Capturing ${channel.name} RSS: ${url}`);
+    const xml = await fetchPublicRss(url, timeoutMs);
+    const capturedAt = new Date().toISOString();
+    fs.writeFileSync(path.join(outputDir, `${channel.name}.xml`), xml);
+    fs.writeFileSync(path.join(outputDir, `${channel.name}.json`), `${JSON.stringify({
+      ...channel,
+      url,
+      capturedAt,
+      credentials: 'omit',
+      source: 'scripts/download-youtube-fixtures.js',
+    }, null, 2)}\n`);
+  }
 }
 
 function readManifest(manifestPath) {
@@ -232,6 +284,11 @@ async function main() {
     }
   } finally {
     await browser.close();
+  }
+
+  if (options.withRss) {
+    await captureRssFixtures(options.rssOutputDir, Math.min(options.timeoutMs, 10000));
+    console.log(`[fixtures] Wrote ${liveRssChannels.length} RSS fixture(s) to ${path.relative(rootDir, options.rssOutputDir)}`);
   }
 
   console.log(`[fixtures] Wrote ${selected.length} fixture(s) to ${path.relative(rootDir, options.outputDir)}`);

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Fixture Channel</title>
+  <entry>
+    <yt:videoId>video-001</yt:videoId>
+    <title>Fixture upload</title>
+    <published>2024-12-31T00:00:00+00:00</published>
+    <author><name>Fixture Channel</name></author>
+    <media:group><media:thumbnail url="https://i.ytimg.com/vi/video-001/mqdefault.jpg" /></media:group>
+  </entry>
+</feed>

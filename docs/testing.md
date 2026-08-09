@@ -1,130 +1,109 @@
-# 🧪 Testing Guide
+# Testing
 
-This document provides a comprehensive overview of the testing strategy, frameworks, and specific tests for the YT re:Watch extension.
+The v5 test strategy separates deterministic release gates from external YouTube canaries. Both Chrome and Firefox are first-class targets.
 
----
-
-## 🚀 Running Tests
+## Primary commands
 
 ```bash
-npm test
+npm run test:local:offline
 ```
 
-Runs **Jest** (unit, integration, memory). Playwright E2E is separate: `npm run test:e2e` (see End-to-End section below).
-
----
-
-## 🛠️ Frameworks
-
-- **[Jest](https://jestjs.io/)**: Primary framework for unit, integration, and memory tests. Uses the `jsdom` environment with custom browser/extension mocks.
-- **[Playwright](https://playwright.dev/)**: Used for end-to-end (E2E) testing. It allows for testing the extension in a real browser environment (Chromium/Firefox/WebKit) to simulate user interactions accurately.
-
----
-
-## 🔬 Test Categories
-
-### End-to-End (Chromium Playwright) — local first
-
-Real Chromium loads the **unpacked E2E** extension from `build/e2e/chrome`.
+Runs every deterministic local gate: Jest, packaged Chromium runtime/static tests, Firefox lint/smoke/static tests, and the required browser builds. It does not depend on live YouTube pages, public RSS, or public channel metadata.
 
 ```bash
-npx playwright install chromium   # one-time
-
-npm run test:e2e         # live + static Chromium extension E2E
-npm run test:e2e:live    # live YouTube Chromium extension E2E
-npm run test:e2e:static  # captured-DOM Chromium extension E2E
-npm run test:e2e:ui      # Playwright UI
-npm run test:e2e:all     # all Playwright projects
+npm run test:canary
 ```
 
-If `build/e2e/chrome/manifest.json` is missing, global setup runs `npm run build:e2e`.
+Runs external-change detectors: live RSS and channel metadata checks, Chrome live YouTube/permission checks, and Firefox live YouTube/permission checks. The grouped runner continues after a failed group so one external problem does not hide the remaining results. This command is suitable for a scheduled cron or CI job.
 
-Set **`PW_HEADLESS=1`** only if you must run headless (extension behavior may differ; on Linux pair with `xvfb-run`).
+```bash
+npm run test:local:full
+```
 
-Optional **yt-storage.json** in the repo root (loaded by `extension-fixture.js` when present) saves cookies after you accept consent once—**best way to avoid flaky CMP dialogs**; keep it **gitignored**. **`tests/e2e/youtube-consent.js`** also walks **every frame** (Google CMP often uses iframes), tries **button** and **link** roles, several **locales**, `tp-yt-paper-button` / `ytd-button-renderer` fallbacks, **Escape**, and multiple passes for stacked dialogs. Use `dismissYouTubeConsent(page, { preferReject: true })` if you want “reject all” first.
+Runs the widest available local command: refreshes captured fixtures, runs Jest, live RSS/metadata checks, all configured Chromium extension tests with the permission canary enabled, and all Firefox tests with the permission canary enabled. It intentionally includes external checks and can fail because of YouTube availability, consent, experiments, anti-bot behavior, or markup changes.
 
-GitHub: run **E2E (Playwright)** manually via Actions (`workflow_dispatch`) — `.github/workflows/e2e.yml`.
+## Focused suites
 
-- **`core-resume.spec.js`**: live YouTube save/resume contract.
-- **`core-overlays.spec.js`**: live playlist/channel overlay contracts.
-- **`static-overlays.spec.js`**: captured playlist/channel DOM overlay contracts.
+```bash
+npm test                         # all Jest suites
+npm run test:unit
+npm run test:integration
+npm run test:memory
+npm run test:coverage
 
-Local Chromium extension tests are headed by default unless `PW_HEADLESS=1`; CI uses `xvfb-run` (see `.github/workflows/e2e.yml`). Headless Chromium can still be useful for debugging, but live YouTube may show anti-bot / CAPTCHA interstitials on watch pages.
+npm run test:e2e:offline         # Chromium packaged runtime + captured DOM
+npm run test:e2e:static          # Chromium captured-DOM project
+npm run test:firefox:offline     # Firefox lint + smoke + captured DOM
 
-### Testing YouTube DOM changes
+npm run test:canary:chrome       # Chrome live site + permission canaries
+npm run test:canary:firefox      # Firefox live site + permission canaries
+npm run test:permissions-canary:live
+npm run test:playlist-canary:live
+```
 
-Live YouTube is useful as a **thin smoke target**, but it is not reliable enough to be the only way to catch markup changes. For DOM-sensitive extension behavior, prefer **fixture-based regression tests** in addition to live Playwright checks.
+`npm run test:e2e` runs the configured Chromium Playwright projects and includes live specs. Use `test:e2e:offline` when external YouTube must not affect the result.
 
-Recommended approach:
+## Why live tests are canaries
 
-- Keep a very small live YouTube smoke suite:
-  - extension loads on `youtube.com`
-  - content script injects styles
-  - one or two critical selectors still exist
-- Move DOM parsing and DOM-targeting logic into helper functions where possible, then test those helpers against saved HTML fixtures with Jest/jsdom.
-- Save representative HTML snapshots for the YouTube surfaces the extension depends on:
-  - search results
-  - home/rich grid
-  - watch page recommendations
-  - playlist pages
-  - Shorts pages
-- Use those saved fixtures to validate:
-  - video ID extraction
-  - thumbnail target resolution
-  - title/channel extraction
-  - overlay insertion points
+A live YouTube failure can be caused by product markup, consent presentation, localization, experiments, network state, rate limits, CAPTCHA/anti-bot behavior, or an actual extension regression. It is an alert requiring investigation, not a deterministic proof that a local code change is wrong.
 
-Practical fixture workflow:
+The live suites remain valuable because they warn when:
 
-1. Open the relevant YouTube page variant.
-2. Capture the DOM you actually depend on, usually with `document.body.innerHTML` or a narrower subtree instead of a full browser save.
-3. Store that snapshot under `tests/fixtures/youtube/` with a scenario-based name such as `search-results.html` or `playlist-sidebar.html`.
-4. Write Jest/jsdom tests that load the fixture and run the extension’s DOM helpers against it.
-5. When YouTube changes its markup, add the new snapshot and a regression test before adjusting the production selectors.
+- a selector or SPA event contract changes;
+- a public RSS/channel endpoint changes behavior;
+- host permissions no longer cover a required request;
+- video, playlist, Shorts, or resume behavior diverges in production.
 
-This gives the project two safety nets:
+The consent helper targets the main page and known consent frames, using semantic controls and bounded fallbacks. Optional `yt-storage.json` can preserve a locally accepted consent state; it must remain gitignored.
 
-- **Live smoke** tells us that production YouTube behavior has changed.
-- **Fixture-based tests** let us debug and lock in selector/parser fixes deterministically without fighting CAPTCHA, VPN reputation, or other anti-bot systems.
+## Captured YouTube DOM
 
-### Integration Tests (`/tests/integration`)
+Deterministic browser tests use reference documents under `helpers/important/` and captured fixtures under `tests/fixtures/youtube/`. They exercise selectors and extension behavior without requesting live YouTube.
 
-Integration tests focus on the interactions between different components of the extension.
+When a live canary exposes new markup:
 
-- **`video-tracking.test.js`**: This suite tests the interaction between the `content.js` script and the storage layer. It ensures that video progress is correctly tracked and saved under various conditions, such as page navigation and video playback events.
+1. capture the smallest relevant subtree;
+2. remove personal/session data;
+3. add or update the fixture;
+4. reproduce the issue in Chrome and Firefox fixture suites;
+5. change production logic only after the deterministic regression is present.
 
-### Unit Tests (`/tests/unit`)
+This keeps store-release gates stable while retaining early warning for external changes.
 
-Unit tests verify the functionality of individual modules or components in isolation.
+## Browser execution
 
-- **`popup.test.js`**:
-  - **Purpose**: Tests the UI logic in `popup.js`.
-  - **Key Scenarios**:
-    - **Internationalization (i18n)**: Ensures the UI correctly displays translated strings by mocking the `chrome.i18n.getMessage` API.
-    - Basic popup layout (button ordering, initial sync indicator state).
-    - Clear history UX (confirmation, use of `clearHistoryOnly`, UI refresh).
-    - URL helpers like `addTimestampToUrl` used when opening videos from the popup.
-    - Import/export flows (`exportHistory`, `openImportPage`) including JSON structure and browser integration (blob download, YouTube `#ytlh_import` tab).
-    - Storage change listener behavior and sync status message handling.
+Chromium tests use Playwright with an unpacked extension from `build/e2e/chrome`. Firefox tests use Selenium with a temporary profile and the extension from `build/e2e/firefox`.
 
-- **`storage.test.js`**:
-  - **Purpose**: Tests the hybrid storage system (`SimpleStorage` / `ytStorage`) and how it interacts with `chrome.storage.local` and IndexedDB.
-  - **Key Scenarios**:
-    - Local-first writes for videos (`setVideo`) and playlists.
-    - Hybrid reads: `getVideo` preferring `storage.local`, then falling back to IndexedDB.
-    - Hybrid deletion: `removeVideo` removing from local storage, calling IndexedDB delete with tombstone creation, and writing legacy `deleted_video_*` markers.
-    - Merged views: `getAllVideos` combining IndexedDB base data with a local overlay where local wins on newer timestamps.
+Both are headless by default. Set `PW_HEADED=1` for supported visible debugging flows. Install Playwright's Chromium once when needed:
 
-- **`utils.test.js`**:
-  - **Purpose**: Tests various utility and helper functions.
-  - **Key Scenarios**:
-    - Time formatting functions.
-    - Data sorting and filtering logic.
-    - URL parsing and video ID extraction.
+```bash
+npx playwright install chromium
+```
 
-### Memory Tests (`/tests/memory`)
+Firefox tests require a compatible Firefox installation and geckodriver available to the fixture.
 
-Memory tests are designed to identify potential memory leaks or excessive resource consumption.
+## Release artifacts
 
-- **`cleanup.test.js`**:
-  - **Purpose**: Verifies that DOM elements and event listeners created by the `content.js` script are properly cleaned up when they are no longer needed (e.g., during YouTube's SPA navigations). This prevents memory leaks and ensures the extension remains performant over long browsing sessions. 
+```bash
+npm run test:release:artifacts
+npm run test:release:chrome
+npm run test:release:firefox
+```
+
+The artifact integration gate builds in isolation and verifies Chrome/Firefox directory and archive parity plus referenced manifest/HTML files. The release browser commands run the static release-feed contract against `build/chrome` and `build/firefox`.
+
+## Documentation checks
+
+```bash
+npm run docs:safety
+npm run docs:build
+```
+
+`docs:safety` checks tracked documentation assets for privacy problems. The screenshot generator uses fictional data and blocks external requests.
+
+## Interpreting failures
+
+- A deterministic Jest/static failure blocks release until understood.
+- A Chrome-only or Firefox-only deterministic failure must be investigated in that browser; the other browser passing is not sufficient.
+- A live canary failure should record the failing external contract and be reproduced against a captured fixture when possible.
+- Never weaken a deterministic assertion merely because a live page is unstable.

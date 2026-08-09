@@ -38,6 +38,42 @@ global.chrome = {
   },
 };
 
+// Lightweight content-script module globals. Tests that require src/content.js
+// only need the content script to initialize and expose hooks; individual
+// helper modules have their own focused tests.
+global.window.YTVHTContentCss = {
+  injectCSS: jest.fn(),
+  updateOverlayCSS: jest.fn(),
+};
+
+require('../src/content-url.js');
+require('../src/content-playlists.js');
+
+global.window.YTVHTContentThumbnails = {
+  create: () => ({
+    thumbnailObserver: { observe: jest.fn(), disconnect: jest.fn() },
+    processExistingThumbnails: jest.fn(),
+    processVideoElement: jest.fn(),
+    startRemovedElementCleanupObserver: jest.fn(),
+  }),
+};
+
+global.window.YTVHTContentMessages = {
+  create: () => jest.fn(),
+};
+
+global.window.YTVHTContentInfo = {
+  create: () => ({
+    showExtensionInfo: jest.fn(),
+  }),
+};
+
+global.window.YTVHTContentImport = {
+  create: () => ({
+    maybeShowImportOverlayFromHash: jest.fn(),
+  }),
+};
+
 // Minimal global ytStorage stub so the real content script
 // can be required in tests without throwing during initialize/loadSettings.
 global.ytStorage = {
