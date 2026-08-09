@@ -19,12 +19,25 @@
         });
     }
 
-    function setImportStatus(text, isError) {
+    function setImportStatus(text, isError, action) {
         const el = document.getElementById('ytvhtImportStatus');
         if (el) {
             el.textContent = text || '';
             el.style.color = isError ? '#ff7070' : '';
+            if (action && typeof action.run === 'function') {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'compact-button';
+                button.textContent = action.label;
+                button.style.marginLeft = '8px';
+                button.addEventListener('click', action.run);
+                el.appendChild(button);
+            }
         }
+    }
+
+    function openIgnoredChannelsPage() {
+        chrome.tabs.create({ url: chrome.runtime.getURL('feed.html#channels/ignored') });
     }
 
     function parseWatchHistoryHtml(htmlText) {
@@ -158,7 +171,17 @@
             }
             setImportStatus(`Importing ${subs.length} subscriptionsâ€¦`);
             const { outcome } = await globalThis.ytvhtFeedSubscriptionImport.importCanonicalSubscriptions(globalThis.ytIndexedDBStorage, subs);
-            setImportStatus(`Imported ${outcome.added} subscriptions; ${outcome.initializationQueued} queued to prepare your local feed. Open the feed page to begin scanning.`);
+            const ignored = outcome.ignored
+                ? ` ${outcome.ignored} remained ignored because you locally unsubscribed from them; review them on the Channels page.`
+                : '';
+            setImportStatus(
+                `Imported ${outcome.added} subscriptions; ${outcome.initializationQueued} queued to prepare your local feed.${ignored} Open the feed page to begin scanning.`,
+                false,
+                outcome.ignored ? {
+                    label: chrome.i18n.getMessage('feed_review_ignored_channels') || 'Review ignored channels',
+                    run: openIgnoredChannelsPage
+                } : null
+            );
             if (typeof notifyYouTubeTabs === 'function') notifyYouTubeTabs({ type: 'ytvhtSubsChanged' });
             if (typeof displaySubscriptionsPage === 'function') displaySubscriptionsPage();
         } catch (err) {
@@ -169,6 +192,7 @@
 
     Object.assign(globalThis, {
         openImportPage,
+        openIgnoredChannelsPage,
         setImportStatus,
         parseWatchHistoryHtml,
         handleImportHistoryFile,

@@ -18,19 +18,43 @@ test('resolves an explicitly entered handle once without credentials and refuses
   await expect(actions.resolveInput('@fixture', async () => ({ ok: true, text: async () => '<html></html>' }))).rejects.toThrow('canonical channel ID');
 });
 
-test('follow queues a canonical local record exactly once and unfollow removes its paired state', async () => {
+test('follow queues a canonical local record and soft unfollow persists local intent', async () => {
   const existing = new Map();
+  const tombstones = new Map();
   const storage = {
     getSubscriptionRecord: jest.fn(async (id) => existing.get(id) || null),
+    getLocalUnsubscribeTombstone: jest.fn(async (id) => tombstones.get(id) || null),
     putSubscriptionRecord: jest.fn(async (record) => existing.set(record.channelId, record)),
     putChannelSyncState: jest.fn(async () => {}),
-    deleteSubscriptionAndSyncState: jest.fn(async (id) => existing.delete(id)),
+    deleteLocalUnsubscribeTombstone: jest.fn(async (id) => tombstones.delete(id)),
+    deleteSubscriptionAndSyncState: jest.fn(async (id, tombstone) => {
+      existing.delete(id);
+      tombstones.set(id, tombstone);
+      return { tombstone, deletedFeedVideoCount: 2 };
+    }),
   };
   await expect(actions.follow(storage, { channelId: CHANNEL_ID, channelName: 'Fixture' }, 123)).resolves.toMatchObject({ status: 'followed' });
   expect(storage.putSubscriptionRecord).toHaveBeenCalledWith(expect.objectContaining({ channelId: CHANNEL_ID, source: 'manual', followedAt: 123 }));
   expect(storage.putChannelSyncState).toHaveBeenCalledWith(expect.objectContaining({ channelId: CHANNEL_ID, initializationState: 'pending', nextEligibleCheckAt: 123 }));
   await expect(actions.follow(storage, { channelId: CHANNEL_ID }, 124)).resolves.toMatchObject({ status: 'already-following' });
   expect(storage.putSubscriptionRecord).toHaveBeenCalledTimes(1);
-  await actions.unfollow(storage, CHANNEL_ID);
-  expect(storage.deleteSubscriptionAndSyncState).toHaveBeenCalledWith(CHANNEL_ID);
+  const unfollowed = await actions.unfollow(storage, CHANNEL_ID, { unsubscribedAt: 200, source: 'video_menu' });
+  expect(storage.deleteSubscriptionAndSyncState).toHaveBeenCalledWith(CHANNEL_ID, expect.objectContaining({
+    channelId: CHANNEL_ID,
+    unsubscribedAt: 200,
+    source: 'video_menu',
+    reason: 'user_unfollow'
+  }));
+  expect(unfollowed).toMatchObject({ status: 'unfollowed', deletedFeedVideoCount: 2 });
+
+  await expect(actions.follow(storage, { channelId: CHANNEL_ID }, 300)).resolves.toMatchObject({
+    status: 'followed',
+    restored: true
+  });
+  expect(storage.deleteLocalUnsubscribeTombstone).toHaveBeenCalledWith(CHANNEL_ID);
+  expect(storage.putChannelSyncState).toHaveBeenLastCalledWith(expect.objectContaining({
+    channelId: CHANNEL_ID,
+    initializationState: 'pending',
+    nextEligibleCheckAt: 300
+  }));
 });

@@ -11,14 +11,29 @@
     }
 
     async function importCanonicalSubscriptions(storage, subscriptions, options = {}) {
-        if (!storage || typeof storage.getSubscriptionRecord !== 'function' || typeof storage.putSubscriptionRecord !== 'function') {
-            throw new TypeError('A subscriptions repository is required');
+        if (!storage || typeof storage.getSubscriptionRecord !== 'function' ||
+            typeof storage.putSubscriptionRecord !== 'function' ||
+            typeof storage.getLocalUnsubscribeTombstone !== 'function') {
+            throw new TypeError('A subscriptions and local-unsubscribe repository is required');
         }
         if (!contracts) throw new Error('Feed contracts are unavailable');
         const source = options.subscriptionSource || 'takeout_csv';
         const importSource = options.importSource || 'takeout_subscriptions';
         const now = Number(options.now || Date.now());
-        const result = { source: importSource, found: Array.isArray(subscriptions) ? subscriptions.length : 0, valid: 0, added: 0, updated: 0, unchanged: 0, skipped: 0, invalid: [], fatalError: null, initializationQueued: 0 };
+        const result = {
+            source: importSource,
+            found: Array.isArray(subscriptions) ? subscriptions.length : 0,
+            valid: 0,
+            added: 0,
+            updated: 0,
+            unchanged: 0,
+            skipped: 0,
+            ignored: 0,
+            ignoredChannels: [],
+            invalid: [],
+            fatalError: null,
+            initializationQueued: 0
+        };
         const queuedChannelIds = [];
 
         for (const subscription of (subscriptions || [])) {
@@ -29,6 +44,20 @@
                 continue;
             }
             result.valid += 1;
+            const tombstone = await storage.getLocalUnsubscribeTombstone(channelId);
+            if (tombstone) {
+                result.skipped += 1;
+                result.ignored += 1;
+                if (result.ignoredChannels.length < 20) {
+                    result.ignoredChannels.push({
+                        channelId,
+                        channelTitle: subscription.title || subscription.channelTitle || tombstone.channelTitle || '',
+                        unsubscribedAt: Number(tombstone.unsubscribedAt || 0),
+                        reason: tombstone.reason || 'user_unfollow'
+                    });
+                }
+                continue;
+            }
             const existing = await storage.getSubscriptionRecord(channelId);
             const incoming = {
                 channelId,

@@ -100,13 +100,14 @@ describe('shared feed scheduler', () => {
     await scheduler.initializeSubscriptions();
     await expect(scheduler.getInitializationProgress()).resolves.toEqual({ completed: 0, total: 2, pending: 2 });
     await expect(scheduler.runInitialization({ limit: 1, concurrency: 1, runId: 'initial-1' })).resolves.toEqual({
-      runId: 'initial-1', completed: 1, total: 1, insertedVideoCount: 1, active: false,
+      runId: 'initial-1', completed: 1, total: 1, insertedVideoCount: 1,
+      insertedVideoIds: [`video-${CHANNEL_A}`], active: false,
     });
     expect(fetchChannelRss).toHaveBeenCalledTimes(1);
     await expect(scheduler.getInitializationProgress()).resolves.toEqual({ completed: 1, total: 2, pending: 1 });
     expect(snapshots).toEqual([
-      { runId: 'initial-1', completed: 0, total: 1, insertedVideoCount: 0, active: true },
-      { runId: 'initial-1', completed: 1, total: 1, insertedVideoCount: 1, active: false },
+      { runId: 'initial-1', completed: 0, total: 1, insertedVideoCount: 0, insertedVideoIds: [], active: true },
+      { runId: 'initial-1', completed: 1, total: 1, insertedVideoCount: 1, insertedVideoIds: [`video-${CHANNEL_A}`], active: false },
     ]);
 
     now = 101;
@@ -116,6 +117,7 @@ describe('shared feed scheduler', () => {
     expect(storage.state(CHANNEL_B).initializationState).toBe('complete');
     expect(storage.syncRun('initial-2')).toEqual(expect.objectContaining({
       kind: 'initialization', total: 1, completed: 1, insertedVideoCount: 1,
+      insertedVideoIds: [`video-${CHANNEL_B}`],
       outcomes: expect.objectContaining({ updated: 1 })
     }));
   });

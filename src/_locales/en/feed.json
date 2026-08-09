@@ -12,8 +12,8 @@
     "description": "Search field placeholder"
   },
   "feed_refresh": {
-    "message": "Refresh",
-    "description": "Refresh button label"
+    "message": "Check for new videos",
+    "description": "Check for new subscription videos button label"
   },
   "feed_create": {
     "message": "Create",
@@ -379,6 +379,30 @@
     "message": "Unsubscribe",
     "description": "feed unsubscribe"
   },
+  "feed_following": {
+    "message": "Following",
+    "description": "Channels internal tab for active local subscriptions"
+  },
+  "feed_follow_again_with_rewatch": {
+    "message": "Follow again with re:Watch",
+    "description": "Restore a locally ignored channel"
+  },
+  "feed_channels_load_failed": {
+    "message": "Could not load channels. Try again.",
+    "description": "Channels and ignored-channel repository load failure"
+  },
+  "feed_ignored": {
+    "message": "Ignored",
+    "description": "Channels internal tab for locally ignored channels"
+  },
+  "feed_ignored_on": {
+    "message": "Ignored $1",
+    "description": "Date when a channel was locally ignored"
+  },
+  "feed_review_ignored_channels": {
+    "message": "Review ignored channels",
+    "description": "Open the Channels Ignored tab after import"
+  },
   "feed_not_subscribed": {
     "message": "Not subscribed",
     "description": "feed not subscribed"
@@ -432,15 +456,63 @@
     "description": "feed unsubscribed from status"
   },
   "feed_refreshing": {
-    "message": "Refreshing...",
-    "description": "feed refreshing"
+    "message": "Checking…",
+    "description": "New subscription video check in progress"
   },
   "feed_updated": {
     "message": "Feed updated.",
     "description": "feed updated"
   },
   "feed_refresh_failed_status": {
-    "message": "Refresh failed: $1. If YouTube shows a consent wall, open youtube.com once in this browser.",
-    "description": "feed refresh failed status"
+    "message": "Could not check for new videos: $1.",
+    "description": "New subscription video check failure"
+  },
+  "feed_reload_view": {
+    "message": "Reload view",
+    "description": "Reload the current view from local storage"
+  },
+  "feed_reloading_view": {
+    "message": "Reloading…",
+    "description": "Local view reload in progress"
+  },
+  "feed_view_reloaded": {
+    "message": "View reloaded.",
+    "description": "Local view reload success"
+  },
+  "feed_reload_view_failed": {
+    "message": "Could not reload the view: $1.",
+    "description": "Local view reload failure"
+  },
+  "feed_pending_inventory_incomplete": {
+    "message": "The local inventory is still missing $1 discovered videos.",
+    "description": "Discovered videos are not all readable from local storage yet"
+  },
+  "feed_show_new_videos_failed": {
+    "message": "Could not show new videos: $1",
+    "description": "Show discovered videos failure"
+  },
+  "feed_showing_new_videos": {
+    "message": "Showing…",
+    "description": "Show discovered videos in progress"
+  },
+  "feed_retry": {
+    "message": "Retry",
+    "description": "Retry failed action"
+  },
+  "feed_new_videos_shown_one": {
+    "message": "$1 new video shown.",
+    "description": "Singular discovered video shown result"
+  },
+  "feed_new_videos_shown_other": {
+    "message": "$1 new videos shown.",
+    "description": "Plural discovered videos shown result"
+  },
+  "feed_new_videos_hidden_by_filters_one": {
+    "message": "$1 new video is hidden by active filters.",
+    "description": "Singular discovered video excluded by filters"
+  },
+  "feed_new_videos_hidden_by_filters_other": {
+    "message": "$1 new videos are hidden by active filters.",
+    "description": "Plural discovered videos excluded by filters"
   }
 }

@@ -60,9 +60,11 @@
         });
         return {
             getSubscriptionRecord: (channelId, handle) => call('get', { channelId, handle }),
+            getLocalUnsubscribeTombstone: (channelId) => call('getTombstone', { channelId }),
             putSubscriptionRecord: (record) => call('putSubscription', { record }),
             putChannelSyncState: (record) => call('putSyncState', { record }),
-            deleteSubscriptionAndSyncState: (channelId) => call('unfollow', { channelId })
+            deleteLocalUnsubscribeTombstone: (channelId) => call('deleteTombstone', { channelId }),
+            deleteSubscriptionAndSyncState: (channelId, tombstone) => call('unfollow', { channelId, tombstone })
         };
     }
 

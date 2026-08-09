@@ -85,8 +85,8 @@ function renderSkippedChannels() {
     const source = Array.isArray(analyticsAllVideos) && analyticsAllVideos.length
         ? analyticsAllVideos.filter(r => !r.isShorts)
         : allHistoryRecords;
-    const longVideos = source.filter(r => r.duration >= 600);
-    const skipped = longVideos.filter(r => (r.time / r.duration) < 0.1);
+    const longVideos = source.filter(r => r.duration >= ytvhtFeedContracts.LONG_VIDEO_MIN_DURATION_SECONDS);
+    const skipped = longVideos.filter(r => (r.time / r.duration) < ytvhtFeedContracts.WATCH_SKIP_RATIO);
 
     // Aggregate by channel
     const channelMap = {};
@@ -160,10 +160,11 @@ function renderCompletionBarChart() {
     const source = Array.isArray(analyticsAllVideos) && analyticsAllVideos.length
         ? analyticsAllVideos.filter(r => !r.isShorts)
         : allHistoryRecords;
-    const longVideos = source.filter(r => r.duration >= 600);
-    const skipped = longVideos.filter(r => (r.time / r.duration) < 0.1);
-    const partial = longVideos.filter(r => (r.time / r.duration) >= 0.1 && (r.time / r.duration) < 0.9);
-    const completed = longVideos.filter(r => (r.time / r.duration) >= 0.9);
+    const longVideos = source.filter(r => r.duration >= ytvhtFeedContracts.LONG_VIDEO_MIN_DURATION_SECONDS);
+    const skipped = longVideos.filter(r => (r.time / r.duration) < ytvhtFeedContracts.WATCH_SKIP_RATIO);
+    const partial = longVideos.filter(r => (r.time / r.duration) >= ytvhtFeedContracts.WATCH_SKIP_RATIO &&
+        (r.time / r.duration) < ytvhtFeedContracts.WATCH_COMPLETION_RATIO);
+    const completed = longVideos.filter(r => (r.time / r.duration) >= ytvhtFeedContracts.WATCH_COMPLETION_RATIO);
     const counts = [skipped.length, partial.length, completed.length];
     // Use short labels for x-axis
     const labels = [
@@ -249,4 +250,3 @@ function renderCompletionBarChart() {
         legendDiv.appendChild(row);
     }
 }
-

@@ -48,7 +48,7 @@ test('packaged local search stays local and Show opens the chronological subscri
       publishedAt: 200, discoveredAt: 200, lastSeenInFeedAt: 200,
       durationSeconds: null, isShort: null, source: 'rss'
     });
-    showNewFeedVideos(1);
+    await showNewFeedVideos(['fixture-new-video']);
   });
 
   await expect(page.locator('#status .btn', { hasText: 'Show' })).toBeVisible();
@@ -75,6 +75,7 @@ test('packaged feed renders cached inventory before a controlled initialization 
   await page.goto(`${extensionOrigin}/feed.html`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('html')).not.toHaveClass(/app-loading/);
   await expect(page.locator('#feedSyncStatus')).toHaveAttribute('aria-busy', 'false');
+  await page.evaluate(() => requestPageActiveFeedWork());
 
   await page.evaluate(async () => {
     clearPageFeedWorkTimer();

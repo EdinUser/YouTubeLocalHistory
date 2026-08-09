@@ -5,7 +5,7 @@ const { hydrateChannel } = require('../../src/feed-channel-metadata.js');
 // this catches YouTube channel-page response-shape changes before blank cards
 // reach users.
 const LIVE_CHANNELS = [
-  ['Astrum', 'UC-9b7aDP6ZNOcoj9-xFnrtw'],
+  ['Astrum', 'UC-9b7aDP6ZN0coj9-xFnrtw'],
   ['PewDiePie', 'UC-lHJZR3Gqxm24_Vd_AJ5Yw'],
   ['Sargon of Akkad', 'UC-yewGHQbNFpDrGM0diZOLA'],
 ];

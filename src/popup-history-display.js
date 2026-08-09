@@ -10,7 +10,8 @@ function displayHistoryPage() {
     const pageRecords = allHistoryRecords.filter((record) => {
         const time = Number(record.time || 0);
         const duration = Number(record.duration || 0);
-        return time > 0 && duration > 0 && time / duration < 0.9;
+        return time > 0 && duration > 0 &&
+            time / duration < ytvhtFeedContracts.WATCH_COMPLETION_RATIO;
     });
 
     adjustContentDensity(pageRecords);

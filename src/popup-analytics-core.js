@@ -35,7 +35,8 @@ function calculateAnalytics(records) {
         // Fallback: current-page-only behavior (what you previously had)
         const totalDuration = records.reduce((sum, record) => sum + (record.duration || 0), 0);
         const completedVideos = records.filter(record =>
-            record.time && record.duration && (record.time / record.duration) >= 0.9
+            record.time && record.duration &&
+            (record.time / record.duration) >= ytvhtFeedContracts.WATCH_COMPLETION_RATIO
         ).length;
 
         videosWatched = records.length;
@@ -212,4 +213,3 @@ async function updateAnalytics() {
     renderSkippedChannels();
     renderCompletionBarChart();
 }
-

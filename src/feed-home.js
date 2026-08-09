@@ -18,6 +18,14 @@ function isShort(v) {
 let shortsOnly = false;
 let subscriptionsChronological = false;
 const VISIBLE_FEED_LIMIT = 300;
+const FEED_RENDER_PAGE_SIZE = typeof ytvhtFeedContracts !== 'undefined'
+    ? Number(ytvhtFeedContracts.FEED_PAGE_SIZE || 50)
+    : 50;
+let feedPaginationObserver = null;
+let feedPaginationGeneration = 0;
+let homeRenderSnapshot = [];
+let homeRenderedCount = 0;
+let subscriptionPaginationState = null;
 const HOME_AGE_BUCKET_PATTERN = [
     'back', 'quarter', 'month', 'older',
     'quarter', 'back', 'month', 'week'
@@ -306,7 +314,7 @@ function rankHomeVideos(videos) {
         const watchedAt = Number(record.timestamp || 0);
         const ageDays = watchedAt > 0 ? Math.max(0, (now - watchedAt) / dayMs) : 90;
         const recencyWeight = Math.pow(0.5, ageDays / 14);
-        const engagement = progress >= 0.9 ? 2.5 : (progress >= 0.25 ? 1.5 : 0.5);
+        const engagement = progress >= ytvhtFeedContracts.WATCH_COMPLETION_RATIO ? 2.5 : (progress >= 0.25 ? 1.5 : 0.5);
 
         const stats = channelAffinity.get(key) || {
             weightedEngagement: 0,
@@ -359,8 +367,8 @@ function rankHomeVideos(videos) {
         // so Home does not become a loop of only established favourites.
         const exploration = channelStats ? Math.max(0, 10 - channelStats.recentCount * 2) : 14;
         const unwatchedBonus = watched ? 0 : 18;
-        const resumeBonus = progress > 0 && progress < 0.9 ? 4 : 0;
-        const completedPenalty = progress >= 0.9 ? 65 : 0;
+        const resumeBonus = progress > 0 && progress < ytvhtFeedContracts.WATCH_COMPLETION_RATIO ? 4 : 0;
+        const completedPenalty = progress >= ytvhtFeedContracts.WATCH_COMPLETION_RATIO ? 65 : 0;
         const repeatPenalty = recentHomePenalty(video.videoId, recentHomeRounds);
         const channelLessPenalty = Math.min(
             80,
@@ -423,7 +431,14 @@ function currentView() {
             rememberHomeRecommendations(homeList);
             return { list: homeList, q };
         }
-        return { list: sortList(list, sort).slice(0, VISIBLE_FEED_LIMIT), q };
+        const sorted = sortList(list, sort);
+        if (subscriptionsChronological && newlyShownFeedVideoIds.length) {
+            const highlighted = new Set(newlyShownFeedVideoIds);
+            const newlyShown = sorted.filter((video) => highlighted.has(video.videoId));
+            const remaining = sorted.filter((video) => !highlighted.has(video.videoId));
+            return { list: newlyShown.concat(remaining).slice(0, VISIBLE_FEED_LIMIT), q };
+        }
+        return { list: sorted.slice(0, VISIBLE_FEED_LIMIT), q };
     }
 
     // Query: YouTube-style search over feed + history. Match every word in any
@@ -580,6 +595,153 @@ function buildLocalChannelResult(match) {
     return row;
 }
 
+function stopFeedPagination() {
+    if (feedPaginationObserver) feedPaginationObserver.disconnect();
+    feedPaginationObserver = null;
+    feedPaginationGeneration += 1;
+    homeRenderSnapshot = [];
+    homeRenderedCount = 0;
+    subscriptionPaginationState = null;
+    const sentinel = document.getElementById('feedPaginationSentinel');
+    if (sentinel) sentinel.hidden = true;
+}
+
+function observeFeedPagination(onVisible) {
+    const sentinel = document.getElementById('feedPaginationSentinel');
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+    if (feedPaginationObserver) feedPaginationObserver.disconnect();
+    sentinel.hidden = false;
+    feedPaginationObserver = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onVisible();
+    }, { rootMargin: '300px 0px' });
+    feedPaginationObserver.observe(sentinel);
+}
+
+function hideFeedPaginationSentinel() {
+    if (feedPaginationObserver) feedPaginationObserver.disconnect();
+    feedPaginationObserver = null;
+    const sentinel = document.getElementById('feedPaginationSentinel');
+    if (sentinel) sentinel.hidden = true;
+}
+
+function appendFeedCards(grid, videos) {
+    const fragment = document.createDocumentFragment();
+    videos.forEach((video) => fragment.appendChild(buildCard(video)));
+    grid.appendChild(fragment);
+}
+
+function appendNextHomePage(grid) {
+    const next = homeRenderSnapshot.slice(homeRenderedCount, homeRenderedCount + FEED_RENDER_PAGE_SIZE);
+    if (!next.length) {
+        hideFeedPaginationSentinel();
+        return;
+    }
+    appendFeedCards(grid, next);
+    homeRenderedCount += next.length;
+    if (typeof ytvhtFeedViewData !== 'undefined') {
+        ytvhtFeedViewData.persistHomeImpressions(
+            ytIndexedDBStorage,
+            next,
+            Date.now(),
+            next.length
+        ).catch(() => {});
+    }
+    if (homeRenderedCount >= homeRenderSnapshot.length) hideFeedPaginationSentinel();
+}
+
+function subscriptionVideoPassesFilters(video) {
+    if (!video || feedFeedback.notInterested[video.videoId] || isShort(video)) return false;
+    if (document.getElementById('unwatched')?.checked && watchedMap[video.videoId]) return false;
+    if (document.getElementById('hideMembers')?.checked && videoIsMembersOnly(video)) return false;
+    return true;
+}
+
+function subscriptionPinnedVideos() {
+    if (!newlyShownFeedVideoIds.length) return [];
+    const byId = new Map(allVideos.map((video) => [video.videoId, video]));
+    return newlyShownFeedVideoIds
+        .map((videoId) => byId.get(videoId))
+        .filter(subscriptionVideoPassesFilters);
+}
+
+function appendBufferedSubscriptionVideos(state, grid, targetCount) {
+    const next = state.videos.slice(state.renderedCount, targetCount);
+    appendFeedCards(grid, next);
+    state.renderedCount += next.length;
+}
+
+async function fillSubscriptionPage(state, grid, empty, targetCount) {
+    if (state.loading || state.generation !== feedPaginationGeneration) return;
+    state.loading = true;
+    try {
+        while (state.videos.length < targetCount && !state.exhausted) {
+            const page = await ytvhtFeedViewData.loadCanonicalSubscriptionFeedPage(
+                ytIndexedDBStorage,
+                { limit: FEED_RENDER_PAGE_SIZE, cursor: state.cursor }
+            );
+            if (state.generation !== feedPaginationGeneration || subscriptionPaginationState !== state) return;
+            localSubscriptions = page.subscriptions;
+            page.videos.filter(subscriptionVideoPassesFilters).forEach((video) => {
+                if (state.seenVideoIds.has(video.videoId)) return;
+                state.seenVideoIds.add(video.videoId);
+                state.videos.push(video);
+            });
+            state.cursor = page.nextCursor;
+            state.exhausted = page.exhausted || !page.nextCursor;
+        }
+
+        if (state.generation !== feedPaginationGeneration || subscriptionPaginationState !== state) return;
+        appendBufferedSubscriptionVideos(state, grid, targetCount);
+        if (!state.renderedCount && state.exhausted) {
+            grid.style.display = 'none';
+            empty.style.display = 'block';
+            empty.textContent = tFeed(
+                'feed_no_videos_add_subscription',
+                'No videos yet. Add a local subscription, then click Refresh here.'
+            );
+        }
+        if (state.renderedCount < state.videos.length || !state.exhausted) {
+            observeFeedPagination(() => {
+                fillSubscriptionPage(
+                    state,
+                    grid,
+                    empty,
+                    state.renderedCount + FEED_RENDER_PAGE_SIZE
+                ).catch(() => {});
+            });
+        } else {
+            hideFeedPaginationSentinel();
+        }
+    } catch (error) {
+        if (state.generation !== feedPaginationGeneration || subscriptionPaginationState !== state) return;
+        console.error('[feed] failed to load subscription page', error);
+        hideFeedPaginationSentinel();
+        if (!state.renderedCount) {
+            grid.style.display = 'none';
+            empty.style.display = 'block';
+            empty.textContent = tFeed('feed_channels_load_failed', 'Could not load channels. Try again.');
+        }
+    } finally {
+        state.loading = false;
+    }
+}
+
+function startSubscriptionPagination(grid, empty) {
+    const pinned = subscriptionPinnedVideos();
+    const state = {
+        generation: feedPaginationGeneration,
+        videos: pinned.slice(),
+        seenVideoIds: new Set(pinned.map((video) => video.videoId)),
+        cursor: null,
+        exhausted: false,
+        renderedCount: 0,
+        loading: false
+    };
+    subscriptionPaginationState = state;
+    appendBufferedSubscriptionVideos(state, grid, FEED_RENDER_PAGE_SIZE);
+    fillSubscriptionPage(state, grid, empty, FEED_RENDER_PAGE_SIZE).catch(() => {});
+}
+
 function render() {
     const grid = document.getElementById('grid');
     const searchResults = document.getElementById('localSearchResults');
@@ -590,7 +752,12 @@ function render() {
     const filters = document.getElementById('searchFilters');
     const sourceTabs = document.getElementById('searchSourceTabs');
 
-    const { list, q, metadataCandidates = [] } = currentView();
+    stopFeedPagination();
+    const rawQuery = (document.getElementById('search').value || '').trim();
+    const subscriptionsBrowse = subscriptionsChronological && !shortsOnly && !rawQuery;
+    const { list, q, metadataCandidates = [] } = subscriptionsBrowse
+        ? { list: [], q: '' }
+        : currentView();
     const visibleList = q ? list.slice(0, searchVisibleLimit) : list;
     document.body.classList.toggle('shorts-mode', shortsOnly && !q);
     grid.textContent = '';
@@ -621,8 +788,15 @@ function render() {
         heading.style.display = 'none';
     }
 
-    if (!shortsOnly && !subscriptionsChronological && list.length && typeof ytvhtFeedViewData !== 'undefined') {
-        ytvhtFeedViewData.persistHomeImpressions(ytIndexedDBStorage, list, Date.now()).catch(() => {});
+    if (subscriptionsBrowse) {
+        if (searchResults) searchResults.style.display = 'none';
+        empty.style.display = 'none';
+        grid.style.display = 'grid';
+        count.textContent = '';
+        startSubscriptionPagination(grid, empty);
+        const ytSection = document.getElementById('ytSection');
+        if (ytSection) ytSection.style.display = 'none';
+        return;
     }
 
     if (allVideos.length === 0 && !q && !shortsOnly) {
@@ -671,9 +845,15 @@ function render() {
         } else {
             if (searchResults) searchResults.style.display = 'none';
             grid.style.display = 'grid';
-            const frag = document.createDocumentFragment();
-            list.forEach((v) => frag.appendChild(buildCard(v)));
-            grid.appendChild(frag);
+            if (!shortsOnly && !subscriptionsChronological) {
+                homeRenderSnapshot = list.slice();
+                appendNextHomePage(grid);
+                if (homeRenderedCount < homeRenderSnapshot.length) {
+                    observeFeedPagination(() => appendNextHomePage(grid));
+                }
+            } else {
+                appendFeedCards(grid, list);
+            }
         }
     }
 

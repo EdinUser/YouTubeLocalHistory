@@ -62,7 +62,12 @@ function buildSubscribeButton(info) {
         try {
             const existing = await findSub(info);
             if (existing) {
-                await ytvhtLocalSubscriptionActions.unfollow(ytIndexedDBStorage, existing.channelId);
+                await ytvhtLocalSubscriptionActions.unfollow(ytIndexedDBStorage, existing.channelId, {
+                    source: 'subscribe_button',
+                    channelTitle: info.channelName,
+                    thumbnail: info.thumbnail,
+                    handle: info.handle
+                });
             } else {
                 const channelId = String(info.ucid || info.channelId || '');
                 if (!/^UC[\w-]+$/.test(channelId)) {
@@ -78,8 +83,11 @@ function buildSubscribeButton(info) {
                     [info.channelName || tFeed('feed_channel', 'channel')]
                 ), false);
             }
-            localSubscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
+            const data = await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage);
+            localSubscriptions = data.subscriptions;
+            allVideos = data.videos;
             await paint();
+            if (existing && !playlistsActive) render();
         } finally {
             btn.disabled = false;
         }

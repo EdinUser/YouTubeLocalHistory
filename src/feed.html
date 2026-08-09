@@ -225,6 +225,10 @@
             row-gap: 36px;
             padding: 18px 24px 60px;
         }
+        .feed-pagination-sentinel {
+            width: 100%;
+            height: 1px;
+        }
         .empty {
             padding: 60px 24px;
             text-align: center;
@@ -249,6 +253,11 @@
         }
         .subs-title { font-size: 22px; font-weight: 700; margin: 0; }
         .subs-count { color: var(--text-2); font-size: 14px; margin-top: 4px; }
+        .subs-tabs { display: flex; gap: 8px; margin: 0 0 18px; }
+        .subs-tabs[hidden], .subs-tab[hidden] { display: none; }
+        .subs-tab[aria-selected="true"] {
+            color: var(--text); background: color-mix(in srgb, var(--accent) 18%, var(--chip)); border-color: var(--accent);
+        }
         .subs-add { display: flex; gap: 8px; align-items: end; max-width: 720px; margin: 0 0 6px; }
         .subs-add label { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; }
         .subs-add input { flex: 1; min-width: 180px; padding: 9px 10px; color: var(--text); background: var(--chip); border: 1px solid var(--border); border-radius: 6px; }
@@ -435,6 +444,21 @@
         }
         .an-panel-wide { grid-column: 1 / -1; }
         .an-panel-title { margin: 0 0 16px; font-size: 16px; }
+        .an-panel-heading {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 14px; margin-bottom: 16px;
+        }
+        .an-panel-heading .an-panel-title { margin-bottom: 4px; }
+        .an-panel-metric { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.4; }
+        .an-sort-controls {
+            display: inline-flex; flex: 0 0 auto; gap: 4px;
+            padding: 3px; border-radius: 9px; background: var(--chip);
+        }
+        .an-sort-button {
+            border: 0; border-radius: 7px; padding: 6px 8px;
+            color: var(--text-2); background: transparent; cursor: pointer; font-size: 11px;
+        }
+        .an-sort-button.active { color: var(--text); background: var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
         .an-empty { color: var(--text-2); font-size: 13px; padding: 10px 0; }
         .an-completion-row { margin-top: 14px; }
         .an-completion-head, .an-channel-row, .an-continue-meta {
@@ -461,6 +485,8 @@
             min-width: 0; color: var(--text); font-size: 14px;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
+        a.an-channel-name { text-decoration: none; }
+        a.an-channel-name:hover { color: var(--accent); }
         .an-channel-stat { flex: 0 0 auto; color: var(--text-2); font-size: 12px; }
         .an-continue-list {
             display: grid;
@@ -502,6 +528,8 @@
         @media (max-width: 560px) {
             .an-cards, .an-charts, .an-insights { padding-left: 12px; padding-right: 12px; }
             .an-continue { grid-template-columns: 120px minmax(0, 1fr); }
+            .an-panel-heading { display: block; }
+            .an-sort-controls { margin-top: 10px; }
         }
 
         /* --- Settings view --- */
@@ -1588,7 +1616,8 @@
         </div>
         <div class="mast-right">
             <span class="feed-sync-status" id="feedSyncStatus" hidden aria-live="polite"></span>
-            <button class="btn primary" id="refresh" data-i18n="feed_refresh">Refresh</button>
+            <button class="btn primary" id="refresh" data-i18n="feed_refresh">Check for new videos</button>
+            <button class="btn" id="reloadView" data-i18n="feed_reload_view">Reload view</button>
             <button class="btn primary" id="createPlaylist" type="button" style="display:none;" data-i18n="feed_create">Create</button>
             <button class="btn danger" id="clearSubscriptions" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
             <button class="btn danger" id="clearHistoryPage" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
@@ -1689,6 +1718,7 @@
                 </select>
             </div>
             <div class="grid" id="grid"></div>
+            <div class="feed-pagination-sentinel" id="feedPaginationSentinel" aria-hidden="true" hidden></div>
             <div class="yt-results local-search-results" id="localSearchResults" style="display:none;"></div>
             <div class="empty" id="empty" style="display:none;"></div>
 
@@ -1714,13 +1744,17 @@
                         <div class="subs-count" id="subscriptionsCount"></div>
                     </div>
                 </div>
+                <div class="subs-tabs" id="subscriptionTabs" role="tablist" aria-label="Channels" data-i18n-aria-label="feed_channels" hidden>
+                    <button class="btn subs-tab" id="channelsFollowingTab" type="button" role="tab" aria-controls="subscriptionsList" aria-selected="true">Following</button>
+                    <button class="btn subs-tab" id="channelsIgnoredTab" type="button" role="tab" aria-controls="subscriptionsList" aria-selected="false" hidden>Ignored</button>
+                </div>
                 <form class="subs-add" id="subscriptionAddForm">
                     <label for="subscriptionAddInput" data-i18n="feed_subscribe_with_rewatch">Subscribe with re:Watch</label>
                     <input id="subscriptionAddInput" type="text" autocomplete="off" placeholder="Channel URL, UC ID, or @handle" data-i18n-placeholder="feed_channel_input_placeholder">
                     <button class="btn primary" type="submit" data-i18n="feed_subscribe">Subscribe</button>
                 </form>
                 <div class="subs-add-status" id="subscriptionAddStatus" aria-live="polite"></div>
-                <div class="subs-list" id="subscriptionsList"></div>
+                <div class="subs-list" id="subscriptionsList" role="tabpanel" aria-live="polite"></div>
                 <div class="subs-empty" id="subscriptionsEmpty" style="display:none;">
                     <span data-i18n="feed_no_local_channels">No locally subscribed channels yet. Add a channel above or use Subscribe with re:Watch on YouTube.</span>
                 </div>
@@ -1773,8 +1807,35 @@
                         <div id="anCompletion"></div>
                     </section>
                     <section class="an-panel">
-                        <h3 class="an-panel-title" data-i18n="feed_top_channels">Top channels</h3>
+                        <div class="an-panel-heading">
+                            <div>
+                                <h3 class="an-panel-title" id="anTopChannelsTitle" data-i18n="feed_top_channels">Top channels</h3>
+                                <p class="an-panel-metric" id="anTopChannelsMetric" aria-live="polite"></p>
+                            </div>
+                            <div class="an-sort-controls" role="group" aria-labelledby="anTopChannelsTitle">
+                                <button class="an-sort-button active" type="button" data-analytics-channel-sort="watchTime" aria-pressed="true" data-i18n="analytics_total_watch_time">Watch time</button>
+                                <button class="an-sort-button" type="button" data-analytics-channel-sort="videos" aria-pressed="false" data-i18n="analytics_videos_watched">Videos watched</button>
+                            </div>
+                        </div>
                         <div id="anTopChannels"></div>
+                    </section>
+                    <section class="an-panel">
+                        <div class="an-panel-heading">
+                            <div>
+                                <h3 class="an-panel-title" data-i18n="analytics_top_skipped_channels">Top Skipped Channels</h3>
+                                <p class="an-panel-metric" data-i18n="feed_analytics_skipped_metric">Long videos watched under 10% · ranked by skipped videos</p>
+                            </div>
+                        </div>
+                        <div id="anSkippedChannels"></div>
+                    </section>
+                    <section class="an-panel">
+                        <div class="an-panel-heading">
+                            <div>
+                                <h3 class="an-panel-title" data-i18n="analytics_unfinished_videos">Longest Unfinished Videos</h3>
+                                <p class="an-panel-metric" data-i18n="feed_analytics_unfinished_metric">Long videos under 90% watched · ranked by time left</p>
+                            </div>
+                        </div>
+                        <div class="an-continue-list" id="anLongestUnfinished"></div>
                     </section>
                     <section class="an-panel an-panel-wide">
                         <h3 class="an-panel-title" data-i18n="feed_continue_watching">Continue watching</h3>
@@ -1934,6 +1995,7 @@
     <script src="feed-channel-classification.js"></script>
     <script src="feed-scheduler.js"></script>
     <script src="feed-view-data.js"></script>
+    <script src="feed-analytics-data.js"></script>
     <script src="feed-subscription-import.js"></script>
     <script src="feed-view-preference.js"></script>
     <script src="feed-state-utils.js"></script>

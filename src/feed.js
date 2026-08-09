@@ -69,11 +69,9 @@ async function runPageActiveFeedWork() {
             const result = await scheduler.runInitialization();
             const after = await scheduler.getInitializationProgress();
             activeInitializationProgress = null;
-            // Keep the local projection current, but do not rerender an already
-            // visible Home page: new inventory waits for Show/opening Home.
-            await loadData();
-            pendingFeedVideoCount += result.insertedVideoCount;
-            if (result.insertedVideoCount) showNewFeedVideos(pendingFeedVideoCount);
+            if (result.insertedVideoIds && result.insertedVideoIds.length) {
+                await showNewFeedVideos(result.insertedVideoIds);
+            }
             if (settingsActive && typeof setFeedSettingsMessage === 'function') {
                 setFeedSettingsInitializationProgress(after);
             }
@@ -93,9 +91,9 @@ async function runPageActiveFeedWork() {
 
         setPageActiveSyncStatus(tFeed('feed_checking_uploads', 'Checking for new uploads'), true);
         const result = await scheduler.runForeground();
-        await loadData();
-        pendingFeedVideoCount += result.insertedVideoCount;
-        if (result.insertedVideoCount) showNewFeedVideos(pendingFeedVideoCount);
+        if (result.insertedVideoIds && result.insertedVideoIds.length) {
+            await showNewFeedVideos(result.insertedVideoIds);
+        }
         let dormant = null;
         if (result.total === 0) {
             setPageActiveSyncStatus(tFeed('feed_checking_low_activity', 'Checking a low-activity channel'), true);
@@ -103,9 +101,7 @@ async function runPageActiveFeedWork() {
         }
         const dormantInserted = Number(dormant && dormant.terminal && dormant.terminal.insertedVideoCount || 0);
         if (dormantInserted) {
-            await loadData();
-            pendingFeedVideoCount += dormantInserted;
-            showNewFeedVideos(pendingFeedVideoCount);
+            await showNewFeedVideos(dormant.terminal.insertedVideoIds || []);
         }
         setPageActiveSyncStatus(
             result.insertedVideoCount || dormantInserted
@@ -123,10 +119,7 @@ async function runPageActiveFeedWork() {
 }
 
 function requestPageActiveFeedWork() {
-    if (pageFeedWorkPromise) {
-        return pageFeedWorkPromise.then(() => runPageActiveFeedWork());
-    }
-    return runPageActiveFeedWork();
+    return pageFeedWorkPromise || runPageActiveFeedWork();
 }
 
 function onStorageChanged(changes, area) {
@@ -220,7 +213,8 @@ function openFeedView(view) {
     if (view === 'settings') showSettings();
     else if (view === 'history') showHistory();
     else if (view === 'playlists') showPlaylists();
-    else if (view === 'channels') showSubscriptions();
+    else if (view === 'channels/ignored') showSubscriptions('ignored');
+    else if (view === 'channels') showSubscriptions('following');
     else if (view === 'analytics') showAnalytics();
     else if (view === 'shorts') {
         shortsOnly = true;
@@ -443,7 +437,8 @@ function init() {
         localStorage.setItem('ytvhtHideMembers', hideMembers.checked ? 'true' : 'false');
         render();
     });
-    document.getElementById('refresh').addEventListener('click', refresh);
+    document.getElementById('refresh').addEventListener('click', checkForNewVideos);
+    document.getElementById('reloadView').addEventListener('click', reloadView);
     document.getElementById('manage').addEventListener('click', showSubscriptions);
 
     const clearSubscriptions = document.getElementById('clearSubscriptions');
@@ -480,9 +475,11 @@ function init() {
 
     window.addEventListener('unload', clearPageFeedWorkTimer, { once: true });
 
-    loadData().then(async () => {
+    Promise.all([loadData(), restorePendingFeedDiscovery()]).then(async () => {
         const hashView = (location.hash || '').replace(/^#/, '').trim();
-        const startupView = hashView === 'settings' ? 'settings' : await getStartupFeedView();
+        const startupView = ['settings', 'channels', 'channels/ignored'].includes(hashView)
+            ? hashView
+            : await getStartupFeedView();
         openFeedView(startupView);
         maybeAutoRefresh();
     }).catch((error) => {
@@ -493,8 +490,8 @@ function init() {
     });
 }
 
-// Refresh on open when the cache is empty or stale, so the page works
-// without anyone clicking Refresh (and without a YouTube tab).
+// Start bounded canonical feed work while the page is active, without
+// changing the currently rendered feed snapshot.
 async function maybeAutoRefresh() {
     startCanonicalFeedWork().catch((error) => {
         console.warn('[feed] canonical scheduler startup failed', error && error.message);

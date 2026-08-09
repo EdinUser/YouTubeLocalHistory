@@ -157,6 +157,10 @@
     // Keep the outgoing Short's identity and progress when YouTube changes the
     // SPA route before the previous media element emits its final save event.
     let latestShortsSnapshot = null;
+    // YouTube can briefly expose the new Short with the previous reel's channel
+    // metadata. Preserve snapshot order so an older in-flight write cannot
+    // finish after, and overwrite, a newer corrected snapshot for the same ID.
+    const shortsSaveQueues = new Map();
 
     // Used to decide whether a timestamp restore belongs to a fresh navigation.
     let lastSpaNavigationTime = 0;
@@ -743,13 +747,29 @@
 
     // Save Shorts timestamp. A captured snapshot can be supplied during SPA
     // navigation, after the URL already points at the next Short.
-    async function saveShortsTimestamp(snapshot = null) {
+    function saveShortsTimestamp(snapshot = null) {
         const currentSnapshot = snapshot || captureShortsSnapshot();
         const videoId = currentSnapshot?.videoId;
         if (!videoId) {
             log('No video ID found for Shorts.');
-            return;
+            return Promise.resolve();
         }
+
+        const queuedSnapshot = { ...currentSnapshot };
+        const previousSave = shortsSaveQueues.get(videoId) || Promise.resolve();
+        const currentSave = previousSave
+            .catch(() => {})
+            .then(() => persistShortsTimestamp(queuedSnapshot));
+        shortsSaveQueues.set(videoId, currentSave);
+        return currentSave.finally(() => {
+            if (shortsSaveQueues.get(videoId) === currentSave) {
+                shortsSaveQueues.delete(videoId);
+            }
+        });
+    }
+
+    async function persistShortsTimestamp(currentSnapshot) {
+        const videoId = currentSnapshot.videoId;
 
         // Playlist-aware pause/ignore logic for Shorts
         try {
@@ -925,6 +945,28 @@
         // The video ID this closure last set up restoration for; used to detect when a
         // reused <video> element switches to a different video (SPA navigation).
         let trackedClosureVideoId = getVideoId();
+        const reconcileTrackedShortsVideoId = () => {
+            if (!window.location.pathname.startsWith('/shorts/')) return false;
+
+            const routeVideoId = getVideoId();
+            const reel = video.closest?.('ytd-reel-video-renderer') || null;
+            const reelVideoId = [...(reel?.querySelectorAll('a[href*="/shorts/"]') || [])]
+                .map(link => (link.getAttribute('href') || '').match(/\/shorts\/([\w-]+)/)?.[1] || '')
+                .find(Boolean) || '';
+            if (!routeVideoId || reelVideoId !== routeVideoId || video !== getPrimaryVideo()) return false;
+            if (routeVideoId === trackedClosureVideoId) return false;
+
+            const previousVideoId = trackedClosureVideoId;
+            trackedClosureVideoId = routeVideoId;
+            userInteracted = false;
+            timestampLoaded = false;
+            lastSaveTime = 0;
+            log('[Shorts] Reconciled reused video tracker identity.', {
+                previousVideoId,
+                videoId: routeVideoId
+            });
+            return true;
+        };
         if (pendingRestoreAfterMediaChange && pendingRestoreAfterMediaChange.videoId !== trackedClosureVideoId) {
             pendingRestoreAfterMediaChange = null;
         }
@@ -1016,6 +1058,7 @@
 
         const trackingStartedAt = Date.now();
         const guardedSaveTimestamp = async (candidateTime = null) => {
+            reconcileTrackedShortsVideoId();
             // A seek into a short pre-roll can be clamped. Do not overwrite the
             // saved position or issue another seek until YouTube loads the next
             // media item and its metadata is available.
@@ -1406,6 +1449,7 @@
             }
         });
         addTrackedEventListener(video, 'pause', () => {
+            reconcileTrackedShortsVideoId();
             captureShortsSnapshot(video, trackedClosureVideoId);
             if (saveIntervalId) {
                 clearInterval(saveIntervalId);
@@ -1414,6 +1458,7 @@
             debouncedSave();
         });
         addTrackedEventListener(video, 'timeupdate', () => {
+            reconcileTrackedShortsVideoId();
             captureShortsSnapshot(video, trackedClosureVideoId);
             const currentTime = Math.floor(video.currentTime);
             const interval = window.location.pathname.startsWith('/shorts/') ? 5 : 15;
@@ -1447,6 +1492,7 @@
             }
         });
         addTrackedEventListener(video, 'seeked', () => {
+            reconcileTrackedShortsVideoId();
             captureShortsSnapshot(video, trackedClosureVideoId);
             traceRestore('video-seeked', {
                 currentTime: video.currentTime || 0,
@@ -1492,7 +1538,9 @@
 
             // New video loaded into a reused <video> element: clear the manual-seek
             // guard so the next video can restore its own saved position.
-            if (currentVideoId && currentVideoId !== trackedClosureVideoId) {
+            if (window.location.pathname.startsWith('/shorts/')) {
+                reconcileTrackedShortsVideoId();
+            } else if (currentVideoId && currentVideoId !== trackedClosureVideoId) {
                 trackedClosureVideoId = currentVideoId;
                 userInteracted = false;
                 timestampLoaded = false;
@@ -2056,6 +2104,8 @@
             [...trackedVideos].forEach(video => cleanupVideoListeners(video));
             pendingRestoreAfterMediaChange = null;
             latestShortsSnapshot = null;
+            lastProcessedVideoId = null;
+            lastUrl = window.location.href;
         };
         window.__YTVHT_TEST__.navigation = {
             handleSpaNavigation,

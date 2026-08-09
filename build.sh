@@ -65,6 +65,7 @@ copy_common_files() {
        "$PROJECT_ROOT/src/feed-channel-classification.js" \
        "$PROJECT_ROOT/src/feed-scheduler.js" \
        "$PROJECT_ROOT/src/feed-view-data.js" \
+       "$PROJECT_ROOT/src/feed-analytics-data.js" \
        "$PROJECT_ROOT/src/feed-subscription-import.js" \
        "$PROJECT_ROOT/src/feed-view-preference.js" \
        "$PROJECT_ROOT/src/feed-state-utils.js" \

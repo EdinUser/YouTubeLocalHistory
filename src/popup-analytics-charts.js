@@ -5,7 +5,8 @@ function renderUnfinishedVideos() {
 
     // Filter for long, unfinished videos
     const unfinished = allHistoryRecords.filter(record => {
-        return record.duration >= 600 && (record.time / record.duration) < 0.9;
+        return record.duration >= ytvhtFeedContracts.LONG_VIDEO_MIN_DURATION_SECONDS &&
+            (record.time / record.duration) < ytvhtFeedContracts.WATCH_COMPLETION_RATIO;
     });
 
     // Sort by absolute time left, descending
@@ -289,4 +290,3 @@ function updateWatchTimeByHourChart() {
     ctx.textAlign = 'center';
     ctx.fillText(chrome.i18n.getMessage('chart_hour_of_day'), canvas.width / 2, canvas.height - 5);
 }
-

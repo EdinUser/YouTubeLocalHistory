@@ -7,6 +7,7 @@ const {
   removeStoredVideo,
   setExtensionSettings,
 } = require('./firefox-fixture');
+const { isConsentActionLabel } = require('../e2e/youtube-consent-labels');
 
 const VIDEO_ID = 'dQw4w9WgXcQ';
 const WATCH_URL = `https://www.youtube.com/watch?v=${VIDEO_ID}`;
@@ -62,32 +63,14 @@ async function withFrame(driver, frame, fn) {
 }
 
 async function clickConsentCandidate(driver) {
-  const patterns = [
-    /accept all/i,
-    /i agree/i,
-    /^agree$/i,
-    /got it/i,
-    /^ok$/i,
-    /consent/i,
-    /reject all/i,
-    /alle akzeptieren/i,
-    /alle ablehnen/i,
-    /acceptez tout/i,
-    /refuser tout/i,
-    /aceptar todo/i,
-    /rechazar todo/i,
-    /prihvati sve/i,
-    /odbi sve/i,
-    /acceptă tot/i,
-    /respinge tot/i,
-    /приемам всички/i,
-    /отхвърляне на всички/i,
-  ];
-
   const elements = await driver.findElements(By.css('button, a, input[type="submit"], [role="button"], tp-yt-paper-button, ytd-button-renderer'));
   for (const element of elements) {
-    const text = `${await element.getText().catch(() => '')} ${await element.getAttribute('aria-label').catch(() => '')} ${await element.getAttribute('value').catch(() => '')}`.trim();
-    if (!text || !patterns.some((pattern) => pattern.test(text))) {
+    const labels = [
+      await element.getText().catch(() => ''),
+      await element.getAttribute('aria-label').catch(() => ''),
+      await element.getAttribute('value').catch(() => ''),
+    ];
+    if (!labels.some(isConsentActionLabel)) {
       continue;
     }
 

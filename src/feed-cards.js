@@ -1,6 +1,8 @@
 // ----- card builder ------------------------------------------------------
 // At/above this fraction watched, a video counts as fully watched.
-const COMPLETED_RATIO = 0.9;
+const COMPLETED_RATIO = typeof ytvhtFeedContracts === 'undefined'
+    ? 0.9
+    : ytvhtFeedContracts.WATCH_COMPLETION_RATIO;
 
 // Add the watched overlay to a thumbnail wrapper: a progress bar (how far you
 // got) plus a label that only says "viewed" when you actually finished — for a
@@ -76,13 +78,15 @@ function findSubscriptionForVideo(video) {
     const ids = [video && video.channelId, video && video.ucid, video && video.handle]
         .filter(Boolean)
         .map((id) => String(id).toLowerCase());
-    return (localSubscriptions || []).find((subscription) => {
-        if (key && channelKey(subscription.channelName) === key) return true;
+    const idMatch = (localSubscriptions || []).find((subscription) => {
         const subIds = [subscription.id, subscription.ucid, subscription.handle, subscription.channelId]
             .filter(Boolean)
             .map((id) => String(id).toLowerCase());
         return ids.some((id) => subIds.includes(id));
-    }) || null;
+    });
+    if (idMatch || ids.length) return idMatch || null;
+    return (localSubscriptions || []).find((subscription) =>
+        key && channelKey(subscription.channelName) === key) || null;
 }
 
 async function saveVideoToLocalPlaylist(playlists, id, title, video) {
@@ -331,21 +335,47 @@ function buildVideoMenu(video, options) {
         }]
         );
     }
-    if (options.showUnsubscribe) {
+    const canonicalChannelInfo = (() => {
+        const subscription = findSubscriptionForVideo(video);
+        const fromVideo = String(video.channelId || video.ucid || '');
+        const fromUrl = (String(video.channelUrl || '').match(/\/channel\/(UC[\w-]+)/) || [])[1] || '';
+        const channelId = [fromVideo, fromUrl, subscription?.channelId, subscription?.ucid]
+            .find((value) => /^UC[\w-]+$/.test(String(value || '')));
+        if (!channelId) return null;
+        return {
+            channelId,
+            channelTitle: decodeHtmlEntities(video.channelName || subscription?.channelName || ''),
+            thumbnail: video.channelThumbnail || subscription?.thumbnail || '',
+            handle: subscription?.handle || ''
+        };
+    })();
+    if (canonicalChannelInfo) {
+        const existingSubscription = findSubscriptionForVideo(video);
         actions.push(
-        [tFeed('feed_unsubscribe', 'Unsubscribe'), '<circle cx="9" cy="8" r="3"></circle><path d="M3.5 18c.5-3.5 2.4-5 5.5-5 1.2 0 2.2.2 3 .7"></path><path d="M15 11h6"></path>', async () => {
-            const subscription = findSubscriptionForVideo(video);
-            if (!subscription) return tFeed('feed_not_subscribed', 'Not subscribed');
-            await ytIndexedDBStorage.deleteSubscriptionRecord(subscription.channelId);
-            await ytIndexedDBStorage.deleteChannelSyncState(subscription.channelId);
-            localSubscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
-            allVideos = allVideos.filter((item) =>
-                channelKey(item.channelName) !== channelKey(subscription.channelName)
-            );
-            const channelName = decodeHtmlEntities(subscription.channelName || video.channelName || tFeed('feed_channel', 'channel'));
-            setStatus(tFeed('feed_unsubscribed_from_status', `Unsubscribed from ${channelName}.`, [channelName]), false);
+        [existingSubscription
+            ? tFeed('feed_unsubscribe', 'Unsubscribe from channel')
+            : tFeed('feed_subscribe_with_rewatch', 'Subscribe to channel'),
+        '<circle cx="9" cy="8" r="3"></circle><path d="M3.5 18c.5-3.5 2.4-5 5.5-5 1.2 0 2.2.2 3 .7"></path><path d="M15 11h6"></path>', async () => {
+            const active = await ytIndexedDBStorage.getSubscriptionRecord(canonicalChannelInfo.channelId);
+            let message;
+            if (active) {
+                await ytvhtLocalSubscriptionActions.unfollow(ytIndexedDBStorage, canonicalChannelInfo.channelId, {
+                    ...canonicalChannelInfo,
+                    source: 'video_menu'
+                });
+                message = tFeed('feed_unsubscribed_from_status', 'Unsubscribed from $1 locally in re:Watch.', [canonicalChannelInfo.channelTitle]);
+            } else {
+                await ytvhtLocalSubscriptionActions.follow(ytIndexedDBStorage, canonicalChannelInfo);
+                message = tFeed('feed_subscribed_to_preparing', 'Subscribed to $1 with re:Watch — preparing local feed.', [canonicalChannelInfo.channelTitle]);
+            }
+            const data = await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage);
+            localSubscriptions = data.subscriptions;
+            allVideos = data.videos;
+            setStatus(message, false);
             if (!playlistsActive) render();
-            return tFeed('feed_unsubscribed', 'Unsubscribed');
+            return active
+                ? tFeed('feed_unsubscribed', 'Unsubscribed locally')
+                : tFeed('feed_subscribe_with_rewatch', 'Subscribed locally');
         }]
         );
     }

@@ -11,6 +11,11 @@ function flush() {
 test('Channels renders local sync state and admits the next metadata batch only when its sentinel becomes visible', async () => {
   document.body.innerHTML = `
     <div id="subscriptionsList"></div><div id="subscriptionsEmpty"></div><div id="subscriptionsCount"></div>
+    <div id="subscriptionTabs" hidden>
+      <button id="channelsFollowingTab"></button><button id="channelsIgnoredTab" hidden></button>
+    </div>
+    <form id="subscriptionAddForm"><input><button type="submit"></button></form>
+    <div id="subscriptionAddStatus"></div>
     <button id="clearSubscriptions"></button><section id="subscriptionsSection"></section>
   `;
   const subscriptions = Array.from({ length: 20 }, (_, index) => ({
@@ -35,13 +40,36 @@ test('Channels renders local sync state and admits the next metadata batch only 
       items.forEach((item) => options.processedIds.add(item.channelId));
     }),
   };
+  let tombstones = [];
+  const actions = {
+    follow: jest.fn(async () => {
+      tombstones = [];
+      return { status: 'followed', restored: true };
+    }),
+    unfollow: jest.fn(async () => ({ status: 'unfollowed' })),
+  };
+  const scheduler = { initializeSubscriptions: jest.fn(async () => {}) };
+  const tombstone = {
+    channelId: 'UCignored',
+    channelTitle: 'Ignored fixture',
+    unsubscribedAt: 100,
+    source: 'channels',
+    reason: 'user_unfollow',
+  };
+  tombstones = [tombstone];
   const context = {
     document, AbortController, IntersectionObserver: FakeIntersectionObserver,
     subscriptionsActive: true, analyticsActive: false, playlistsActive: false,
     historyActive: false, settingsActive: false, channelActive: false,
     ytvhtFeedChannelMetadata: metadata,
     ytvhtFeedViewData: { loadCanonicalFeedViewData: jest.fn(async () => ({ subscriptions })) },
-    ytIndexedDBStorage: { getChannelSyncState: jest.fn(async () => null), putSubscriptionRecord: jest.fn(async () => {}) },
+    ytvhtLocalSubscriptionActions: actions,
+    ytIndexedDBStorage: {
+      getChannelSyncState: jest.fn(async () => null),
+      putSubscriptionRecord: jest.fn(async () => {}),
+      listLocalUnsubscribeTombstones: jest.fn(async () => tombstones),
+    },
+    ensureSharedFeedScheduler: jest.fn(() => scheduler),
     decodeHtmlEntities: (value) => value, relativeTime: () => '1 minute ago',
     tFeed: (_key, fallback, substitutions = []) => substitutions.reduce(
       (message, value, index) => message.replace(`$${index + 1}`, value),
@@ -63,6 +91,10 @@ test('Channels renders local sync state and admits the next metadata batch only 
   await flush();
 
   expect(document.querySelector('#subscriptionsList').textContent).toContain('Last upload 1 minute ago · regular · Next check in 1m');
+  expect(document.querySelector('#subscriptionsList').textContent).not.toContain('Ignored fixture');
+  expect(document.querySelector('#subscriptionTabs').hidden).toBe(false);
+  expect(document.querySelector('#channelsFollowingTab').textContent).toBe('Following (20)');
+  expect(document.querySelector('#channelsIgnoredTab').textContent).toBe('Ignored (1)');
   expect(batches).toEqual([subscriptions.slice(0, 15).map((item) => item.channelId)]);
   expect(observers).toHaveLength(1);
   expect(observers[0].target.dataset.channelId).toBe('UC14');
@@ -74,4 +106,29 @@ test('Channels renders local sync state and admits the next metadata batch only 
     subscriptions.slice(0, 15).map((item) => item.channelId),
     subscriptions.slice(15).map((item) => item.channelId),
   ]);
+
+  document.querySelector('#channelsIgnoredTab').click();
+  await flush();
+  expect(document.querySelector('#subscriptionsList').textContent).toContain('Ignored fixture');
+  expect(document.querySelector('#subscriptionsList').textContent).not.toContain('Fixture 0');
+  expect(document.querySelector('#subscriptionAddForm').style.display).toBe('none');
+  expect(document.querySelector('#channelsIgnoredTab').getAttribute('aria-selected')).toBe('true');
+
+  [...document.querySelectorAll('#subscriptionsList button')]
+    .find((button) => button.textContent === 'Follow again with re:Watch')
+    .click();
+  await flush();
+  await flush();
+  expect(actions.follow).toHaveBeenCalledWith(context.ytIndexedDBStorage, expect.objectContaining({
+    channelId: tombstone.channelId,
+    channelTitle: tombstone.channelTitle,
+  }));
+  expect(scheduler.initializeSubscriptions).toHaveBeenCalledWith([tombstone.channelId]);
+  expect(document.querySelector('#subscriptionTabs').hidden).toBe(true);
+  expect(document.querySelector('#subscriptionsList').textContent).toContain('Fixture 0');
+
+  context.ytvhtFeedViewData.loadCanonicalFeedViewData.mockRejectedValueOnce(new Error('database unavailable'));
+  await context.renderSubscriptions();
+  expect(document.querySelector('#subscriptionTabs').hidden).toBe(true);
+  expect(document.querySelector('#subscriptionsList').textContent).toBe('Could not load channels. Try again.');
 });

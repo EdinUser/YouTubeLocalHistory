@@ -6,6 +6,8 @@ let playlistDetailRenderToken = 0;
 let historyActive = false;
 let settingsActive = false;
 let historyVisibleLimit = 30;
+let analyticsChannelSort = 'watchTime';
+let analyticsHistorySnapshot = [];
 
 function formatWatchTotal(totalSec) {
     const s = Math.floor(totalSec || 0);
@@ -67,8 +69,8 @@ function renderCompletionBreakdown(videos) {
     ];
     withDuration.forEach((video) => {
         const ratio = Math.max(0, Number(video.time || 0) / Number(video.duration || 1));
-        if (ratio >= 0.9) groups[0].count++;
-        else if (ratio >= 0.1) groups[1].count++;
+        if (ratio >= ytvhtFeedContracts.WATCH_COMPLETION_RATIO) groups[0].count++;
+        else if (ratio >= ytvhtFeedContracts.WATCH_SKIP_RATIO) groups[1].count++;
         else groups[2].count++;
     });
     const max = Math.max(1, ...groups.map((group) => group.count));
@@ -100,20 +102,18 @@ function renderTopChannels(videos) {
     const wrap = document.getElementById('anTopChannels');
     if (!wrap) return;
     wrap.textContent = '';
-
-    const channels = new Map();
-    videos.forEach((video) => {
-        const channel = decodeHtmlEntities(video.channelName || '').trim();
-        const watched = Math.max(0, Number(video.time || 0));
-        if (!channel || watched <= 0) return;
-        const current = channels.get(channel) || { seconds: 0, videos: 0 };
-        current.seconds += watched;
-        current.videos++;
-        channels.set(channel, current);
+    const top = ytvhtFeedAnalyticsData.topChannels(videos, analyticsChannelSort, 6);
+    const metric = document.getElementById('anTopChannelsMetric');
+    if (metric) {
+        metric.textContent = analyticsChannelSort === 'videos'
+            ? tFeed('feed_analytics_ranked_by_videos', 'Ranked by watched video records')
+            : tFeed('feed_analytics_ranked_by_watch_time', 'Ranked by local watch time');
+    }
+    document.querySelectorAll('[data-analytics-channel-sort]').forEach((button) => {
+        const selected = button.dataset.analyticsChannelSort === analyticsChannelSort;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
-    const top = [...channels.entries()]
-        .sort((a, b) => b[1].seconds - a[1].seconds)
-        .slice(0, 6);
     if (!top.length) {
         const empty = document.createElement('div');
         empty.className = 'an-empty';
@@ -121,18 +121,154 @@ function renderTopChannels(videos) {
         wrap.appendChild(empty);
         return;
     }
-    top.forEach(([channel, data]) => {
+    top.forEach((data) => {
         const row = document.createElement('div');
         row.className = 'an-channel-row';
-        const name = document.createElement('div');
+        const channelUrl = ytvhtFeedAnalyticsData.channelUrl(data.channelId);
+        const name = document.createElement(channelUrl ? 'a' : 'div');
         name.className = 'an-channel-name';
-        name.textContent = channel;
+        name.textContent = decodeHtmlEntities(data.channelName);
+        if (channelUrl) {
+            name.href = channelUrl;
+            name.target = '_blank';
+            name.rel = 'noopener';
+        }
         const stat = document.createElement('div');
         stat.className = 'an-channel-stat';
-        stat.textContent = `${formatWatchTotal(data.seconds)} · ${feedPlural('feed_videos', data.videos, '$1 video', '$1 videos')}`;
+        stat.textContent = tFeed('analytics_channel_videos', '$1 videos, $2', [
+            feedFormatNumber(data.videos),
+            formatWatchTotal(data.watchSeconds)
+        ]);
         row.appendChild(name);
         row.appendChild(stat);
         wrap.appendChild(row);
+    });
+}
+
+function setupAnalyticsChannelSort() {
+    document.querySelectorAll('[data-analytics-channel-sort]').forEach((button) => {
+        if (button.dataset.bound) return;
+        button.dataset.bound = 'true';
+        button.addEventListener('click', () => {
+            analyticsChannelSort = button.dataset.analyticsChannelSort === 'videos' ? 'videos' : 'watchTime';
+            renderTopChannels(analyticsHistorySnapshot);
+        });
+    });
+}
+
+function renderSkippedChannels(videos) {
+    const wrap = document.getElementById('anSkippedChannels');
+    if (!wrap) return;
+    wrap.textContent = '';
+    const skipped = ytvhtFeedAnalyticsData.topSkippedChannels(videos, {
+        minimumDuration: ytvhtFeedContracts.LONG_VIDEO_MIN_DURATION_SECONDS,
+        skipRatio: ytvhtFeedContracts.WATCH_SKIP_RATIO,
+        limit: 5
+    });
+    if (!skipped.length) {
+        const empty = document.createElement('div');
+        empty.className = 'an-empty';
+        empty.textContent = tFeed('analytics_no_skipped_channel_data', 'No skipped channels found.');
+        wrap.appendChild(empty);
+        return;
+    }
+    skipped.forEach((data) => {
+        const row = document.createElement('div');
+        row.className = 'an-channel-row';
+        const channelUrl = ytvhtFeedAnalyticsData.channelUrl(data.channelId);
+        const name = document.createElement(channelUrl ? 'a' : 'div');
+        name.className = 'an-channel-name';
+        name.textContent = decodeHtmlEntities(data.channelName);
+        if (channelUrl) {
+            name.href = channelUrl;
+            name.target = '_blank';
+            name.rel = 'noopener';
+        }
+        const stat = document.createElement('div');
+        stat.className = 'an-channel-stat';
+        stat.textContent = tFeed('analytics_skipped_count', '$1 skipped', [feedFormatNumber(data.videos)]);
+        row.appendChild(name);
+        row.appendChild(stat);
+        wrap.appendChild(row);
+    });
+}
+
+function analyticsVideoUrl(video) {
+    const fallback = `https://www.youtube.com/watch?v=${encodeURIComponent(video.videoId || '')}`;
+    try {
+        const url = new URL(video.url || fallback);
+        const watched = Math.floor(Math.max(0, Number(video.watchedSeconds || video.time || 0)));
+        if (watched > 0) url.searchParams.set('t', String(watched));
+        return url.toString();
+    } catch (_) {
+        return fallback;
+    }
+}
+
+function renderLongestUnfinished(videos) {
+    const wrap = document.getElementById('anLongestUnfinished');
+    if (!wrap) return;
+    wrap.textContent = '';
+    const unfinished = ytvhtFeedAnalyticsData.longestUnfinishedVideos(videos, {
+        minimumDuration: ytvhtFeedContracts.LONG_VIDEO_MIN_DURATION_SECONDS,
+        completionRatio: ytvhtFeedContracts.WATCH_COMPLETION_RATIO,
+        limit: 5
+    });
+    if (!unfinished.length) {
+        const empty = document.createElement('div');
+        empty.className = 'an-empty';
+        empty.textContent = tFeed('analytics_no_unfinished_long_videos', 'No unfinished long videos found.');
+        wrap.appendChild(empty);
+        return;
+    }
+    unfinished.forEach((video) => {
+        const percent = Math.max(0, Math.min(89, Math.round(
+            (video.watchedSeconds / video.durationSeconds) * 100
+        )));
+        const link = document.createElement('a');
+        link.className = 'an-continue';
+        link.href = analyticsVideoUrl(video);
+        link.target = '_blank';
+        link.rel = 'noopener';
+
+        const thumb = document.createElement('div');
+        thumb.className = 'an-continue-thumb';
+        const image = document.createElement('img');
+        image.loading = 'lazy';
+        image.alt = '';
+        image.src = video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`;
+        thumb.appendChild(image);
+        const durationLabel = document.createElement('span');
+        durationLabel.className = 'an-continue-duration';
+        durationLabel.textContent = formatDuration(video.durationSeconds);
+        thumb.appendChild(durationLabel);
+
+        const info = document.createElement('div');
+        info.className = 'an-continue-info';
+        const title = document.createElement('div');
+        title.className = 'an-continue-title';
+        title.textContent = decodeHtmlEntities(feedVideoTitle(video.title));
+        const channel = document.createElement('div');
+        channel.className = 'an-continue-channel';
+        channel.textContent = decodeHtmlEntities(feedChannelTitle(video.channelName));
+        const meta = document.createElement('div');
+        meta.className = 'an-continue-meta';
+        const remaining = document.createElement('span');
+        remaining.textContent = tFeed('feed_analytics_time_left', '$1 left', [
+            formatWatchTotal(video.remainingSeconds)
+        ]);
+        const watched = document.createElement('span');
+        watched.textContent = tFeed('feed_percent_watched', '$1 watched', [
+            feedFormatNumber(percent / 100, { style: 'percent' })
+        ]);
+        meta.appendChild(remaining);
+        meta.appendChild(watched);
+        info.appendChild(title);
+        info.appendChild(channel);
+        info.appendChild(meta);
+        link.appendChild(thumb);
+        link.appendChild(info);
+        wrap.appendChild(link);
     });
 }
 
@@ -145,7 +281,8 @@ function renderContinueWatching(videos) {
         .filter((video) => {
             const time = Number(video.time || 0);
             const duration = Number(video.duration || 0);
-            return !video.isShorts && time >= 30 && duration >= 180 && time / duration < 0.9;
+            return !video.isShorts && time >= 30 && duration >= 180 &&
+                time / duration < ytvhtFeedContracts.WATCH_COMPLETION_RATIO;
         })
         .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
         .slice(0, 6);
@@ -222,6 +359,7 @@ async function renderAnalytics() {
 
     stats = stats || {};
     const history = Object.values(videoMap || {}).filter(Boolean);
+    analyticsHistorySnapshot = history;
     const counters = stats.counters || {};
     const videos = Number(counters.videos || 0);
     const shorts = Number(counters.shorts || 0);
@@ -283,7 +421,10 @@ async function renderAnalytics() {
         tip: `${h}:00 — ${formatWatchTotal(Number(v || 0))}`
     })));
     renderCompletionBreakdown(history);
+    setupAnalyticsChannelSort();
     renderTopChannels(history);
+    renderSkippedChannels(history);
+    renderLongestUnfinished(history);
     renderContinueWatching(history);
 }
 

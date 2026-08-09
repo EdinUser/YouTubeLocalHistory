@@ -173,8 +173,10 @@
             const total = selected.length;
             let completed = 0;
             let insertedVideoCount = 0;
+            const insertedVideoIds = [];
+            const insertedVideoIdSet = new Set();
             const outcomes = { updated: 0, unchanged: 0, failed: 0, timed_out: 0 };
-            this.publish({ runId, completed, total, insertedVideoCount, active: total > 0 });
+            this.publish({ runId, completed, total, insertedVideoCount, insertedVideoIds, active: total > 0 });
 
             let cursor = 0;
             const worker = async () => {
@@ -188,16 +190,21 @@
                     const terminal = await this.scanChannel(state.channelId, runId, { kind: options.kind });
                     if (terminal) {
                         insertedVideoCount += terminal.insertedVideoCount;
+                        (terminal.insertedVideoIds || []).forEach((videoId) => {
+                            if (insertedVideoIdSet.has(videoId)) return;
+                            insertedVideoIdSet.add(videoId);
+                            insertedVideoIds.push(videoId);
+                        });
                         outcomes[terminal.outcome] += 1;
                     }
                     completed += 1;
-                    this.publish({ runId, completed, total, insertedVideoCount, active: completed < total });
+                    this.publish({ runId, completed, total, insertedVideoCount, insertedVideoIds, active: completed < total });
                 }
             };
             const workerCount = Math.min(Math.max(1, Number(options.concurrency || this.concurrency)), selected.length);
             await Promise.all(Array.from({ length: workerCount }, worker));
             this.cancelledRunIds.delete(runId);
-            const result = { runId, completed, total, insertedVideoCount, active: false };
+            const result = { runId, completed, total, insertedVideoCount, insertedVideoIds, active: false };
             await this.recordRunDiagnostic({ ...result, kind: options.kind || 'foreground', startedAt, completedAt: nowFrom(this.clock), outcomes });
             await this.cleanupRetainedFeedData();
             return result;
@@ -278,6 +285,7 @@
                     total: 1,
                     completed: 1,
                     insertedVideoCount: terminal.insertedVideoCount,
+                    insertedVideoIds: terminal.insertedVideoIds,
                     outcomes: { updated: terminal.outcome === 'updated' ? 1 : 0, unchanged: terminal.outcome === 'unchanged' ? 1 : 0, failed: terminal.outcome === 'failed' ? 1 : 0, timed_out: terminal.outcome === 'timed_out' ? 1 : 0 }
                 });
                 await this.cleanupRetainedFeedData();

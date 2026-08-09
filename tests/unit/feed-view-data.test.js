@@ -26,3 +26,56 @@ test('records bounded persistent Home impressions separately from feed inventory
   expect(values.get('a')).toEqual(expect.objectContaining({ lastShownOnHomeAt: 10, homeImpressionCount: 3, consecutiveHomeAppearances: 2 }));
   expect(values.has('b')).toBe(false);
 });
+
+test('projects only active, non-tombstoned subscription feed records', async () => {
+  const storage = {
+    listSubscriptionFeedVideosByPublishedAt: jest.fn(async () => [
+      { videoId: 'active', channelId: 'UCactive', publishedAt: 30 },
+      { videoId: 'tombstoned', channelId: 'UCtombstoned', publishedAt: 20 },
+      { videoId: 'orphaned', channelId: 'UCorphaned', publishedAt: 10 },
+    ]),
+    listSubscriptionRecords: jest.fn(async () => [
+      { channelId: 'UCactive', source: 'manual' },
+      { channelId: 'UCtombstoned', source: 'manual' },
+    ]),
+    listLocalUnsubscribeTombstones: jest.fn(async () => [
+      { channelId: 'UCtombstoned', unsubscribedAt: 100 },
+    ]),
+  };
+
+  const data = await viewData.loadCanonicalFeedViewData(storage);
+
+  expect(data.videos.map((video) => video.videoId)).toEqual(['active']);
+  expect(data.subscriptions.map((subscription) => subscription.channelId)).toEqual(['UCactive']);
+});
+
+test('projects a repository page while preserving its raw keyset cursor', async () => {
+  const storage = {
+    listSubscriptionFeedVideosPageByPublishedAt: jest.fn(async () => ({
+      records: [
+        { videoId: 'active', channelId: 'UCactive', publishedAt: 30 },
+        { videoId: 'orphaned', channelId: 'UCorphaned', publishedAt: 20 },
+      ],
+      nextCursor: { publishedAt: 20, videoId: 'orphaned' },
+      exhausted: false,
+    })),
+    listSubscriptionRecords: jest.fn(async () => [
+      { channelId: 'UCactive', channelTitle: 'Active channel', source: 'manual' },
+    ]),
+    listLocalUnsubscribeTombstones: jest.fn(async () => []),
+  };
+
+  await expect(viewData.loadCanonicalSubscriptionFeedPage(storage, {
+    limit: 50,
+    cursor: { publishedAt: 40, videoId: 'prior' },
+  })).resolves.toEqual({
+    videos: [expect.objectContaining({ videoId: 'active', channelName: 'Active channel' })],
+    subscriptions: [expect.objectContaining({ channelId: 'UCactive' })],
+    nextCursor: { publishedAt: 20, videoId: 'orphaned' },
+    exhausted: false,
+  });
+  expect(storage.listSubscriptionFeedVideosPageByPublishedAt).toHaveBeenCalledWith({
+    limit: 50,
+    cursor: { publishedAt: 40, videoId: 'prior' },
+  });
+});

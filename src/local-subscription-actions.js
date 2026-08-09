@@ -30,14 +30,46 @@
     async function follow(storage, info, now = Date.now()) {
         const channelId = String(info && info.channelId || '');
         if (!CHANNEL_ID.test(channelId)) throw new TypeError('A canonical YouTube channel ID is required.');
+        if (!storage || typeof storage.getLocalUnsubscribeTombstone !== 'function' ||
+            typeof storage.deleteLocalUnsubscribeTombstone !== 'function') {
+            throw new TypeError('A local-unsubscribe repository is required.');
+        }
         const existing = await storage.getSubscriptionRecord(channelId);
-        if (existing) return { status: 'already-following', subscription: existing };
-        const subscription = { channelId, channelTitle: String(info.channelTitle || info.channelName || ''), thumbnail: String(info.thumbnail || ''), handle: String(info.handle || ''), source: 'manual', followedAt: now };
+        const tombstone = await storage.getLocalUnsubscribeTombstone(channelId);
+        if (existing && !tombstone) return { status: 'already-following', subscription: existing };
+        if (tombstone) await storage.deleteLocalUnsubscribeTombstone(channelId);
+        const subscription = {
+            ...existing,
+            channelId,
+            channelTitle: String(info.channelTitle || info.channelName || tombstone?.channelTitle || existing?.channelTitle || ''),
+            thumbnail: String(info.thumbnail || tombstone?.thumbnail || existing?.thumbnail || ''),
+            handle: String(info.handle || tombstone?.handle || existing?.handle || ''),
+            source: 'manual',
+            followedAt: now
+        };
         await storage.putSubscriptionRecord(subscription);
         await storage.putChannelSyncState({ channelId, initializationState: 'pending', nextEligibleCheckAt: now, scanLeaseUntil: null, scanRunId: null });
-        return { status: 'followed', subscription };
+        return { status: 'followed', subscription, restored: Boolean(tombstone) };
     }
-    async function unfollow(storage, channelId) { await storage.deleteSubscriptionAndSyncState(channelId); return { status: 'unfollowed' }; }
+    async function unfollow(storage, channelId, options = {}) {
+        const input = {
+            channelId,
+            unsubscribedAt: Number(options.unsubscribedAt || Date.now()),
+            source: options.source || 'local_action',
+            reason: options.reason || 'user_unfollow',
+            channelTitle: options.channelTitle || '',
+            thumbnail: options.thumbnail || '',
+            handle: options.handle || ''
+        };
+        let tombstone = input;
+        const contracts = root.ytvhtFeedContracts ||
+            (typeof require === 'function' ? require('./feed-contracts.js') : null);
+        if (contracts && typeof contracts.createLocalUnsubscribeTombstone === 'function') {
+            tombstone = contracts.createLocalUnsubscribeTombstone(input);
+        }
+        const result = await storage.deleteSubscriptionAndSyncState(channelId, tombstone);
+        return { status: 'unfollowed', tombstone, ...(result || {}) };
+    }
     const api = { normalizeInput, channelIdFromHtml, resolveInput, follow, unfollow };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     root.ytvhtLocalSubscriptionActions = api;

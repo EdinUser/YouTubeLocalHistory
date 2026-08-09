@@ -24,9 +24,16 @@ function mergeCanonicalBackupSubscription(existing, incoming) {
 }
 
 async function restoreCanonicalBackupSubscriptions(subscriptions) {
-    const result = { restored: 0, skipped: 0 };
+    const result = { restored: 0, skipped: 0, ignored: 0 };
     for (const incoming of (Array.isArray(subscriptions) ? subscriptions : [])) {
         const channelId = String(incoming && incoming.channelId || '').trim();
+        const tombstone = /^UC[\w-]+$/.test(channelId)
+            ? await ytIndexedDBStorage.getLocalUnsubscribeTombstone(channelId)
+            : null;
+        if (tombstone) {
+            result.ignored += 1;
+            continue;
+        }
         const existing = /^UC[\w-]+$/.test(channelId)
             ? await ytIndexedDBStorage.getSubscriptionRecord(channelId)
             : null;
@@ -41,6 +48,22 @@ async function restoreCanonicalBackupSubscriptions(subscriptions) {
     return result;
 }
 
+async function restoreLocalUnsubscribeTombstones(tombstones) {
+    const result = { restored: 0, skipped: 0 };
+    for (const incoming of (Array.isArray(tombstones) ? tombstones : [])) {
+        let tombstone;
+        try {
+            tombstone = ytvhtFeedContracts.createLocalUnsubscribeTombstone(incoming);
+        } catch (_) {
+            result.skipped += 1;
+            continue;
+        }
+        await ytIndexedDBStorage.softUnfollowSubscription(tombstone.channelId, tombstone);
+        result.restored += 1;
+    }
+    return result;
+}
+
 async function createFeedBackupData() {
     const [
         videos,
@@ -48,6 +71,7 @@ async function createFeedBackupData() {
         stats,
         legacySubscriptions,
         canonicalSubscriptions,
+        localUnsubscribeTombstones,
         watchLater,
         settings,
         localData
@@ -57,6 +81,7 @@ async function createFeedBackupData() {
         ytStorage.getStats(),
         ytStorage.getSubscriptionList(),
         ytIndexedDBStorage.listSubscriptionRecords(),
+        ytIndexedDBStorage.listLocalUnsubscribeTombstones(),
         ytStorage.getAllWatchLater(),
         ytStorage.getSettings(),
         chrome.storage.local.get([
@@ -73,7 +98,7 @@ async function createFeedBackupData() {
             exportDate: new Date().toISOString(),
             extensionVersion: chrome.runtime.getManifest().version,
             exportFormat: 'json',
-            dataVersion: '2.1',
+            dataVersion: '2.2',
             type: 'yt-rewatch-full-backup'
         },
         history: Object.values(videos || {}),
@@ -81,6 +106,7 @@ async function createFeedBackupData() {
         localPlaylists: localData.localVideoPlaylists || {},
         subscriptions: legacySubscriptions || [],
         canonicalSubscriptions: canonicalSubscriptions || [],
+        localUnsubscribeTombstones: localUnsubscribeTombstones || [],
         watchLater: Object.values(watchLater || {}),
         settings: settings || {},
         stats,
@@ -133,6 +159,7 @@ async function restoreFeedBackupData(data) {
     for (const subscription of (Array.isArray(data.subscriptions) ? data.subscriptions : [])) {
         if (subscription) await ytStorage.addSubscription(subscription);
     }
+    await restoreLocalUnsubscribeTombstones(data.localUnsubscribeTombstones);
     await restoreCanonicalBackupSubscriptions(data.canonicalSubscriptions);
     for (const item of (Array.isArray(data.watchLater) ? data.watchLater : [])) {
         if (item && item.videoId) await ytStorage.setWatchLater(item.videoId, item);
@@ -216,11 +243,20 @@ function notifySubsChanged() {
     } catch (_) { /* ignore */ }
 }
 
-function setFeedSettingsMessage(text) {
+function setFeedSettingsMessage(text, options = {}) {
     const message = document.getElementById('feedSettingsMessage');
     if (message) {
         delete message.dataset.initializing;
         message.textContent = text || '';
+        if (options.reviewIgnored) {
+            const review = document.createElement('button');
+            review.type = 'button';
+            review.className = 'btn';
+            review.textContent = tFeed('feed_review_ignored_channels', 'Review ignored channels');
+            review.style.marginLeft = '8px';
+            review.addEventListener('click', () => showSubscriptions('ignored'));
+            message.appendChild(review);
+        }
     }
 }
 
@@ -382,6 +418,14 @@ async function importYouTubeChannelsFile(file) {
     return outcome;
 }
 
+function importIgnoredChannelsMessage(outcome) {
+    if (!outcome || !outcome.ignored) return '';
+    return ` ${feedFormatNumber(outcome.ignored)} · ${tFeed(
+        'feed_not_subscribed',
+        'Not subscribed'
+    )} (kept ignored locally).`;
+}
+
 async function resetAllFeedData() {
     setRefreshUi(false);
     setStatus('', false);
@@ -538,7 +582,7 @@ function initFeedDataSettings() {
                 'feed_imported_channels_queued',
                 'Imported $1 channels; $2 queued to prepare your local feed.',
                 [feedFormatNumber(outcome.added), feedFormatNumber(outcome.initializationQueued)]
-            ));
+            ) + importIgnoredChannelsMessage(outcome), { reviewIgnored: outcome.ignored > 0 });
         } catch (error) {
             console.error('[settings] channels import failed', error);
             setFeedSettingsMessage(error.message || tFeed('feed_channels_import_failed', 'Could not import channels.'));

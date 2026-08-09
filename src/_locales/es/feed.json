@@ -12,8 +12,8 @@
     "description": "Search field placeholder"
   },
   "feed_refresh": {
-    "message": "Actualizar",
-    "description": "Refresh button label"
+    "message": "Buscar vídeos nuevos",
+    "description": "Check for new subscription videos button label"
   },
   "feed_create": {
     "message": "Crear",
@@ -379,6 +379,12 @@
     "message": "Cancelar suscripción",
     "description": "feed unsubscribe"
   },
+  "feed_following": { "message": "Seguidos" },
+  "feed_follow_again_with_rewatch": { "message": "Volver a seguir con re:Watch" },
+  "feed_channels_load_failed": { "message": "No se pudieron cargar los canales. Inténtalo de nuevo." },
+  "feed_ignored": { "message": "Ignorados" },
+  "feed_ignored_on": { "message": "Ignorado el $1" },
+  "feed_review_ignored_channels": { "message": "Revisar canales ignorados" },
   "feed_not_subscribed": {
     "message": "No suscrito",
     "description": "feed not subscribed"
@@ -432,15 +438,27 @@
     "description": "feed unsubscribed from status"
   },
   "feed_refreshing": {
-    "message": "Actualizando...",
-    "description": "feed refreshing"
+    "message": "Comprobando…",
+    "description": "New subscription video check in progress"
   },
   "feed_updated": {
     "message": "Feed actualizado.",
     "description": "feed updated"
   },
   "feed_refresh_failed_status": {
-    "message": "Error al actualizar: $1. Si YouTube muestra una pantalla de consentimiento, abre youtube.com una vez en este navegador.",
-    "description": "feed refresh failed status"
-  }
+    "message": "No se pudieron buscar vídeos nuevos: $1.",
+    "description": "New subscription video check failure"
+  },
+  "feed_reload_view": { "message": "Recargar vista" },
+  "feed_reloading_view": { "message": "Recargando…" },
+  "feed_view_reloaded": { "message": "Vista recargada." },
+  "feed_reload_view_failed": { "message": "No se pudo recargar la vista: $1." },
+  "feed_pending_inventory_incomplete": { "message": "Aún faltan $1 vídeos detectados en el inventario local." },
+  "feed_show_new_videos_failed": { "message": "No se pudieron mostrar los vídeos nuevos: $1" },
+  "feed_showing_new_videos": { "message": "Mostrando…" },
+  "feed_retry": { "message": "Reintentar" },
+  "feed_new_videos_shown_one": { "message": "Se muestra $1 vídeo nuevo." },
+  "feed_new_videos_shown_other": { "message": "Se muestran $1 vídeos nuevos." },
+  "feed_new_videos_hidden_by_filters_one": { "message": "$1 vídeo nuevo está oculto por los filtros activos." },
+  "feed_new_videos_hidden_by_filters_other": { "message": "$1 vídeos nuevos están ocultos por los filtros activos." }
 }

@@ -2,12 +2,15 @@ const { importCanonicalSubscriptions } = require('../../src/feed-subscription-im
 
 const CHANNEL = 'UC1234567890abcdefghijkl';
 
-function createStorage(existing = []) {
+function createStorage(existing = [], tombstones = []) {
   const records = new Map(existing.map((record) => [record.channelId, { ...record }]));
+  const exclusions = new Map(tombstones.map((record) => [record.channelId, { ...record }]));
   return {
     getSubscriptionRecord: jest.fn(async (channelId) => records.get(channelId) || null),
+    getLocalUnsubscribeTombstone: jest.fn(async (channelId) => exclusions.get(channelId) || null),
     putSubscriptionRecord: jest.fn(async (record) => records.set(record.channelId, { ...record })),
     records,
+    exclusions,
   };
 }
 
@@ -30,4 +33,34 @@ test('merges an existing explicit subscription without changing its source or re
   expect(outcome).toMatchObject({ added: 0, updated: 1, initializationQueued: 0 });
   expect(queuedChannelIds).toEqual([]);
   expect(storage.records.get(CHANNEL)).toEqual(expect.objectContaining({ source: 'manual', followedAt: 50, channelTitle: 'New title' }));
+});
+
+test('reports a later account import as ignored while a local-unsubscribe tombstone exists', async () => {
+  const storage = createStorage([], [{
+    channelId: CHANNEL,
+    unsubscribedAt: 90,
+    source: 'channels',
+    reason: 'user_unfollow'
+  }]);
+
+  const { outcome, queuedChannelIds } = await importCanonicalSubscriptions(storage, [
+    { ucid: CHANNEL, title: 'Ignored imported channel' }
+  ], { now: 100 });
+
+  expect(outcome).toMatchObject({
+    found: 1,
+    valid: 1,
+    added: 0,
+    skipped: 1,
+    ignored: 1,
+    initializationQueued: 0,
+    ignoredChannels: [{
+      channelId: CHANNEL,
+      channelTitle: 'Ignored imported channel',
+      unsubscribedAt: 90,
+      reason: 'user_unfollow'
+    }]
+  });
+  expect(queuedChannelIds).toEqual([]);
+  expect(storage.putSubscriptionRecord).not.toHaveBeenCalled();
 });

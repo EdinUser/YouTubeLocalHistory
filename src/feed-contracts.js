@@ -30,6 +30,16 @@
         'oauth'
     ]);
 
+    // Shared feed/analytics semantics. Boundary behavior is intentional:
+    // skipped is below 10%, completed is at or above 90%, and a long video is
+    // at least ten minutes. Feed pagination always advances in 50-item steps.
+    const FEED_PAGE_SIZE = 50;
+    const WATCH_SKIP_RATIO = 0.1;
+    const WATCH_COMPLETION_RATIO = 0.9;
+    const LONG_VIDEO_MIN_DURATION_SECONDS = 10 * 60;
+    const LOCAL_UNSUBSCRIBE_TOMBSTONE_SCHEMA_VERSION = 1;
+    const LOCAL_UNSUBSCRIBE_TOMBSTONE_STORE = 'local_unsubscribe_tombstones';
+
     function assert(condition, message) {
         if (!condition) throw new TypeError(message);
     }
@@ -50,6 +60,44 @@
         const text = String(value || '').trim();
         assert(text.length > 0, `${fieldName} is required`);
         return text;
+    }
+
+    function canonicalChannelId(value, fieldName = 'channelId') {
+        const channelId = nonEmptyString(value, fieldName);
+        assert(/^UC[\w-]+$/.test(channelId), `${fieldName} must be a canonical channel ID`);
+        return channelId;
+    }
+
+    function createPendingFeedDiscovery(input) {
+        const source = input || {};
+        const seen = new Set();
+        const videoIds = [];
+        (Array.isArray(source.videoIds) ? source.videoIds : []).forEach((value) => {
+            const videoId = String(value || '').trim();
+            if (!videoId || seen.has(videoId)) return;
+            seen.add(videoId);
+            videoIds.push(videoId);
+        });
+        return {
+            videoIds,
+            discoveredAt: timestamp(source.discoveredAt !== undefined ? source.discoveredAt : 0, 'discoveredAt')
+        };
+    }
+
+    function createLocalUnsubscribeTombstone(input) {
+        const source = input || {};
+        const tombstone = {
+            schemaVersion: LOCAL_UNSUBSCRIBE_TOMBSTONE_SCHEMA_VERSION,
+            channelId: canonicalChannelId(source.channelId),
+            unsubscribedAt: timestamp(source.unsubscribedAt, 'unsubscribedAt'),
+            source: nonEmptyString(source.source || 'local_action', 'local unsubscribe source'),
+            reason: nonEmptyString(source.reason || 'user_unfollow', 'local unsubscribe reason')
+        };
+        ['channelTitle', 'thumbnail', 'handle'].forEach((field) => {
+            const value = String(source[field] || '').trim();
+            if (value) tombstone[field] = value;
+        });
+        return tombstone;
     }
 
     function createScanError(input) {
@@ -105,13 +153,22 @@
         const channelId = nonEmptyString(source.channelId, 'channelId');
         const outcome = nonEmptyString(source.outcome, 'outcome');
         assert(SCAN_OUTCOMES.includes(outcome), `unsupported scan outcome: ${outcome}`);
+        const insertedVideoIds = createPendingFeedDiscovery({
+            videoIds: source.insertedVideoIds,
+            discoveredAt: 0
+        }).videoIds;
 
-        return {
+        const terminal = {
             channelId,
             outcome,
-            insertedVideoCount: nonNegativeInteger(source.insertedVideoCount || 0, 'insertedVideoCount'),
+            insertedVideoCount: nonNegativeInteger(
+                source.insertedVideoCount === undefined ? insertedVideoIds.length : source.insertedVideoCount,
+                'insertedVideoCount'
+            ),
             completedAt: timestamp(source.completedAt, 'completedAt')
         };
+        if (Array.isArray(source.insertedVideoIds)) terminal.insertedVideoIds = insertedVideoIds;
+        return terminal;
     }
 
     function createForegroundProgress(input) {
@@ -119,14 +176,23 @@
         const completed = nonNegativeInteger(source.completed, 'completed');
         const total = nonNegativeInteger(source.total, 'total');
         assert(completed <= total, 'completed cannot exceed total');
+        const insertedVideoIds = createPendingFeedDiscovery({
+            videoIds: source.insertedVideoIds,
+            discoveredAt: 0
+        }).videoIds;
 
-        return {
+        const progress = {
             runId: nonEmptyString(source.runId, 'runId'),
             completed,
             total,
-            insertedVideoCount: nonNegativeInteger(source.insertedVideoCount || 0, 'insertedVideoCount'),
+            insertedVideoCount: nonNegativeInteger(
+                source.insertedVideoCount === undefined ? insertedVideoIds.length : source.insertedVideoCount,
+                'insertedVideoCount'
+            ),
             active: Boolean(source.active)
         };
+        if (Array.isArray(source.insertedVideoIds)) progress.insertedVideoIds = insertedVideoIds;
+        return progress;
     }
 
     function canInitializeSubscription(subscription) {
@@ -143,6 +209,14 @@
             row: nonNegativeInteger(item.row, 'invalid row'),
             reason: nonEmptyString(item.reason, 'invalid reason')
         })) : [];
+        const ignoredChannels = Array.isArray(source.ignoredChannels)
+            ? source.ignoredChannels.slice(0, 20).map((item) => ({
+                channelId: canonicalChannelId(item.channelId, 'ignored channelId'),
+                channelTitle: String(item.channelTitle || ''),
+                unsubscribedAt: timestamp(item.unsubscribedAt || 0, 'ignored unsubscribedAt'),
+                reason: String(item.reason || 'user_unfollow')
+            }))
+            : [];
 
         return {
             source: importSource,
@@ -152,6 +226,8 @@
             updated: nonNegativeInteger(source.updated || 0, 'updated'),
             unchanged: nonNegativeInteger(source.unchanged || 0, 'unchanged'),
             skipped: nonNegativeInteger(source.skipped || 0, 'skipped'),
+            ignored: nonNegativeInteger(source.ignored || 0, 'ignored'),
+            ignoredChannels,
             invalid,
             fatalError: source.fatalError ? String(source.fatalError) : null,
             initializationQueued: nonNegativeInteger(source.initializationQueued || 0, 'initializationQueued')
@@ -163,7 +239,15 @@
         SCAN_OUTCOMES,
         SUBSCRIPTION_SOURCES,
         IMPORT_SOURCES,
+        FEED_PAGE_SIZE,
+        WATCH_SKIP_RATIO,
+        WATCH_COMPLETION_RATIO,
+        LONG_VIDEO_MIN_DURATION_SECONDS,
+        LOCAL_UNSUBSCRIBE_TOMBSTONE_SCHEMA_VERSION,
+        LOCAL_UNSUBSCRIBE_TOMBSTONE_STORE,
         createScanError,
+        createPendingFeedDiscovery,
+        createLocalUnsubscribeTombstone,
         normalizeFeedEntry,
         createRssScanResult,
         createTerminalResult,

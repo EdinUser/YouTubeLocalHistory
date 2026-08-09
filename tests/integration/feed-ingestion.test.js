@@ -2,10 +2,12 @@ const contracts = require('../../src/feed-contracts.js');
 const { ingestRssScan } = require('../../src/feed-ingestion.js');
 const { CHANNEL_ID, RSS_ENTRY } = require('../fixtures/feed/contracts.js');
 
-function createFeedStorage() {
+function createFeedStorage({ active = true, tombstoned = false } = {}) {
   const videos = new Map();
   const states = new Map();
   return {
+    getSubscriptionRecord: jest.fn(async () => active ? { channelId: CHANNEL_ID, source: 'manual' } : null),
+    getLocalUnsubscribeTombstone: jest.fn(async () => tombstoned ? { channelId: CHANNEL_ID, unsubscribedAt: 110 } : null),
     getSubscriptionFeedVideo: jest.fn(async (id) => videos.get(id) || null),
     putSubscriptionFeedVideo: jest.fn(async (record) => videos.set(record.videoId, { ...record })),
     getChannelSyncState: jest.fn(async (id) => states.get(id) || null),
@@ -22,7 +24,8 @@ describe('feed ingestion boundary', () => {
     const scan = contracts.createRssScanResult({ channelId: CHANNEL_ID, entries: [RSS_ENTRY], fetchedAt: 100 });
 
     await expect(ingestRssScan(scan, { storage, now: 120, onProgress: progress })).resolves.toEqual({
-      channelId: CHANNEL_ID, outcome: 'updated', insertedVideoCount: 1, completedAt: 120
+      channelId: CHANNEL_ID, outcome: 'updated', insertedVideoCount: 1,
+      insertedVideoIds: ['video-001'], completedAt: 120
     });
     expect(storage.video('video-001')).toEqual(expect.objectContaining({ discoveredAt: 120, lastSeenInFeedAt: 120, durationSeconds: null, isShort: null }));
     expect(storage.state(CHANNEL_ID)).toEqual(expect.objectContaining({ lastSuccessfulCheckAt: 120, failureCount: 0 }));
@@ -42,5 +45,20 @@ describe('feed ingestion boundary', () => {
     await expect(ingestRssScan(timedOut, { storage, now: 130 })).resolves.toEqual(expect.objectContaining({ outcome: 'timed_out', insertedVideoCount: 0 }));
     expect(storage.putSubscriptionFeedVideo).not.toHaveBeenCalled();
     expect(storage.state(CHANNEL_ID)).toEqual(expect.objectContaining({ lastAttemptAt: 130, failureCount: 2 }));
+  });
+
+  test('discards a scan that completes after the channel was locally unfollowed', async () => {
+    const storage = createFeedStorage({ active: false, tombstoned: true });
+    const scan = contracts.createRssScanResult({ channelId: CHANNEL_ID, entries: [RSS_ENTRY], fetchedAt: 100 });
+
+    await expect(ingestRssScan(scan, { storage, now: 120 })).resolves.toEqual({
+      channelId: CHANNEL_ID,
+      outcome: 'unchanged',
+      insertedVideoCount: 0,
+      insertedVideoIds: [],
+      completedAt: 120
+    });
+    expect(storage.putSubscriptionFeedVideo).not.toHaveBeenCalled();
+    expect(storage.putChannelSyncState).not.toHaveBeenCalled();
   });
 });

@@ -54,17 +54,35 @@ function createMemoryStore(keyName, records = new Map()) {
     index: (indexName) => ({
       openCursor: (range, direction) => {
         const values = Array.from(records.values())
-          .filter((record) => !range || Number(record[indexName] || 0) <= Number(range.upperBound))
+          .filter((record) => {
+            if (!range) return true;
+            if (typeof range === 'object' && range.upperBound !== undefined) {
+              return Number(record[indexName] || 0) <= Number(range.upperBound);
+            }
+            return record[indexName] === range;
+          })
           .sort((a, b) => {
-          const factor = direction === 'prev' ? -1 : 1;
-          return factor * (Number(a[indexName] || 0) - Number(b[indexName] || 0));
+            const factor = direction === 'prev' ? -1 : 1;
+            const indexDifference = Number(a[indexName] || 0) - Number(b[indexName] || 0);
+            if (indexDifference) return factor * indexDifference;
+            return factor * String(a[keyName]).localeCompare(String(b[keyName]));
           });
         const request = {};
         let index = 0;
         const next = () => {
           queueMicrotask(() => {
             const value = values[index++];
-            request.onsuccess?.({ target: { result: value ? { value, continue: next } : null } });
+            request.onsuccess?.({
+              target: {
+                result: value ? {
+                  value,
+                  key: value[indexName],
+                  primaryKey: value[keyName],
+                  delete: () => records.delete(value[keyName]),
+                  continue: next
+                } : null
+              }
+            });
           });
         };
         next();
@@ -76,9 +94,11 @@ function createMemoryStore(keyName, records = new Map()) {
 
 function createRepositoryStorage(IndexedDBStorage) {
   const stores = {
+    videos: createMemoryStore('videoId'),
     subscriptions: createMemoryStore('channelId'),
     subscription_feed_videos: createMemoryStore('videoId'),
     channel_sync_state: createMemoryStore('channelId'),
+    local_unsubscribe_tombstones: createMemoryStore('channelId'),
     home_impressions: createMemoryStore('videoId'),
     feed_sync_runs: createMemoryStore('runId')
   };
@@ -88,7 +108,7 @@ function createRepositoryStorage(IndexedDBStorage) {
   return storage;
 }
 
-describe('v5 IndexedDB feed repositories', () => {
+describe('v6 IndexedDB feed repositories', () => {
   const CHANNEL_ID = 'UC1234567890abcdefghijkl';
 
   afterEach(() => {
@@ -98,7 +118,7 @@ describe('v5 IndexedDB feed repositories', () => {
     delete global.ytIndexedDBStorage;
   });
 
-  test('creates the fresh v5 stores and their required indexes', async () => {
+  test('creates the v6 tombstone store without changing the existing feed indexes', async () => {
     const schema = createSchemaDatabase();
     global.indexedDB = {
       open: jest.fn(() => {
@@ -115,7 +135,7 @@ describe('v5 IndexedDB feed repositories', () => {
     const dbModule = require('../../src/indexeddb-storage.js');
     await dbModule.openDatabase();
 
-    expect(dbModule.DB_VERSION).toBe(5);
+    expect(dbModule.DB_VERSION).toBe(6);
     expect(schema.stores.get(dbModule.STORE_SUBSCRIPTIONS).keyPath).toBe('channelId');
     expect(Array.from(schema.stores.get(dbModule.STORE_SUBSCRIPTIONS)._indexes.keys()))
       .toEqual(expect.arrayContaining(['followedAt', 'source']));
@@ -128,6 +148,9 @@ describe('v5 IndexedDB feed repositories', () => {
     expect(schema.stores.get(dbModule.STORE_FEED_SYNC_RUNS).keyPath).toBe('runId');
     expect(Array.from(schema.stores.get(dbModule.STORE_FEED_SYNC_RUNS)._indexes.keys()))
       .toEqual(expect.arrayContaining(['completedAt']));
+    expect(schema.stores.get(dbModule.STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES).keyPath).toBe('channelId');
+    expect(Array.from(schema.stores.get(dbModule.STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES)._indexes.keys()))
+      .toEqual(expect.arrayContaining(['unsubscribedAt', 'source']));
   });
 
   test('accepts only explicit canonical subscriptions and keeps them in the v5 repository', async () => {
@@ -172,6 +195,38 @@ describe('v5 IndexedDB feed repositories', () => {
       .rejects.toThrow('videoId and channelId');
   });
 
+  test('paginates equal publication timestamps by video ID without shifting after a newer insert', async () => {
+    const { IndexedDBStorage } = require('../../src/indexeddb-storage.js');
+    const storage = createRepositoryStorage(IndexedDBStorage);
+    const videoIds = Array.from({ length: 55 }, (_, index) => `same-${String(index).padStart(2, '0')}`);
+    await Promise.all(videoIds.map((videoId) => storage.putSubscriptionFeedVideo({
+      videoId,
+      channelId: CHANNEL_ID,
+      publishedAt: 10,
+    })));
+
+    const first = await storage.listSubscriptionFeedVideosPageByPublishedAt({ limit: 50 });
+    expect(first.records).toHaveLength(50);
+    expect(first.records[0].videoId).toBe('same-54');
+    expect(first.records[49].videoId).toBe('same-05');
+    expect(first).toEqual(expect.objectContaining({
+      nextCursor: { publishedAt: 10, videoId: 'same-05' },
+      exhausted: false,
+    }));
+
+    await storage.putSubscriptionFeedVideo({ videoId: 'inserted-newer', channelId: CHANNEL_ID, publishedAt: 20 });
+    global.IDBKeyRange = { upperBound: (upperBound) => ({ upperBound }) };
+    const second = await storage.listSubscriptionFeedVideosPageByPublishedAt({
+      limit: 50,
+      cursor: first.nextCursor,
+    });
+    expect(second.records.map((record) => record.videoId)).toEqual([
+      'same-04', 'same-03', 'same-02', 'same-01', 'same-00',
+    ]);
+    expect(second.exhausted).toBe(true);
+    expect(new Set(first.records.concat(second.records).map((record) => record.videoId)).size).toBe(55);
+  });
+
   test('claims and releases a sync-state lease without a scheduler runtime', async () => {
     const { IndexedDBStorage } = require('../../src/indexeddb-storage.js');
     const storage = createRepositoryStorage(IndexedDBStorage);
@@ -196,17 +251,49 @@ describe('v5 IndexedDB feed repositories', () => {
     }));
   });
 
-  test('unfollow atomically removes the subscription and its scheduler state only', async () => {
+  test('soft unfollow tombstones the channel and removes its active feed state', async () => {
     const { IndexedDBStorage } = require('../../src/indexeddb-storage.js');
     const storage = createRepositoryStorage(IndexedDBStorage);
-    await storage.putSubscriptionRecord({ channelId: CHANNEL_ID, source: 'manual', followedAt: 10 });
+    await storage.putSubscriptionRecord({
+      channelId: CHANNEL_ID,
+      channelTitle: 'Retained review title',
+      source: 'manual',
+      followedAt: 10
+    });
     await storage.putChannelSyncState({ channelId: CHANNEL_ID, scanLeaseUntil: 500, scanRunId: 'active-run' });
     await storage.putSubscriptionFeedVideo({ videoId: 'retained-feed-video', channelId: CHANNEL_ID, publishedAt: 10 });
+    await storage.putVideo({ videoId: 'watched-history-video', channelId: CHANNEL_ID, time: 42, duration: 100 });
 
-    await storage.deleteSubscriptionAndSyncState(CHANNEL_ID);
+    await storage.deleteSubscriptionAndSyncState(CHANNEL_ID, {
+      unsubscribedAt: 100,
+      source: 'channels',
+      reason: 'user_unfollow'
+    });
     expect(await storage.getSubscriptionRecord(CHANNEL_ID)).toBeNull();
     expect(await storage.getChannelSyncState(CHANNEL_ID)).toBeNull();
-    expect(await storage.getSubscriptionFeedVideo('retained-feed-video')).toEqual(expect.objectContaining({ channelId: CHANNEL_ID }));
+    expect(await storage.getSubscriptionFeedVideo('retained-feed-video')).toBeNull();
+    expect(await storage.getVideo('watched-history-video')).toEqual(expect.objectContaining({
+      channelId: CHANNEL_ID,
+      time: 42
+    }));
+    expect(await storage.getLocalUnsubscribeTombstone(CHANNEL_ID)).toEqual(expect.objectContaining({
+      channelId: CHANNEL_ID,
+      channelTitle: 'Retained review title',
+      unsubscribedAt: 100,
+      source: 'channels',
+      reason: 'user_unfollow'
+    }));
+  });
+
+  test('deletes cached feed records by channel ID without touching other channels', async () => {
+    const { IndexedDBStorage } = require('../../src/indexeddb-storage.js');
+    const storage = createRepositoryStorage(IndexedDBStorage);
+    await storage.putSubscriptionFeedVideo({ videoId: 'remove-1', channelId: CHANNEL_ID, publishedAt: 20 });
+    await storage.putSubscriptionFeedVideo({ videoId: 'keep-1', channelId: 'UC9876543210abcdefghijkl', publishedAt: 10 });
+
+    await expect(storage.deleteSubscriptionFeedVideosByChannelId(CHANNEL_ID)).resolves.toBe(1);
+    expect(await storage.getSubscriptionFeedVideo('remove-1')).toBeNull();
+    expect(await storage.getSubscriptionFeedVideo('keep-1')).not.toBeNull();
   });
 
   test('queries only sync states eligible at the requested time', async () => {

@@ -2,12 +2,17 @@ function showFeedStatus(show) {
     const status = document.getElementById('status');
     if (!status) return;
     status.style.display = show && status.textContent ? '' : 'none';
-    if (!show && typeof setFeedSyncStatus === 'function') setFeedSyncStatus('', false);
+    if (!show) {
+        if (typeof stopFeedPagination === 'function') stopFeedPagination();
+        if (typeof setFeedSyncStatus === 'function') setFeedSyncStatus('', false);
+    }
 }
 
 function setRefreshVisible(visible) {
-    const refresh = document.getElementById('refresh');
-    if (refresh) refresh.style.display = visible ? '' : 'none';
+    ['refresh', 'reloadView'].forEach((id) => {
+        const action = document.getElementById(id);
+        if (action) action.style.display = visible ? '' : 'none';
+    });
 }
 
 function setCreatePlaylistVisible(visible) {
@@ -179,23 +184,67 @@ async function renderSubscriptions() {
     const empty = document.getElementById('subscriptionsEmpty');
     const count = document.getElementById('subscriptionsCount');
     const clear = document.getElementById('clearSubscriptions');
+    const tabs = document.getElementById('subscriptionTabs');
+    const followingTab = document.getElementById('channelsFollowingTab');
+    const ignoredTab = document.getElementById('channelsIgnoredTab');
+    const addForm = document.getElementById('subscriptionAddForm');
+    const addStatus = document.getElementById('subscriptionAddStatus');
     if (!list || !empty || !count) return;
 
     setupSubscriptionAddForm();
+    setupSubscriptionTabs();
     let subscriptions = [];
+    let ignoredChannels = [];
+    let loadError = null;
     try {
-        subscriptions = (await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage)).subscriptions;
+        const data = await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage);
+        subscriptions = data.subscriptions;
+        if (Array.isArray(data.videos)) allVideos = data.videos;
+        localSubscriptions = subscriptions;
+        ignoredChannels = typeof ytIndexedDBStorage.listLocalUnsubscribeTombstones === 'function'
+            ? await ytIndexedDBStorage.listLocalUnsubscribeTombstones()
+            : [];
         subscriptions = await Promise.all(subscriptions.map(async (subscription) => ({
             ...subscription,
             ...((await ytIndexedDBStorage.getChannelSyncState(subscription.channelId)) || {})
         })));
-    } catch (_) { /* show empty */ }
+    } catch (error) {
+        console.error('[subscriptions] could not load channels', error);
+        loadError = error;
+    }
+    if (loadError) {
+        if (tabs) tabs.hidden = true;
+        if (addForm) addForm.style.display = 'none';
+        if (addStatus) addStatus.style.display = 'none';
+        if (clear) clear.style.display = 'none';
+        count.textContent = '';
+        empty.style.display = 'none';
+        list.textContent = tFeed('feed_channels_load_failed', 'Could not load channels. Try again.');
+        return;
+    }
+    if (!ignoredChannels.length) channelsInternalTab = 'following';
+    const showingIgnored = channelsInternalTab === 'ignored' && ignoredChannels.length > 0;
+    if (tabs) tabs.hidden = ignoredChannels.length === 0;
+    if (ignoredTab) {
+        ignoredTab.hidden = ignoredChannels.length === 0;
+        ignoredTab.textContent = `${tFeed('feed_ignored', 'Ignored')} (${feedFormatNumber(ignoredChannels.length)})`;
+        ignoredTab.setAttribute('aria-selected', showingIgnored ? 'true' : 'false');
+    }
+    if (followingTab) {
+        followingTab.textContent = `${tFeed('feed_following', 'Following')} (${feedFormatNumber(subscriptions.length)})`;
+        followingTab.setAttribute('aria-selected', showingIgnored ? 'false' : 'true');
+    }
+    list.setAttribute('aria-labelledby', showingIgnored ? 'channelsIgnoredTab' : 'channelsFollowingTab');
+    if (addForm) addForm.style.display = showingIgnored ? 'none' : '';
+    if (addStatus) addStatus.style.display = showingIgnored ? 'none' : '';
     list.textContent = '';
-    count.textContent = feedPlural('feed_channels_count', subscriptions.length, '$1 channel', '$1 channels');
-    empty.style.display = subscriptions.length ? 'none' : 'block';
-    if (clear) clear.style.display = subscriptions.length ? '' : 'none';
+    count.textContent = showingIgnored
+        ? `${feedFormatNumber(ignoredChannels.length)} ${tFeed('feed_ignored', 'Ignored')}`
+        : feedPlural('feed_channels_count', subscriptions.length, '$1 channel', '$1 channels');
+    empty.style.display = !showingIgnored && subscriptions.length === 0 ? 'block' : 'none';
+    if (clear) clear.style.display = !showingIgnored && subscriptions.length ? '' : 'none';
 
-    subscriptions.forEach((sub) => {
+    if (!showingIgnored) subscriptions.forEach((sub) => {
         const row = document.createElement('div');
         row.className = 'subs-row subs-card';
         row.dataset.channelId = sub.channelId;
@@ -261,7 +310,12 @@ async function renderSubscriptions() {
         unsubscribe.addEventListener('click', async () => {
             unsubscribe.disabled = true;
             try {
-                await ytIndexedDBStorage.deleteSubscriptionAndSyncState(sub.channelId);
+                await ytvhtLocalSubscriptionActions.unfollow(ytIndexedDBStorage, sub.channelId, {
+                    source: 'channels',
+                    channelTitle: sub.channelName,
+                    thumbnail: sub.thumbnail,
+                    handle: sub.handle
+                });
                 await renderSubscriptions();
                 setStatus(tFeed('feed_unsubscribed_from_status', 'Unsubscribed from $1.', [name.textContent]), false);
             } catch (error) {
@@ -272,8 +326,76 @@ async function renderSubscriptions() {
         row.appendChild(unsubscribe);
         list.appendChild(row);
     });
-    if (!channelMetadataStarted) hydrateVisibleChannelMetadata(subscriptions).catch(() => {});
-    else if (channelMetadataAwaitingVisibility) observeNextChannelMetadataBatch(subscriptions, list);
+    if (showingIgnored) {
+        ignoredChannels.forEach((tombstone) => {
+            const row = document.createElement('div');
+            row.className = 'subs-row';
+            row.dataset.channelId = tombstone.channelId;
+
+            const copy = document.createElement('div');
+            copy.className = 'subs-copy';
+            const name = document.createElement('span');
+            name.className = 'subs-name';
+            name.textContent = decodeHtmlEntities(tombstone.channelTitle || tombstone.channelId);
+            const detail = document.createElement('div');
+            detail.className = 'subs-count';
+            const ignoredDate = formatSavedDate(tombstone.unsubscribedAt);
+            detail.textContent = [
+                ignoredDate
+                    ? tFeed('feed_ignored_on', 'Ignored $1', [ignoredDate])
+                    : tFeed('feed_ignored', 'Ignored'),
+                tombstone.channelId
+            ].join(' · ');
+            copy.append(name, detail);
+            row.appendChild(copy);
+
+            const followAgain = document.createElement('button');
+            followAgain.className = 'btn';
+            followAgain.textContent = tFeed('feed_follow_again_with_rewatch', 'Follow again with re:Watch');
+            followAgain.addEventListener('click', async () => {
+                followAgain.disabled = true;
+                try {
+                    await ytvhtLocalSubscriptionActions.follow(ytIndexedDBStorage, {
+                        channelId: tombstone.channelId,
+                        channelTitle: tombstone.channelTitle,
+                        thumbnail: tombstone.thumbnail,
+                        handle: tombstone.handle
+                    });
+                    const scheduler = ensureSharedFeedScheduler();
+                    if (scheduler) await scheduler.initializeSubscriptions([tombstone.channelId]);
+                    await renderSubscriptions();
+                    setStatus(tFeed('feed_subscribed_to_preparing', 'Following $1 again with re:Watch.', [name.textContent]), false);
+                } catch (error) {
+                    console.error('[subscriptions] follow again failed', error);
+                    followAgain.disabled = false;
+                }
+            });
+            row.appendChild(followAgain);
+            list.appendChild(row);
+        });
+    }
+    if (!showingIgnored) {
+        if (!channelMetadataStarted) hydrateVisibleChannelMetadata(subscriptions).catch(() => {});
+        else if (channelMetadataAwaitingVisibility) observeNextChannelMetadataBatch(subscriptions, list);
+    }
+}
+
+let channelsInternalTab = 'following';
+
+function setupSubscriptionTabs() {
+    const following = document.getElementById('channelsFollowingTab');
+    const ignored = document.getElementById('channelsIgnoredTab');
+    if (!following || !ignored || following.dataset.bound === 'true') return;
+    following.dataset.bound = 'true';
+    ignored.dataset.bound = 'true';
+    following.addEventListener('click', () => {
+        channelsInternalTab = 'following';
+        renderSubscriptions();
+    });
+    ignored.addEventListener('click', () => {
+        channelsInternalTab = 'ignored';
+        renderSubscriptions();
+    });
 }
 
 function formatNextChannelCheck(timestamp) {
@@ -348,7 +470,8 @@ function resetChannelMetadataHydration() {
     channelMetadataProcessedIds.clear();
 }
 
-function showSubscriptions() {
+function showSubscriptions(requestedTab) {
+    channelsInternalTab = requestedTab === 'ignored' ? 'ignored' : 'following';
     resetChannelMetadataHydration();
     rememberView('channels');
     document.body.classList.remove('shorts-mode');

@@ -40,12 +40,30 @@
         }
         const scan = contracts.createRssScanResult(scanResult);
         const completedAt = Number(options.now === undefined ? scan.fetchedAt : options.now);
-        let insertedVideoCount = 0;
+        if (typeof storage.getSubscriptionRecord === 'function') {
+            const [subscription, tombstone] = await Promise.all([
+                storage.getSubscriptionRecord(scan.channelId),
+                typeof storage.getLocalUnsubscribeTombstone === 'function'
+                    ? storage.getLocalUnsubscribeTombstone(scan.channelId)
+                    : null
+            ]);
+            if (!subscription || tombstone) {
+                const ignored = contracts.createTerminalResult({
+                    channelId: scan.channelId,
+                    outcome: 'unchanged',
+                    insertedVideoIds: [],
+                    completedAt
+                });
+                if (typeof options.onProgress === 'function') options.onProgress(ignored);
+                return ignored;
+            }
+        }
+        const insertedVideoIds = [];
 
         if (!scan.error) {
             for (const entry of scan.entries) {
                 const existing = await storage.getSubscriptionFeedVideo(entry.videoId);
-                if (!existing) insertedVideoCount += 1;
+                if (!existing) insertedVideoIds.push(entry.videoId);
                 await storage.putSubscriptionFeedVideo(mergeFeedVideo(existing, entry, completedAt));
             }
         }
@@ -54,8 +72,8 @@
 
         const terminal = contracts.createTerminalResult({
             channelId: scan.channelId,
-            outcome: scan.error ? (scan.error.code === 'timeout' ? 'timed_out' : 'failed') : (insertedVideoCount ? 'updated' : 'unchanged'),
-            insertedVideoCount,
+            outcome: scan.error ? (scan.error.code === 'timeout' ? 'timed_out' : 'failed') : (insertedVideoIds.length ? 'updated' : 'unchanged'),
+            insertedVideoIds,
             completedAt
         });
         if (typeof options.onProgress === 'function') options.onProgress(terminal);

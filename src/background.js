@@ -134,9 +134,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         }
                     }
                 }
+                else if (message.operation === 'getTombstone') result = await ytIndexedDBStorage.getLocalUnsubscribeTombstone(args.channelId);
                 else if (message.operation === 'putSubscription') result = await ytIndexedDBStorage.putSubscriptionRecord(args.record);
                 else if (message.operation === 'putSyncState') result = await ytIndexedDBStorage.putChannelSyncState(args.record);
-                else if (message.operation === 'unfollow') result = await ytIndexedDBStorage.deleteSubscriptionAndSyncState(args.channelId);
+                else if (message.operation === 'deleteTombstone') result = await ytIndexedDBStorage.deleteLocalUnsubscribeTombstone(args.channelId);
+                else if (message.operation === 'unfollow') result = await ytIndexedDBStorage.deleteSubscriptionAndSyncState(args.channelId, args.tombstone);
                 else throw new Error('Unknown local subscription operation.');
                 chrome.runtime.sendMessage({ type: 'localSubscriptionChanged', channelId: args.channelId || args.record?.channelId }).catch(() => {});
                 sendResponse({ result });
@@ -378,9 +380,12 @@ async function handleAddWatchLater(info, tab) {
 function subscriptionRepository() {
     return {
         getSubscriptionRecord: (channelId) => ytIndexedDBStorage.getSubscriptionRecord(channelId),
+        getLocalUnsubscribeTombstone: (channelId) => ytIndexedDBStorage.getLocalUnsubscribeTombstone(channelId),
         putSubscriptionRecord: (record) => ytIndexedDBStorage.putSubscriptionRecord(record),
         putChannelSyncState: (record) => ytIndexedDBStorage.putChannelSyncState(record),
-        deleteSubscriptionAndSyncState: (channelId) => ytIndexedDBStorage.deleteSubscriptionAndSyncState(channelId)
+        deleteLocalUnsubscribeTombstone: (channelId) => ytIndexedDBStorage.deleteLocalUnsubscribeTombstone(channelId),
+        deleteSubscriptionAndSyncState: (channelId, tombstone) =>
+            ytIndexedDBStorage.deleteSubscriptionAndSyncState(channelId, tombstone)
     };
 }
 

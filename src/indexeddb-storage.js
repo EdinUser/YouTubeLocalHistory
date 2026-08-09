@@ -20,9 +20,9 @@
             : (typeof self !== 'undefined' ? self : this));
 
     const DB_NAME = 'YTLH_HybridDB';
-    // Version 5 introduces the canonical local-feed stores. Existing installs
-    // need this bump before onupgradeneeded can create those stores.
-    const DB_VERSION = 5;
+    // Version 6 adds durable local-unsubscribe tombstones. Existing v5
+    // subscriptions and cached feed records remain untouched by the upgrade.
+    const DB_VERSION = 6;
 
     const STORE_VIDEOS = 'videos';
     const STORE_PLAYLISTS = 'playlists';
@@ -34,6 +34,7 @@
     const STORE_CHANNEL_SYNC_STATE = 'channel_sync_state';
     const STORE_HOME_IMPRESSIONS = 'home_impressions';
     const STORE_FEED_SYNC_RUNS = 'feed_sync_runs';
+    const STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES = 'local_unsubscribe_tombstones';
     const EXPLICIT_SUBSCRIPTION_SOURCES = ['takeout_csv', 'oauth', 'manual'];
 
     // ----- Forgiving, YouTube-like search matcher -----------------------------
@@ -155,6 +156,19 @@
                 }
                 if (!subscriptionsStore.indexNames.contains('source')) {
                     subscriptionsStore.createIndex('source', 'source', { unique: false });
+                }
+
+                let localUnsubscribeStore;
+                if (!db.objectStoreNames.contains(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES)) {
+                    localUnsubscribeStore = db.createObjectStore(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES, { keyPath: 'channelId' });
+                } else {
+                    localUnsubscribeStore = tx.objectStore(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES);
+                }
+                if (!localUnsubscribeStore.indexNames.contains('unsubscribedAt')) {
+                    localUnsubscribeStore.createIndex('unsubscribedAt', 'unsubscribedAt', { unique: false });
+                }
+                if (!localUnsubscribeStore.indexNames.contains('source')) {
+                    localUnsubscribeStore.createIndex('source', 'source', { unique: false });
                 }
 
                 let feedVideosStore;
@@ -362,7 +376,25 @@
             }));
         }
 
-        // --- V5 local-feed repositories -----------------------------------
+        _deleteRecordsByIndex(store, indexName, key) {
+            return new Promise((resolve, reject) => {
+                let deleted = 0;
+                const request = store.index(indexName).openCursor(key);
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (!cursor) {
+                        resolve(deleted);
+                        return;
+                    }
+                    cursor.delete();
+                    deleted += 1;
+                    cursor.continue();
+                };
+                request.onerror = () => reject(request.error || new Error(`IndexedDB index ${indexName} delete failed`));
+            });
+        }
+
+        // --- Canonical local-feed repositories -----------------------------
 
         async getSubscriptionRecord(channelId) {
             return this._getRecord(STORE_SUBSCRIPTIONS, channelId);
@@ -396,12 +428,74 @@
             return this._deleteRecord(STORE_SUBSCRIPTIONS, channelId);
         }
 
-        async deleteSubscriptionAndSyncState(channelId) {
-            if (!channelId) return;
-            return this._withStores([STORE_SUBSCRIPTIONS, STORE_CHANNEL_SYNC_STATE], 'readwrite', (stores) => {
-                stores[STORE_SUBSCRIPTIONS].delete(channelId);
-                stores[STORE_CHANNEL_SYNC_STATE].delete(channelId);
+        async getLocalUnsubscribeTombstone(channelId) {
+            return this._getRecord(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES, channelId);
+        }
+
+        async listLocalUnsubscribeTombstones() {
+            const records = await this._getAllRecords(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES);
+            return records.sort((a, b) => Number(b.unsubscribedAt || 0) - Number(a.unsubscribedAt || 0));
+        }
+
+        async putLocalUnsubscribeTombstone(record) {
+            const channelId = String(record && record.channelId || '').trim();
+            if (!/^UC[\w-]+$/.test(channelId)) {
+                throw new Error('Local unsubscribe tombstone must include a canonical channelId');
+            }
+            const tombstone = {
+                ...record,
+                schemaVersion: 1,
+                channelId,
+                unsubscribedAt: Number(record.unsubscribedAt || Date.now()),
+                source: String(record.source || 'local_action'),
+                reason: String(record.reason || 'user_unfollow')
+            };
+            await this._putRecord(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES, tombstone, 'channelId');
+            return tombstone;
+        }
+
+        async deleteLocalUnsubscribeTombstone(channelId) {
+            return this._deleteRecord(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES, channelId);
+        }
+
+        async softUnfollowSubscription(channelId, options = {}) {
+            const normalizedChannelId = String(channelId || '').trim();
+            if (!/^UC[\w-]+$/.test(normalizedChannelId)) {
+                throw new Error('A canonical channelId is required for local unsubscribe');
+            }
+            const existing = await this.getSubscriptionRecord(normalizedChannelId);
+            const tombstone = {
+                ...options,
+                schemaVersion: 1,
+                channelId: normalizedChannelId,
+                unsubscribedAt: Number(options.unsubscribedAt || Date.now()),
+                source: String(options.source || 'local_action'),
+                reason: String(options.reason || 'user_unfollow'),
+                channelTitle: String(options.channelTitle || existing?.channelTitle || existing?.channelName || ''),
+                thumbnail: String(options.thumbnail || existing?.thumbnail || ''),
+                handle: String(options.handle || existing?.handle || '')
+            };
+            const storesToUpdate = [
+                STORE_SUBSCRIPTIONS,
+                STORE_CHANNEL_SYNC_STATE,
+                STORE_SUBSCRIPTION_FEED_VIDEOS,
+                STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES
+            ];
+            return this._withStores(storesToUpdate, 'readwrite', async (stores) => {
+                stores[STORE_SUBSCRIPTIONS].delete(normalizedChannelId);
+                stores[STORE_CHANNEL_SYNC_STATE].delete(normalizedChannelId);
+                stores[STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES].put(tombstone);
+                const deletedFeedVideoCount = await this._deleteRecordsByIndex(
+                    stores[STORE_SUBSCRIPTION_FEED_VIDEOS],
+                    'channelId',
+                    normalizedChannelId
+                );
+                return { tombstone, deletedFeedVideoCount };
             });
+        }
+
+        async deleteSubscriptionAndSyncState(channelId, options = {}) {
+            return this.softUnfollowSubscription(channelId, options);
         }
 
         async getSubscriptionFeedVideo(videoId) {
@@ -419,11 +513,72 @@
             return this._deleteRecord(STORE_SUBSCRIPTION_FEED_VIDEOS, videoId);
         }
 
+        async deleteSubscriptionFeedVideosByChannelId(channelId) {
+            if (!channelId) return 0;
+            return this._withStore(STORE_SUBSCRIPTION_FEED_VIDEOS, 'readwrite', (store) =>
+                this._deleteRecordsByIndex(store, 'channelId', channelId));
+        }
+
         async listSubscriptionFeedVideosByPublishedAt(limit = 0) {
             return this._getRecordsByIndex(STORE_SUBSCRIPTION_FEED_VIDEOS, 'publishedAt', {
                 direction: 'prev',
                 limit
             });
+        }
+
+        async listSubscriptionFeedVideosPageByPublishedAt(options = {}) {
+            const limit = Math.max(1, Math.floor(Number(options.limit) || 50));
+            const suppliedCursor = options.cursor || null;
+            const cursor = suppliedCursor ? {
+                publishedAt: Number(suppliedCursor.publishedAt),
+                videoId: String(suppliedCursor.videoId || '')
+            } : null;
+            if (cursor && (!Number.isFinite(cursor.publishedAt) || !cursor.videoId)) {
+                throw new TypeError('Feed page cursor must include publishedAt and videoId');
+            }
+
+            let range = null;
+            if (cursor && typeof IDBKeyRange !== 'undefined') {
+                range = IDBKeyRange.upperBound(cursor.publishedAt);
+            }
+
+            return this._withStore(STORE_SUBSCRIPTION_FEED_VIDEOS, 'readonly', (store) =>
+                new Promise((resolve, reject) => {
+                    const records = [];
+                    const request = store.index('publishedAt').openCursor(range, 'prev');
+                    const finish = (exhausted) => {
+                        const last = records[records.length - 1];
+                        resolve({
+                            records,
+                            nextCursor: last ? {
+                                publishedAt: Number(last.publishedAt || 0),
+                                videoId: String(last.videoId)
+                            } : null,
+                            exhausted
+                        });
+                    };
+                    request.onsuccess = (event) => {
+                        const indexCursor = event.target.result;
+                        if (!indexCursor) {
+                            finish(true);
+                            return;
+                        }
+                        const record = indexCursor.value;
+                        const publishedAt = Number(indexCursor.key ?? record.publishedAt ?? 0);
+                        const videoId = String(indexCursor.primaryKey ?? record.videoId ?? '');
+                        if (cursor && publishedAt === cursor.publishedAt && videoId >= cursor.videoId) {
+                            indexCursor.continue();
+                            return;
+                        }
+                        if (records.length >= limit) {
+                            finish(false);
+                            return;
+                        }
+                        records.push(record);
+                        indexCursor.continue();
+                    };
+                    request.onerror = () => reject(request.error || new Error('IndexedDB feed pagination failed'));
+                }));
         }
 
         async getChannelSyncState(channelId) {
@@ -900,6 +1055,7 @@
             STORE_CHANNEL_SYNC_STATE,
             STORE_HOME_IMPRESSIONS,
             STORE_FEED_SYNC_RUNS,
+            STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES,
             EXPLICIT_SUBSCRIPTION_SOURCES,
             IndexedDBStorage,
             openDatabase

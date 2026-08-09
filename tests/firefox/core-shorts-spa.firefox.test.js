@@ -7,6 +7,10 @@ const {
   removeStoredVideo,
   setExtensionSettings,
 } = require('./firefox-fixture');
+const {
+  advanceToNextOrganicShort,
+  isReadyOrganicShortState,
+} = require('../e2e/shorts-canary-navigation');
 
 const HOME_URL = 'https://www.youtube.com/';
 const TEST_TIMEOUT_MS = 240000;
@@ -163,16 +167,10 @@ async function waitForActiveShort(driver, expectedDifferentFrom = '', expectedVi
     const state = await activeShortState(driver);
     return {
       ...state,
-      ok: state.found
-        && state.readyState >= 1
-        && state.duration > 0
-        && !!state.videoId
-        && state.videoId !== expectedDifferentFrom
-        && (!expectedVideoId || state.videoId === expectedVideoId)
-        && state.reelVideoId === state.videoId
-        && !!state.title
-        && !!state.channelName
-        && !!state.channelId,
+      ok: isReadyOrganicShortState(state, {
+        previousVideoId: expectedDifferentFrom,
+        expectedVideoId,
+      }),
     };
   });
 }
@@ -242,43 +240,46 @@ async function dispatchTrackedSave(driver) {
   return activeShortState(driver);
 }
 
-async function waitForStoredShort(session, videoId, timeoutMs = 15000) {
-  const result = await waitUntil(`stored Short ${videoId}`, timeoutMs, async () => {
+async function waitForStoredShort(session, videoId, active, timeoutMs = 15000) {
+  const result = await waitUntil(`stored Short ${videoId} with current metadata`, timeoutMs, async () => {
     const record = await getStoredVideo(session, videoId);
-    return { ok: !!record && record.isShorts === true, record };
+    const metadataMatches = !active || (
+      record?.videoId === active.videoId &&
+      record?.url === `https://www.youtube.com/shorts/${active.videoId}` &&
+      normalizeText(record?.title) === normalizeText(active.title) &&
+      normalizeText(record?.channelName) === normalizeText(active.channelName) &&
+      record?.channelId === active.channelId
+    );
+    return { ok: !!record && record.isShorts === true && metadataMatches, record };
   });
   return result.record;
 }
 
-async function advanceToNextShort(driver, previousVideoId) {
-  let lastError;
-  for (let attempt = Number(false); attempt < 3; attempt++) {
-    if (attempt === 0) {
-      await waitUntil('the next Shorts control', 30000, async () => {
-        const buttons = await driver.findElements(By.css('button'));
-        for (const button of buttons) {
-          const label = await button.getAttribute('aria-label').catch(() => '');
-          if (/next video/i.test(label || '') && await button.isDisplayed().catch(() => false)) {
-            await button.click();
-            return { ok: true };
-          }
-        }
-        return { ok: false };
-      });
-    } else {
-      const body = await driver.findElement(By.css('body'));
-      await body.sendKeys(attempt === 1 ? Key.ARROW_DOWN : Key.PAGE_DOWN);
-    }
-
-    try {
-      return await waitForActiveShort(driver, previousVideoId, '', 10000);
-    } catch (error) {
-      lastError = error;
-      if (attempt < 2) await sleep(500);
+async function advanceShortsViewport(driver, attempt) {
+  const controls = await driver.findElements(By.css([
+    '#navigation-button-down button',
+    'button#navigation-button-down',
+  ].join(', ')));
+  for (const control of controls) {
+    if (await control.isDisplayed().catch(() => false)) {
+      await control.click();
+      return;
     }
   }
 
-  throw lastError || new Error(`Failed to advance from Short ${previousVideoId}`);
+  await driver.executeScript(() => document.activeElement?.blur()).catch(() => {});
+  const body = await driver.findElement(By.css('body'));
+  await body.sendKeys(attempt > 1 && attempt % 2 === 0 ? Key.PAGE_DOWN : Key.ARROW_DOWN);
+}
+
+async function advanceToNextShort(driver, previousVideoId) {
+  return advanceToNextOrganicShort({
+    previousVideoId,
+    maxAttempts: 5,
+    advance: (attempt) => advanceShortsViewport(driver, attempt),
+    waitForOrganic: () => waitForActiveShort(driver, previousVideoId, '', 10000),
+    readState: () => activeShortState(driver),
+  });
 }
 
 async function verifyDirectLoad(session, active) {
@@ -295,7 +296,7 @@ async function verifyDirectLoad(session, active) {
   const direct = await waitForActiveShort(session.driver, '', active.videoId);
   const savedDirect = await dispatchTrackedSave(session.driver);
   assert.equal(savedDirect.videoId, direct.videoId);
-  const record = await waitForStoredShort(session, direct.videoId);
+  const record = await waitForStoredShort(session, direct.videoId, savedDirect);
   assertStoredShortMatchesActive(record, savedDirect);
 }
 
@@ -333,17 +334,17 @@ async function main() {
     await removeStoredVideo(session, first.videoId);
     const savedFirst = await dispatchTrackedSave(session.driver);
     assert.equal(savedFirst.videoId, first.videoId);
-    const initialRecord = await waitForStoredShort(session, first.videoId);
+    const initialRecord = await waitForStoredShort(session, first.videoId, savedFirst);
     assertStoredShortMatchesActive(initialRecord, savedFirst);
 
     await removeStoredVideo(session, first.videoId);
     const second = await advanceToNextShort(session.driver, first.videoId);
     const savedSecond = await dispatchTrackedSave(session.driver);
     assert.equal(savedSecond.videoId, second.videoId);
-    const secondRecord = await waitForStoredShort(session, second.videoId);
+    const secondRecord = await waitForStoredShort(session, second.videoId, savedSecond);
     assertStoredShortMatchesActive(secondRecord, savedSecond);
 
-    const outgoingRecord = await waitForStoredShort(session, first.videoId, 10000);
+    const outgoingRecord = await waitForStoredShort(session, first.videoId, savedFirst, 10000);
     assertStoredShortMatchesActive(outgoingRecord, savedFirst);
 
     await verifyDirectLoad(session, second);

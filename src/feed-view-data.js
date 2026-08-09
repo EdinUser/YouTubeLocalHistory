@@ -27,24 +27,61 @@
         };
     }
 
+    async function loadActiveSubscriptions(storage) {
+        const [subscriptions, tombstones] = await Promise.all([
+            storage.listSubscriptionRecords(),
+            typeof storage.listLocalUnsubscribeTombstones === 'function'
+                ? storage.listLocalUnsubscribeTombstones()
+                : []
+        ]);
+        const tombstonedChannelIds = new Set(tombstones.map((tombstone) => tombstone.channelId));
+        return subscriptions.filter((subscription) => !tombstonedChannelIds.has(subscription.channelId));
+    }
+
+    function projectActiveFeedVideos(videos, activeSubscriptions) {
+        const subscriptionByChannelId = new Map(
+            activeSubscriptions.map((subscription) => [subscription.channelId, subscription])
+        );
+        return videos.filter((video) => subscriptionByChannelId.has(video.channelId)).map((video) => {
+            const subscription = subscriptionByChannelId.get(video.channelId);
+            return toViewVideo({
+                ...video,
+                channelTitle: video.channelTitle || (subscription && (subscription.channelTitle || subscription.channelName)) || ''
+            });
+        }).filter(Boolean);
+    }
+
     async function loadCanonicalFeedViewData(storage, limit = 0) {
         if (!storage || typeof storage.listSubscriptionFeedVideosByPublishedAt !== 'function' || typeof storage.listSubscriptionRecords !== 'function') {
             throw new TypeError('Canonical feed repositories are required');
         }
-        const [videos, subscriptions] = await Promise.all([
+        const [videos, activeSubscriptions] = await Promise.all([
             storage.listSubscriptionFeedVideosByPublishedAt(limit),
-            storage.listSubscriptionRecords()
+            loadActiveSubscriptions(storage)
         ]);
-        const subscriptionByChannelId = new Map(subscriptions.map((subscription) => [subscription.channelId, subscription]));
         return {
-            videos: videos.map((video) => {
-                const subscription = subscriptionByChannelId.get(video.channelId);
-                return toViewVideo({
-                    ...video,
-                    channelTitle: video.channelTitle || (subscription && (subscription.channelTitle || subscription.channelName)) || ''
-                });
-            }).filter(Boolean),
-            subscriptions: subscriptions.map(toViewSubscription).filter(Boolean)
+            videos: projectActiveFeedVideos(videos, activeSubscriptions),
+            subscriptions: activeSubscriptions.map(toViewSubscription).filter(Boolean)
+        };
+    }
+
+    async function loadCanonicalSubscriptionFeedPage(storage, options = {}) {
+        if (!storage || typeof storage.listSubscriptionFeedVideosPageByPublishedAt !== 'function' ||
+            typeof storage.listSubscriptionRecords !== 'function') {
+            throw new TypeError('Canonical paginated feed repositories are required');
+        }
+        const [page, activeSubscriptions] = await Promise.all([
+            storage.listSubscriptionFeedVideosPageByPublishedAt({
+                limit: options.limit,
+                cursor: options.cursor || null
+            }),
+            loadActiveSubscriptions(storage)
+        ]);
+        return {
+            videos: projectActiveFeedVideos(page.records || [], activeSubscriptions),
+            subscriptions: activeSubscriptions.map(toViewSubscription).filter(Boolean),
+            nextCursor: page.nextCursor || null,
+            exhausted: page.exhausted === true
         };
     }
 
@@ -62,7 +99,13 @@
         }));
     }
 
-    const api = { toViewVideo, toViewSubscription, loadCanonicalFeedViewData, persistHomeImpressions };
+    const api = {
+        toViewVideo,
+        toViewSubscription,
+        loadCanonicalFeedViewData,
+        loadCanonicalSubscriptionFeedPage,
+        persistHomeImpressions
+    };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     root.ytvhtFeedViewData = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

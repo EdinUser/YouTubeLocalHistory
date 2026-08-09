@@ -47,6 +47,9 @@ async function main() {
       !document.documentElement.classList.contains('app-loading') &&
       document.querySelector('#feedSyncStatus')?.getAttribute('aria-busy') !== 'true'
     ), 10000, 'automatic feed startup should settle before installing the controlled scan');
+    await session.driver.executeAsyncScript((done) => {
+      requestPageActiveFeedWork().then(() => done({ ok: true }), (error) => done({ ok: false, error: error.message }));
+    }).then((result) => assert.equal(result.ok, true, result.error));
 
     await session.driver.executeAsyncScript((done) => {
       (async () => {
@@ -116,7 +119,7 @@ async function main() {
           videoId: 'firefox-new-video', channelId, title: 'Firefox new fixture upload', thumbnailUrl,
           publishedAt: 200, discoveredAt: 200, lastSeenInFeedAt: 200, durationSeconds: null, isShort: null, source: 'rss'
         });
-        showNewFeedVideos(1);
+        await showNewFeedVideos(['firefox-new-video']);
         done({ ok: true });
       })().catch((error) => done({ ok: false, error: error.message }));
     }).then((result) => assert.equal(result.ok, true, result.error));
