@@ -13,6 +13,7 @@ plugins:
 nav:
   - Home: index.md
   - Detailed Guide: detailed_guide.md
+  - Privacy and Data: privacy.md
   - Roadmap: roadmap.md
   - Changelog: changelog.md
   - FAQ: faq.md
@@ -24,6 +25,7 @@ nav:
   - Contributing: contributing.md
   - Project Overview: readme.md
   - Live chat: https://t.me/+eFftKWGVvSpiZjZk
+  - Discord: https://discord.gg/9fuvSzP7Qr
   - Community: https://community.kirilov.dev/t/re-watch
 markdown_extensions:
   - admonition

@@ -1338,12 +1338,16 @@
 
             await this.ensureMigrated();
             
-            // Clear IndexedDB (videos, playlists, deletions)
+            // Clear IndexedDB history data without touching canonical feed state.
             if (this._isIndexedDBAvailable()) {
                 try {
-                    await ytIndexedDBStorage.clearAll();
+                    if (typeof ytIndexedDBStorage.clearHistory === 'function') {
+                        await ytIndexedDBStorage.clearHistory();
+                    } else {
+                        await ytIndexedDBStorage.clearAll();
+                    }
                 } catch (error) {
-                    console.warn('[Storage] IndexedDB clearAll failed:', error);
+                    console.warn('[Storage] IndexedDB history clear failed:', error);
                 }
             }
             

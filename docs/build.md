@@ -1,14 +1,12 @@
-# Build Instructions
-
-This guide explains how to install dependencies, run checks, and load YT re:Watch for local browser testing.
+# Build instructions
 
 ## Prerequisites
 
-- Node.js 18 or newer
-- npm
-- Git
-- Firefox or Chrome/Chromium
-- Git Bash, WSL, or another Bash-compatible shell if you want to run `build.sh`
+- Node.js 18 or newer;
+- npm and Git;
+- Bash (native, Git Bash, or WSL for the release scripts);
+- Chromium/Chrome for Playwright extension testing;
+- Firefox and a compatible geckodriver for Firefox extension testing.
 
 ## Install
 
@@ -18,109 +16,88 @@ cd YouTubeLocalHistory
 npm install
 ```
 
-## Local Firefox Testing
+## Development builds
 
-This is the recommended development path on Windows.
+Prepare the unpacked Chrome test extension:
 
 ```bash
-npm run prepare:firefox
+npm run build:e2e:chrome
 ```
 
-Then open Firefox:
+Load `build/e2e/chrome` from `chrome://extensions/` with Developer mode enabled.
 
-1. Go to `about:debugging`.
-2. Click `This Firefox`.
-3. Click `Load Temporary Add-on`.
-4. Select `build/firefox/manifest.json`.
+Prepare the unpacked Firefox test extension:
 
-After code changes, run `npm run prepare:firefox` again, then reload the temporary add-on.
+```bash
+npm run build:e2e:firefox
+```
 
-## Local Chrome Testing
+Load `build/e2e/firefox/manifest.json` from `about:debugging` → **This Firefox** → **Load Temporary Add-on**. `npm run firefox:run` prepares and launches the temporary Firefox extension through the project helper.
 
-Use the release build script to prepare `build/chrome`, or copy the source files into a Chrome build folder using the same file list from `build.sh`.
+`npm run prepare:firefox` remains available for the conventional `build/firefox` development package.
 
-Then open Chrome:
+## Release checks
 
-1. Go to `chrome://extensions/`.
-2. Enable `Developer mode`.
-3. Click `Load unpacked`.
-4. Select `build/chrome`.
-
-## Checks
-
-Run these before opening a pull request:
+Start with deterministic cross-browser coverage:
 
 ```bash
 npm run lint
-npm test -- --runInBand
-npm run prepare:firefox
-npx web-ext lint --source-dir=build/firefox
+npm run test:local:offline
+npm run docs:safety
+npm run docs:build
+npm run test:release:artifacts
 ```
 
-Useful test commands:
+Run external canaries separately:
 
 ```bash
-npm test
-npm run test:unit
-npm run test:integration
-npm run test:memory
-npm run test:e2e
-npm run test:coverage
+npm run test:canary
 ```
 
-`npm run test:e2e` uses Playwright. If browsers are missing, run:
+For the widest available command, including fixture refresh and all live checks:
 
 ```bash
-npx playwright install
+npm run test:local:full
 ```
 
-## Release Packaging
+See [Testing](testing.md) for why deterministic gates and live canaries are reported separately.
 
-The release script builds browser folders and creates ZIP packages in `dist/`.
+## Release packages
 
 ```bash
 npm run build
 ```
 
-or directly:
+This invokes `build.sh`, copies the explicit release file set, and creates packages under `dist/`:
 
-```bash
-./build.sh
-```
+- `youtube-local-history-chrome-v{version}.zip`;
+- `youtube-local-history-chrome-v{version}.crx` when Chrome signing is configured;
+- `youtube-local-history-firefox-v{version}.zip`.
 
-Notes:
+Chrome CRX signing requires a Chrome executable and `certs/privatekey.pem`, or paths provided through `CHROME_EXTENSION_DIR` and `PRIVATE_KEY_PATH`. ZIP artifacts can still be produced when CRX signing is unavailable.
 
-- `build.sh` is a Bash script. On Windows, run it from Git Bash or WSL.
-- Chrome CRX signing requires `google-chrome` and a private key at `certs/privatekey.pem`, or paths supplied through `CHROME_EXTENSION_DIR` and `PRIVATE_KEY_PATH`.
-- If Chrome signing is not configured, the Chrome ZIP may still be useful, but CRX generation can warn or fail depending on your environment.
-
-Expected release outputs:
-
-- `dist/youtube-local-history-chrome-v{version}.zip`
-- `dist/youtube-local-history-chrome-v{version}.crx` when signing succeeds
-- `dist/youtube-local-history-firefox-v{version}.zip`
-
-## Project Structure
+## Release structure
 
 ```text
 src/
-  _locales/                  Translation files
-  manifest.chrome.json       Chrome extension manifest
-  manifest.firefox.json      Firefox extension manifest
-  background.js              Extension background script
-  content*.js                YouTube page content scripts
-  popup*.js                  Toolbar popup
-  feed*.js                   Full local feed page
-  import.html, import.js     Import page
-  storage.js                 Browser storage wrapper
-  indexeddb-storage.js       IndexedDB history storage
+  _locales/                  localized messages
+  manifest.chrome.json       Chrome manifest
+  manifest.firefox.json      Firefox manifest
+  background.js              background/service-worker runtime
+  content*.js                YouTube integration and tracking
+  popup*.js                  compact toolbar popup
+  feed*.js                   full local feed interface
+  indexeddb-storage.js       extension-origin IndexedDB repository
+  storage.js                 shared compatibility/storage API
 ```
 
-## Debugging
+`build.sh` copies files explicitly. When adding a loaded source file, update its copy list and the owning manifest or HTML load order, then run the release-artifact test.
 
-- Enable Debug Mode in Settings for extra logs.
-- Use `about:debugging` in Firefox to inspect the temporary extension.
-- Use `chrome://extensions/` in Chrome to inspect service worker/content script errors.
-- If the local feed looks stale, reload the extension and click `Refresh` in the feed page.
+## Debugging a local build
 
-For more technical details, see [Technical Documentation](./technical.md).
+- Enable Debug Mode in re:Watch Settings for additional extension logs.
+- Inspect Firefox from `about:debugging`.
+- Inspect Chrome extension pages and its service worker from `chrome://extensions/`.
+- Select **Reload** to redraw the feed from local storage.
+- Select **Check** when you intend to scan eligible public channel feeds.
+- Reload existing YouTube tabs after rebuilding or reloading the extension.

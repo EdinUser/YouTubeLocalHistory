@@ -84,9 +84,13 @@ function findSubscriptionForVideo(video) {
             .map((id) => String(id).toLowerCase());
         return ids.some((id) => subIds.includes(id));
     });
-    if (idMatch || ids.length) return idMatch || null;
+    if (idMatch) return idMatch;
+    // A saved history record commonly has only an @handle while an imported
+    // subscription initially has only its UC id. Use the channel title as the
+    // bridge unless the video already supplied a different canonical UC id.
+    if (ids.some((id) => /^uc[\w-]+$/.test(id))) return null;
     return (localSubscriptions || []).find((subscription) =>
-        key && channelKey(subscription.channelName) === key) || null;
+        key && channelKey(subscription.channelName || subscription.channelTitle) === key) || null;
 }
 
 async function saveVideoToLocalPlaylist(playlists, id, title, video) {

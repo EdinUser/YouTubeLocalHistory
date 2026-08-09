@@ -137,13 +137,17 @@ function onStorageChanged(changes, area) {
     }
     const videoChanges = changes && Object.entries(changes).filter(([key]) => key.startsWith('video_'));
     if (videoChanges && videoChanges.length) {
+        let historyNeedsRender = false;
         videoChanges.forEach(([key, change]) => {
             const videoId = key.slice('video_'.length);
             if (change.newValue) watchedMap[videoId] = change.newValue;
             else delete watchedMap[videoId];
             if (typeof refreshWatchedOverlayForVideo === 'function') refreshWatchedOverlayForVideo(videoId);
+            if (historyActive && (!change.newValue || !refreshHistoryRow(videoId, change.newValue))) {
+                historyNeedsRender = true;
+            }
         });
-        if (historyActive) renderHistory();
+        if (historyActive && historyNeedsRender) renderHistory();
         else if (channelActive && activeChannelInfo) renderChannelPage(activeChannelInfo);
         else if (isFeedContentViewActive() && (shortsOnly || document.getElementById('unwatched')?.checked)) render();
     }

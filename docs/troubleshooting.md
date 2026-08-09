@@ -1,179 +1,107 @@
-# 🔧 Troubleshooting Guide
+# Troubleshooting
 
-This guide helps you solve common issues with YT re:Watch extension. If you're experiencing problems, follow these steps in order.
+Start with the smallest relevant check. Export a backup before clearing extension data, reinstalling, or resetting.
 
-## 🚨 Quick Fixes (Try First)
+## Videos are not being recorded
 
-Most issues can be resolved with these simple steps:
+1. Confirm the page is a normal `youtube.com/watch` or Shorts page.
+2. Start playback and leave it running long enough for meaningful progress to be recorded.
+3. Check whether global playlist pause or the current playlist's ignore toggle is enabled.
+4. Reload the YouTube tab after installing or updating the extension.
+5. Temporarily disable other YouTube-modifying extensions and retry.
+6. Confirm the extension is allowed in the current private/incognito window if applicable.
 
-### 1. Refresh YouTube Page
-```bash
-# Press Ctrl+F5 (or Cmd+Shift+R on Mac) to hard refresh
-```
-This fixes 90% of all issues by clearing cached content and reloading the extension.
+If only one YouTube layout fails, include the page type and a screenshot in the bug report. YouTube rolls out different markup to different users.
 
-### 2. Restart Extension
-1. Click the extension icon in your browser toolbar
-2. Close the popup or feed page completely
-3. Click the extension icon again to reopen
+## Resume or metadata looks stale
 
-### 3. Check Browser Compatibility
-- **Chrome**: Works on `youtube.com` (not `youtube.tv` or mobile)
-- **Firefox**: Works on `youtube.com` (not mobile or TV)
-- Ensure you're on the main YouTube website, not embedded players
+Close and reopen the popup or select **Reload** in the full interface to render current local records. Duration appears only when it is available; playing an older saved video can fill it later.
 
-## 🐛 Common Issues & Solutions
+If a History card refreshes, its **Remove** control and three-dot menu should remain present. Report a reproducible disappearance as a UI bug.
 
-### Installation Problems
+## The feed is empty
 
-#### Extension Icon Not Visible
-**Symptoms**: Extension icon missing from browser toolbar
+1. Open **Channels** and confirm at least one local follow exists.
+2. Select **Check** and watch the scheduler status beside the button.
+3. Allow the initialization scan to finish; existing cached cards should render before it completes.
+4. Open **Subscriptions** or select **Show** to inspect the chronological inventory.
 
-**Solutions**:
-1. **Check if installed**: Go to `chrome://extensions/` (Chrome) or `about:addons` (Firefox)
-2. **Enable extension**: Click the toggle to enable YT re:Watch
-3. **Pin to toolbar**: Click the puzzle piece icon and pin YT re:Watch
-4. **Restart browser**: Complete browser restart often fixes visibility issues
+Public feeds can be missing, delayed, rate-limited, or temporarily unavailable. A failed channel does not mean your local history was lost.
 
-#### Extension Not Loading on YouTube
-**Symptoms**: No overlays or progress bars on YouTube pages
+## Check, Reload, or Show did something unexpected
 
-**Solutions**:
-1. **Refresh YouTube page** (try multiple times)
-2. **Check permissions**: Extension needs access to `youtube.com`
-3. **Clear browser cache**: Old cached content can interfere
-4. **Disable other extensions**: Conflicts with other YouTube extensions
+- **Check** performs eligible public feed work.
+- **Reload** only rebuilds the visible interface from local storage.
+- **Show** changes to the chronological Subscriptions inventory.
 
-### Video Tracking Issues
+Opening Home also regenerates its local ordering; it should not initiate a separate Home-owned request.
 
-#### Videos Not Being Tracked
-**Symptoms**: Watched videos don't appear in history
+## Search cannot find a YouTube video
 
-**Solutions**:
-1. **Watch for 10+ seconds**: Extension tracks after minimum watch time
-2. **Refresh page**: Reload YouTube after watching
-3. **Check if on YouTube.com**: Extension only works on main site
-4. **Disable ad blockers**: Some ad blockers interfere with video detection
-5. **Enable in settings**: Ensure "Track videos" is enabled in extension settings
+Feed search is intentionally local. It can find only saved history and cached feed records. Use YouTube itself for remote discovery.
 
-#### Progress Bars Not Showing
-**Symptoms**: No visual indicators on video thumbnails
+## A subscription import skipped channels
 
-**Solutions**:
-1. **Refresh YouTube page** after watching videos
-2. **Check overlay settings**: Ensure overlays are enabled in settings
-3. **Allow time for saving**: Progress bars appear after video is saved to local storage
-4. **Clear browser data**: Old cached thumbnails can cause display issues
+Review the result in Settings. Previously removed channels are counted as ignored. Select the result action or open **Channels → Ignored**, then choose **Restore** or **Forget** for each record.
 
-#### Videos Not Resuming from Saved Position
-**Symptoms**: Clicking videos from channel pages or certain navigation paths starts from beginning instead of saved timestamp
+The Ignored tab is hidden when no tombstones exist.
 
-**Solutions**:
-1. **Refresh the video page**: Sometimes YouTube's restoration catches up after a refresh
-2. **Check extension version**: Ensure you have the latest version (3.1.5+) with enhanced navigation detection
-3. **Try different navigation**: Videos from suggested videos or search results may work better than channel page clicks
-4. **Wait a moment**: The extension has fallback restoration that activates when video starts playing
-5. **Disable ad blockers temporarily**: Some ad blockers interfere with YouTube's restoration mechanisms
+## A followed channel still shows Subscribe
 
-#### Videos Not Being Saved During Playback
-**Symptoms**: Video plays but progress isn't saved, requiring manual pause/play to start tracking
+Reload the local interface. re:Watch compares canonical channel identity, including known handle/channel-ID aliases. If the action remains wrong, report the video URL, channel URL, and whether the follow was added manually or imported.
 
-**Solutions**:
-1. **Refresh YouTube page**: Reload to reinitialize extension properly
-2. **Check for conflicts**: Disable other YouTube-related extensions temporarily
-3. **Browser restart**: Complete browser restart can resolve initialization issues
-4. **Update extension**: Ensure you have version 3.1.5+ with improved save interval management
+## Playlist videos are missing from re:Watch
 
-### History Display Problems
+This is expected for a saved playlist reference. v5 stores the link and available metadata but does not import playlist members. Open the reference to view the original playlist on YouTube.
 
-#### History Tab Empty or Missing Videos
-**Symptoms**: Extension feed or popup shows no history or missing videos
+## Analytics are blank or delayed
 
-**Solutions**:
-1. **Refresh the extension UI**: Refresh the feed page or close and reopen the popup
-2. **Check storage quota**: Extension has 5GB+ storage limit
-3. **Browser data clearing**: If you cleared browser data, history is lost
-4. **Incognito mode**: Extension doesn't work in private browsing
-5. **Different browser profile**: Each profile has separate history
+Analytics are derived from meaningful local history. A new profile may not have enough data for every card. Reload the interface to rebuild the presentation from the local statistics snapshot and history.
 
-#### Videos Disappearing from History
-**Symptoms**: Previously tracked videos no longer appear
+Hourly and activity bars should share a consistent baseline. Include a screenshot if a selected hour appears offset or extends below the chart.
 
-**Solutions**:
-1. **Check deletion**: Videos may have been manually deleted
-2. **Storage corruption**: Rare, but can happen with browser crashes
-3. **Storage migration**: Check if hybrid storage migration is in progress
-4. **Browser update**: Updates can sometimes affect extension storage
+## Backup will not restore
 
-### Storage & Migration Issues
+1. Confirm the file is an unmodified JSON backup created by re:Watch.
+2. Check that sufficient browser storage and disk space are available.
+3. Retry in a normal browser window.
+4. Preserve the failed file and visible error message for a bug report.
 
-#### Migration Problems
-**Symptoms**: Extension shows migration in progress, or data appears incomplete
+Restore merges; it does not offer a destructive replace mode. Older supported backup fields are migrated when possible.
 
-**Solutions**:
-1. **Check migration status**: Open extension settings to see migration progress
-2. **Ensure stable connection**: Migration may pause during network issues
-3. **Restart browser**: Complete restart can resume stuck migrations
-4. **Wait for completion**: Migration may take time for large histories
+## Reset did not produce an empty profile
 
-### Performance Issues
+After **Reset all data**, close and reopen extension pages. History, playlist references, Watch Later, subscriptions, tombstones, feed/scheduler state, deletion markers, analytics, and settings should be cleared.
 
-#### Extension Slow or Unresponsive
-**Symptoms**: Extension feed or popup slow to open, videos slow to track
+Do not use the browser's developer tools to delete individual IndexedDB stores unless you are diagnosing with a developer; partial deletion can leave inconsistent state.
 
-**Solutions**:
-1. **Backup first**: Go to Settings > Data Management and download a backup before clearing data
-2. **Browser restart**: Complete restart frees up memory
-3. **Check storage usage**: Large history can slow down the extension
-4. **Disable unused features**: Turn off features you don't need
+## Firefox-specific checks
 
-#### High Memory Usage
-**Symptoms**: Browser using excessive memory
+- Confirm re:Watch is enabled in `about:addons`.
+- Confirm it has permission to access YouTube.
+- Reload existing YouTube tabs after an extension update.
+- If testing a temporary development build, remember that it disappears when that Firefox session ends.
 
-**Solutions**:
-1. **Browser restart**: Frees up accumulated memory
-2. **Check video count**: Large history increases memory usage
-3. **Storage cleanup**: Remove old videos you no longer need
-4. **Browser extensions**: Other extensions may also use memory
+Firefox and Chrome can receive different YouTube layouts. A problem in one browser still needs its browser/version recorded even when the other works.
 
-## 🔍 Debug Mode
+## Collect useful diagnostics
 
-Enable debug mode for detailed logging to help troubleshoot complex issues:
+Enable debug logging only while reproducing the problem, then include:
 
-### Enable Debug Mode
-1. Open the YT re:Watch feed page
-2. Go to **Settings** tab
-3. Enable **"Debug Mode"**
-4. Check browser console for detailed logs
+- re:Watch version;
+- browser and browser version;
+- operating system;
+- exact steps and affected URL type;
+- visible status/error text;
+- whether the problem reproduces in a clean browser profile;
+- a screenshot with personal information removed.
 
-### Debug Information to Include in Bug Reports
-When reporting issues, include:
-- **Browser and version** (Chrome 120.0, Firefox 119.0)
-- **Extension version** (visible in the extension UI or browser add-on details)
-- **Operating system** (Windows 11, macOS 14.0, Ubuntu 22.04)
-- **Steps to reproduce** the issue
-- **Expected vs actual behavior**
-- **Console errors** (if in debug mode)
-- **Screenshots** (if visual issues)
+Do not publish backup files or logs containing sensitive viewing data.
 
-## 📞 Getting Help
+## Get help
 
-### Community Support
-- **GitHub Issues**: [Report bugs or request help](https://github.com/EdinUser/YouTubeLocalHistory/issues)
-- **Telegram Community**: [Chat with other users](https://t.me/+eFftKWGVvSpiZjZk)
-
-### Before Asking for Help
-1. **Try the troubleshooting steps above**
-2. **Search existing GitHub issues** - someone may have reported the same problem
-3. **Check the FAQ** - [Frequently Asked Questions](./faq.md)
-4. **Read the detailed guide** - [Complete User Guide](./detailed_guide.md)
-
-### Emergency Fixes
-If nothing works:
-1. **Reset extension data**: Use your browser's extension storage controls only after exporting a backup (this loses local data)
-2. **Reinstall extension**: Remove and reinstall YT re:Watch
-3. **Check for updates**: Ensure you have the latest version
-
----
-
-*Most issues are resolved by **refreshing the YouTube page** and **restarting the browser**. Try these steps first before diving into complex troubleshooting.*
+- [GitHub issues](https://github.com/EdinUser/YouTubeLocalHistory/issues)
+- [Community forum](https://community.kirilov.dev/t/re-watch)
+- [Telegram community](https://t.me/+eFftKWGVvSpiZjZk)
+- [Discord community](https://discord.gg/9fuvSzP7Qr)
+- [FAQ](faq.md)

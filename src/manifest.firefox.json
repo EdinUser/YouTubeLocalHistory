@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "YT re:Watch",
     "version": "5.0.0",
-    "description": "Private local YouTube history, watch progress, subscriptions, playlists, and a local feed. Everything stays in your browser.",
+    "description": "Private local YouTube history, watch progress, channel subscriptions, analytics, and an in-browser feed. No account required.",
     "author": "Edin User",
     "homepage_url": "https://github.com/EdinUser/YouTubeLocalHistory",
     "browser_specific_settings": {

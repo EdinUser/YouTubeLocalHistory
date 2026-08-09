@@ -1,63 +1,20 @@
-# 📚 YT re:Watch Documentation
+# Documentation map
 
-# ❤️ Support the Project
+Use this page to find the shortest path to the information you need.
 
-If you find YT re:Watch helpful, you can support ongoing development on [Patreon](https://patreon.com/EdinUser)!
+| Guide | Best for |
+| --- | --- |
+| [Documentation home](index.md) | Installing re:Watch and understanding the v5 feature set |
+| [Detailed guide](detailed_guide.md) | Using every feed, history, channel, analytics, backup, and customization surface |
+| [Privacy and data](privacy.md) | Storage, network requests, account boundaries, backup, and deletion |
+| [FAQ](faq.md) | Concise answers about accounts, feeds, subscriptions, and data |
+| [Troubleshooting](troubleshooting.md) | Diagnosing tracking, feed, import, and browser-specific problems |
+| [Changelog](changelog.md) | Shipped behavior and release notes |
+| [Roadmap](roadmap.md) | Planned work that is not part of the stable release |
+| [Build](build.md) | Producing Chrome and Firefox packages |
+| [Testing](testing.md) | Offline suites, browser coverage, and live canaries |
+| [Technical reference](technical.md) | Architecture and implementation boundaries |
+| [Code notes](code-notes.md) | Maintainer-level module and storage notes |
+| [Contributing](contributing.md) | Preparing a contribution |
 
-[![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange?logo=patreon&logoColor=white)](https://patreon.com/EdinUser)
-
-Welcome! Find the right guide for you:
-
-## 🎯 **Choose Your Guide**
-
-### 🙋‍♀️ **New User?**
-**[→ Start Here: Quick Setup Guide](./index.md)**
-- Same history across ALL YouTube accounts
-- Get the extension working in 5 minutes  
-- Local history, subscriptions, playlists, and feed basics
-- What local storage protects, and what normal YouTube browsing still exposes
-
-### ❓ **Have Questions?**
-**[→ Frequently Asked Questions](./faq.md)**
-- Common problems & solutions
-- Privacy explanations
-- Feature questions
-
-### 📖 **Want Complete Instructions?**
-**[→ Detailed User Guide](./detailed_guide.md)**
-- Step-by-step walkthrough
-- All features explained
-- Customization options
-
-
-### 🔧 **Developer or Contributor?**
-**[→ Technical Documentation](./technical.md)**
-- Architecture details
-- API references
-- Build instructions
-
----
-
-## 📁 **What's in Each Guide**
-
-| Guide | Best For | What You'll Learn |
-|-------|----------|-------------------|
-| **[index.md](./index.md)** | Multi-account users & newcomers | Account independence + privacy benefits |
-| **[faq.md](./faq.md)** | Anyone with questions | Account switching, privacy details |
-| **[detailed_guide.md](./detailed_guide.md)** | Power users | Complete feature walkthrough |
-| **[technical.md](./technical.md)** | Developers | Code structure, APIs |
-
----
-
-## 🤝 **Need Help?**
-
-- 💬 **[Join our Telegram community](https://t.me/+eFftKWGVvSpiZjZk)** - Get help from other users
-- 🐛 **[Report issues on GitHub](https://github.com/EdinUser/YouTubeLocalHistory/issues)** - Found a bug?
-
----
-
-*Most people start with the **[Quick Setup Guide](./index.md)** →*
-
-## Multilanguage Support
-
-This extension is available in several languages. See the [documentation home](./index.md) and [technical guide](./technical.md) for details on translation and contributing improvements.
+For help, visit the [community forum](https://community.kirilov.dev/t/re-watch), join the [Telegram community](https://t.me/+eFftKWGVvSpiZjZk) or [Discord community](https://discord.gg/9fuvSzP7Qr), or [report an issue](https://github.com/EdinUser/YouTubeLocalHistory/issues).

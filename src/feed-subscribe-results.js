@@ -115,9 +115,16 @@ function buildResultRow(video, opts) {
     img.alt = '';
     tw.appendChild(img);
 
-    addWatchedOverlay(tw, opts.overlayRecord || watchedMap[video.videoId]);
+    const overlayRecord = opts.overlayRecord || watchedMap[video.videoId];
+    addWatchedOverlay(tw, overlayRecord);
+    const durationSeconds = Number(
+        video.duration
+        || (video.videoId && durationCache[video.videoId])
+        || (overlayRecord && overlayRecord.duration)
+        || 0
+    );
     const durText = cleanDurationText(video._durationText) ||
-        (video.duration > 0 ? formatDuration(video.duration) : '');
+        (durationSeconds > 0 ? formatDuration(durationSeconds) : '');
     if (videoIsLive(video)) {
         addLiveBadge(tw);
     } else if (durText) {

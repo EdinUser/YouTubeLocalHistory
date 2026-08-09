@@ -52,6 +52,30 @@ async function renderHistory() {
         : tFeed('feed_load_more', 'Load more');
 }
 
+function refreshHistoryRow(videoId, record) {
+    const row = Array.from(document.querySelectorAll('#historyList .history-row'))
+        .find((candidate) => candidate.dataset.ytvhtVideoId === videoId);
+    if (!row || !isVisibleHistoryRecord(record) || isShortsHistoryRecord(record)) return false;
+
+    const meta = row.querySelector('.yt-row-meta');
+    if (meta) meta.textContent = historyWatchedText(record);
+
+    const thumbWrap = row.querySelector('.ytvht-thumb-wrap');
+    if (thumbWrap) {
+        const existingDuration = thumbWrap.querySelector('.ytvht-card-duration');
+        const durationText = Number(record.duration || 0) > 0 ? formatDuration(record.duration) : '';
+        if (durationText) {
+            const badge = existingDuration || document.createElement('span');
+            badge.className = 'ytvht-card-duration';
+            badge.textContent = durationText;
+            if (!existingDuration) thumbWrap.appendChild(badge);
+        } else if (existingDuration) {
+            existingDuration.remove();
+        }
+    }
+    return true;
+}
+
 function showHistory() {
     rememberView('history');
     document.body.classList.remove('shorts-mode');

@@ -66,12 +66,19 @@ Recommended checks before opening a PR:
 
 ```bash
 npm run lint
-npm test -- --runInBand
-npm run prepare:firefox
-npx web-ext lint --source-dir=build/firefox
+npm run test:local:offline
+npm run docs:safety
 ```
 
-For local Firefox testing, load `build/firefox/manifest.json` from `about:debugging` after running `npm run prepare:firefox`.
+Run `npm run test:canary` separately when the change affects live YouTube,
+public feeds, channel metadata, or retained host permissions. Canary failures
+must be investigated, but they are reported separately from deterministic
+release gates because YouTube and the network are external inputs.
+
+For local Firefox testing, run `npm run build:e2e:firefox` and load
+`build/e2e/firefox/manifest.json` from `about:debugging`. For Chrome, run
+`npm run build:e2e:chrome` and load `build/e2e/chrome` unpacked. See the
+[Testing guide](testing.md) for focused and full-suite commands.
 
 ### Code Review Guidelines
 
@@ -126,6 +133,7 @@ When reviewing contributions, focus on:
 ### Community Support
 - **GitHub Issues** - [Report bugs or request features](https://github.com/EdinUser/YouTubeLocalHistory/issues)
 - **Telegram Community** - [Chat with other contributors](https://t.me/+eFftKWGVvSpiZjZk)
+- **Discord Community** - [Chat with users and contributors](https://discord.gg/9fuvSzP7Qr)
 - **Documentation** - Check existing docs for guidance
 
 ### Before Asking Questions
@@ -138,7 +146,7 @@ When reviewing contributions, focus on:
 Contributors are recognized in:
 - **CHANGELOG.md** - For significant contributions
 - **GitHub repository** - All contributors listed
-- **Community shoutouts** - In our Telegram community
+- **Community shoutouts** - In our Telegram and Discord communities
 
 ---
 

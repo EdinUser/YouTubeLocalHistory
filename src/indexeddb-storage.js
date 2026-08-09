@@ -1027,17 +1027,27 @@
 
         // --- Utilities ------------------------------------------------------
 
+        async clearHistory() {
+            const storeNames = [STORE_VIDEOS, STORE_PLAYLISTS, STORE_DELETIONS];
+            return this._withStores(storeNames, 'readwrite', (stores) => {
+                storeNames.forEach((storeName) => stores[storeName].clear());
+            });
+        }
+
         async clearAll() {
-            return this._withStore(STORE_VIDEOS, 'readwrite', (store) => {
-                store.clear();
-            }).then(() => {
-                return this._withStore(STORE_PLAYLISTS, 'readwrite', (store) => {
-                    store.clear();
-                });
-            }).then(() => {
-                return this._withStore(STORE_DELETIONS, 'readwrite', (store) => {
-                    store.clear();
-                });
+            const storeNames = [
+                STORE_VIDEOS,
+                STORE_PLAYLISTS,
+                STORE_DELETIONS,
+                STORE_SUBSCRIPTIONS,
+                STORE_SUBSCRIPTION_FEED_VIDEOS,
+                STORE_CHANNEL_SYNC_STATE,
+                STORE_HOME_IMPRESSIONS,
+                STORE_FEED_SYNC_RUNS,
+                STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES
+            ];
+            return this._withStores(storeNames, 'readwrite', (stores) => {
+                storeNames.forEach((storeName) => stores[storeName].clear());
             });
         }
     }

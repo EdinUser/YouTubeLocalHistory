@@ -60,8 +60,8 @@ Files named `popup*.js` power the browser action popup:
 Files named `feed*.js` power the extension feed page:
 
 - `feed.js`: top-level page wiring and page-active scheduler coordination.
-- `feed-refresh.js`: reloads canonical projections and owns manual Refresh
-  status/notice behavior.
+- `feed-refresh.js`: reloads canonical projections and owns manual Check/Reload
+  status and notice behavior.
 - `feed-contracts.js`, `rss-parser.js`, `rss-client.js`, and
   `feed-ingestion.js`: normalize public channel RSS and idempotently upsert the
   canonical feed inventory and per-channel sync state.
@@ -95,14 +95,18 @@ The extension has two central storage boundaries:
   watch history, playlists, deletion markers, Watch Later, settings, stats,
   selected caches, and legacy `sub_*` compatibility records.
 - `indexeddb-storage.js` exposes `globalThis.ytIndexedDBStorage` and owns the
-  extension-origin database at version 5. Its canonical feed stores are
+  extension-origin database at version 6. Its canonical feed stores are
   `subscriptions`, `subscription_feed_videos`, `channel_sync_state`,
-  `home_impressions`, and `feed_sync_runs`.
+  `home_impressions`, `feed_sync_runs`, and
+  `local_unsubscribe_tombstones`.
 
 Main responsibilities:
 
 - `subscriptions` contains only explicit canonical local follows/imports keyed
   by UC channel ID. Legacy `sub_*` records are not automatic feed inputs.
+- `local_unsubscribe_tombstones` records explicit local unfollows so imports do
+  not silently restore removed channels. The Channels Ignored tab is derived
+  from this store and is hidden when the store is empty.
 - `subscription_feed_videos` is the RSS-derived feed inventory. Existing watch
   history remains a separate durable source used only for local ranking and
   watched presentation.
@@ -113,6 +117,9 @@ Main responsibilities:
 - Feed retention removes only feed-owned inventory, impression, and run-summary
   records. It does not prune history, progress, playlists, saved items, local
   subscriptions, or channel sync state.
+- Full Reset is different from history-only clearing: it clears every IndexedDB
+  store, including canonical feed state and local-unsubscribe tombstones, plus
+  extension local storage.
 - `feedCache` and the aggregate/backfill pipeline are not part of the active v5
   feed runtime.
 

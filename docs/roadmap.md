@@ -1,6 +1,7 @@
 # YT re:Watch roadmap
 
-This roadmap describes the intended direction after the stable v5.0 release.
+This roadmap describes the intended direction after the stable v5.0 release,
+published on 9 August 2026.
 It is not a promise of dates or final scope. Priorities may change when design,
 privacy, browser-policy, or technical findings require it.
 
