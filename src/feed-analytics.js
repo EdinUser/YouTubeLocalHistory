@@ -5,6 +5,7 @@ let activePlaylistDetailId = null;
 let playlistDetailRenderToken = 0;
 let historyActive = false;
 let settingsActive = false;
+let watchLaterActive = false;
 let historyVisibleLimit = 30;
 let analyticsChannelSort = 'watchTime';
 let analyticsHistorySnapshot = [];

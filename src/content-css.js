@@ -289,6 +289,10 @@
                 background: ${color} !important;
             }
         `;
+        // injectCSS recreates the base stylesheet when settings change. Keep
+        // this dynamic stylesheet last so its chosen accent wins over that
+        // base stylesheet's blue fallback rules.
+        document.head.appendChild(styleElement);
     }
 
     window.YTVHTContentCss = {

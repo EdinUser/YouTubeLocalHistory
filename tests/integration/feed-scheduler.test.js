@@ -1,6 +1,10 @@
 const contracts = require('../../src/feed-contracts.js');
 const { ingestRssScan } = require('../../src/feed-ingestion.js');
 const { FeedScheduler } = require('../../src/feed-scheduler.js');
+const feedViewData = require('../../src/feed-view-data.js');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 
 const CHANNEL_A = 'UC1234567890abcdefghijkl';
 const CHANNEL_B = 'UC9876543210abcdefghijkl';
@@ -339,5 +343,44 @@ describe('shared feed scheduler', () => {
     expect(storage.feedSyncRuns.has('prior-99')).toBe(false);
     expect(JSON.stringify([...storage.durableHistory])).toBe(historyBefore);
     expect(JSON.stringify([...storage.durablePlaylists])).toBe(playlistsBefore);
+  });
+
+  test('does not advertise a discovered ID that retention removed before the user can Show it', async () => {
+    const storage = createStorage([{ channelId: CHANNEL_A, source: 'manual' }]);
+    const now = 2_000_000_000_000;
+    await storage.putChannelSyncState({ channelId: CHANNEL_A, initializationState: 'complete', nextEligibleCheckAt: 0 });
+    const scheduler = new FeedScheduler({
+      storage,
+      clock: () => now,
+      fetchChannelRss: async () => contracts.createRssScanResult({
+        channelId: CHANNEL_A,
+        fetchedAt: now,
+        entries: [{
+          videoId: 'expired-discovery', title: 'Expired discovery',
+          publishedAt: now - 271 * 24 * 60 * 60 * 1000
+        }]
+      }),
+      ingestRssScan
+    });
+    const result = await scheduler.runForeground({ limit: 1, concurrency: 1, runId: 'expired-discovery-run' });
+    expect(result.insertedVideoIds).toEqual(['expired-discovery']);
+    expect(storage.feedVideos.has('expired-discovery')).toBe(false);
+
+    const feedSource = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'feed.js'), 'utf8');
+    const helperSource = feedSource.slice(
+      feedSource.indexOf('async function showRetainedNewFeedVideos'),
+      feedSource.indexOf('function onStorageChanged')
+    );
+    const showNewFeedVideos = jest.fn(async () => {});
+    const context = {
+      Promise, Set, String, Array, console,
+      ytvhtFeedViewData: feedViewData,
+      ytIndexedDBStorage: storage,
+      showNewFeedVideos
+    };
+    vm.runInNewContext(helperSource, context);
+
+    await expect(context.showRetainedNewFeedVideos(result.insertedVideoIds)).resolves.toEqual([]);
+    expect(showNewFeedVideos).not.toHaveBeenCalled();
   });
 });

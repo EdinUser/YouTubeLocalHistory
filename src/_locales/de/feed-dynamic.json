@@ -141,5 +141,8 @@
   "feed_views_other": { "message": "$1 Aufrufe" },
   "feed_watched_on": { "message": "Angesehen am $1" },
   "feed_watched_on_percent": { "message": "Angesehen am $1 · $2 angesehen" },
-  "feed_watched_relative": { "message": "Angesehen $1" }
+  "feed_watched_relative": { "message": "Angesehen $1" },
+  "feed_watch_later_added": { "message": "Gespeichert $1" },
+  "feed_watch_later_entries_one": { "message": "$1 gespeichertes Video" },
+  "feed_watch_later_entries_other": { "message": "$1 gespeicherte Videos" }
 }

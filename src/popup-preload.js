@@ -40,9 +40,9 @@
             chrome.storage.local.get(['settings', 'popupAccentColor'], (result) => {
                 const settings = result?.settings || {};
                 const themePreference = settings.themePreference || 'system';
-                const accentColor = result?.popupAccentColor ||
+                const accentColor = settings.overlayColor ||
                     settings.accentColor ||
-                    settings.overlayColor ||
+                    result?.popupAccentColor ||
                     'blue';
                 localStorage.setItem('ytvhtThemePreference', themePreference);
                 localStorage.setItem('ytvhtAccentColor', accentColor);

@@ -9,7 +9,8 @@ let latestPageSyncStatus = { message: '', busy: false };
 
 function isFeedContentViewActive() {
     return !analyticsActive && !subscriptionsActive && !playlistsActive &&
-        !historyActive && !settingsActive && !channelActive;
+        !historyActive && !settingsActive && !channelActive &&
+        !(typeof watchLaterActive !== 'undefined' && watchLaterActive);
 }
 
 function clearPageFeedWorkTimer() {
@@ -70,7 +71,7 @@ async function runPageActiveFeedWork() {
             const after = await scheduler.getInitializationProgress();
             activeInitializationProgress = null;
             if (result.insertedVideoIds && result.insertedVideoIds.length) {
-                await showNewFeedVideos(result.insertedVideoIds);
+                await showRetainedNewFeedVideos(result.insertedVideoIds);
             }
             if (settingsActive && typeof setFeedSettingsMessage === 'function') {
                 setFeedSettingsInitializationProgress(after);
@@ -92,7 +93,7 @@ async function runPageActiveFeedWork() {
         setPageActiveSyncStatus(tFeed('feed_checking_uploads', 'Checking for new uploads'), true);
         const result = await scheduler.runForeground();
         if (result.insertedVideoIds && result.insertedVideoIds.length) {
-            await showNewFeedVideos(result.insertedVideoIds);
+            await showRetainedNewFeedVideos(result.insertedVideoIds);
         }
         let dormant = null;
         if (result.total === 0) {
@@ -101,7 +102,7 @@ async function runPageActiveFeedWork() {
         }
         const dormantInserted = Number(dormant && dormant.terminal && dormant.terminal.insertedVideoCount || 0);
         if (dormantInserted) {
-            await showNewFeedVideos(dormant.terminal.insertedVideoIds || []);
+            await showRetainedNewFeedVideos(dormant.terminal.insertedVideoIds || []);
         }
         setPageActiveSyncStatus(
             result.insertedVideoCount || dormantInserted
@@ -122,6 +123,35 @@ function requestPageActiveFeedWork() {
     return pageFeedWorkPromise || runPageActiveFeedWork();
 }
 
+// A scheduler batch reports every RSS record it inserted. Retention runs before
+// the batch returns, so old/ineligible records can legitimately be removed by
+// the time the UI offers its Show action. Only advertise IDs that remain in
+// the canonical, active-subscription inventory.
+async function showRetainedNewFeedVideos(videoIds) {
+    const requested = typeof ytvhtFeedContracts !== 'undefined'
+        ? ytvhtFeedContracts.createPendingFeedDiscovery({ videoIds, discoveredAt: 0 }).videoIds
+        : [...new Set((videoIds || []).map((videoId) => String(videoId || '').trim()).filter(Boolean))];
+    if (!requested.length) return [];
+    if (typeof showNewFeedVideos !== 'function') return requested;
+    if (typeof ytvhtFeedViewData === 'undefined' || !ytIndexedDBStorage) {
+        await showNewFeedVideos(requested);
+        return requested;
+    }
+    try {
+        const viewData = await ytvhtFeedViewData.loadCanonicalFeedViewData(ytIndexedDBStorage);
+        const retained = new Set((viewData.videos || []).map((video) => video.videoId));
+        const showable = requested.filter((videoId) => retained.has(videoId));
+        if (showable.length) await showNewFeedVideos(showable);
+        return showable;
+    } catch (error) {
+        // Do not hide fresh discoveries merely because this confirmation read
+        // failed; Show retains its existing retry behavior in that case.
+        console.warn('[feed] could not confirm retained discoveries', error && error.message);
+        await showNewFeedVideos(requested);
+        return requested;
+    }
+}
+
 function onStorageChanged(changes, area) {
     if (area && area !== 'local') return;
     if (changes && changes.durationCache) {
@@ -132,8 +162,13 @@ function onStorageChanged(changes, area) {
         shortsCache = changes.shortsCache.newValue || {};
         if (!analyticsActive && !subscriptionsActive && !playlistsActive && !historyActive && !settingsActive) render();
     }
-    if (changes && changes.settings && pageFeedWorkTimer !== null) {
-        feedRefreshIntervalMs().then(schedulePageFeedWork).catch(() => {});
+    if (changes && changes.settings) {
+        const settings = changes.settings.newValue || {};
+        applyFeedTheme(settings.themePreference || 'system');
+        applyAccentColor(settings.overlayColor || settings.accentColor || 'blue');
+        if (pageFeedWorkTimer !== null) {
+            feedRefreshIntervalMs().then(schedulePageFeedWork).catch(() => {});
+        }
     }
     const videoChanges = changes && Object.entries(changes).filter(([key]) => key.startsWith('video_'));
     if (videoChanges && videoChanges.length) {
@@ -153,6 +188,9 @@ function onStorageChanged(changes, area) {
     }
     if (subscriptionsActive && changes && Object.keys(changes).some((key) => key.startsWith('sub_'))) {
         renderSubscriptions();
+    }
+    if (watchLaterActive && changes && Object.keys(changes).some((key) => key.startsWith('watchlater_'))) {
+        renderWatchLater();
     }
     if (playlistsActive && !activePlaylistDetailId &&
         changes && Object.keys(changes).some((key) => key.startsWith('playlist_'))) {
@@ -216,6 +254,7 @@ async function startCanonicalFeedWork() {
 function openFeedView(view) {
     if (view === 'settings') showSettings();
     else if (view === 'history') showHistory();
+    else if (view === 'watchlater') showWatchLater();
     else if (view === 'playlists') showPlaylists();
     else if (view === 'channels/ignored') showSubscriptions('ignored');
     else if (view === 'channels') showSubscriptions('following');
@@ -254,7 +293,7 @@ function init() {
     searchInput.addEventListener('input', () => {
         searchVisibleLimit = SEARCH_PAGE_SIZE;
         // Typing in search means the user wants the feed, not another section.
-        if (analyticsActive || subscriptionsActive || playlistsActive || historyActive || settingsActive || channelActive) showFeed();
+        if (analyticsActive || subscriptionsActive || playlistsActive || historyActive || settingsActive || channelActive || watchLaterActive) showFeed();
         else render();
     });
     ['searchDate', 'searchDuration', 'searchWatched', 'searchSort'].forEach((id) => {
@@ -335,6 +374,11 @@ function init() {
         searchInput.value = '';
         historyVisibleLimit = 30;
         showHistory();
+    });
+    const navWatchLater = document.getElementById('navWatchLater');
+    if (navWatchLater) navWatchLater.addEventListener('click', () => {
+        searchInput.value = '';
+        showWatchLater();
     });
 
     // Hamburger collapses/expands the sidebar.
@@ -479,9 +523,9 @@ function init() {
 
     window.addEventListener('unload', clearPageFeedWorkTimer, { once: true });
 
-    Promise.all([loadData(), restorePendingFeedDiscovery()]).then(async () => {
+    Promise.all([loadData(), restorePendingFeedDiscovery(), initializeFeedAppearance()]).then(async () => {
         const hashView = (location.hash || '').replace(/^#/, '').trim();
-        const startupView = ['settings', 'channels', 'channels/ignored'].includes(hashView)
+        const startupView = ['settings', 'channels', 'channels/ignored', 'watchlater'].includes(hashView)
             ? hashView
             : await getStartupFeedView();
         openFeedView(startupView);

@@ -2,6 +2,23 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [5.0.1] - 2026-08-11
+
+### Fixed
+
+- Rebuilt the compact Continue Watching popup from an unfinished-only, timestamp-sorted projection. Live updates can no longer apply an unfiltered history index to a different visible row, so titles, thumbnails, progress, ordering, and completion removal remain consistent.
+- Deferred regular-video saves briefly during YouTube single-page navigation until the route, watch page, and player agree on the active video ID. This prevents a new record from inheriting a previous video's title or channel metadata.
+- Unified the legacy `overlayColor` and v5 `accentColor` settings. Existing color choices are retained, and popup/feed/content-script updates now use one synchronized value.
+- Applied the saved accent when the full feed opens and made the canonical settings color override stale popup-only cache entries.
+- Kept the YouTube-page dynamic overlay stylesheet after its reinjected base rules, so saved accent colors now apply to Viewed badges and progress lines instead of falling back to blue.
+- Restored lazy page navigation in the popup's Continue Watching list. Its page count now derives from the same unfinished-only, timestamp-sorted records it displays.
+- Pending-new-video notices now exclude discoveries removed by feed retention or no longer eligible through an active local subscription, so **Show** never promises inventory that cannot be displayed.
+- Watch Later saves now recover title and channel metadata through YouTube oEmbed when the current page has not mounted a matching video card. Existing incomplete Watch Later records are repaired when the list opens.
+
+### Added
+
+- Added Watch Later to the full re:Watch page, with newest-first records, Open and Remove actions, live updates, and localized empty/count states.
+
 ## [5.0.0] - 2026-08-09
 
 Version 5 turns YT re:Watch from a popup-centered history tracker into a full local YouTube companion while preserving its local-first privacy boundary. The release adds explicit local channel subscriptions, an RSS-backed feed, channel and history management, richer analytics, durable import/backup contracts, and matching Chromium/Firefox coverage.

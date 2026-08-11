@@ -120,7 +120,7 @@
     const videoEventListeners = new WeakMap();
 
     function getAccentOverlayColor(settings = currentSettings) {
-        const colorName = settings?.accentColor || settings?.overlayColor || 'blue';
+        const colorName = settings?.overlayColor || settings?.accentColor || 'blue';
         return OVERLAY_COLORS[colorName] || OVERLAY_COLORS.blue;
     }
 
@@ -546,6 +546,31 @@
         }
     }
 
+    // During YouTube SPA navigation the URL can change before the previous
+    // player and title nodes are replaced. Saving in that interval creates a
+    // record keyed by the new URL with the preceding video's metadata.
+    function isActiveWatchVideoIdentitySettled(expectedVideoId) {
+        if (!expectedVideoId) return false;
+
+        const watchPage = document.querySelector('ytd-watch-flexy[video-id]');
+        const renderedVideoId = watchPage?.getAttribute('video-id');
+        if (renderedVideoId && renderedVideoId !== expectedVideoId) return false;
+
+        const player = document.querySelector('#movie_player');
+        try {
+            const playerVideoId = player?.getVideoData?.()?.video_id;
+            if (playerVideoId && playerVideoId !== expectedVideoId) return false;
+        } catch (_) {
+            // The player API is not available in every browser/page state;
+            // the watch-page identity check above remains useful on its own.
+        }
+
+        // Give YouTube one short rendering turn after a route change before
+        // reading title and channel nodes. The regular five-second save loop
+        // will capture the new video immediately afterwards.
+        return Date.now() - lastSpaNavigationTime >= 1000;
+    }
+
     // Save the current video timestamp (regular videos)
     async function saveTimestamp() {
         if (window.location.pathname.startsWith('/shorts/')) {
@@ -583,6 +608,10 @@
         const duration = video.duration;
         const videoId = getVideoId();
         if (!videoId) return;
+        if (!isActiveWatchVideoIdentitySettled(videoId)) {
+            log('[SAVE] Waiting for the active watch-page identity to settle', { videoId });
+            return;
+        }
 
         // Do not update record if timestamp is 0 or duration is not available
         if (!currentTime || currentTime === 0 || !duration || duration === 0) return;
@@ -1940,6 +1969,37 @@
     });
 
     chrome.runtime.onMessage.addListener(messageListener);
+
+    // A YouTube document can remain alive while the user opens re:Watch and
+    // returns to it. Refresh from the canonical store on that return, rather
+    // than keeping the color that was loaded when the tab was first opened.
+    // This also covers settings edits made in another extension surface.
+    let overlaySettingsRefresh = null;
+    function refreshOverlaySettingsFromStorage() {
+        if (overlaySettingsRefresh) return overlaySettingsRefresh;
+        overlaySettingsRefresh = (async () => {
+            const settings = await loadSettings();
+            currentSettings = settings;
+            updateOverlayCSS(
+                OVERLAY_LABEL_SIZE_MAP[settings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium,
+                getAccentOverlayColor(settings)
+            );
+            if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS) processExistingThumbnails?.();
+        })().catch((error) => {
+            log('[Overlay] Could not refresh settings:', error);
+        }).finally(() => {
+            overlaySettingsRefresh = null;
+        });
+        return overlaySettingsRefresh;
+    }
+
+    chrome.storage?.onChanged?.addListener((changes, area) => {
+        if (area === 'local' && changes.settings) refreshOverlaySettingsFromStorage();
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshOverlaySettingsFromStorage();
+    });
+    window.addEventListener('focus', refreshOverlaySettingsFromStorage);
 
     const { showExtensionInfo } = window.YTVHTContentInfo.create({
         log,

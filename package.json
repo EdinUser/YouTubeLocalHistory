@@ -1,6 +1,6 @@
 {
   "name": "youtube-local-history",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "Private local YouTube history, progress tracking, channel subscriptions, analytics, and an in-browser feed.",
   "main": "src/content.js",
   "scripts": {

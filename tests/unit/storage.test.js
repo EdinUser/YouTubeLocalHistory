@@ -391,4 +391,42 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
       expect(second.ignoreVideos).toBe(true);
     });
   });
+
+  describe('Continue Watching projection', () => {
+    test('filters completed records before sorting and pagination', async () => {
+      fakeLocalData.video_completed = {
+        videoId: 'completed', time: 95, duration: 100, timestamp: 300
+      };
+      fakeLocalData.video_first = {
+        videoId: 'first', time: 20, duration: 100, timestamp: 200
+      };
+      fakeLocalData.video_second = {
+        videoId: 'second', time: 10, duration: 100, timestamp: 100
+      };
+
+      const result = await ytStorage.getVideosPage({
+        page: 1,
+        pageSize: 1,
+        unfinishedOnly: true
+      });
+
+      expect(result.records.map((record) => record.videoId)).toEqual(['first']);
+      expect(result.pagination.totalRecords).toBe(2);
+      expect(result.pagination.totalPages).toBe(2);
+    });
+  });
+
+  describe('accent-color compatibility', () => {
+    test('uses the legacy overlay color when old and new fields disagree, then persists both fields', async () => {
+      fakeLocalData.settings = { overlayColor: 'green', accentColor: 'blue' };
+
+      const loaded = await ytStorage.getSettings();
+      expect(loaded.overlayColor).toBe('green');
+      expect(loaded.accentColor).toBe('green');
+
+      const saved = await ytStorage.setSettings(loaded);
+      expect(saved).toEqual(expect.objectContaining({ overlayColor: 'green', accentColor: 'green' }));
+      expect(fakeLocalData.settings).toEqual(expect.objectContaining({ overlayColor: 'green', accentColor: 'green' }));
+    });
+  });
 });

@@ -72,6 +72,7 @@ function showAnalytics() {
     playlistsActive = false;
     historyActive = false;
     settingsActive = false;
+    watchLaterActive = false;
     channelActive = false;
     ['localHeading', 'grid', 'localSearchResults', 'empty', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);
@@ -83,6 +84,8 @@ function showAnalytics() {
     if (playlists) playlists.style.display = 'none';
     const history = document.getElementById('historySection');
     if (history) history.style.display = 'none';
+    const watchLater = document.getElementById('watchLaterSection');
+    if (watchLater) watchLater.style.display = 'none';
     const settings = document.getElementById('settingsSection');
     if (settings) settings.style.display = 'none';
     const chips = document.querySelector('.chips');
@@ -107,6 +110,7 @@ function showFeed() {
     playlistsActive = false;
     historyActive = false;
     settingsActive = false;
+    watchLaterActive = false;
     channelActive = false;
     const sec = document.getElementById('analyticsSection');
     if (sec) sec.style.display = 'none';
@@ -116,6 +120,8 @@ function showFeed() {
     if (playlists) playlists.style.display = 'none';
     const history = document.getElementById('historySection');
     if (history) history.style.display = 'none';
+    const watchLater = document.getElementById('watchLaterSection');
+    if (watchLater) watchLater.style.display = 'none';
     const settings = document.getElementById('settingsSection');
     if (settings) settings.style.display = 'none';
     const channel = document.getElementById('channelSection');
@@ -489,6 +495,7 @@ function showSubscriptions(requestedTab) {
     historyActive = false;
     settingsActive = false;
     channelActive = false;
+    watchLaterActive = false;
     ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
@@ -499,6 +506,8 @@ function showSubscriptions(requestedTab) {
     if (playlists) playlists.style.display = 'none';
     const history = document.getElementById('historySection');
     if (history) history.style.display = 'none';
+    const watchLater = document.getElementById('watchLaterSection');
+    if (watchLater) watchLater.style.display = 'none';
     const settings = document.getElementById('settingsSection');
     if (settings) settings.style.display = 'none';
     const chips = document.querySelector('.chips');

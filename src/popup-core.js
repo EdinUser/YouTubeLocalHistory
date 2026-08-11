@@ -50,6 +50,7 @@ const DEFAULT_SETTINGS = {
     paginationCount: 10,
     themePreference: 'system', // 'system', 'light', or 'dark'
     overlayTitle: 'viewed',
+    accentColor: 'blue',
     overlayColor: 'blue',
     overlayLabelSize: 'medium',
     debug: false,
@@ -118,7 +119,7 @@ function initializePopupAccent() {
     try {
         chrome.storage.local.get(['settings', 'popupAccentColor'], (result) => {
             const settings = (result && result.settings) || {};
-            applyPopupAccent(result.popupAccentColor || settings.accentColor || settings.overlayColor || 'blue');
+            applyPopupAccent(settings.overlayColor || settings.accentColor || result.popupAccentColor || 'blue');
         });
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area !== 'local') return;
@@ -128,7 +129,7 @@ function initializePopupAccent() {
             }
             if (changes.settings && changes.settings.newValue) {
                 const settings = changes.settings.newValue;
-                applyPopupAccent(settings.accentColor || settings.overlayColor || 'blue');
+                applyPopupAccent(settings.overlayColor || settings.accentColor || 'blue');
             }
         });
     } catch (error) {
@@ -242,10 +243,11 @@ async function initStorage() {
                                 // Check for tombstone before adding/updating
                                 checkTombstoneAndUpdateVideo(videoId, change.newValue);
                             } else {
-                                // Record was deleted
-                                allHistoryRecords = allHistoryRecords.filter(r => r.videoId !== videoId);
+                                // A deletion can expose the next unfinished
+                                // record, so reload instead of just removing a
+                                // visible row from the bounded projection.
                                 allShortsRecords = allShortsRecords.filter(r => r.videoId !== videoId);
-                                displayHistoryPage();
+                                refreshContinueWatchingPage();
                                 displayShortsPage();
                             }
                         }
@@ -264,27 +266,27 @@ async function initStorage() {
 // Handle storage updates
 function handleStorageUpdates(changes) {
     let needsRefresh = false;
+    const refreshes = [];
 
     changes.forEach(([key, change]) => {
         if (key.startsWith('video_')) {
             const videoId = key.replace('video_', '');
             if (change.newValue) {
-                // Update or add record
-                updateVideoRecord(change.newValue);
+                // Rebuild the filtered Continue Watching projection. The
+                // compact DOM contains only unfinished records, so it cannot
+                // safely be updated by an index from the unfiltered history.
+                refreshes.push(updateVideoRecord(change.newValue));
             } else {
                 // Record was deleted
-                const index = allHistoryRecords.findIndex(r => r.videoId === videoId);
-                if (index !== -1) {
-                    allHistoryRecords.splice(index, 1);
-                    needsRefresh = true;
-                }
+                needsRefresh = true;
             }
         }
     });
 
     if (needsRefresh) {
-        displayHistoryPage();
+        refreshes.push(refreshContinueWatchingPage());
     }
+    return Promise.all(refreshes.filter(Boolean));
 }
 
 // Check for tombstone before updating video record
@@ -313,58 +315,41 @@ async function checkTombstoneAndUpdateVideo(videoId, videoRecord) {
     }
 }
 
-// Update a single video record in the table
+// Rebuild the compact Continue Watching projection from storage. Live updates
+// arrive through both runtime messages and storage.onChanged, so coalesce
+// overlap and run one final refresh if an update lands while a read is active.
+function refreshContinueWatchingPage() {
+    if (typeof loadHistoryPage !== 'function') {
+        return Promise.resolve();
+    }
+    if (refreshContinueWatchingPage.promise) {
+        refreshContinueWatchingPage.queued = true;
+        return refreshContinueWatchingPage.promise;
+    }
+
+    refreshContinueWatchingPage.promise = (async () => {
+        do {
+            refreshContinueWatchingPage.queued = false;
+            currentPage = 1;
+            await loadHistoryPage({ page: currentPage });
+            displayHistoryPage();
+        } while (refreshContinueWatchingPage.queued);
+    })().catch((error) => {
+        console.error('[Popup] Could not refresh Continue Watching:', error);
+    }).finally(() => {
+        refreshContinueWatchingPage.promise = null;
+    });
+    return refreshContinueWatchingPage.promise;
+}
+
+// Update a single history record. Do not patch a row in place: the rendered
+// rows are an unfinished-only subset and their indexes never correspond to the
+// unfiltered history indexes used by storage events.
 function updateVideoRecord(record) {
     if (!record || !record.videoId) return;
 
     log('Updating video record:', record);
-
-    // Update the record in our local array
-    const recordIndex = allHistoryRecords.findIndex(r => r.videoId === record.videoId);
-    if (recordIndex !== -1) {
-        allHistoryRecords[recordIndex] = record;
-    } else {
-        // New record, add it to the beginning and sort
-        allHistoryRecords.unshift(record);
-        allHistoryRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    }
-
-    // Find if the record is currently displayed
-    const historyTable = document.getElementById('ytvhtHistoryTable');
-    const startIdx = (currentPage - 1) * pageSize;
-    const endIdx = Math.min(startIdx + pageSize, allHistoryRecords.length);
-    const recordPageIndex = recordIndex - startIdx;
-
-    // Only update DOM if the record is on the current page
-    if (recordIndex >= startIdx && recordIndex < endIdx) {
-        const row = historyTable.rows[recordPageIndex];
-        if (row) {
-            const cell = row.cells[0];
-            if (cell) {
-                const link = cell.querySelector('.video-link');
-                const progress = cell.querySelector('.video-progress');
-                const date = cell.querySelector('.video-date');
-
-                if (link) {
-                    link.textContent = record.title || 'Unknown Title';
-                    link.href = (record.time && record.time > 0) 
-                        ? addTimestampToUrl(record.url, record.time)
-                        : record.url;
-                }
-
-                if (progress) {
-                    progress.textContent = formatProgress(record.time, record.duration);
-                }
-
-                if (date) {
-                    date.textContent = formatDate(record.timestamp);
-                }
-            }
-        }
-    } else if (recordIndex === -1 && currentPage === 1) {
-        // If it's a new record and we're on the first page, refresh the display
-        displayHistoryPage();
-    }
+    return refreshContinueWatchingPage();
 }
 
 // Load history records

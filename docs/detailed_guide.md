@@ -27,6 +27,7 @@ The toolbar popup is a compact resume surface. The full-page interface contains 
 | Home | Locally arranged videos from followed channels |
 | Subscriptions | Complete chronological cached subscription inventory |
 | Shorts | Locally watched YouTube Shorts |
+| Watch Later | Videos explicitly saved for later in this browser profile |
 | Playlists | References that open the original YouTube playlist |
 | History | Ordinary watched videos and progress |
 | Channels | Local follows and, when present, ignored import records |
@@ -35,10 +36,9 @@ The toolbar popup is a compact resume surface. The full-page interface contains 
 
 ### Popup { #popup }
 
-<figure markdown="span">
-  ![The re:Watch popup showing unfinished videos with progress bars and an Open Feed button.](assets/guide/popup-continue-watching.png){ width="600" height="480" }
-  <figcaption>Resume unfinished videos or open the full re:Watch interface.</figcaption>
-</figure>
+![The re:Watch popup showing unfinished videos with progress bars and an Open Feed button.](assets/guide/popup-continue-watching.png)
+
+*Resume unfinished videos or open the full re:Watch interface.*
 
 The popup also reports subscription-import results. If an import skipped previously removed channels, its action opens **Channels → Ignored** so you can review them.
 
@@ -46,10 +46,9 @@ The popup also reports subscription-import results. If an import skipped previou
 
 ### Home { #home }
 
-<figure markdown="span">
-  ![The re:Watch Home feed displaying locally personalized video cards.](assets/guide/feed-home.png){ width="1440" height="960" loading="lazy" }
-  <figcaption>Home arranges cached uploads using local viewing and feedback signals.</figcaption>
-</figure>
+![The re:Watch Home feed displaying locally personalized video cards.](assets/guide/feed-home.png)
+
+*Home arranges cached uploads using local viewing and feedback signals.*
 
 Home is not a copy of the YouTube recommendation service. It ranks locally cached uploads from channels followed in re:Watch. Opening Home regenerates that local view and does not start a Home-owned network request.
 
@@ -57,10 +56,9 @@ Home uses stable 50-card pages. Moving between pages does not duplicate cards or
 
 ### Subscriptions { #subscriptions }
 
-<figure markdown="span">
-  ![The re:Watch Subscriptions tab showing recent cached uploads from locally followed channels.](assets/guide/feed-subscriptions.png){ width="1440" height="960" loading="lazy" }
-  <figcaption>Subscriptions lists cached uploads in chronological order.</figcaption>
-</figure>
+![The re:Watch Subscriptions tab showing recent cached uploads from locally followed channels.](assets/guide/feed-subscriptions.png)
+
+*Subscriptions lists cached uploads in chronological order.*
 
 Subscriptions is the complete chronological inventory of regular cached uploads. It also uses stable 50-card pages.
 
@@ -84,10 +82,9 @@ Video menus provide local actions such as more or less from a channel, hide, sub
 
 ### History { #history }
 
-<figure markdown="span">
-  ![The re:Watch History tab listing locally stored viewing activity and progress.](assets/guide/feed-history.png){ width="1440" height="960" loading="lazy" }
-  <figcaption>History keeps ordinary viewing activity and resume progress local.</figcaption>
-</figure>
+![The re:Watch History tab listing locally stored viewing activity and progress.](assets/guide/feed-history.png)
+
+*History keeps ordinary viewing activity and resume progress local.*
 
 History cards show the available channel, progress, and video duration. When metadata or progress changes, re:Watch updates the video-specific portion of the card while preserving its **Remove** control and three-dot menu.
 
@@ -95,19 +92,17 @@ Removing a history record also creates a temporary deletion marker so an older a
 
 ### Shorts { #shorts }
 
-<figure markdown="span">
-  ![The re:Watch Shorts tab showing watched short-form videos.](assets/guide/feed-shorts.png){ width="1440" height="960" loading="lazy" }
-  <figcaption>Shorts separates locally watched short-form videos from ordinary history.</figcaption>
-</figure>
+![The re:Watch Shorts tab showing watched short-form videos.](assets/guide/feed-shorts.png)
+
+*Shorts separates locally watched short-form videos from ordinary history.*
 
 re:Watch follows Shorts navigation inside YouTube's single-page interface and records the active Short's video and channel identity. The Shorts tab updates from local history without requiring a feed reload.
 
 ## Playlist references { #playlists }
 
-<figure markdown="span">
-  ![The re:Watch Playlists tab showing saved references that open their playlists on YouTube.](assets/guide/feed-playlists.png){ width="1440" height="960" loading="lazy" }
-  <figcaption>A saved reference opens its original playlist on YouTube.</figcaption>
-</figure>
+![The re:Watch Playlists tab showing saved references that open their playlists on YouTube.](assets/guide/feed-playlists.png)
+
+*A saved reference opens its original playlist on YouTube.*
 
 v5 stores YouTube playlists as references with available title, artwork, and source link. It does not fetch the playlist's member videos in the background.
 
@@ -115,12 +110,21 @@ The per-playlist **Ignore videos** toggle prevents history saves while viewing t
 
 Creating and managing extension-owned local playlists is planned separately and is not part of stable v5.
 
+## Watch Later { #watch-later }
+
+![The re:Watch Watch Later tab showing locally saved videos.](assets/guide/feed-watch-later.png)
+
+*Watch Later keeps explicitly saved videos in a local, newest-first list.*
+
+Watch Later is a small local list, separate from YouTube's account-based Watch Later playlist. Save a recognized video or Short by right-clicking it on YouTube and choosing **Save to Watch Later (local)**, or choose **Save to Watch Later** from a re:Watch card menu.
+
+The **Watch Later** sidebar view orders saved videos newest first. Each row opens the original YouTube video and has a **Remove** action. re:Watch stores the video ID, link, title, and channel locally; if a page did not expose title or channel data when it was saved, the list repairs that metadata when it is next opened.
+
 ## Channels { #channels }
 
-<figure markdown="span">
-  ![The re:Watch Channels tab showing channels followed locally by the extension.](assets/guide/feed-channels.png){ width="1440" height="960" loading="lazy" }
-  <figcaption>Channels manages follows owned by re:Watch, not by the YouTube account.</figcaption>
-</figure>
+![The re:Watch Channels tab showing channels followed locally by the extension.](assets/guide/feed-channels.png)
+
+*Channels manages follows owned by re:Watch, not by the YouTube account.*
 
 Follow a channel from a supported YouTube channel/watch surface, a re:Watch video menu, or the Channels controls. You can also import subscriptions in Settings. re:Watch canonicalizes channel IDs and avoids duplicate follows.
 
@@ -137,10 +141,9 @@ When no tombstones exist, the Ignored tab is hidden instead of showing an empty 
 
 ## Analytics { #analytics }
 
-<figure markdown="span">
-  ![The re:Watch Analytics tab summarizing locally calculated viewing activity.](assets/guide/feed-analytics.png){ width="1440" height="960" loading="lazy" }
-  <figcaption>Analytics derives viewing patterns from local extension data.</figcaption>
-</figure>
+![The re:Watch Analytics tab summarizing locally calculated viewing activity.](assets/guide/feed-analytics.png)
+
+*Analytics derives viewing patterns from local extension data.*
 
 Analytics includes total watch time, videos and Shorts watched, average duration, completion rate, saved playlist references, weekly activity, and watch time by hour. Hourly bars share a consistent baseline so selected or low-activity hours remain visually comparable.
 
@@ -148,10 +151,9 @@ Additional insights include unfinished videos and skipped, watched, and completi
 
 ## Settings { #settings }
 
-<figure markdown="span">
-  ![The re:Watch Settings tab showing appearance, feed, import, backup, and data controls.](assets/guide/feed-settings.png){ width="1440" height="960" loading="lazy" }
-  <figcaption>Settings contains appearance, import, backup, and data-management controls.</figcaption>
-</figure>
+![The re:Watch Settings tab showing appearance, feed, import, backup, and data controls.](assets/guide/feed-settings.png)
+
+*Settings contains appearance, import, backup, and data-management controls.*
 
 ### Appearance and overlays
 

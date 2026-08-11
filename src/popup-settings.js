@@ -36,10 +36,14 @@ async function saveSettings(settings) {
         if ('settings' in settings) {
             delete settings.settings;
         }
-        await ytStorage.setSettings(settings);
-        localStorage.setItem('ytvhtThemePreference', settings.themePreference || 'system');
+        const normalized = await ytStorage.setSettings(settings);
+        await chrome.storage.local.set({ popupAccentColor: normalized.overlayColor || normalized.accentColor || 'blue' });
+        localStorage.setItem('ytvhtThemePreference', normalized.themePreference || 'system');
         localStorage.setItem('ytvhtAccentColor',
-            settings.accentColor || settings.overlayColor || 'blue');
+            normalized.overlayColor || normalized.accentColor || 'blue');
+        if (typeof notifyYouTubeTabs === 'function') {
+            notifyYouTubeTabs({ type: 'updateSettings', settings: normalized });
+        }
         return true;
     } catch (error) {
         console.error('Error saving settings:', error);
@@ -154,6 +158,7 @@ async function initSettingsTab() {
     if (overlayColor) {
         overlayColor.addEventListener('change', async function () {
             const settings = await loadSettings();
+            settings.accentColor = this.value;
             settings.overlayColor = this.value;
             updateColorPreview(this.value);
             await saveSettings(settings);

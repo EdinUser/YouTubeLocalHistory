@@ -141,5 +141,8 @@
   "feed_views_other": { "message": "$1 гледания" },
   "feed_watched_on": { "message": "Гледано на $1" },
   "feed_watched_on_percent": { "message": "Гледано на $1 · $2 изгледано" },
-  "feed_watched_relative": { "message": "Гледано $1" }
+  "feed_watched_relative": { "message": "Гледано $1" },
+  "feed_watch_later_added": { "message": "Запазено $1" },
+  "feed_watch_later_entries_one": { "message": "$1 запазено видео" },
+  "feed_watch_later_entries_other": { "message": "$1 запазени видеа" }
 }

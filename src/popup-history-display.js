@@ -26,10 +26,10 @@ function displayHistoryPage() {
     }
 
     noHistory.style.display = 'none';
-    paginationDiv.style.display = 'flex';
-
-    if (currentPage > totalPages) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
+    paginationDiv.style.display = totalPages > 1 ? 'flex' : 'none';
+    if (totalPages > 1 && typeof updatePaginationUI === 'function') {
+        updatePaginationUI(currentPage, totalPages);
+    }
 
     // Reuse existing rows when possible
     while (historyTable.rows.length > pageRecords.length) {
@@ -123,9 +123,6 @@ function displayHistoryPage() {
         deleteButton.onclick = () => deleteRecord(record.videoId);
     });
 
-    // Update pagination info and controls
-    updatePaginationUI(currentPage, totalPages);
-
     // Update analytics if we're showing them
     if (document.getElementById('ytvhtAnalyticsContainer').style.display !== 'none') {
         updateAnalytics();
@@ -136,8 +133,13 @@ async function deleteRecord(videoId) {
     try {
         await ytStorage.removeVideo(videoId);
         showMessage(chrome.i18n.getMessage('message_video_removed'));
-        // Remove from local array and refresh page
-        allHistoryRecords = allHistoryRecords.filter(r => r.videoId !== videoId);
+        // Reload the unfinished-only page, which can move a record from the
+        // following page into this one after deletion.
+        await loadHistoryPage({ page: currentPage });
+        if (currentPage > totalPages) {
+            currentPage = Math.max(1, totalPages);
+            await loadHistoryPage({ page: currentPage });
+        }
         displayHistoryPage();
     } catch (error) {
         console.error('Error deleting record:', error);

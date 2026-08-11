@@ -77,6 +77,7 @@ copy_common_files() {
        "$PROJECT_ROOT/src/feed-playlist-import.js" \
        "$PROJECT_ROOT/src/feed-playlists-view.js" \
        "$PROJECT_ROOT/src/feed-history-view.js" \
+       "$PROJECT_ROOT/src/feed-watchlater-view.js" \
        "$PROJECT_ROOT/src/feed-settings.js" \
        "$PROJECT_ROOT/src/feed-localization.js" \
        "$PROJECT_ROOT/src/feed-backup.js" \

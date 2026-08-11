@@ -93,6 +93,20 @@
       "caption": "History provides a dedicated view of locally recorded viewing activity."
     },
     {
+      "id": "feed-watch-later",
+      "page": "feed.html",
+      "view": "feed-watch-later",
+      "output": "docs/assets/guide/feed-watch-later.png",
+      "guidePage": "detailed_guide.md",
+      "guideAnchor": "watch-later",
+      "viewport": { "width": 1440, "height": 960 },
+      "capture": { "type": "viewport" },
+      "readySelector": "#watchLaterList .history-row",
+      "display": { "width": 1440, "height": 960 },
+      "alt": "The re:Watch Watch Later tab showing locally saved videos.",
+      "caption": "Watch Later keeps explicitly saved videos in a local, newest-first list."
+    },
+    {
       "id": "feed-channels",
       "page": "feed.html",
       "view": "feed-channels",

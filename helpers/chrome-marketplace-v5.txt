@@ -58,6 +58,14 @@ Version 5 introduces the full local feed experience: local channel subscriptions
 
 It also improves SPA resume and Shorts identity tracking, keeps History card actions stable during metadata updates, shows available video durations, and makes feed scan, reload, and chronological-inventory actions explicit.
 
+PROMOTIONAL ASSET
+
+chrome_small_promo_tile.png
+Small promo tile: 440 x 280 px.
+
+chrome_marquee_promo_tile.png
+Marquee promo tile: 1400 x 560 px.
+
 SCREENSHOT UPLOAD ORDER AND CAPTIONS
 
 1. chrome_home.png
@@ -82,6 +90,8 @@ Single purpose: Keep a local, account-independent YouTube history and provide re
 Data handling: Extension feature data is stored locally in the browser profile. There is no re:Watch backend, account, advertising profile, sale of data, or cloud synchronization.
 
 Host access: Required for YouTube content-script integration and public channel feed/metadata retrieval. Direct feed and metadata requests use credentials omitted.
+
+Context menus: Required to add user-invoked re:Watch actions to YouTube's right-click menu. A user can explicitly save the selected YouTube video to the extension's local Watch Later list or locally follow or unfollow the selected channel. These actions run only when the user chooses the corresponding re:Watch menu item.
 
 Remote code: None.
 

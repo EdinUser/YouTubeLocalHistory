@@ -134,15 +134,18 @@ async function seedInExtensionPage(pageEvaluate, fixture) {
   });
 }
 
-function assertPng(file) {
+function assertPng(file, expectedWidth = WIDTH, expectedHeight = HEIGHT, requireOpaque = false) {
   const data = fs.readFileSync(file);
   if (data.length < 24 || data.toString('ascii', 1, 4) !== 'PNG') {
     throw new Error(`Screenshot is not a PNG: ${file}`);
   }
   const width = data.readUInt32BE(16);
   const height = data.readUInt32BE(20);
-  if (width !== WIDTH || height !== HEIGHT) {
-    throw new Error(`${path.basename(file)} is ${width}x${height}; expected ${WIDTH}x${HEIGHT}`);
+  if (width !== expectedWidth || height !== expectedHeight) {
+    throw new Error(`${path.basename(file)} is ${width}x${height}; expected ${expectedWidth}x${expectedHeight}`);
+  }
+  if (requireOpaque && (data.readUInt8(24) !== 8 || data.readUInt8(25) !== 2)) {
+    throw new Error(`${path.basename(file)} must be an opaque 24-bit PNG`);
   }
 }
 
@@ -157,6 +160,110 @@ async function waitForChromeImages(page) {
   await page.waitForFunction(() => [...document.images]
     .filter((image) => image.getBoundingClientRect().width > 0 && image.getBoundingClientRect().height > 0)
     .every((image) => image.complete && image.naturalWidth > 0), null, { timeout: 10000 });
+}
+
+function promoDestination(name) {
+  const file = path.join(OUTPUT_DIR, `chrome_${name}.png`);
+  const expectedRoot = `${OUTPUT_DIR}${path.sep}`;
+  if (!file.startsWith(expectedRoot)) throw new Error('Unsafe Chrome promotional asset destination');
+  return file;
+}
+
+function promoDocument(body, styles) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { font-family: Arial, Helvetica, sans-serif; background: #0f0f0f; color: #fff; }
+    ${styles}
+  </style>
+</head>
+<body>${body}</body>
+</html>`;
+}
+
+async function renderChromePromo(context, { file, width, height, document }) {
+  const page = await context.newPage();
+  try {
+    await page.setViewportSize({ width, height });
+    await page.setContent(document, { waitUntil: 'load' });
+    await page.evaluate(async () => document.fonts.ready);
+    await waitForChromeImages(page);
+    await page.screenshot({ path: file, animations: 'disabled', caret: 'hide', scale: 'css' });
+    assertPng(file, width, height, true);
+    console.log(`Generated ${path.relative(ROOT, file)}`);
+  } finally {
+    await page.close();
+  }
+}
+
+async function generateChromePromoAssets(context) {
+  const smallFile = promoDestination('small_promo_tile');
+  const smallDocument = promoDocument(`
+    <main class="small-tile">
+      <div class="orb orb-one"></div><div class="orb orb-two"></div>
+      <header><span class="play"></span><strong>YT re:Watch</strong></header>
+      <section class="small-message">
+        <h1>Your YouTube history.<br>Kept locally.</h1>
+        <p>History&nbsp; • &nbsp;Progress&nbsp; • &nbsp;Local feed</p>
+      </section>
+      <footer><span></span>Private by design. Independent of your account.</footer>
+    </main>`, `
+    .small-tile { position: relative; width: 440px; height: 280px; padding: 30px 36px; background: linear-gradient(135deg, #0f0f0f 0%, #142433 100%); }
+    .orb { position: absolute; border-radius: 999px; background: #3ea6ff; }
+    .orb-one { width: 224px; height: 224px; right: -77px; top: -124px; opacity: .10; }
+    .orb-two { width: 188px; height: 188px; left: -64px; bottom: -137px; opacity: .10; }
+    header { position: relative; display: flex; align-items: center; gap: 8px; font-size: 23px; }
+    .play { width: 0; height: 0; border-top: 11px solid transparent; border-bottom: 11px solid transparent; border-left: 20px solid #3ea6ff; }
+    .small-message { position: relative; margin-top: 35px; padding: 20px 24px 18px 29px; border: 1px solid #313131; border-radius: 18px; background: #181818; box-shadow: 0 8px 24px rgba(0, 0, 0, .32); }
+    .small-message::before { content: ''; position: absolute; left: -1px; top: 0; width: 7px; height: 100%; border-radius: 4px; background: linear-gradient(#2563eb, #3ea6ff); }
+    h1 { margin: 0; font-size: 25px; line-height: 1.32; letter-spacing: -.4px; }
+    .small-message p { margin: 13px 0 0; color: #a9b3bd; font-size: 14px; }
+    footer { position: relative; display: flex; align-items: center; gap: 9px; margin-top: 20px; color: #c8d1da; font-size: 13px; }
+    footer span { width: 10px; height: 10px; border-radius: 50%; background: #3ea6ff; }
+  `);
+  await renderChromePromo(context, { file: smallFile, width: 440, height: 280, document: smallDocument });
+
+  const homeFile = destination('chrome', 'home');
+  const homeScreenshot = `data:image/png;base64,${fs.readFileSync(homeFile).toString('base64')}`;
+  const marqueeFile = promoDestination('marquee_promo_tile');
+  const marqueeDocument = promoDocument(`
+    <main class="marquee">
+      <div class="glow glow-blue"></div><div class="glow glow-green"></div>
+      <section class="pitch">
+        <header><span class="play"></span><strong>YT re:Watch</strong></header>
+        <h1>Your YouTube history.<br><em>Kept locally.</em></h1>
+        <p>Follow channels, resume videos, and browse your own local feed—independent of your YouTube account.</p>
+        <div class="features"><span>Local history</span><span>Watch progress</span><span>Private feed</span></div>
+      </section>
+      <section class="product-frame">
+        <div class="frame-bar"><i></i><i></i><i></i><b>YT re:Watch</b></div>
+        <img src="${homeScreenshot}" alt="YT re:Watch Home feed">
+      </section>
+    </main>`, `
+    .marquee { position: relative; width: 1400px; height: 560px; overflow: hidden; background: linear-gradient(125deg, #0b0f13 0%, #101b25 56%, #142b3d 100%); }
+    .glow { position: absolute; border-radius: 50%; filter: blur(2px); }
+    .glow-blue { width: 560px; height: 560px; left: -310px; bottom: -365px; background: rgba(62, 166, 255, .15); }
+    .glow-green { width: 460px; height: 460px; right: -190px; top: -275px; background: rgba(48, 190, 143, .12); }
+    .pitch { position: absolute; z-index: 2; left: 70px; top: 54px; width: 535px; }
+    header { display: flex; align-items: center; gap: 13px; font-size: 31px; }
+    .play { width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-left: 27px solid #3ea6ff; }
+    h1 { margin: 65px 0 23px; font-size: 52px; line-height: 1.08; letter-spacing: -1.7px; }
+    h1 em { color: #55b3ff; font-style: normal; }
+    .pitch > p { width: 505px; margin: 0; color: #c3ccd5; font-size: 20px; line-height: 1.45; }
+    .features { display: flex; gap: 10px; margin-top: 31px; }
+    .features span { padding: 9px 13px; border: 1px solid #38516a; border-radius: 999px; background: rgba(31, 55, 75, .72); color: #d9e7f3; font-size: 14px; font-weight: 700; }
+    .product-frame { position: absolute; z-index: 1; left: 650px; top: 52px; width: 820px; height: 512px; overflow: hidden; border: 1px solid #3b4c59; border-radius: 24px 0 0 0; background: #0f0f0f; box-shadow: 0 28px 70px rgba(0, 0, 0, .5); transform: rotate(-1deg); transform-origin: center; }
+    .frame-bar { display: flex; align-items: center; gap: 8px; height: 35px; padding: 0 15px; background: #20262c; border-bottom: 1px solid #303942; }
+    .frame-bar i { width: 9px; height: 9px; border-radius: 50%; background: #56616b; }
+    .frame-bar i:first-child { background: #3ea6ff; }
+    .frame-bar b { margin-left: 9px; color: #aeb8c1; font-size: 12px; font-weight: 400; }
+    .product-frame img { display: block; width: 820px; height: 512px; object-fit: cover; object-position: left top; }
+  `);
+  await renderChromePromo(context, { file: marqueeFile, width: 1400, height: 560, document: marqueeDocument });
 }
 
 async function getChromeExtensionOrigin(context) {
@@ -247,6 +354,7 @@ async function generateChrome(fixture, headed) {
       await page.close();
       console.log(`Generated ${path.relative(ROOT, file)}`);
     }
+    await generateChromePromoAssets(context);
     if (unexpectedRequests.length) {
       throw new Error(`Unexpected Chrome requests were blocked:\n${[...new Set(unexpectedRequests)].join('\n')}`);
     }

@@ -1,5 +1,12 @@
 # Changelog
 
+## v5.0.1 — 11 August 2026
+
+- Fixed Continue Watching to use one unfinished-only, timestamp-sorted projection for its rows and popup pagination; live updates no longer mix visible rows with unfiltered history indexes.
+- Restored the saved appearance color across the popup, full re:Watch page, and existing YouTube tabs, including Viewed badges and progress bars.
+- Added the full-page **Watch Later** view, including newest-first ordering, open/remove actions, localization, and automatic repair of incomplete saved title/channel metadata.
+- Made **Show** advertise only subscription discoveries that remain in local inventory after retention and active-subscription filtering.
+
 ## v5.0.0 — 9 August 2026
 
 v5 turns re:Watch from a local progress tracker into a complete local browsing companion while keeping its account-independent storage model.
