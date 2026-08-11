@@ -67,6 +67,18 @@
     "message": "Deinen lokalen Wiedergabeverlauf anzeigen",
     "description": "History navigation tooltip"
   },
+  "feed_nav_watch_later": {
+    "message": "Später ansehen",
+    "description": "Watch Later navigation label"
+  },
+  "feed_nav_watch_later_title": {
+    "message": "Für später gespeicherte Videos anzeigen",
+    "description": "Watch Later navigation tooltip"
+  },
+  "feed_watch_later_empty": {
+    "message": "Keine Videos für später gespeichert.",
+    "description": "Empty Watch Later state"
+  },
   "feed_nav_channels": {
     "message": "Kanäle",
     "description": "Channels navigation label"

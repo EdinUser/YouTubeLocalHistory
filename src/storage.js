@@ -30,6 +30,23 @@
         }
     })();
     const isChrome = typeof chrome !== 'undefined' && (!isFirefox);
+    // storage.js also runs in the MV3 service worker, where feed-contracts.js
+    // is not loaded. Keep the shared value when it is available, with the
+    // canonical v5 threshold as a safe standalone fallback.
+    const WATCH_COMPLETION_RATIO = globalScope.ytvhtFeedContracts?.WATCH_COMPLETION_RATIO || 0.9;
+    const ACCENT_COLORS = new Set(['blue', 'red', 'green', 'purple', 'orange']);
+
+    // v5 briefly carried both names. overlayColor was the long-standing user
+    // setting, so it wins if an interrupted upgrade left the two values out of
+    // sync. All writes then keep the compatibility alias in lockstep.
+    function normalizeSettings(settings) {
+        const normalized = { ...(settings || {}) };
+        const requestedColor = normalized.overlayColor || normalized.accentColor || 'blue';
+        const color = ACCENT_COLORS.has(requestedColor) ? requestedColor : 'blue';
+        normalized.accentColor = color;
+        normalized.overlayColor = color;
+        return normalized;
+    }
 
     function isExtensionContextInvalidated(error) {
         const message = String(error && error.message || error || '');
@@ -1049,7 +1066,8 @@
                 pageSize = 10,
                 searchQuery = '',
                 sortBy = 'timestamp',
-                sortOrder = 'desc'
+                sortOrder = 'desc',
+                unfinishedOnly = false
             } = options;
 
             await this.ensureMigrated();
@@ -1153,6 +1171,19 @@
             // Convert map to array
             let records = Array.from(mergedMap.values());
 
+            // Continue Watching is a distinct projection, not a client-side
+            // filter applied after a page of general history was fetched.
+            // Filtering here keeps completed records from consuming a page and
+            // makes the pagination metadata match what the popup renders.
+            if (unfinishedOnly && type === 'videos') {
+                records = records.filter((record) => {
+                    const time = Number(record.time || 0);
+                    const duration = Number(record.duration || 0);
+                    return time > 0 && duration > 0 &&
+                        time / duration < WATCH_COMPLETION_RATIO;
+                });
+            }
+
             // Step 4: Sort merged array
             records.sort((a, b) => {
                 const aVal = a[sortBy] || 0;
@@ -1188,7 +1219,8 @@
                 pageSize = 10,
                 searchQuery = '',
                 sortBy = 'timestamp',
-                sortOrder = 'desc'
+                sortOrder = 'desc',
+                unfinishedOnly = false
             } = options;
 
             await this.ensureMigrated();
@@ -1227,6 +1259,15 @@
             if (searchQuery) {
                 const tokens = searchTokens(searchQuery);
                 records = records.filter(record => recordMatchesTokens(record, tokens));
+            }
+
+            if (unfinishedOnly && type === 'videos') {
+                records = records.filter((record) => {
+                    const time = Number(record.time || 0);
+                    const duration = Number(record.duration || 0);
+                    return time > 0 && duration > 0 &&
+                        time / duration < WATCH_COMPLETION_RATIO;
+                });
             }
 
             records.sort((a, b) => {
@@ -1271,13 +1312,15 @@
         async getSettings() {
             await this.ensureMigrated();
             const result = await storage.get(['settings']);
-            return result.settings || null;
+            return result.settings ? normalizeSettings(result.settings) : null;
         }
 
         // Save settings
         async setSettings(settings) {
             await this.ensureMigrated();
-            await storage.set({'settings': settings});
+            const normalized = normalizeSettings(settings);
+            await storage.set({'settings': normalized});
+            return normalized;
         }
 
         // ----- Watch Later (local, account-free) ----------------------------

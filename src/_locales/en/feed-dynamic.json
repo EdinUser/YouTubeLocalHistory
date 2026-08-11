@@ -141,5 +141,8 @@
   "feed_views_other": { "message": "$1 views", "description": "Plural view count" },
   "feed_watched_on": { "message": "Watched $1", "description": "History watched date" },
   "feed_watched_on_percent": { "message": "Watched $1 · $2 watched", "description": "History watched date and percentage" },
-  "feed_watched_relative": { "message": "Watched $1", "description": "Relative watched time" }
+  "feed_watched_relative": { "message": "Watched $1", "description": "Relative watched time" },
+  "feed_watch_later_added": { "message": "Saved $1", "description": "Watch Later saved date" },
+  "feed_watch_later_entries_one": { "message": "$1 saved video", "description": "Singular Watch Later count" },
+  "feed_watch_later_entries_other": { "message": "$1 saved videos", "description": "Plural Watch Later count" }
 }

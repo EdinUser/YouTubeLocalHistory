@@ -322,6 +322,26 @@ function ytvhtExtractVideoMeta(videoId) {
     return { title: '', channelName: '' };
 }
 
+// The card DOM is not guaranteed to be mounted when a context-menu item is
+// clicked (and YouTube changes those card layouts regularly). oEmbed gives us
+// the two bits of display metadata we need without depending on that DOM.
+async function ytvhtFetchWatchLaterMetadata(url) {
+    if (!url) return { title: '', channelName: '' };
+    try {
+        const response = await fetch(
+            'https://www.youtube.com/oembed?url=' + encodeURIComponent(url) + '&format=json'
+        );
+        if (!response.ok) return { title: '', channelName: '' };
+        const data = await response.json();
+        return {
+            title: typeof data.title === 'string' ? data.title.trim() : '',
+            channelName: typeof data.author_name === 'string' ? data.author_name.trim() : ''
+        };
+    } catch (_) {
+        return { title: '', channelName: '' };
+    }
+}
+
 // Brief icon-badge feedback so the user knows the save worked (no extra
 // "notifications" permission needed).
 function flashBadge(tabId, text, color) {
@@ -355,6 +375,14 @@ async function handleAddWatchLater(info, tab) {
             if (results && results[0] && results[0].result) meta = results[0].result;
         }
     } catch (_) { /* ignore — save with what we have */ }
+
+    if (!meta.title || !meta.channelName) {
+        const fallback = await ytvhtFetchWatchLaterMetadata(parsed.url);
+        meta = {
+            title: meta.title || fallback.title,
+            channelName: meta.channelName || fallback.channelName
+        };
+    }
 
     const record = {
         videoId: parsed.videoId,

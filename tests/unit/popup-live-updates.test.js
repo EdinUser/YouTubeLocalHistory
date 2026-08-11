@@ -8,34 +8,52 @@ const runtimeSource = source.slice(source.indexOf('function handleStorageUpdates
 
 function createRuntime(records = []) {
   document.body.innerHTML = '<table id="ytvhtHistoryTable"><tr><td><a class="video-link"></a><span class="video-progress"></span><span class="video-date"></span></td></tr></table>';
+  const storedRecords = [...records];
   const context = {
     document, allHistoryRecords: records, allShortsRecords: [...records], currentPage: 1, pageSize: 20,
     displayHistoryPage: jest.fn(), displayShortsPage: jest.fn(), log: jest.fn(),
     addTimestampToUrl: (url, time) => `${url}&t=${time}`, formatProgress: (time, duration) => `${time}/${duration}`,
     formatDate: (timestamp) => `date:${timestamp}`, chrome: { storage: { local: { get: jest.fn(async () => ({})) } } }, console, Promise,
   };
+  context.loadHistoryPage = jest.fn(async () => {
+    context.allHistoryRecords = storedRecords
+      .filter((record) => Number(record.time || 0) > 0 && Number(record.duration || 0) > 0 &&
+        Number(record.time) / Number(record.duration) < 0.9)
+      .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+  });
+  context.setStoredRecords = (next) => {
+    storedRecords.splice(0, storedRecords.length, ...next);
+  };
   vm.runInNewContext(runtimeSource, context);
   return context;
 }
 
-test('updates the current popup row using the real compact row contract', () => {
-  const context = createRuntime([{ videoId: 'one', title: 'Old', time: 10, duration: 100, timestamp: 1, url: 'https://example.test/watch?v=one' }]);
-  context.updateVideoRecord({ videoId: 'one', title: 'New', time: 50, duration: 100, timestamp: 2, url: 'https://example.test/watch?v=one' });
-  expect(document.querySelector('.video-link').textContent).toBe('New');
-  expect(document.querySelector('.video-progress').textContent).toBe('50/100');
-  expect(document.querySelector('.video-date').textContent).toBe('date:2');
+test('rebuilds Continue Watching instead of patching the wrong filtered DOM row', async () => {
+  const completed = { videoId: 'completed', title: 'Completed', time: 95, duration: 100, timestamp: 3 };
+  const unfinished = { videoId: 'unfinished', title: 'Keep me', time: 20, duration: 100, timestamp: 2 };
+  const context = createRuntime([completed, unfinished]);
+
+  await context.updateVideoRecord(completed);
+
+  expect(context.loadHistoryPage).toHaveBeenCalledWith({ page: 1 });
+  expect(context.allHistoryRecords).toEqual([unfinished]);
+  expect(context.displayHistoryPage).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('.video-link').textContent).toBe('');
 });
 
-test('adds a new first-page record, removes deleted records, and blocks tombstoned resurrection', async () => {
+test('refreshes for new records and deletions, and blocks tombstoned resurrection', async () => {
   const context = createRuntime([{ videoId: 'old', timestamp: 1 }]);
-  context.updateVideoRecord({ videoId: 'new', title: 'New', timestamp: 2, url: 'https://example.test/watch?v=new' });
-  expect(context.allHistoryRecords[0].videoId).toBe('new');
-  expect(context.displayHistoryPage).toHaveBeenCalled();
+  context.setStoredRecords([
+    { videoId: 'old', title: 'Old', time: 10, duration: 100, timestamp: 1 },
+    { videoId: 'new', title: 'New', time: 20, duration: 100, timestamp: 2 }
+  ]);
+  await context.updateVideoRecord({ videoId: 'new', title: 'New', timestamp: 2 });
+  expect(context.allHistoryRecords.map((record) => record.videoId)).toEqual(['new', 'old']);
 
-  context.handleStorageUpdates([['video_new', { newValue: null }]]);
-  expect(context.allHistoryRecords.map((record) => record.videoId)).toEqual(['old']);
+  await context.handleStorageUpdates([['video_new', { newValue: null }]]);
+  expect(context.loadHistoryPage).toHaveBeenCalledTimes(2);
 
   context.chrome.storage.local.get.mockResolvedValue({ deleted_video_blocked: { deletedAt: 1 } });
   await context.checkTombstoneAndUpdateVideo('blocked', { videoId: 'blocked', timestamp: 3 });
-  expect(context.allHistoryRecords.map((record) => record.videoId)).toEqual(['old']);
+  expect(context.loadHistoryPage).toHaveBeenCalledTimes(2);
 });

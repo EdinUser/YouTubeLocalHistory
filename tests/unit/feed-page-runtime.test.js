@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const contracts = require('../../src/feed-contracts.js');
 
 const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'feed.js'), 'utf8')
   .slice(0, fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'feed.js'), 'utf8').indexOf('function init()'));
@@ -70,4 +71,23 @@ test('page-active foreground work yields to dormant maintenance only when no for
   await busy.context.runPageActiveFeedWork();
   expect(busy.scheduler.runDormantMaintenance).not.toHaveBeenCalled();
   expect(busy.timers).toEqual([expect.objectContaining({ delay: 5 * 60 * 1000 })]);
+});
+
+test('only advertises scheduler discoveries that remain in the canonical inventory', async () => {
+  const context = {
+    Promise, Set, String, Array, console,
+    ytvhtFeedContracts: contracts,
+    ytIndexedDBStorage: {},
+    ytvhtFeedViewData: {
+      loadCanonicalFeedViewData: jest.fn(async () => ({
+        videos: [{ videoId: 'retained' }], subscriptions: []
+      }))
+    },
+    showNewFeedVideos: jest.fn(async () => {})
+  };
+  vm.runInNewContext(source, context);
+
+  await expect(context.showRetainedNewFeedVideos(['expired', 'retained', 'retained']))
+    .resolves.toEqual(['retained']);
+  expect(context.showNewFeedVideos).toHaveBeenCalledWith(['retained']);
 });

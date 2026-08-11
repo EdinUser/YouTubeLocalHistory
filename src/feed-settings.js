@@ -37,6 +37,16 @@ function applyAccentColor(color) {
     );
 }
 
+// The main feed opens directly to Home, so its appearance must be loaded
+// independently of opening the Settings section.
+async function initializeFeedAppearance() {
+    const stored = (await ytStorage.getSettings()) || {};
+    const settings = { ...FEED_SETTINGS_DEFAULTS, ...stored };
+    applyFeedTheme(settings.themePreference);
+    applyAccentColor(settings.overlayColor || settings.accentColor || 'blue');
+    return settings;
+}
+
 async function loadFeedSettingsForm() {
     const stored = (await ytStorage.getSettings()) || {};
     if (stored.autoCleanPeriod === 90 || stored.autoCleanPeriod === '90') {
@@ -46,7 +56,7 @@ async function loadFeedSettingsForm() {
     const settings = { ...FEED_SETTINGS_DEFAULTS, ...stored };
     document.getElementById('feedSettingTheme').value = settings.themePreference;
     document.getElementById('feedSettingAccent').value =
-        settings.accentColor || settings.overlayColor || 'blue';
+        settings.overlayColor || settings.accentColor || 'blue';
     const defaultPageSelect = document.getElementById('feedSettingDefaultPage');
     if (defaultPageSelect) defaultPageSelect.value = settings.defaultFeedPage || 'last';
     const refreshSelect = document.getElementById('feedSettingRefresh');
@@ -56,7 +66,7 @@ async function loadFeedSettingsForm() {
         : '60';
     document.getElementById('feedSettingAutoClean').value = String(settings.autoCleanPeriod);
     applyFeedTheme(settings.themePreference);
-    applyAccentColor(settings.accentColor);
+    applyAccentColor(settings.overlayColor || settings.accentColor || 'blue');
 }
 
 function notifySettingsChanged(settings) {
@@ -88,14 +98,14 @@ async function saveFeedSettings() {
         feedRefreshMinutes: cleanRefresh,
         autoCleanPeriod: autoCleanValue === 'forever' ? 'forever' : Number(autoCleanValue)
     };
-    await ytStorage.setSettings(settings);
-    await chrome.storage.local.set({ popupAccentColor: color });
-    localStorage.setItem('ytvhtThemePreference', settings.themePreference);
-    localStorage.setItem('ytvhtAccentColor', color);
+    const normalized = await ytStorage.setSettings(settings);
+    await chrome.storage.local.set({ popupAccentColor: normalized.overlayColor || normalized.accentColor || color });
+    localStorage.setItem('ytvhtThemePreference', normalized.themePreference);
+    localStorage.setItem('ytvhtAccentColor', normalized.overlayColor || normalized.accentColor || color);
     overlayTitle = tFeed('feed_viewed', 'Viewed');
-    applyFeedTheme(settings.themePreference);
-    applyAccentColor(settings.accentColor);
-    notifySettingsChanged(settings);
+    applyFeedTheme(normalized.themePreference);
+    applyAccentColor(normalized.overlayColor || normalized.accentColor || 'blue');
+    notifySettingsChanged(normalized);
     const message = document.getElementById('feedSettingsMessage');
     message.textContent = '';
 }
@@ -117,11 +127,12 @@ function showSettings() {
     historyActive = false;
     settingsActive = true;
     channelActive = false;
+    watchLaterActive = false;
     ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
-    ['analyticsSection', 'subscriptionsSection', 'playlistsSection', 'historySection'].forEach((id) => {
+    ['analyticsSection', 'subscriptionsSection', 'playlistsSection', 'historySection', 'watchLaterSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });

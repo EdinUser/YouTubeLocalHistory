@@ -6,7 +6,7 @@ const contracts = require('../../src/feed-contracts.js');
 const refreshSource = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'feed-refresh.js'), 'utf8');
 const source = refreshSource.slice(refreshSource.indexOf('function setStatus'));
 
-function runtime({ videoIds = [], loadData, work, visibleIds = videoIds } = {}) {
+function runtime({ videoIds = [], loadData, work, visibleIds = videoIds, inventoryIds = videoIds } = {}) {
   document.body.innerHTML = `
     <button id="refresh"></button>
     <button id="reloadView"></button>
@@ -29,7 +29,7 @@ function runtime({ videoIds = [], loadData, work, visibleIds = videoIds } = {}) 
     pendingFeedDiscovery: contracts.createPendingFeedDiscovery({ videoIds, discoveredAt: 100 }),
     pendingFeedNoticeState: { busy: false, error: '' },
     newlyShownFeedVideoIds: [],
-    allVideos: [],
+    allVideos: inventoryIds.map((videoId) => ({ videoId })),
     shortsOnly: false,
     analyticsActive: false,
     subscriptionsActive: false,
@@ -119,6 +119,33 @@ test('a failed Show preserves identities and exposes a working Retry action', as
   await context.showPendingFeedVideos();
   expect(loadData).toHaveBeenCalledTimes(2);
   expect(context.pendingFeedDiscovery.videoIds).toEqual([]);
+});
+
+test('Show recovers retained IDs from a stale pending discovery after retention', async () => {
+  const incomplete = new Error('The local inventory is still missing 1 discovered video.');
+  incomplete.code = 'pending_inventory_incomplete';
+  const loadData = jest.fn()
+    .mockRejectedValueOnce(incomplete)
+    .mockResolvedValueOnce(undefined)
+    .mockResolvedValueOnce(undefined);
+  const { context, stored } = runtime({
+    videoIds: ['expired', 'retained'],
+    inventoryIds: ['retained'],
+    visibleIds: ['retained'],
+    loadData
+  });
+
+  await context.showPendingFeedVideos();
+
+  expect(loadData).toHaveBeenNthCalledWith(1, {
+    requireCanonicalInventory: true,
+    expectedVideoIds: ['expired', 'retained']
+  });
+  expect(loadData).toHaveBeenNthCalledWith(2, { requireCanonicalInventory: true });
+  expect(context.pendingFeedDiscovery.videoIds).toEqual([]);
+  expect(stored['ytvht.pendingFeedDiscovery.v1'].videoIds).toEqual([]);
+  expect(context.newlyShownFeedVideoIds).toEqual(['retained']);
+  expect(document.getElementById('status').textContent).toContain('1 new video shown.');
 });
 
 test('Show reports discovered videos excluded by active filters', async () => {

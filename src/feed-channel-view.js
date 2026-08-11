@@ -140,9 +140,10 @@ function showChannelPage(info) {
     playlistsActive = false;
     historyActive = false;
     settingsActive = false;
+    watchLaterActive = false;
     ['localHeading', 'grid', 'localSearchResults', 'empty',
         'analyticsSection', 'subscriptionsSection', 'playlistsSection',
-        'historySection', 'settingsSection'].forEach((id) => {
+        'historySection', 'settingsSection', 'watchLaterSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });

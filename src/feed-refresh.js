@@ -279,6 +279,28 @@ async function showPendingFeedVideos(onReady) {
         setStatus(message, false);
         scrollToShownFeedVideos(videoIds);
     } catch (error) {
+        // Pending discoveries created before a retention pass can include IDs
+        // that were legitimately removed before the user clicks Show. Recover
+        // any remaining canonical IDs in-place rather than presenting a
+        // guaranteed failure. A fully unavailable inventory still stays
+        // retryable below.
+        if (error && error.code === 'pending_inventory_incomplete') {
+            try {
+                await loadData({ requireCanonicalInventory: true });
+                const available = new Set((allVideos || []).map((video) => video.videoId));
+                const retainedVideoIds = videoIds.filter((videoId) => available.has(videoId));
+                if (retainedVideoIds.length) {
+                    await replacePendingFeedDiscovery({
+                        videoIds: retainedVideoIds,
+                        discoveredAt: pendingFeedDiscovery.discoveredAt || Date.now()
+                    });
+                    pendingFeedNoticeState = { busy: false, error: '' };
+                    return showPendingFeedVideos(onReady);
+                }
+            } catch (recoveryError) {
+                console.warn('[feed] could not recover retained discoveries', recoveryError && recoveryError.message);
+            }
+        }
         pendingFeedNoticeState = {
             busy: false,
             error: String(error && error.message || tFeed('message_unknown_error', 'error'))

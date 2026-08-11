@@ -13,6 +13,7 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 | Home | Builds a mixed local feed from followed channels |
 | Subscriptions | Shows a chronological inventory of cached subscription videos |
 | Shorts | Separates watched Shorts from ordinary history |
+| Watch Later | Keeps videos explicitly saved for later, independently of a YouTube account |
 | Channels | Manages local follows and reviewable ignored-channel records |
 | Analytics | Summarizes local activity, watch time, completion, and channel patterns |
 | Playlist references | Saves links to YouTube playlists without importing their members |
@@ -26,7 +27,7 @@ The feed's Home and Subscriptions views use stable 50-card pages. Search is loca
 2. Watch a video. re:Watch records meaningful playback and updates the local resume point.
 3. Follow channels from supported YouTube surfaces, add them in **Channels**, or import a subscriptions file in **Settings**.
 
-Click the extension button for quick actions. Open the full re:Watch page for Home, Subscriptions, Shorts, playlist references, History, Channels, Analytics, and Settings.
+Click the extension button for quick actions. Open the full re:Watch page for Home, Subscriptions, Shorts, Watch Later, playlist references, History, Channels, Analytics, and Settings.
 
 ## Feed refresh controls
 
@@ -47,6 +48,10 @@ When an imported channel was previously removed, re:Watch keeps a tombstone so l
 ## Playlist behavior
 
 v5 saves YouTube playlists as outbound references: title, available metadata, and the original YouTube link. It does not hydrate playlist members in the background and does not yet provide extension-managed local playlists.
+
+## Watch Later
+
+Right-click a recognized YouTube video or Short and choose **Save to Watch Later (local)**, or use **Save to Watch Later** from a re:Watch video menu. The **Watch Later** sidebar view lists these local saves newest first and provides Open and Remove actions. This list is independent of YouTube's account-based Watch Later playlist.
 
 ## Privacy boundaries
 

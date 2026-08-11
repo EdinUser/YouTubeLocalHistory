@@ -1665,6 +1665,9 @@
             <button class="nav-item" id="navHistory" title="View your local watch history" data-i18n-title="feed_nav_history_title">
                 <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"></path><path d="M4 4v5h5"></path><path d="M12 7v5l3 2"></path></svg></span><span data-i18n="feed_nav_history">History</span>
             </button>
+            <button class="nav-item" id="navWatchLater" title="View videos saved to Watch Later" data-i18n-title="feed_nav_watch_later_title">
+                <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5v5l3.2 2"></path></svg></span><span data-i18n="feed_nav_watch_later">Watch Later</span>
+            </button>
             <button class="nav-item" id="manage" title="Manage your locally subscribed channels" data-i18n-title="feed_nav_channels_title">
                 <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-4 2.5-6 5.5-6s5 2 5.5 6"></path><circle cx="17" cy="9" r="2.2"></circle><path d="M15.5 14c3.2-.5 5 1.2 5.5 4"></path></svg></span><span data-i18n="feed_nav_channels">Channels</span>
             </button>
@@ -1787,6 +1790,18 @@
                 <button class="btn primary search-load-more" id="historyLoadMore" style="display:none;" data-i18n="feed_load_more">Load more</button>
             </section>
 
+            <!-- Locally saved Watch Later videos -->
+            <section class="history-view" id="watchLaterSection" style="display:none;">
+                <div class="history-toolbar">
+                    <div>
+                        <h2 class="history-title" data-i18n="feed_nav_watch_later">Watch Later</h2>
+                        <div class="history-count" id="watchLaterCount"></div>
+                    </div>
+                </div>
+                <div class="history-list" id="watchLaterList"></div>
+                <div class="history-empty" id="watchLaterEmpty" style="display:none;" data-i18n="feed_watch_later_empty">No videos saved to Watch Later.</div>
+            </section>
+
             <!-- Analytics view (hidden until the Analytics nav item is clicked) -->
             <div id="analyticsSection" style="display:none;">
                 <h2 class="section-h"><span data-i18n="tab_analytics">Analytics</span> <span class="sub" data-i18n="feed_analytics_subtitle">your watch stats, kept locally</span></h2>
@@ -1883,6 +1898,7 @@
                                 <option value="shorts" data-i18n="tab_shorts">Shorts</option>
                                 <option value="playlists" data-i18n="tab_playlists">Playlists</option>
                                 <option value="history" data-i18n="feed_nav_history">History</option>
+                                <option value="watchlater" data-i18n="feed_nav_watch_later">Watch Later</option>
                                 <option value="channels" data-i18n="feed_nav_channels">Channels</option>
                                 <option value="analytics" data-i18n="tab_analytics">Analytics</option>
                                 <option value="last" data-i18n="feed_last_used_tab">Last used tab</option>
@@ -2007,6 +2023,7 @@
     <script src="feed-playlist-import.js"></script>
     <script src="feed-playlists-view.js"></script>
     <script src="feed-history-view.js"></script>
+    <script src="feed-watchlater-view.js"></script>
     <script src="feed-settings.js"></script>
     <script src="feed-backup.js"></script>
     <script src="feed-subscribe-results.js"></script>

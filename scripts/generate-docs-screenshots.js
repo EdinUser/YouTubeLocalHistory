@@ -269,6 +269,7 @@ async function activateView(page, entry) {
     'feed-shorts': '#navShorts',
     'feed-playlists': '#navPlaylists',
     'feed-history': '#navHistory',
+    'feed-watch-later': '#navWatchLater',
     'feed-channels': '#manage',
     'feed-analytics': '#analyticsToggle',
     'feed-settings': '#navSettings',

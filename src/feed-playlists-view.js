@@ -788,6 +788,7 @@ function showPlaylists() {
     historyActive = false;
     settingsActive = false;
     channelActive = false;
+    watchLaterActive = false;
     initPlaylistsToolbar();
     ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);
@@ -801,6 +802,8 @@ function showPlaylists() {
     if (settings) settings.style.display = 'none';
     const history = document.getElementById('historySection');
     if (history) history.style.display = 'none';
+    const watchLater = document.getElementById('watchLaterSection');
+    if (watchLater) watchLater.style.display = 'none';
     const chips = document.querySelector('.chips');
     if (chips) chips.style.display = 'none';
     const playlists = document.getElementById('playlistsSection');

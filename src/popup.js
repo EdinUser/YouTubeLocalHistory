@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Load settings first
         const settings = await loadSettings();
         debugEnabled = settings.debug || false;
-        applyPopupAccent(settings.accentColor || settings.overlayColor || 'blue');
+        applyPopupAccent(settings.overlayColor || settings.accentColor || 'blue');
         await applyTheme(settings.themePreference);
 
         // Update page size variables from settings
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             log('Theme change detected, re-applying theme...');
             const currentSettings = await loadSettings();
             await applyTheme(currentSettings.themePreference);
-            applyPopupAccent(currentSettings.accentColor || currentSettings.overlayColor || 'blue');
+            applyPopupAccent(currentSettings.overlayColor || currentSettings.accentColor || 'blue');
         }
 
         // Set up theme change listeners
@@ -120,13 +120,13 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Keep the theme in sync after settings UI/storage initialization.
         await applyTheme(settings.themePreference);
-        applyPopupAccent(settings.accentColor || settings.overlayColor || 'blue');
+        applyPopupAccent(settings.overlayColor || settings.accentColor || 'blue');
 
         if (chrome.storage && chrome.storage.onChanged) {
             chrome.storage.onChanged.addListener((changes, area) => {
                 if (area !== 'local' || !changes.settings || !changes.settings.newValue) return;
                 const updated = changes.settings.newValue;
-                applyPopupAccent(updated.accentColor || updated.overlayColor || 'blue');
+                applyPopupAccent(updated.overlayColor || updated.accentColor || 'blue');
             });
         }
 

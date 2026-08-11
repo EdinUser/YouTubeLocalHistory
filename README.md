@@ -38,6 +38,7 @@ The full feed page contains:
 | --- | --- |
 | **Home** | A locally regenerated mix of cached videos using freshness, watch activity, and local feedback |
 | **Subscriptions** | Cached uploads from locally followed channels in chronological order |
+| **Watch Later** | Locally saved videos, newest first |
 | **Shorts** | Known short-form videos and watched Shorts |
 | **Playlists** | Saved YouTube playlist references that open on YouTube |
 | **History** | Locally recorded videos, progress, duration, and watched time |
@@ -46,6 +47,8 @@ The full feed page contains:
 | **Settings** | Appearance, retention, feed timing, imports, backup/restore, and reset controls |
 
 Home and Subscriptions render stable 50-card pages as you scroll. Checking for new videos is separate from reloading the current local view, so a background scan does not unexpectedly replace or reorder visible cards. When uploads are found, re:Watch offers a deliberate **Show** action.
+
+Watch Later is independent of YouTube's account playlist. Right-click a recognized video or Short and choose **Save to Watch Later (local)**, or use a re:Watch video menu; the full-page Watch Later view provides newest-first Open and Remove actions.
 
 ## Local subscriptions and feed
 
@@ -85,6 +88,7 @@ Direct YouTube requests used by the local feed:
 - public channel RSS checks;
 - public channel or handle pages when identity or presentation metadata is needed;
 - YouTube-hosted thumbnails, avatars, and banners displayed by the UI.
+- YouTube oEmbed metadata only when a locally saved Watch Later item is missing its title or channel.
 
 Feed metadata requests omit browser credentials. Local search does not contact YouTube. The extension does not subscribe, unsubscribe, like, comment, or modify a YouTube account.
 

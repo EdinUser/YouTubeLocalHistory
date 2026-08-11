@@ -5,19 +5,22 @@ async function loadHistoryPage(options = {}) {
     try {
         log(`Loading history page ${page} with search: "${query}"`);
         const result = await ytStorage.getVideosPage({
+            // Filter before storage paginates. This keeps a page's records,
+            // count, and controls on the same unfinished-only projection.
             page,
             pageSize: pageSizeParam,
-            searchQuery: query
+            searchQuery: query,
+            unfinishedOnly: true
         });
 
         // Update global arrays with just the current page data
         allHistoryRecords = result.records;
 
         // Update pagination metadata
-        totalPages = result.pagination.totalPages;
+        totalPages = Math.max(1, result.pagination.totalPages || 0);
         totalHistoryRecords = result.pagination.totalRecords;
 
-        log(`Loaded page ${page}/${totalPages} with ${result.records.length} records (total: ${totalHistoryRecords})`);
+        log(`Loaded page ${currentPage}/${totalPages} with ${result.records.length} records (total: ${totalHistoryRecords})`);
 
         return result;
     } catch (error) {
@@ -193,4 +196,3 @@ function filterRecords(records) {
         record.title?.toLowerCase().includes(searchQuery)
     );
 }
-

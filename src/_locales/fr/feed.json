@@ -67,6 +67,18 @@
     "message": "Voir votre historique local",
     "description": "History navigation tooltip"
   },
+  "feed_nav_watch_later": {
+    "message": "À regarder plus tard",
+    "description": "Watch Later navigation label"
+  },
+  "feed_nav_watch_later_title": {
+    "message": "Voir les vidéos enregistrées à regarder plus tard",
+    "description": "Watch Later navigation tooltip"
+  },
+  "feed_watch_later_empty": {
+    "message": "Aucune vidéo enregistrée à regarder plus tard.",
+    "description": "Empty Watch Later state"
+  },
   "feed_nav_channels": {
     "message": "Chaînes",
     "description": "Channels navigation label"
