@@ -2,6 +2,25 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [5.1.0] - 2026-08-14
+
+### Added
+
+- Added extension-managed local playlists with creation, rename, deletion, ordering, and video actions. These remain separate from YouTube-account playlists.
+- Added a per-channel RSS log in **Channels**, showing the latest 15 successful and failed feed reads with timestamps and HTTP status.
+- Added upload-date and detection-date ordering for Subscriptions, with an explanation of videos hidden by active filters.
+- Unified full-page Feed headers around an icon, title, description, and view-local controls. Added contextual Reload actions and a persisted collapsed sidebar icon rail.
+
+### Changed
+
+- RSS-backed subscriptions now treat temporary YouTube 404, 403, 429, 5xx, timeout, and network failures as retryable. Cached videos remain intact; retries use backoff and jitter; first imports retain priority; and retry-only work is paced conservatively.
+- Popup history is strictly last-watched ordered, including completed videos, and retains the current page during live updates.
+
+### Fixed
+
+- Handled extension-context invalidation without a misleading content-script error.
+- Made release rebuilds preserve the unpacked extension directory instead of requiring extension removal and reinstallation.
+
 ## [5.0.1] - 2026-08-11
 
 ### Fixed

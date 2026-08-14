@@ -24,3 +24,11 @@ test('Feed persists the default collapsed icon rail and restores expanded naviga
   expect(source).toContain("localStorage.setItem('ytvhtSidebarCollapsed'");
   expect(source).toContain("item.title = collapsed ? item.textContent.trim() : item.dataset.expandedTitle");
 });
+
+test('Feed title icons are constructed as SVG DOM nodes rather than dynamic HTML', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'src', 'feed-home.js'), 'utf8');
+
+  expect(source).toContain("document.createElementNS('http://www.w3.org/2000/svg', 'svg')");
+  expect(source).toContain('titleIcon.replaceChildren(createFeedTitleIcon(');
+  expect(source).not.toContain('titleIcon.innerHTML');
+});
