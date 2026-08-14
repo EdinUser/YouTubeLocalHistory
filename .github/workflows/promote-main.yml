@@ -1,0 +1,39 @@
+name: Promote develop to main
+
+on:
+  workflow_dispatch:
+
+jobs:
+  promote:
+    if: ${{ github.ref == 'refs/heads/develop' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.MAIN_PROMOTION_TOKEN }}
+
+      - name: Verify fast-forward promotion path
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main develop --prune
+          MAIN_SHA="$(git rev-parse origin/main)"
+          DEVELOP_SHA="$(git rev-parse origin/develop)"
+          if [ "${MAIN_SHA}" = "${DEVELOP_SHA}" ]; then
+            echo "main already matches develop"
+            exit 0
+          fi
+          if ! git merge-base --is-ancestor "${MAIN_SHA}" "${DEVELOP_SHA}"; then
+            echo "main is not an ancestor of develop; refusing non-fast-forward promotion"
+            exit 1
+          fi
+
+      - name: Fast-forward main to develop
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin refs/remotes/origin/develop:refs/heads/main

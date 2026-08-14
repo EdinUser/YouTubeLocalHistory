@@ -4,15 +4,27 @@ on:
   push:
     branches:
       - main
-      - master
+      - develop
   pull_request:
     branches:
       - main
-      - master
+      - develop
 
 jobs:
+  validate-pr-route:
+    name: validate-pr-route
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce develop-to-main promotion
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "Pull requests into main must come from develop."
+            exit 1
+          fi
+
   test:
     name: Run Jest Tests
+    needs: validate-pr-route
     runs-on: ubuntu-latest
 
     steps:
