@@ -17,6 +17,7 @@ function isShort(v) {
 // and Shorts shows only Shorts.
 let shortsOnly = false;
 let subscriptionsChronological = false;
+let subscriptionSort = ytvhtSubscriptionSort.DEFAULT_SUBSCRIPTION_SORT;
 const VISIBLE_FEED_LIMIT = 300;
 const FEED_RENDER_PAGE_SIZE = typeof ytvhtFeedContracts !== 'undefined'
     ? Number(ytvhtFeedContracts.FEED_PAGE_SIZE || 50)
@@ -727,13 +728,17 @@ async function fillSubscriptionPage(state, grid, empty, targetCount) {
 }
 
 function startSubscriptionPagination(grid, empty) {
-    const pinned = subscriptionPinnedVideos();
+    const filtered = allVideos.filter(subscriptionVideoPassesFilters);
+    const useInMemorySort = subscriptionSort !== 'published_desc';
+    const pinned = useInMemorySort
+        ? ytvhtSubscriptionSort.sortSubscriptionVideos(filtered, subscriptionSort)
+        : subscriptionPinnedVideos();
     const state = {
         generation: feedPaginationGeneration,
         videos: pinned.slice(),
         seenVideoIds: new Set(pinned.map((video) => video.videoId)),
         cursor: null,
-        exhausted: false,
+        exhausted: useInMemorySort,
         renderedCount: 0,
         loading: false
     };
@@ -748,6 +753,8 @@ function render() {
     const empty = document.getElementById('empty');
     const count = document.getElementById('count');
     const heading = document.getElementById('localHeading');
+    const titleIcon = document.getElementById('feedTitleIcon');
+    const titleDescription = document.getElementById('feedTitleDescription');
     const status = document.getElementById('status');
     const filters = document.getElementById('searchFilters');
     const sourceTabs = document.getElementById('searchSourceTabs');
@@ -755,6 +762,12 @@ function render() {
     stopFeedPagination();
     const rawQuery = (document.getElementById('search').value || '').trim();
     const subscriptionsBrowse = subscriptionsChronological && !shortsOnly && !rawQuery;
+    const subscriptionSortControl = document.getElementById('subscriptionSort');
+    if (subscriptionSortControl) {
+        subscriptionSortControl.hidden = !subscriptionsBrowse;
+        subscriptionSortControl.value = subscriptionSort;
+        syncFeedStatusRow();
+    }
     const { list, q, metadataCandidates = [] } = subscriptionsBrowse
         ? { list: [], q: '' }
         : currentView();
@@ -762,31 +775,28 @@ function render() {
     document.body.classList.toggle('shorts-mode', shortsOnly && !q);
     grid.textContent = '';
     if (searchResults) searchResults.textContent = '';
-    // No plain "Your feed" label; only show a heading for search/Shorts context.
-    const headingText = q
+    const title = q
         ? tFeed('feed_search_results_for_query', 'Search results for “$1”', [q])
-        : (shortsOnly ? tFeed('tab_shorts', 'Shorts') : '');
-    heading.textContent = '';
-    if (shortsOnly && !q) {
-        const icon = document.createElement('span');
-        icon.className = 'shorts-heading-icon';
-        icon.setAttribute('aria-hidden', 'true');
-        icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="m13.5 2-7 11h5l-1 9 7-12h-5l1-8Z"></path></svg>';
-        heading.append(icon, document.createTextNode(tFeed('tab_shorts', 'Shorts')));
-    } else {
-        heading.textContent = headingText;
-    }
-    heading.style.display = headingText ? '' : 'none';
+        : (shortsOnly ? tFeed('tab_shorts', 'Shorts') : (subscriptionsBrowse
+            ? tFeed('feed_nav_subscriptions', 'Subscriptions')
+            : tFeed('feed_nav_home', 'Home')));
+    const description = q ? tFeed('feed_title_search_description', 'Results from your local history and feed.')
+        : (shortsOnly ? tFeed('feed_title_shorts_description', 'Quick picks from your subscribed channels.')
+            : (subscriptionsBrowse ? tFeed('feed_title_subscriptions_description', 'Latest uploads from channels you follow.')
+                : tFeed('feed_title_home_description', 'Personalized locally from your watch history.')));
+    if (heading) heading.textContent = title;
+    if (titleDescription) titleDescription.textContent = description;
+    if (titleIcon) titleIcon.innerHTML = shortsOnly
+        ? '<svg viewBox="0 0 24 24"><path d="m13.5 2-7 11h5l-1 9 7-12h-5l1-8Z"></path></svg>'
+        : (subscriptionsBrowse
+            ? '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"></rect><path d="m9 3 3 3 3-3"></path><path d="m10 10 5 3-5 3v-6Z"></path></svg>'
+            : '<svg viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-7h5v7"></path></svg>');
     if (filters) {
         filters.classList.toggle('visible', !!q);
         filters.classList.toggle('open', !!q && searchFiltersOpen);
     }
     if (sourceTabs) sourceTabs.classList.toggle('visible', !!q);
     if (status) status.style.display = q ? 'none' : '';
-
-    if (q) {
-        heading.style.display = 'none';
-    }
 
     if (subscriptionsBrowse) {
         if (searchResults) searchResults.style.display = 'none';

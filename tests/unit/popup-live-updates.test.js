@@ -6,11 +6,11 @@ const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'popup-core.js'), 'utf8');
 const runtimeSource = source.slice(source.indexOf('function handleStorageUpdates'), source.indexOf('// Load history records'));
 
-function createRuntime(records = []) {
+function createRuntime(records = [], currentPage = 1, totalPages = 1) {
   document.body.innerHTML = '<table id="ytvhtHistoryTable"><tr><td><a class="video-link"></a><span class="video-progress"></span><span class="video-date"></span></td></tr></table>';
   const storedRecords = [...records];
   const context = {
-    document, allHistoryRecords: records, allShortsRecords: [...records], currentPage: 1, pageSize: 20,
+    document, allHistoryRecords: records, allShortsRecords: [...records], currentPage, totalPages, pageSize: 20,
     displayHistoryPage: jest.fn(), displayShortsPage: jest.fn(), log: jest.fn(),
     addTimestampToUrl: (url, time) => `${url}&t=${time}`, formatProgress: (time, duration) => `${time}/${duration}`,
     formatDate: (timestamp) => `date:${timestamp}`, chrome: { storage: { local: { get: jest.fn(async () => ({})) } } }, console, Promise,
@@ -56,4 +56,15 @@ test('refreshes for new records and deletions, and blocks tombstoned resurrectio
   context.chrome.storage.local.get.mockResolvedValue({ deleted_video_blocked: { deletedAt: 1 } });
   await context.checkTombstoneAndUpdateVideo('blocked', { videoId: 'blocked', timestamp: 3 });
   expect(context.loadHistoryPage).toHaveBeenCalledTimes(2);
+});
+
+test('keeps the selected page during a live update', async () => {
+  const context = createRuntime([
+    { videoId: 'page-two', title: 'Page two', time: 20, duration: 100, timestamp: 2 }
+  ], 2, 3);
+
+  await context.updateVideoRecord({ videoId: 'newer', time: 30, duration: 100, timestamp: 3 });
+
+  expect(context.loadHistoryPage).toHaveBeenCalledWith({ page: 2 });
+  expect(context.currentPage).toBe(2);
 });

@@ -5,7 +5,7 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 [Install for Chrome](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba){ .md-button .md-button--primary }
 [Install for Firefox](https://addons.mozilla.org/firefox/addon/yt-rewatch/){ .md-button }
 
-## What v5 includes
+## What v5.1 includes
 
 | Area | What it does |
 | --- | --- |
@@ -17,6 +17,7 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 | Channels | Manages local follows and reviewable ignored-channel records |
 | Analytics | Summarizes local activity, watch time, completion, and channel patterns |
 | Playlist references | Saves links to YouTube playlists without importing their members |
+| Local playlists | Creates and manages extension-owned playlists without changing YouTube account playlists |
 | Backup | Exports and restores the documented local profile data |
 
 The feed's Home and Subscriptions views use stable 50-card pages. Search is local: it searches records already saved by re:Watch and does not send a remote YouTube search request.
@@ -27,7 +28,7 @@ The feed's Home and Subscriptions views use stable 50-card pages. Search is loca
 2. Watch a video. re:Watch records meaningful playback and updates the local resume point.
 3. Follow channels from supported YouTube surfaces, add them in **Channels**, or import a subscriptions file in **Settings**.
 
-Click the extension button for quick actions. Open the full re:Watch page for Home, Subscriptions, Shorts, Watch Later, playlist references, History, Channels, Analytics, and Settings.
+Click the extension button for quick actions. Open the full re:Watch page for Home, Subscriptions, Shorts, Watch Later, playlists, History, Channels, Analytics, and Settings.
 
 ## Feed refresh controls
 
@@ -47,7 +48,7 @@ When an imported channel was previously removed, re:Watch keeps a tombstone so l
 
 ## Playlist behavior
 
-v5 saves YouTube playlists as outbound references: title, available metadata, and the original YouTube link. It does not hydrate playlist members in the background and does not yet provide extension-managed local playlists.
+re:Watch saves YouTube playlists as outbound references: title, available metadata, and the original YouTube link. It does not hydrate their members in the background. Separately, **Playlists** lets you create and manage extension-owned local playlists without changing a YouTube account playlist.
 
 ## Watch Later
 
@@ -72,7 +73,7 @@ There is no automatic cross-device synchronization. Use export and restore to mo
 - [Detailed guide](detailed_guide.md)
 - [Frequently asked questions](faq.md)
 - [Troubleshooting](troubleshooting.md)
-- [v5 release notes](changelog.md)
+- [v5.1 release notes](changelog.md)
 - [Roadmap](roadmap.md)
 
 For support, use the [community forum](https://community.kirilov.dev/t/re-watch), [Telegram community](https://t.me/+eFftKWGVvSpiZjZk), [Discord community](https://discord.gg/9fuvSzP7Qr), or [GitHub issues](https://github.com/EdinUser/YouTubeLocalHistory/issues).

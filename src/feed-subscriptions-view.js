@@ -9,10 +9,8 @@ function showFeedStatus(show) {
 }
 
 function setRefreshVisible(visible) {
-    ['refresh', 'reloadView'].forEach((id) => {
-        const action = document.getElementById(id);
-        if (action) action.style.display = visible ? '' : 'none';
-    });
+    const action = document.getElementById('refresh');
+    if (action) action.style.display = visible ? '' : 'none';
 }
 
 function setCreatePlaylistVisible(visible) {
@@ -74,7 +72,7 @@ function showAnalytics() {
     settingsActive = false;
     watchLaterActive = false;
     channelActive = false;
-    ['localHeading', 'grid', 'localSearchResults', 'empty', 'channelSection'].forEach((id) => {
+    ['feedTitleBar', 'grid', 'localSearchResults', 'empty', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -128,8 +126,8 @@ function showFeed() {
     if (channel) channel.style.display = 'none';
     const chips = document.querySelector('.chips');
     if (chips) chips.style.display = '';
-    const heading = document.getElementById('localHeading');
-    if (heading) heading.style.display = '';
+    const titleBar = document.getElementById('feedTitleBar');
+    if (titleBar) titleBar.style.display = '';
     setActiveNav(shortsOnly ? 'navShorts' : (subscriptionsChronological ? 'navSubscriptions' : 'navHome'));
     render();
     if (typeof restorePageActiveSyncStatus === 'function') restorePageActiveSyncStatus();
@@ -147,6 +145,46 @@ function setSubscriptionAddStatus(message, isError) {
     if (!status) return;
     status.textContent = message || '';
     status.style.color = isError ? 'var(--danger-text)' : '';
+}
+
+function showSubscriptionRssLog(subscription) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'rss-log-dialog';
+    const title = document.createElement('h2');
+    title.textContent = tFeed('feed_rss_log_title', 'RSS read log · $1', [subscription.channelName || subscription.channelId]);
+    dialog.appendChild(title);
+    const attempts = Array.isArray(subscription.rssAttempts) ? subscription.rssAttempts.slice().reverse() : [];
+    if (!attempts.length) {
+        const empty = document.createElement('p');
+        empty.textContent = tFeed('feed_rss_log_empty', 'No RSS reads recorded yet.');
+        dialog.appendChild(empty);
+    } else {
+        const list = document.createElement('ol');
+        list.className = 'rss-log-list';
+        attempts.forEach((attempt) => {
+            const item = document.createElement('li');
+            const status = Number(attempt.status || 0);
+            item.className = status >= 200 && status < 300 ? 'success' : 'failure';
+            const at = Number(attempt.at || 0);
+            const when = at ? new Date(at).toLocaleString() : tFeed('feed_unknown_date', 'Unknown date');
+            const result = status ? `HTTP ${status}` : String(attempt.code || 'network');
+            item.textContent = [when, result, attempt.message].filter(Boolean).join(' · ');
+            list.appendChild(item);
+        });
+        dialog.appendChild(list);
+    }
+    const close = document.createElement('button');
+    close.className = 'btn';
+    close.textContent = tFeed('feed_close', 'Close');
+    close.addEventListener('click', () => {
+        if (typeof dialog.close === 'function') dialog.close();
+        else dialog.remove();
+    });
+    dialog.appendChild(close);
+    dialog.addEventListener('close', () => dialog.remove(), { once: true });
+    document.body.appendChild(dialog);
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', '');
 }
 
 function setupSubscriptionAddForm() {
@@ -310,6 +348,13 @@ async function renderSubscriptions() {
             row.appendChild(meta);
         }
 
+        const actions = document.createElement('div');
+        actions.className = 'subs-actions';
+        const log = document.createElement('button');
+        log.className = 'btn';
+        log.textContent = tFeed('feed_rss_log', 'Log');
+        log.addEventListener('click', () => showSubscriptionRssLog(sub));
+        actions.appendChild(log);
         const unsubscribe = document.createElement('button');
         unsubscribe.className = 'btn';
         unsubscribe.textContent = tFeed('subscriptions_unsubscribe', 'Unsubscribe');
@@ -329,7 +374,8 @@ async function renderSubscriptions() {
                 unsubscribe.disabled = false;
             }
         });
-        row.appendChild(unsubscribe);
+        actions.appendChild(unsubscribe);
+        row.appendChild(actions);
         list.appendChild(row);
     });
     if (showingIgnored) {
@@ -496,7 +542,7 @@ function showSubscriptions(requestedTab) {
     settingsActive = false;
     channelActive = false;
     watchLaterActive = false;
-    ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection', 'channelSection'].forEach((id) => {
+    ['feedTitleBar', 'grid', 'localSearchResults', 'empty', 'ytSection', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });

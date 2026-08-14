@@ -15,20 +15,45 @@
         };
     }
 
+    function nextRssAttempts(existing, scan, now) {
+        const prior = Array.isArray(existing && existing.rssAttempts) ? existing.rssAttempts : [];
+        const error = scan.error || null;
+        return [...prior.slice(-14), {
+            at: now,
+            status: error ? Number(error.status || 0) : 200,
+            code: error ? error.code : 'success',
+            message: error ? String(error.message || error.code) : ''
+        }];
+    }
+
     function updatedSyncState(existing, scan, now) {
         const base = { ...(existing || {}), channelId: scan.channelId, lastAttemptAt: now };
+        const rssAttempts = nextRssAttempts(base, scan, now);
         if (scan.error) {
-            return { ...base, failureCount: Number(base.failureCount || 0) + 1 };
+            const { unavailableStatus, unavailableAt, ...retryBase } = base;
+            return {
+                ...retryBase,
+                failureCount: Number(retryBase.failureCount || 0) + 1,
+                lastRssError: {
+                    code: scan.error.code,
+                    status: Number(scan.error.status || 0),
+                    message: String(scan.error.message || scan.error.code),
+                    occurredAt: now
+                },
+                rssAttempts
+            };
         }
         const latest = scan.entries.reduce((current, entry) => !current || entry.publishedAt > current.publishedAt ? entry : current, null);
+        const { unavailableStatus, unavailableAt, lastRssError, ...availableBase } = base;
         return {
-            ...base,
+            ...availableBase,
             lastSuccessfulCheckAt: now,
             failureCount: 0,
             retryAfter: null,
             latestKnownVideoId: latest ? latest.videoId : base.latestKnownVideoId || null,
             latestUploadAt: latest ? latest.publishedAt : base.latestUploadAt || null,
-            unchangedChecks: latest ? Number(base.unchangedChecks || 0) : Number(base.unchangedChecks || 0) + 1
+            unchangedChecks: latest ? Number(base.unchangedChecks || 0) : Number(base.unchangedChecks || 0) + 1,
+            rssAttempts
         };
     }
 
@@ -80,7 +105,7 @@
         return terminal;
     }
 
-    const api = { mergeFeedVideo, ingestRssScan };
+    const api = { mergeFeedVideo, nextRssAttempts, ingestRssScan };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     root.ytvhtFeedIngestion = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -80,11 +80,11 @@ Subscriptions are matched by canonical YouTube channel ID. Reimporting the same 
 
 ### Does re:Watch import every video in a YouTube playlist?
 
-No. v5 saves an outbound playlist reference and available metadata, then opens the original playlist on YouTube. It does not hydrate members in the background.
+No. re:Watch saves an outbound playlist reference and available metadata, then opens the original playlist on YouTube. It does not hydrate members in the background.
 
 ### Can I create extension-managed playlists?
 
-Not in stable v5. That is a separately planned feature.
+Yes. Use **Playlists** to create and manage a local playlist. It remains separate from YouTube account playlists.
 
 ## Analytics
 

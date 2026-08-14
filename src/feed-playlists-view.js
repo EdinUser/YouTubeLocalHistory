@@ -790,7 +790,7 @@ function showPlaylists() {
     channelActive = false;
     watchLaterActive = false;
     initPlaylistsToolbar();
-    ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection', 'channelSection'].forEach((id) => {
+    ['feedTitleBar', 'grid', 'localSearchResults', 'empty', 'ytSection', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });

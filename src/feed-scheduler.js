@@ -11,12 +11,20 @@
         foregroundBatchSize: 30,
         initializationBatchSize: 30,
         concurrency: 4,
+        initializationConcurrency: 2,
+        // A run made entirely of previously failed feeds is deliberately
+        // gentler than a normal scan.  This avoids turning a YouTube-side
+        // RSS incident into another burst of requests, while never blocking
+        // channels that have not yet had their first import attempt.
+        retryConcurrency: 1,
         requestTimeoutMs: 10000,
         leaseMs: 30000,
         successfulCheckIntervalMs: 6 * 60 * 60 * 1000,
         retryBaseMs: 60 * 1000,
         retryMaxMs: 60 * 60 * 1000,
-        unavailableChannelRetryMs: 30 * 24 * 60 * 60 * 1000,
+        transientHttpRetryBaseMs: 5 * 60 * 1000,
+        transientHttpRetryMaxMs: 6 * 60 * 60 * 1000,
+        retryJitterRatio: 0.2,
         activityIntervalsMs: Object.freeze({
             very_active: 60 * 60 * 1000,
             active: 3 * 60 * 60 * 1000,
@@ -146,6 +154,29 @@
             return { completed, total: initialized.length, pending: Math.max(0, initialized.length - completed) };
         }
 
+        async getNextEligibleCheckAt() {
+            const eligible = (await this.storage.listChannelSyncStates())
+                .map((state) => Number(state && state.nextEligibleCheckAt || 0))
+                .filter((at) => Number.isFinite(at) && at > 0);
+            return eligible.length ? Math.min(...eligible) : Infinity;
+        }
+
+        async getRetryDiagnostics(limit = 15) {
+            const [subscriptions, states] = await Promise.all([
+                this.storage.listSubscriptionRecords(), this.storage.listChannelSyncStates()
+            ]);
+            const titleByChannelId = new Map(subscriptions.map((subscription) => [
+                subscription.channelId, subscription.channelTitle || subscription.channelName || subscription.channelId
+            ]));
+            return states.filter((state) => state && state.lastRssError).map((state) => ({
+                channelId: state.channelId,
+                channelTitle: titleByChannelId.get(state.channelId) || state.channelId,
+                ...state.lastRssError,
+                nextEligibleCheckAt: Number(state.nextEligibleCheckAt || 0)
+            })).sort((left, right) => Number(left.nextEligibleCheckAt || 0) - Number(right.nextEligibleCheckAt || 0))
+                .slice(0, Math.max(1, Number(limit || 15)));
+        }
+
         async runInitialization(options = {}) {
             await this.initializeSubscriptions(options.channelIds);
             const at = nowFrom(this.clock);
@@ -154,16 +185,29 @@
             const states = await this.storage.getEligibleChannelSyncStates(at);
             const pending = states
                 .filter((state) => state.initializationState === 'pending' && !state.lastSuccessfulCheckAt)
-                .sort((left, right) => (this.initializationPriority(left) - this.initializationPriority(right)) ||
+                .sort((left, right) => (Number(Boolean(left.lastAttemptAt)) - Number(Boolean(right.lastAttemptAt))) ||
+                    (this.initializationPriority(left) - this.initializationPriority(right)) ||
                     (Number(left.nextEligibleCheckAt || 0) - Number(right.nextEligibleCheckAt || 0)) ||
                     String(left.channelId).localeCompare(String(right.channelId)));
-            return this.runBatch(pending, { ...options, limit: Number(options.limit || this.initializationBatchSize), kind: 'initialization' });
+            const retryOnly = pending.length > 0 && pending.every((state) => Boolean(state.lastAttemptAt));
+            return this.runBatch(pending, {
+                ...options,
+                limit: Number(options.limit || this.initializationBatchSize),
+                concurrency: Number(options.concurrency || (retryOnly ? this.retryConcurrency : this.initializationConcurrency)),
+                kind: 'initialization'
+            });
         }
 
         async runForeground(options = {}) {
             const at = nowFrom(this.clock);
             const states = await this.storage.getEligibleChannelSyncStates(at, Number(options.limit || this.foregroundBatchSize));
-            return this.runBatch(states.filter((state) => !this.isDormantState(state)), { ...options, kind: 'foreground' });
+            const selected = states.filter((state) => !this.isDormantState(state));
+            const retryOnly = selected.length > 0 && selected.every((state) => Boolean(state.lastRssError));
+            return this.runBatch(selected, {
+                ...options,
+                concurrency: Number(options.concurrency || (retryOnly ? this.retryConcurrency : this.concurrency)),
+                kind: 'foreground'
+            });
         }
 
         async runBatch(states, options = {}) {
@@ -248,9 +292,7 @@
                 ? classification.classifyChannelActivity(claim.state, scan.entries, completedAt)
                 : null;
             const partial = terminal.outcome === 'failed' || terminal.outcome === 'timed_out'
-                ? (scan.error && Number(scan.error.status) === 404
-                    ? this.unavailableChannelSchedule(claim.state, completedAt)
-                    : this.failureSchedule(claim.state, completedAt))
+                ? this.failureSchedule(claim.state, completedAt, scan.error)
                 : {
                     initializationState: 'complete',
                     nextEligibleCheckAt: completedAt + this.activityIntervalMs(activity && activity.activityClass),
@@ -327,23 +369,18 @@
             return Math.max(configured, Number.isFinite(byActivity) ? byActivity : configured);
         }
 
-        failureSchedule(state, completedAt) {
+        failureSchedule(state, completedAt, error = null) {
             const failures = Number(state.failureCount || 0) + 1;
-            const delay = Math.min(this.retryBaseMs * (2 ** Math.max(0, failures - 1)), this.retryMaxMs);
+            const status = Number(error && error.status || 0);
+            const isTransientHttpFailure = status >= 400 && status <= 599;
+            const base = isTransientHttpFailure ? this.transientHttpRetryBaseMs : this.retryBaseMs;
+            const max = isTransientHttpFailure ? this.transientHttpRetryMaxMs : this.retryMaxMs;
+            const delay = Math.min(base * (2 ** Math.max(0, failures - 1)), max);
+            const jitter = Math.floor(delay * Math.max(0, Number(this.retryJitterRatio || 0)) * Math.random());
             return {
                 initializationState: state.initializationState || 'pending',
-                retryAfter: completedAt + delay,
-                nextEligibleCheckAt: completedAt + delay
-            };
-        }
-
-        unavailableChannelSchedule(state, completedAt) {
-            return {
-                initializationState: 'complete',
-                retryAfter: null,
-                nextEligibleCheckAt: completedAt + this.unavailableChannelRetryMs,
-                unavailableAt: completedAt,
-                unavailableStatus: 404
+                retryAfter: completedAt + delay + jitter,
+                nextEligibleCheckAt: completedAt + delay + jitter
             };
         }
     }

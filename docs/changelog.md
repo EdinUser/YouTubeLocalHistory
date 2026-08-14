@@ -1,5 +1,15 @@
 # Changelog
 
+## v5.1.0 — 14 August 2026
+
+- Added extension-managed local playlists, including creation, rename, deletion, ordering, and video actions that remain separate from the user's YouTube account playlists.
+- Made the RSS-backed subscription feed resilient to temporary YouTube `404`, `403`, `429`, `5xx`, timeout, and network failures: cached videos remain intact, retries use backoff and jitter, first imports retain priority, and retry-only work is paced conservatively.
+- Added a per-channel RSS log in **Channels**, showing the latest 15 successful and failed feed reads with timestamps and HTTP status.
+- Made popup history strictly last-watched ordered, including completed videos, and preserved the current popup page during live updates.
+- Added upload-date and detection-date ordering for Subscriptions, with clear explanation of videos hidden by active filters.
+- Unified full-page Feed headers around an icon, title, description, and view-local controls; added contextual Reload actions and a persisted collapsed sidebar icon rail.
+- Handled extension-context invalidation without a misleading content-script error and made release rebuilds preserve the unpacked extension directory.
+
 ## v5.0.1 — 11 August 2026
 
 - Fixed Continue Watching to use one unfinished-only, timestamp-sorted projection for its rows and popup pagination; live updates no longer mix visible rows with unfiltered history indexes.

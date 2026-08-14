@@ -65,7 +65,12 @@ test('Channels renders local sync state and admits the next metadata batch only 
     ytvhtFeedViewData: { loadCanonicalFeedViewData: jest.fn(async () => ({ subscriptions })) },
     ytvhtLocalSubscriptionActions: actions,
     ytIndexedDBStorage: {
-      getChannelSyncState: jest.fn(async () => null),
+    getChannelSyncState: jest.fn(async (channelId) => channelId === 'UC0' ? {
+      rssAttempts: [
+        { at: 1_700_000_000_000, status: 200, code: 'success', message: '' },
+        { at: 1_700_000_060_000, status: 404, code: 'http', message: 'RSS returned HTTP 404' },
+      ],
+    } : null),
       putSubscriptionRecord: jest.fn(async () => {}),
       listLocalUnsubscribeTombstones: jest.fn(async () => tombstones),
     },
@@ -126,6 +131,15 @@ test('Channels renders local sync state and admits the next metadata batch only 
   expect(scheduler.initializeSubscriptions).toHaveBeenCalledWith([tombstone.channelId]);
   expect(document.querySelector('#subscriptionTabs').hidden).toBe(true);
   expect(document.querySelector('#subscriptionsList').textContent).toContain('Fixture 0');
+
+  [...document.querySelectorAll('#subscriptionsList button')]
+    .find((button) => button.textContent === 'Log')
+    .click();
+  const rssLog = document.querySelector('.rss-log-dialog');
+  expect(rssLog.textContent).toContain('HTTP 200');
+  expect(rssLog.textContent).toContain('HTTP 404');
+  expect(rssLog.querySelectorAll('.success')).toHaveLength(1);
+  expect(rssLog.querySelectorAll('.failure')).toHaveLength(1);
 
   context.ytvhtFeedViewData.loadCanonicalFeedViewData.mockRejectedValueOnce(new Error('database unavailable'));
   await context.renderSubscriptions();

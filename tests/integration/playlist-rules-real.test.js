@@ -67,6 +67,19 @@ describe('playlist save rules (real content.js)', () => {
     expect(global.ytStorage.setVideo).not.toHaveBeenCalled();
   });
 
+  test('an invalidated extension context falls back to defaults without a console error', async () => {
+    global.ytStorage.getSettings.mockRejectedValueOnce(new Error('Extension context invalidated.'));
+    const error = jest.spyOn(console, 'error').mockImplementation();
+
+    await expect(loadSettings()).resolves.toEqual(expect.objectContaining({
+      autoCleanPeriod: 'forever',
+      localFeedEnabled: true
+    }));
+    expect(error).not.toHaveBeenCalledWith('Error loading settings:', expect.anything());
+
+    error.mockRestore();
+  });
+
   test('per-playlist ignoreVideos prevents saving when global pause is disabled', async () => {
     global.ytStorage.getPlaylist.mockResolvedValue({
       playlistId: PLAYLIST_ID,

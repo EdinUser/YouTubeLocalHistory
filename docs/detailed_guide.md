@@ -98,7 +98,7 @@ Removing a history record also creates a temporary deletion marker so an older a
 
 re:Watch follows Shorts navigation inside YouTube's single-page interface and records the active Short's video and channel identity. The Shorts tab updates from local history without requiring a feed reload.
 
-## Playlist references { #playlists }
+## Playlists { #playlists }
 
 ![The re:Watch Playlists tab showing saved references that open their playlists on YouTube.](assets/guide/feed-playlists.png)
 
@@ -108,7 +108,7 @@ v5 stores YouTube playlists as references with available title, artwork, and sou
 
 The per-playlist **Ignore videos** toggle prevents history saves while viewing that playlist. The global **Pause history in playlists** setting applies the same behavior to every playlist.
 
-Creating and managing extension-owned local playlists is planned separately and is not part of stable v5.
+You can also create and manage extension-owned local playlists in this view. They are separate from YouTube playlist references and never change a YouTube-account playlist.
 
 ## Watch Later { #watch-later }
 

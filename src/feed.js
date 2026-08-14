@@ -1,5 +1,7 @@
 // ----- wiring ------------------------------------------------------------
-const INITIALIZATION_CONTINUATION_DELAY_MS = 350;
+// Initial imports can contain hundreds of channels. Space batches out so the
+// public YouTube RSS endpoint is not hammered immediately after an import.
+const INITIALIZATION_CONTINUATION_DELAY_MS = 5000;
 const DORMANT_MAINTENANCE_WAKE_DELAY_MS = 1000;
 let pageFeedWorkTimer = null;
 let pageFeedWorkPromise = null;
@@ -26,6 +28,12 @@ function schedulePageFeedWork(delayMs) {
             console.warn('[feed] scheduled feed work failed', error && error.message);
         });
     }, Math.max(0, Number(delayMs || 0)));
+}
+
+async function scheduleNextPageFeedWork(scheduler, regularIntervalMs) {
+    const nextEligibleAt = await scheduler.getNextEligibleCheckAt();
+    const retryDelay = Number.isFinite(nextEligibleAt) ? Math.max(0, nextEligibleAt - Date.now()) : Infinity;
+    schedulePageFeedWork(Math.min(Number(regularIntervalMs), retryDelay));
 }
 
 async function feedRefreshIntervalMs() {
@@ -85,7 +93,7 @@ async function runPageActiveFeedWork() {
                 schedulePageFeedWork(INITIALIZATION_CONTINUATION_DELAY_MS);
             } else {
                 setPageActiveSyncStatus(tFeed('feed_local_ready', 'Local feed ready'), false);
-                schedulePageFeedWork(intervalMs);
+                await scheduleNextPageFeedWork(scheduler, intervalMs);
             }
             return { result, progress: after };
         }
@@ -104,13 +112,12 @@ async function runPageActiveFeedWork() {
         if (dormantInserted) {
             await showRetainedNewFeedVideos(dormant.terminal.insertedVideoIds || []);
         }
-        setPageActiveSyncStatus(
-            result.insertedVideoCount || dormantInserted
-                ? tFeed('feed_new_uploads_found', 'New uploads found')
-                : tFeed('feed_up_to_date', 'Up to date'),
-            false
-        );
-        schedulePageFeedWork(dormant && dormant.ran ? DORMANT_MAINTENANCE_WAKE_DELAY_MS : intervalMs);
+        const statusBase = result.insertedVideoCount || dormantInserted
+            ? tFeed('feed_new_uploads_found', 'New uploads found')
+            : tFeed('feed_up_to_date', 'Up to date');
+        setPageActiveSyncStatus(statusBase, false);
+        if (dormant && dormant.ran) schedulePageFeedWork(DORMANT_MAINTENANCE_WAKE_DELAY_MS);
+        else await scheduleNextPageFeedWork(scheduler, intervalMs);
         return { result, progress: before };
     })().finally(() => {
         activeInitializationProgress = null;
@@ -381,11 +388,22 @@ function init() {
         showWatchLater();
     });
 
-    // Hamburger collapses/expands the sidebar.
+    // Keep the compact icon rail by default, while preserving the user's last choice.
     const menuToggle = document.getElementById('menuToggle');
+    const setSidebarCollapsed = (collapsed) => {
+        document.body.classList.toggle('sidebar-collapsed', collapsed);
+        if (menuToggle) menuToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        document.querySelectorAll('.nav-item').forEach((item) => {
+            if (!item.dataset.expandedTitle) item.dataset.expandedTitle = item.title || '';
+            item.title = collapsed ? item.textContent.trim() : item.dataset.expandedTitle;
+        });
+    };
+    setSidebarCollapsed(localStorage.getItem('ytvhtSidebarCollapsed') !== 'false');
     if (menuToggle) {
         menuToggle.addEventListener('click', () => {
-            document.body.classList.toggle('sidebar-collapsed');
+            const collapsed = !document.body.classList.contains('sidebar-collapsed');
+            setSidebarCollapsed(collapsed);
+            localStorage.setItem('ytvhtSidebarCollapsed', collapsed ? 'true' : 'false');
         });
     }
 
@@ -487,6 +505,22 @@ function init() {
     });
     document.getElementById('refresh').addEventListener('click', checkForNewVideos);
     document.getElementById('reloadView').addEventListener('click', reloadView);
+    document.getElementById('reloadWatchLater')?.addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        try {
+            await renderWatchLater();
+        } finally {
+            button.disabled = false;
+            button.setAttribute('aria-busy', 'false');
+        }
+    });
+    document.getElementById('subscriptionSort')?.addEventListener('change', (event) => {
+        subscriptionSort = event.target.value;
+        newlyShownFeedVideoIds = [];
+        render();
+    });
     document.getElementById('manage').addEventListener('click', showSubscriptions);
 
     const clearSubscriptions = document.getElementById('clearSubscriptions');

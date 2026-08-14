@@ -6,7 +6,7 @@ const contracts = require('../../src/feed-contracts.js');
 const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'feed.js'), 'utf8')
   .slice(0, fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'feed.js'), 'utf8').indexOf('function init()'));
 
-function runtime({ progress, foreground, dormant } = {}) {
+function runtime({ progress, foreground, dormant, nextEligibleCheckAt = Infinity } = {}) {
   const scheduler = {
     successfulCheckIntervalMs: 0,
     start: jest.fn(async () => {}),
@@ -14,6 +14,7 @@ function runtime({ progress, foreground, dormant } = {}) {
     getInitializationProgress: jest.fn()
       .mockResolvedValueOnce(progress?.before || { completed: 0, total: 0, pending: 0 })
       .mockResolvedValue(progress?.after || { completed: 0, total: 0, pending: 0 }),
+    getNextEligibleCheckAt: jest.fn(async () => nextEligibleCheckAt),
     runInitialization: jest.fn(async () => progress?.result || { insertedVideoCount: 0 }),
     runForeground: jest.fn(async () => foreground || { total: 0, insertedVideoCount: 0 }),
     runDormantMaintenance: jest.fn(async () => dormant || { ran: false, terminal: null }),
@@ -56,9 +57,24 @@ test('page-active initialization is resumable and schedules only one bounded con
 
   expect(scheduler.runInitialization).toHaveBeenCalledTimes(1);
   expect(scheduler.runForeground).not.toHaveBeenCalled();
-  expect(timers).toEqual([expect.objectContaining({ delay: 350 })]);
+  expect(timers).toEqual([expect.objectContaining({ delay: 5000 })]);
   context.clearPageFeedWorkTimer();
   expect(context.clearTimeout).toHaveBeenCalledWith(1);
+});
+
+test('completed initialization does not classify a failed RSS fetch as an unavailable channel', async () => {
+  const { context, scheduler } = runtime({
+    progress: {
+      before: { completed: 28, total: 30, pending: 2 },
+      after: { completed: 30, total: 30, pending: 0 },
+      result: { insertedVideoCount: 0 },
+    },
+  });
+
+  await context.runPageActiveFeedWork();
+
+  expect(scheduler.getUnavailableChannelCount).toBeUndefined();
+  expect(context.setFeedSyncStatus).toHaveBeenLastCalledWith('Local feed ready', false);
 });
 
 test('page-active foreground work yields to dormant maintenance only when no foreground channel ran', async () => {
@@ -71,6 +87,32 @@ test('page-active foreground work yields to dormant maintenance only when no for
   await busy.context.runPageActiveFeedWork();
   expect(busy.scheduler.runDormantMaintenance).not.toHaveBeenCalled();
   expect(busy.timers).toEqual([expect.objectContaining({ delay: 5 * 60 * 1000 })]);
+});
+
+test('scheduled refresh does not turn a prior RSS failure into an unavailable-channel claim', async () => {
+  const { context, scheduler } = runtime({
+    foreground: { total: 1, insertedVideoCount: 0 },
+  });
+
+  await context.runPageActiveFeedWork();
+
+  expect(scheduler.getUnavailableChannelCount).toBeUndefined();
+  expect(context.setFeedSyncStatus).toHaveBeenLastCalledWith('Up to date', false);
+});
+
+test('wakes for the earliest durable RSS retry instead of waiting the regular refresh interval', async () => {
+  const retryAt = Date.now() + 12_345;
+  const { context, scheduler, timers } = runtime({
+    foreground: { total: 1, insertedVideoCount: 0 },
+    nextEligibleCheckAt: retryAt,
+  });
+
+  await context.runPageActiveFeedWork();
+
+  expect(scheduler.getNextEligibleCheckAt).toHaveBeenCalledTimes(1);
+  expect(timers).toEqual([expect.objectContaining({ delay: expect.any(Number) })]);
+  expect(timers[0].delay).toBeGreaterThanOrEqual(12_000);
+  expect(timers[0].delay).toBeLessThanOrEqual(12_345);
 });
 
 test('only advertises scheduler discoveries that remain in the canonical inventory', async () => {

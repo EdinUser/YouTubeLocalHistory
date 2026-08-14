@@ -392,8 +392,8 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
     });
   });
 
-  describe('Continue Watching projection', () => {
-    test('filters completed records before sorting and pagination', async () => {
+  describe('regular video history projection', () => {
+    test('keeps completed records in last-watched order and pagination', async () => {
       fakeLocalData.video_completed = {
         videoId: 'completed', time: 95, duration: 100, timestamp: 300
       };
@@ -407,12 +407,12 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
       const result = await ytStorage.getVideosPage({
         page: 1,
         pageSize: 1,
-        unfinishedOnly: true
+        unfinishedOnly: false
       });
 
-      expect(result.records.map((record) => record.videoId)).toEqual(['first']);
-      expect(result.pagination.totalRecords).toBe(2);
-      expect(result.pagination.totalPages).toBe(2);
+      expect(result.records.map((record) => record.videoId)).toEqual(['completed']);
+      expect(result.pagination.totalRecords).toBe(3);
+      expect(result.pagination.totalPages).toBe(3);
     });
   });
 

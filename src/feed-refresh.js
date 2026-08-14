@@ -33,7 +33,12 @@ async function loadData(options = {}) {
         feedCachePolicy = 'v5-canonical';
         feedDiagnostics = [];
     } catch (e) {
-        console.error('[feed] failed to load canonical feed inventory', e);
+        // This is an expected validation result for a stale “new videos”
+        // notice, not a database-load failure. Its caller reconciles the
+        // pending IDs with the current canonical inventory below.
+        if (e && e.code !== 'pending_inventory_incomplete') {
+            console.error('[feed] failed to load canonical feed inventory', e);
+        }
         if (options.requireCanonicalInventory) throw e;
         allVideos = [];
         localSubscriptions = [];
@@ -89,6 +94,38 @@ function setStatus(message, busy) {
     }
     if (message) el.appendChild(document.createTextNode(message));
     el.style.display = message ? '' : 'none';
+    syncFeedStatusRow();
+}
+
+function syncFeedStatusRow() {
+    const row = document.getElementById('statusRow');
+    const status = document.getElementById('status');
+    const subscriptionSortControl = document.getElementById('subscriptionSort');
+    if (!row || !status || !subscriptionSortControl) return;
+    row.hidden = !status.textContent && subscriptionSortControl.hidden;
+}
+
+function pendingFeedHiddenReasons(videoIds) {
+    const pendingIds = new Set(videoIds || []);
+    const counts = new Map();
+    const add = (label) => counts.set(label, (counts.get(label) || 0) + 1);
+    const isUnwatchedOnly = document.getElementById('unwatched')?.checked;
+    const hidesMembers = document.getElementById('hideMembers')?.checked;
+    const videos = (allVideos || []).filter((video) => pendingIds.has(video?.videoId));
+
+    videos.forEach((video) => {
+        if (typeof isShort === 'function' && isShort(video)) {
+            add(tFeed('tab_shorts', 'Shorts'));
+        } else if (feedFeedback?.notInterested?.[video.videoId]) {
+            add(tFeed('feed_hidden_manually', 'Hidden manually'));
+        } else if (isUnwatchedOnly && watchedMap?.[video.videoId]) {
+            add(tFeed('feed_unwatched_only', 'Unwatched only'));
+        } else if (hidesMembers && typeof videoIsMembersOnly === 'function' && videoIsMembersOnly(video)) {
+            add(tFeed('feed_hide_members', 'Hide member videos'));
+        }
+    });
+
+    return Array.from(counts, ([label, count]) => `${label} (${feedFormatNumber(count)})`).join(', ');
 }
 
 function setRefreshUi(busy) {
@@ -258,6 +295,7 @@ async function showPendingFeedVideos(onReady) {
         if (search) search.value = '';
         shortsOnly = false;
         subscriptionsChronological = true;
+        subscriptionSort = 'discovered_desc';
         if (typeof onReady === 'function') onReady();
         else showFeed();
         const visibleCount = visiblePendingFeedVideoCount(videoIds);
@@ -269,11 +307,14 @@ async function showPendingFeedVideos(onReady) {
             '$1 new videos shown.'
         );
         if (hiddenCount) {
+            const reasons = pendingFeedHiddenReasons(videoIds)
+                || tFeed('feed_hidden_reason_unavailable', 'a saved visibility preference');
             message += ` ${feedPlural(
                 'feed_new_videos_hidden_by_filters',
                 hiddenCount,
-                '$1 new video is hidden by active filters.',
-                '$1 new videos are hidden by active filters.'
+                '$1 new video is hidden: $2.',
+                '$1 new videos are hidden: $2.',
+                [reasons]
             )}`;
         }
         setStatus(message, false);
@@ -297,6 +338,19 @@ async function showPendingFeedVideos(onReady) {
                     pendingFeedNoticeState = { busy: false, error: '' };
                     return showPendingFeedVideos(onReady);
                 }
+                // These IDs were discovered earlier but were later removed
+                // by retention. A retry cannot restore them, so clear only
+                // this stale notice instead of trapping the user behind Retry.
+                await replacePendingFeedDiscovery({ videoIds: [], discoveredAt: 0 });
+                pendingFeedNoticeState = { busy: false, error: '' };
+                renderFeedNotice();
+                setStatus(feedPlural(
+                    'feed_stale_discoveries_removed',
+                    videoIds.length,
+                    '$1 stale discovery was removed from the new-videos notice.',
+                    '$1 stale discoveries were removed from the new-videos notice.'
+                ), false);
+                return;
             } catch (recoveryError) {
                 console.warn('[feed] could not recover retained discoveries', recoveryError && recoveryError.message);
             }
@@ -313,12 +367,13 @@ async function checkForNewVideos() {
     setRefreshUi(true);
     setStatus('', false);
     try {
-        const work = await requestPageActiveFeedWork();
-        if (!work.result.insertedVideoCount && work.progress.pending === 0) {
-            setFeedSyncStatus(tFeed('feed_up_to_date', 'Up to date'), false);
-        }
+        await requestPageActiveFeedWork();
     } catch (e) {
-        setStatus(tFeed('feed_refresh_failed_status', 'Could not check for new videos: $1.', [e.message || tFeed('message_unknown_error', 'error')]), false);
+        console.warn('[feed] upload check failed', e && e.message);
+        setStatus(tFeed(
+            'feed_refresh_failed_status',
+            'Could not check for new videos. Please try again.'
+        ), false);
     } finally {
         setRefreshUi(false);
     }

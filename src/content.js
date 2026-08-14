@@ -515,6 +515,12 @@
     });
 
     // Load settings from browser.storage.local
+    function isExtensionContextInvalidated(error) {
+        const message = String(error && error.message || error || '');
+        return message.includes('Extension context invalidated') ||
+            message.includes('EXTENSION_CONTEXT_INVALIDATED');
+    }
+
     async function loadSettings() {
         try {
             const settings = await ytStorage.getSettings() || {};
@@ -540,6 +546,16 @@
             currentSettings = settings;
             return settings;
         } catch (error) {
+            // A content script may be terminated while Chrome applies an
+            // unpacked-extension reload. This is not a settings failure, and
+            // attempting another extension API call from this script cannot
+            // recover it. Use the defaults for its remaining lifetime without
+            // producing a misleading console error.
+            if (isExtensionContextInvalidated(error)) {
+                log('[Settings] Extension context invalidated; using defaults until this tab reloads');
+                currentSettings = { ...DEFAULT_SETTINGS };
+                return currentSettings;
+            }
             console.error('Error loading settings:', error);
             currentSettings = DEFAULT_SETTINGS;
             return DEFAULT_SETTINGS;

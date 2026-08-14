@@ -91,7 +91,7 @@ function assertPackageContract(buildDir, archivePath, expectedVersion) {
   const englishCatalog = JSON.parse(
     fs.readFileSync(path.join(buildDir, '_locales', 'en', 'messages.json'), 'utf8')
   );
-  expect(Object.keys(englishCatalog)).toHaveLength(409);
+  expect(Object.keys(englishCatalog)).toHaveLength(428);
   LOCALES.forEach((locale) => {
     const localePath = `_locales/${locale}/messages.json`;
     expect(entries).toContain(localePath);
@@ -157,6 +157,8 @@ test('release build is clean, repeatable, complete, localized, and version-align
     expect(firefoxSourceManifest.version).toBe(version);
 
     build(checkout, fakeBin);
+    const chromeBuildDirectoryInode = fs.statSync(path.join(checkout, 'build', 'chrome')).ino;
+    const firefoxBuildDirectoryInode = fs.statSync(path.join(checkout, 'build', 'firefox')).ino;
     const chromeArchive = path.join(checkout, 'dist', `youtube-local-history-chrome-v${version}.zip`);
     const firefoxArchive = path.join(checkout, 'dist', `youtube-local-history-firefox-v${version}.zip`);
     const firstMissing = {
@@ -172,6 +174,8 @@ test('release build is clean, repeatable, complete, localized, and version-align
     run('zip', ['-j', firefoxArchive, sentinel]);
 
     build(checkout, fakeBin);
+    expect(fs.statSync(path.join(checkout, 'build', 'chrome')).ino).toBe(chromeBuildDirectoryInode);
+    expect(fs.statSync(path.join(checkout, 'build', 'firefox')).ino).toBe(firefoxBuildDirectoryInode);
     expect(filesUnder(path.join(checkout, 'build', 'chrome'))).not.toContain(path.basename(sentinel));
     expect(filesUnder(path.join(checkout, 'build', 'firefox'))).not.toContain(path.basename(sentinel));
     expect(archiveEntries(chromeArchive)).not.toContain(path.basename(sentinel));
