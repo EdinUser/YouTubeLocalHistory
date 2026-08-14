@@ -37,6 +37,28 @@ function applyShortsFilter(list) {
     return shortsOnly ? dedupeShorts(list.filter((v) => isShort(v))) : list.filter((v) => !isShort(v));
 }
 
+function createFeedTitleIcon(kind) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    const add = (name, attributes) => {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', name);
+        Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, value));
+        svg.appendChild(node);
+    };
+    if (kind === 'shorts') {
+        add('path', { d: 'm13.5 2-7 11h5l-1 9 7-12h-5l1-8Z' });
+    } else if (kind === 'subscriptions') {
+        add('rect', { x: '3', y: '6', width: '18', height: '14', rx: '2' });
+        add('path', { d: 'm9 3 3 3 3-3' });
+        add('path', { d: 'm10 10 5 3-5 3v-6Z' });
+    } else {
+        add('path', { d: 'M3 10.8 12 3l9 7.8' });
+        add('path', { d: 'M5.5 9.5V21h13V9.5' });
+        add('path', { d: 'M9.5 21v-7h5v7' });
+    }
+    return svg;
+}
+
 function sortShortsByLastWatched(list) {
     const watchedAt = (video) => Number(
         (video && video.videoId && watchedMap[video.videoId]?.timestamp)
@@ -786,11 +808,9 @@ function render() {
                 : tFeed('feed_title_home_description', 'Personalized locally from your watch history.')));
     if (heading) heading.textContent = title;
     if (titleDescription) titleDescription.textContent = description;
-    if (titleIcon) titleIcon.innerHTML = shortsOnly
-        ? '<svg viewBox="0 0 24 24"><path d="m13.5 2-7 11h5l-1 9 7-12h-5l1-8Z"></path></svg>'
-        : (subscriptionsBrowse
-            ? '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"></rect><path d="m9 3 3 3 3-3"></path><path d="m10 10 5 3-5 3v-6Z"></path></svg>'
-            : '<svg viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-7h5v7"></path></svg>');
+    if (titleIcon) titleIcon.replaceChildren(createFeedTitleIcon(
+        shortsOnly ? 'shorts' : (subscriptionsBrowse ? 'subscriptions' : 'home')
+    ));
     if (filters) {
         filters.classList.toggle('visible', !!q);
         filters.classList.toggle('open', !!q && searchFiltersOpen);
