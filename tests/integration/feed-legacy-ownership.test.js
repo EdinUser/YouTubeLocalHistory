@@ -118,7 +118,9 @@ test('normal feed work is page-active and schedules bounded continuation rather 
   expect(source).toContain('schedulePageFeedWork(INITIALIZATION_CONTINUATION_DELAY_MS)');
   expect(source).toContain('feedRefreshIntervalMs');
   expect(source).toContain('DORMANT_MAINTENANCE_WAKE_DELAY_MS');
-  expect(source).toContain('dormant && dormant.ran ? DORMANT_MAINTENANCE_WAKE_DELAY_MS : intervalMs');
+  expect(source).toContain('async function scheduleNextPageFeedWork(scheduler, regularIntervalMs)');
+  expect(source).toContain('scheduler.getNextEligibleCheckAt()');
+  expect(source).toContain('if (dormant && dormant.ran) schedulePageFeedWork(DORMANT_MAINTENANCE_WAKE_DELAY_MS);');
   expect(source).toContain("window.addEventListener('unload', clearPageFeedWorkTimer");
   expect(read('src/background.js')).not.toContain('runPageActiveFeedWork');
 });
