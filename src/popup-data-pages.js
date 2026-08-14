@@ -5,12 +5,9 @@ async function loadHistoryPage(options = {}) {
     try {
         log(`Loading history page ${page} with search: "${query}"`);
         const result = await ytStorage.getVideosPage({
-            // Filter before storage paginates. This keeps a page's records,
-            // count, and controls on the same unfinished-only projection.
             page,
             pageSize: pageSizeParam,
-            searchQuery: query,
-            unfinishedOnly: true
+            searchQuery: query
         });
 
         // Update global arrays with just the current page data

@@ -3,10 +3,20 @@
 # Use environment variables with fallbacks for security (paths not exposed in git)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Recreate build directories so clean and repeated builds start from the same
-# empty filesystem state.
-rm -rf -- "$PROJECT_ROOT/build/chrome" "$PROJECT_ROOT/build/firefox"
-mkdir -p "$PROJECT_ROOT/build/chrome" "$PROJECT_ROOT/build/firefox" "$PROJECT_ROOT/dist"
+# Keep the top-level build directories stable. Chrome identifies an unpacked
+# extension by its path; deleting the directory a developer has loaded makes
+# Chrome temporarily lose its files and can push them toward a destructive
+# remove/re-add workflow. Clean only the contents so repeated release builds
+# remain deterministic without invalidating the unpacked directory itself.
+prepare_build_directory() {
+    local target_dir=$1
+    mkdir -p "$target_dir"
+    find "$target_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+}
+
+prepare_build_directory "$PROJECT_ROOT/build/chrome"
+prepare_build_directory "$PROJECT_ROOT/build/firefox"
+mkdir -p "$PROJECT_ROOT/dist"
 
 # Get current version from manifest
 VERSION=$(grep '"version"' "$PROJECT_ROOT/src/manifest.chrome.json" | cut -d'"' -f4)
@@ -71,6 +81,7 @@ copy_common_files() {
        "$PROJECT_ROOT/src/feed-state-utils.js" \
        "$PROJECT_ROOT/src/feed-cards.js" \
        "$PROJECT_ROOT/src/feed-local-search.js" \
+       "$PROJECT_ROOT/src/feed-subscription-sort.js" \
        "$PROJECT_ROOT/src/feed-home.js" \
        "$PROJECT_ROOT/src/feed-analytics.js" \
        "$PROJECT_ROOT/src/feed-subscriptions-view.js" \

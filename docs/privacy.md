@@ -1,6 +1,6 @@
 # Privacy and data
 
-YT re:Watch is local-first. Its history, progress, subscriptions, cached feed records, analytics, settings, playlist references, and ignored-channel records are stored in the extension profile on the current device.
+YT re:Watch is local-first. Its history, progress, subscriptions, cached feed records, analytics, settings, local playlists, playlist references, and ignored-channel records are stored in the extension profile on the current device.
 
 ## What stays local
 
@@ -9,6 +9,7 @@ YT re:Watch is local-first. Its history, progress, subscriptions, cached feed re
 - re:Watch channel subscriptions and ignored-channel tombstones;
 - cached feed inventory and scheduling state;
 - playlist references;
+- extension-managed local playlists;
 - analytics snapshots and presentation settings;
 - backup and import state.
 
@@ -25,7 +26,7 @@ The feed needs public information to discover uploads and identify channels.
 - Local feed search does not send a remote search request.
 - Saving a playlist reference does not fetch or import its member videos in the background.
 
-re:Watch does not use OAuth in v5 and does not change subscriptions, playlists, history, or other data in the user's YouTube account.
+re:Watch does not use OAuth in v5.1 and does not change subscriptions, playlists, history, or other data in the user's YouTube account.
 
 ## What re:Watch does not hide
 
@@ -37,7 +38,7 @@ Records remain until they are removed in re:Watch, reset from Settings, or delet
 
 Removing a local subscription creates an ignored-channel tombstone. That record prevents a later import from silently restoring the channel. When tombstones exist, **Channels → Ignored** provides restore and forget actions.
 
-**Reset all data** removes re:Watch-owned history, playlist references, local subscriptions, ignored-channel tombstones, feed and scheduler state, deletion markers, analytics snapshots, and settings from the current browser profile.
+**Reset all data** removes re:Watch-owned history, local playlists, playlist references, local subscriptions, ignored-channel tombstones, feed and scheduler state, deletion markers, analytics snapshots, and settings from the current browser profile.
 
 ## Backup and transfer
 

@@ -128,13 +128,26 @@
             animation: spin 0.8s linear infinite;
         }
 
+        .feed-title-bar {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 16px; padding: 20px 24px 14px; border-bottom: 1px solid var(--border);
+        }
+        .feed-title-block { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+        .feed-title-icon { width: 28px; height: 28px; flex: 0 0 28px; color: var(--accent); }
+        .feed-title-icon svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .feed-title-text h2 { margin: 0; font-size: 24px; line-height: 1.15; }
+        .feed-title-text p { margin: 4px 0 0; color: var(--text-2); font-size: 13px; line-height: 1.35; }
+        .feed-title-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; min-height: 32px; }
+        .feed-title-actions .count, .feed-title-actions .subs-count, .feed-title-actions .playlists-count, .feed-title-actions .history-count { white-space: nowrap; }
+        .status-row { display: contents; }
+        .status-row[hidden] { display: contents; }
         .status {
-            padding: 10px 24px;
             font-size: 16px;
             color: var(--text);
-            min-height: 22px;
+            max-width: 640px;
         }
         .status:empty { display: none; }
+        .subscription-sort { margin-left: 0; }
         .status .spinner {
             display: inline-block; width: 16px; height: 16px;
             border: 2px solid var(--text-2); border-top-color: transparent;
@@ -246,11 +259,8 @@
         .section-h .sub { font-weight: 400; color: var(--text-2); font-size: 13px; margin-left: 8px; }
 
         /* --- Local subscriptions manager --- */
-        .subs-view { padding: 20px 24px 60px; }
-        .subs-toolbar {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 16px; margin-bottom: 18px;
-        }
+        .subs-view { padding: 0 24px 60px; }
+        .subs-toolbar { margin: 0 -24px 18px; }
         .subs-title { font-size: 22px; font-weight: 700; margin: 0; }
         .subs-count { color: var(--text-2); font-size: 14px; margin-top: 4px; }
         .subs-tabs { display: flex; gap: 8px; margin: 0 0 18px; }
@@ -277,7 +287,14 @@
         .subs-card .subs-avatar { width: 58px; height: 58px; flex-basis: 58px; border: 2px solid var(--bg); }
         .subs-card .subs-copy { min-width: 0; }
         .subs-card .subs-meta { position: relative; grid-column: 1; padding: 0 18px 16px 90px; color: var(--text-2); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .subs-card > .btn { position: relative; grid-column: 2; grid-row: 1 / span 2; margin-right: 18px; }
+        .subs-actions { position: relative; grid-column: 2; grid-row: 1 / span 2; margin-right: 18px; display: flex; gap: 8px; }
+        .rss-log-dialog { width: min(620px, calc(100vw - 40px)); max-height: min(680px, calc(100vh - 40px)); color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
+        .rss-log-dialog::backdrop { background: rgba(0, 0, 0, .62); }
+        .rss-log-dialog h2 { margin: 0 0 14px; font-size: 18px; }
+        .rss-log-list { margin: 0 0 18px; padding-left: 22px; max-height: 460px; overflow: auto; }
+        .rss-log-list li { padding: 6px 0; font-size: 13px; line-height: 1.4; }
+        .rss-log-list li.success { color: #78c98b; }
+        .rss-log-list li.failure { color: var(--danger-text); }
         .subs-channel {
             min-width: 0; display: flex; align-items: center; gap: 14px;
             color: var(--text); text-decoration: none; font-size: 17px;
@@ -308,17 +325,14 @@
         .btn.danger:hover { background: var(--danger-bg-hover); }
 
         /* --- Saved playlists --- */
-        .playlists-view { padding: 20px 24px 60px; }
+        .playlists-view { padding: 0 24px 60px; }
         .playlists-view.playlists-view-detail .playlists-toolbar {
             display: none;
         }
         .playlists-view.playlists-view-detail {
             padding-top: 22px;
         }
-        .playlists-toolbar {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 16px; margin-bottom: 18px;
-        }
+        .playlists-toolbar { margin: 0 -24px 18px; }
         .playlists-title { font-size: 22px; font-weight: 700; margin: 0; }
         .playlists-count { color: var(--text-2); font-size: 14px; margin-top: 4px; }
         .playlists-list {
@@ -931,28 +945,6 @@
         }
 
         /* --- Dedicated Shorts gallery --- */
-        body.shorts-mode .section-h {
-            display: flex !important;
-            align-items: center;
-            gap: 10px;
-            margin-top: 20px;
-            font-size: 24px;
-        }
-        .shorts-heading-icon {
-            width: 28px; height: 28px; flex: 0 0 28px;
-            display: inline-flex; align-items: center; justify-content: center;
-            color: var(--accent);
-        }
-        .shorts-heading-icon svg {
-            width: 27px; height: 27px; display: block;
-            fill: none; stroke: currentColor; stroke-width: 1.8;
-            stroke-linecap: round; stroke-linejoin: round;
-        }
-        body.shorts-mode .section-h::after {
-            content: "Quick picks from your subscribed channels";
-            color: var(--text-2); font-size: 13px; font-weight: 400;
-            margin-left: 2px;
-        }
         body.shorts-mode .grid {
             grid-template-columns: repeat(auto-fill, 220px);
             gap: 28px 16px;
@@ -1262,11 +1254,8 @@
         .yt-row-channel { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
         .yt-row-channel:hover { color: var(--text); }
         .yt-row-ava { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: #373737; }
-        .history-view { padding: 22px 24px 60px; }
-        .history-toolbar {
-            display: flex; align-items: flex-end; justify-content: space-between;
-            gap: 18px; flex-wrap: wrap; margin-bottom: 22px;
-        }
+        .history-view { padding: 0 24px 60px; }
+        .history-toolbar { margin: 0 -24px 22px; }
         .history-title { margin: 0 0 4px; font-size: 24px; }
         .history-count { color: var(--text-2); font-size: 14px; }
         .history-list {
@@ -1595,9 +1584,15 @@
         }
         .menu-item:hover { background: var(--chip); }
 
-        /* Hamburger collapses the sidebar; also auto-collapse on narrow screens. */
-        body.sidebar-collapsed .sidebar { display: none; }
-        @media (max-width: 1000px) { .sidebar { display: none; } }
+        /* The default compact rail keeps navigation available without consuming a full column. */
+        body.sidebar-collapsed .sidebar { flex-basis: 72px; width: 72px; padding-left: 8px; padding-right: 8px; }
+        body.sidebar-collapsed .nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+        body.sidebar-collapsed .nav-item > span:not(.nav-ico) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        @media (max-width: 760px) {
+            .sidebar { display: none; }
+            .feed-title-bar { padding: 16px 12px 12px; flex-wrap: wrap; }
+            .feed-title-actions { width: 100%; justify-content: flex-start; }
+        }
     </style>
 </head>
 <body>
@@ -1617,7 +1612,6 @@
         <div class="mast-right">
             <span class="feed-sync-status" id="feedSyncStatus" hidden aria-live="polite"></span>
             <button class="btn primary" id="refresh" data-i18n="feed_refresh">Check for new videos</button>
-            <button class="btn" id="reloadView" data-i18n="feed_reload_view">Reload view</button>
             <button class="btn primary" id="createPlaylist" type="button" style="display:none;" data-i18n="feed_create">Create</button>
             <button class="btn danger" id="clearSubscriptions" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
             <button class="btn danger" id="clearHistoryPage" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
@@ -1683,14 +1677,26 @@
 
         <!-- Main content -->
         <main class="main">
-            <div class="chips">
-                <span class="count" id="count"></span>
-            </div>
-
-            <div class="status" id="status"></div>
+            <header class="feed-title-bar" id="feedTitleBar">
+                <div class="feed-title-block">
+                    <span class="feed-title-icon" id="feedTitleIcon" aria-hidden="true"></span>
+                    <div class="feed-title-text">
+                        <h2 id="localHeading" data-i18n="feed_your_feed">Your feed</h2>
+                        <p id="feedTitleDescription"></p>
+                    </div>
+                </div>
+                <div class="feed-title-actions">
+                    <span class="count" id="count"></span>
+                    <div class="status-row" id="statusRow" hidden><div class="status" id="status"></div></div>
+                    <select id="subscriptionSort" class="subscription-sort" aria-label="Subscription order" data-i18n-aria-label="feed_subscription_sort" hidden>
+                        <option value="published_desc" data-i18n="feed_subscription_sort_newest">Upload date: newest</option>
+                        <option value="published_asc" data-i18n="feed_subscription_sort_oldest">Upload date: oldest</option>
+                        <option value="discovered_desc" data-i18n="feed_subscription_sort_detected">Added to re:Watch</option>
+                    </select>
+                    <button class="btn" id="reloadView" type="button" data-i18n="feed_reload_view">Reload view</button>
+                </div>
+            </header>
             <div class="status" id="homeDebug" style="display:none;"></div>
-
-            <h2 class="section-h" id="localHeading" data-i18n="feed_your_feed">Your feed</h2>
             <div class="search-source-tabs" id="searchSourceTabs" aria-label="Search options" data-i18n-aria-label="feed_search_options">
                 <button class="search-filter-toggle" id="searchFilterToggle" type="button" data-i18n="feed_filters">Filters</button>
             </div>
@@ -1741,21 +1747,21 @@
 
             <!-- Local subscriptions manager -->
             <section class="subs-view" id="subscriptionsSection" style="display:none;">
-                <div class="subs-toolbar">
-                    <div>
-                        <h2 class="subs-title" data-i18n="feed_channels">Channels</h2>
+                <div class="subs-toolbar feed-title-bar">
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-4 2.5-6 5.5-6s5 2 5.5 6"></path><circle cx="17" cy="9" r="2.2"></circle><path d="M15.5 14c3.2-.5 5 1.2 5.5 4"></path></svg></span><div class="feed-title-text"><h2 class="subs-title" data-i18n="feed_channels">Channels</h2><p data-i18n="feed_title_channels_description">Manage channels followed by re:Watch.</p></div></div>
+                    <div class="feed-title-actions">
                         <div class="subs-count" id="subscriptionsCount"></div>
+                        <div class="subs-tabs" id="subscriptionTabs" role="tablist" aria-label="Channels" data-i18n-aria-label="feed_channels" hidden>
+                            <button class="btn subs-tab" id="channelsFollowingTab" type="button" role="tab" aria-controls="subscriptionsList" aria-selected="true">Following</button>
+                            <button class="btn subs-tab" id="channelsIgnoredTab" type="button" role="tab" aria-controls="subscriptionsList" aria-selected="false" hidden>Ignored</button>
+                        </div>
+                        <form class="subs-add" id="subscriptionAddForm">
+                            <label for="subscriptionAddInput" data-i18n="feed_subscribe_with_rewatch">Subscribe with re:Watch</label>
+                            <input id="subscriptionAddInput" type="text" autocomplete="off" placeholder="Channel URL, UC ID, or @handle" data-i18n-placeholder="feed_channel_input_placeholder">
+                            <button class="btn primary" type="submit" data-i18n="feed_subscribe">Subscribe</button>
+                        </form>
                     </div>
                 </div>
-                <div class="subs-tabs" id="subscriptionTabs" role="tablist" aria-label="Channels" data-i18n-aria-label="feed_channels" hidden>
-                    <button class="btn subs-tab" id="channelsFollowingTab" type="button" role="tab" aria-controls="subscriptionsList" aria-selected="true">Following</button>
-                    <button class="btn subs-tab" id="channelsIgnoredTab" type="button" role="tab" aria-controls="subscriptionsList" aria-selected="false" hidden>Ignored</button>
-                </div>
-                <form class="subs-add" id="subscriptionAddForm">
-                    <label for="subscriptionAddInput" data-i18n="feed_subscribe_with_rewatch">Subscribe with re:Watch</label>
-                    <input id="subscriptionAddInput" type="text" autocomplete="off" placeholder="Channel URL, UC ID, or @handle" data-i18n-placeholder="feed_channel_input_placeholder">
-                    <button class="btn primary" type="submit" data-i18n="feed_subscribe">Subscribe</button>
-                </form>
                 <div class="subs-add-status" id="subscriptionAddStatus" aria-live="polite"></div>
                 <div class="subs-list" id="subscriptionsList" role="tabpanel" aria-live="polite"></div>
                 <div class="subs-empty" id="subscriptionsEmpty" style="display:none;">
@@ -1765,11 +1771,9 @@
 
             <!-- Saved playlists -->
             <section class="playlists-view" id="playlistsSection" style="display:none;">
-                <div class="playlists-toolbar">
-                    <div>
-                        <h2 class="playlists-title" data-i18n="tab_playlists">Playlists</h2>
-                        <div class="playlists-count" id="playlistsCount"></div>
-                    </div>
+                <div class="playlists-toolbar feed-title-bar">
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h10M4 11h10M4 16h7"></path><path d="m15 14 5 3-5 3v-6Z"></path></svg></span><div class="feed-title-text"><h2 class="playlists-title" data-i18n="tab_playlists">Playlists</h2><p data-i18n="feed_title_playlists_description">Saved locally in this browser.</p></div></div>
+                    <div class="feed-title-actions"><div class="playlists-count" id="playlistsCount"></div></div>
                 </div>
                 <div class="playlists-list" id="playlistsList"></div>
                 <div class="playlists-empty" id="playlistsEmpty" style="display:none;">
@@ -1779,11 +1783,9 @@
 
             <!-- Local watch history -->
             <section class="history-view" id="historySection" style="display:none;">
-                <div class="history-toolbar">
-                    <div>
-                        <h2 class="history-title" data-i18n="feed_history">History</h2>
-                        <div class="history-count" id="historyCount"></div>
-                    </div>
+                <div class="history-toolbar feed-title-bar">
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7"></path><path d="M4 4v5h5"></path><path d="M12 7v5l3 2"></path></svg></span><div class="feed-title-text"><h2 class="history-title" data-i18n="feed_history">History</h2><p data-i18n="feed_title_history_description">Watch history stored locally in this browser.</p></div></div>
+                    <div class="feed-title-actions"><div class="history-count" id="historyCount"></div></div>
                 </div>
                 <div class="history-list" id="historyList"></div>
                 <div class="history-empty" id="historyEmpty" style="display:none;" data-i18n="feed_no_history_matches">No watch history matches these filters.</div>
@@ -1792,11 +1794,9 @@
 
             <!-- Locally saved Watch Later videos -->
             <section class="history-view" id="watchLaterSection" style="display:none;">
-                <div class="history-toolbar">
-                    <div>
-                        <h2 class="history-title" data-i18n="feed_nav_watch_later">Watch Later</h2>
-                        <div class="history-count" id="watchLaterCount"></div>
-                    </div>
+                <div class="history-toolbar feed-title-bar">
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5v5l3.2 2"></path></svg></span><div class="feed-title-text"><h2 class="history-title" data-i18n="feed_nav_watch_later">Watch Later</h2><p data-i18n="feed_title_watch_later_description">Videos saved locally to watch later.</p></div></div>
+                    <div class="feed-title-actions"><div class="history-count" id="watchLaterCount"></div><button class="btn" id="reloadWatchLater" type="button" data-i18n="feed_reload_view">Reload view</button></div>
                 </div>
                 <div class="history-list" id="watchLaterList"></div>
                 <div class="history-empty" id="watchLaterEmpty" style="display:none;" data-i18n="feed_watch_later_empty">No videos saved to Watch Later.</div>
@@ -1804,7 +1804,7 @@
 
             <!-- Analytics view (hidden until the Analytics nav item is clicked) -->
             <div id="analyticsSection" style="display:none;">
-                <h2 class="section-h"><span data-i18n="tab_analytics">Analytics</span> <span class="sub" data-i18n="feed_analytics_subtitle">your watch stats, kept locally</span></h2>
+                <header class="feed-title-bar"><div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7"></path><path d="M2 20h20"></path></svg></span><div class="feed-title-text"><h2 data-i18n="tab_analytics">Analytics</h2><p data-i18n="feed_analytics_subtitle">your watch stats, kept locally</p></div></div></header>
                 <div class="an-cards" id="anCards"></div>
                 <div class="an-charts">
                     <div class="an-chart">
@@ -1860,11 +1860,8 @@
             </div>
 
             <section class="settings-view" id="settingsSection" style="display:none;">
-                <div class="settings-header">
-                    <div>
-                        <h2 class="settings-title" data-i18n="tab_settings">Settings</h2>
-                        <p class="settings-subtitle" data-i18n="feed_settings_subtitle">Everything stays local in this browser.</p>
-                    </div>
+                <div class="settings-header feed-title-bar">
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H10v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3V10h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.16 4.1l.06.06A1.7 1.7 0 0 0 9.1 4.6a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 .4-1.1V3h3.5v.1a1.7 1.7 0 0 0 1.1 1.6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1V14h-.1a1.7 1.7 0 0 0-1.7 1Z"></path></svg></span><div class="feed-title-text"><h2 class="settings-title" data-i18n="tab_settings">Settings</h2><p class="settings-subtitle" data-i18n="feed_settings_subtitle">Everything stays local in this browser.</p></div></div>
                     <div class="settings-header-actions">
                         <span class="settings-message" id="feedSettingsMessage"></span>
                     </div>
@@ -2017,6 +2014,7 @@
     <script src="feed-state-utils.js"></script>
     <script src="feed-cards.js"></script>
     <script src="feed-local-search.js"></script>
+    <script src="feed-subscription-sort.js"></script>
     <script src="feed-home.js"></script>
     <script src="feed-analytics.js"></script>
     <script src="feed-subscriptions-view.js"></script>

@@ -70,6 +70,21 @@
         }
     }
 
+    function logTransactionFailure(operation, storeNames, mode, error) {
+        try {
+            console.error('[YTLH IndexedDB] transaction failed', {
+                operation: operation || 'unnamed',
+                stores: Array.isArray(storeNames) ? storeNames : [storeNames],
+                mode,
+                errorName: error && error.name || 'Error',
+                message: String(error && error.message || error || 'Unknown IndexedDB error'),
+                stack: error && error.stack || ''
+            });
+        } catch (_) {
+            // IndexedDB diagnostics must never affect the storage operation.
+        }
+    }
+
     function hasIndexedDB() {
         try {
             return typeof indexedDB !== 'undefined';
@@ -275,14 +290,22 @@
         /**
          * Helper to run a function within a transaction for a given store.
          */
-        async _withStore(storeName, mode, callback) {
+        async _withStore(storeName, mode, callback, operation = '') {
             const db = await this._getDB();
             return new Promise((resolve, reject) => {
                 let tx;
+                let failureLogged = false;
+                const fail = (error) => {
+                    if (!failureLogged) {
+                        failureLogged = true;
+                        logTransactionFailure(operation, storeName, mode, error);
+                    }
+                    reject(error);
+                };
                 try {
                     tx = db.transaction(storeName, mode);
                 } catch (error) {
-                    reject(error);
+                    fail(error);
                     return;
                 }
 
@@ -292,24 +315,32 @@
                 try {
                     result = callback(store);
                 } catch (error) {
-                    reject(error);
+                    fail(error);
                     return;
                 }
 
                 tx.oncomplete = () => resolve(result);
-                tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
-                tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+                tx.onerror = () => fail(tx.error || new Error('IndexedDB transaction failed'));
+                tx.onabort = () => fail(tx.error || new Error('IndexedDB transaction aborted'));
             });
         }
 
-        async _withStores(storeNames, mode, callback) {
+        async _withStores(storeNames, mode, callback, operation = '') {
             const db = await this._getDB();
             return new Promise((resolve, reject) => {
                 let tx;
+                let failureLogged = false;
+                const fail = (error) => {
+                    if (!failureLogged) {
+                        failureLogged = true;
+                        logTransactionFailure(operation, storeNames, mode, error);
+                    }
+                    reject(error);
+                };
                 try {
                     tx = db.transaction(storeNames, mode);
                 } catch (error) {
-                    reject(error);
+                    fail(error);
                     return;
                 }
                 const stores = Object.fromEntries(storeNames.map((name) => [name, tx.objectStore(name)]));
@@ -318,12 +349,12 @@
                     result = callback(stores);
                 } catch (error) {
                     try { tx.abort(); } catch (_) { /* ignore */ }
-                    reject(error);
+                    fail(error);
                     return;
                 }
                 tx.oncomplete = () => resolve(result);
-                tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
-                tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+                tx.onerror = () => fail(tx.error || new Error('IndexedDB transaction failed'));
+                tx.onabort = () => fail(tx.error || new Error('IndexedDB transaction aborted'));
             });
         }
 
@@ -340,16 +371,16 @@
             return this._withStore(storeName, 'readonly', (store) => this._request(store, 'get', key));
         }
 
-        async _putRecord(storeName, record, keyName) {
+        async _putRecord(storeName, record, keyName, operation = '') {
             if (!record || !record[keyName]) {
                 throw new Error(`Record must include ${keyName}`);
             }
-            return this._withStore(storeName, 'readwrite', (store) => this._request(store, 'put', record));
+            return this._withStore(storeName, 'readwrite', (store) => this._request(store, 'put', record), operation || `put:${storeName}`);
         }
 
-        async _deleteRecord(storeName, key) {
+        async _deleteRecord(storeName, key, operation = '') {
             if (!key) return;
-            return this._withStore(storeName, 'readwrite', (store) => this._request(store, 'delete', key));
+            return this._withStore(storeName, 'readwrite', (store) => this._request(store, 'delete', key), operation || `delete:${storeName}`);
         }
 
         async _getAllRecords(storeName) {
@@ -420,7 +451,7 @@
                 source,
                 followedAt: Number(record.followedAt || Date.now())
             };
-            await this._putRecord(STORE_SUBSCRIPTIONS, stored, 'channelId');
+            await this._putRecord(STORE_SUBSCRIPTIONS, stored, 'channelId', 'putSubscriptionRecord');
             return stored;
         }
 
@@ -450,7 +481,7 @@
                 source: String(record.source || 'local_action'),
                 reason: String(record.reason || 'user_unfollow')
             };
-            await this._putRecord(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES, tombstone, 'channelId');
+            await this._putRecord(STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES, tombstone, 'channelId', 'putLocalUnsubscribeTombstone');
             return tombstone;
         }
 
@@ -491,7 +522,7 @@
                     normalizedChannelId
                 );
                 return { tombstone, deletedFeedVideoCount };
-            });
+            }, 'softUnfollowSubscription');
         }
 
         async deleteSubscriptionAndSyncState(channelId, options = {}) {
@@ -506,7 +537,7 @@
             if (!record || !record.videoId || !record.channelId) {
                 throw new Error('Feed video record must include videoId and channelId');
             }
-            return this._putRecord(STORE_SUBSCRIPTION_FEED_VIDEOS, record, 'videoId');
+            return this._putRecord(STORE_SUBSCRIPTION_FEED_VIDEOS, record, 'videoId', 'putSubscriptionFeedVideo');
         }
 
         async deleteSubscriptionFeedVideo(videoId) {
@@ -516,7 +547,7 @@
         async deleteSubscriptionFeedVideosByChannelId(channelId) {
             if (!channelId) return 0;
             return this._withStore(STORE_SUBSCRIPTION_FEED_VIDEOS, 'readwrite', (store) =>
-                this._deleteRecordsByIndex(store, 'channelId', channelId));
+                this._deleteRecordsByIndex(store, 'channelId', channelId), 'deleteSubscriptionFeedVideosByChannelId');
         }
 
         async listSubscriptionFeedVideosByPublishedAt(limit = 0) {
@@ -590,7 +621,7 @@
         }
 
         async putChannelSyncState(record) {
-            return this._putRecord(STORE_CHANNEL_SYNC_STATE, record, 'channelId');
+            return this._putRecord(STORE_CHANNEL_SYNC_STATE, record, 'channelId', 'putChannelSyncState');
         }
 
         async deleteChannelSyncState(channelId) {
@@ -636,7 +667,7 @@
                     putRequest.onerror = () => reject(putRequest.error || new Error('IndexedDB channel claim failed'));
                 };
                 getRequest.onerror = () => reject(getRequest.error || new Error('IndexedDB channel state read failed'));
-            }));
+            }), 'claimChannelSyncState');
         }
 
         async releaseChannelSyncState(channelId, runId, partial = {}) {
@@ -659,7 +690,7 @@
                     putRequest.onerror = () => reject(putRequest.error || new Error('IndexedDB channel release failed'));
                 };
                 getRequest.onerror = () => reject(getRequest.error || new Error('IndexedDB channel state read failed'));
-            }));
+            }), 'releaseChannelSyncState');
         }
 
         async getHomeImpression(videoId) {
@@ -680,7 +711,7 @@
 
         async putFeedSyncRun(record) {
             if (!record || !record.runId) throw new Error('Feed sync run must include runId');
-            return this._putRecord(STORE_FEED_SYNC_RUNS, record, 'runId');
+            return this._putRecord(STORE_FEED_SYNC_RUNS, record, 'runId', 'putFeedSyncRun');
         }
 
         async listFeedSyncRunsByCompletedAt(limit = 0) {

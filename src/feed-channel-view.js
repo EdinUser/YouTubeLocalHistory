@@ -141,7 +141,7 @@ function showChannelPage(info) {
     historyActive = false;
     settingsActive = false;
     watchLaterActive = false;
-    ['localHeading', 'grid', 'localSearchResults', 'empty',
+    ['feedTitleBar', 'grid', 'localSearchResults', 'empty',
         'analyticsSection', 'subscriptionsSection', 'playlistsSection',
         'historySection', 'settingsSection', 'watchLaterSection'].forEach((id) => {
         const el = document.getElementById(id);

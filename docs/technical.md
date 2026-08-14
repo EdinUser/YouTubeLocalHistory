@@ -9,7 +9,7 @@ YT re:Watch is a browser extension with no application backend. Chrome and Firef
 | YouTube content script | `content*.js`, `storage.js`, `indexeddb-storage.js` | Playback tracking, resume, SPA identity, overlays, playlist references, local follow controls |
 | Background runtime | `background.js` | Cross-context messages, extension-page coordination, storage RPC |
 | Popup | `popup*.js` | Compact unfinished/Watch Later view and handoff to full feed |
-| Feed page | `feed*.js`, `rss-*.js` | Home, Subscriptions, Shorts, History, Channels, Analytics, Settings, imports, backup |
+| Feed page | `feed*.js`, `rss-*.js` | Home, Subscriptions, Shorts, local playlists, History, Channels, Analytics, Settings, imports, backup |
 
 Scripts expose bounded globals because the extension does not use a runtime bundler. Manifest/HTML load order is therefore part of the internal contract.
 
@@ -45,11 +45,11 @@ The IndexedDB database is `YTLH_HybridDB`, version 6. Its stores are:
 | `home_impressions` | `videoId` | Local Home rotation history |
 | `feed_sync_runs` | `runId` | Bounded scan summaries |
 
-`storage.local` also holds settings, Watch Later, analytics snapshots, selected caches, and compatibility records. Reads merge recent compatibility data with IndexedDB where required.
+`storage.local` also holds settings, Watch Later, local playlists, analytics snapshots, selected caches, and compatibility records. Reads merge recent compatibility data with IndexedDB where required.
 
 ### Reset contract
 
-`ytStorage.resetAllData()` clears extension local storage and calls the IndexedDB repository's full-store reset. The reset includes history, playlist references, deletion markers, canonical feed stores, local-unsubscribe tombstones, settings, and cached state.
+`ytStorage.resetAllData()` clears extension local storage and calls the IndexedDB repository's full-store reset. The reset includes history, local playlists, playlist references, deletion markers, canonical feed stores, local-unsubscribe tombstones, settings, and cached state.
 
 History-only removal is a distinct operation and must not be substituted for full reset.
 
@@ -98,9 +98,9 @@ Local search combines saved history and canonical feed records; there is no remo
 
 Subscribe/unsubscribe state uses canonical channel identity and known aliases rather than display-name equality.
 
-## Playlist references
+## Playlists
 
-`content-playlists.js` extracts available playlist metadata and persistence preferences. The stable v5 feed renders outbound references and never hydrates playlist members in the background. Extension-managed local playlists are outside the v5 release contract.
+`content-playlists.js` extracts available playlist metadata and persistence preferences. re:Watch renders outbound references without hydrating YouTube playlist members in the background. `feed-playlists-view.js` separately manages extension-owned local playlists; neither form changes the user's YouTube account.
 
 ## Analytics
 

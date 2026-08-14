@@ -330,8 +330,14 @@ function refreshContinueWatchingPage() {
     refreshContinueWatchingPage.promise = (async () => {
         do {
             refreshContinueWatchingPage.queued = false;
-            currentPage = 1;
             await loadHistoryPage({ page: currentPage });
+            // A deletion can make the selected final page disappear. Keep the
+            // selected page whenever it remains valid, otherwise use the
+            // final available page.
+            if (currentPage > totalPages) {
+                currentPage = Math.max(1, totalPages);
+                await loadHistoryPage({ page: currentPage });
+            }
             displayHistoryPage();
         } while (refreshContinueWatchingPage.queued);
     })().catch((error) => {

@@ -6,13 +6,8 @@ function displayHistoryPage() {
     const noHistory = document.getElementById('ytvhtNoHistory');
     const paginationDiv = document.getElementById('ytvhtPagination');
 
-    // The compact popup is for quickly resuming unfinished regular videos.
-    const pageRecords = allHistoryRecords.filter((record) => {
-        const time = Number(record.time || 0);
-        const duration = Number(record.duration || 0);
-        return time > 0 && duration > 0 &&
-            time / duration < ytvhtFeedContracts.WATCH_COMPLETION_RATIO;
-    });
+    // The popup mirrors regular-video history in pure last-watched order.
+    const pageRecords = allHistoryRecords;
 
     adjustContentDensity(pageRecords);
 

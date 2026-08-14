@@ -30,6 +30,8 @@ function runtime({ videoIds = [], loadData, work, visibleIds = videoIds, invento
     pendingFeedNoticeState: { busy: false, error: '' },
     newlyShownFeedVideoIds: [],
     allVideos: inventoryIds.map((videoId) => ({ videoId })),
+    watchedMap: {},
+    feedFeedback: { notInterested: {} },
     shortsOnly: false,
     analyticsActive: false,
     subscriptionsActive: false,
@@ -38,6 +40,7 @@ function runtime({ videoIds = [], loadData, work, visibleIds = videoIds, invento
     settingsActive: false,
     channelActive: false,
     subscriptionsChronological: false,
+    subscriptionSort: 'published_desc',
     loadData: loadData || jest.fn(async () => {}),
     showFeed: jest.fn(),
     refreshActiveFeedDataView: jest.fn(),
@@ -58,8 +61,11 @@ function runtime({ videoIds = [], loadData, work, visibleIds = videoIds, invento
       fallback
     ),
     feedFormatNumber: (value) => String(value),
-    feedPlural: (_key, count, singular, plural) =>
-      (count === 1 ? singular : plural).replace('$1', String(count))
+    feedPlural: (_key, count, singular, plural, extraSubstitutions = []) =>
+      [String(count), ...extraSubstitutions].reduce(
+        (message, value, index) => message.replace(`$${index + 1}`, value),
+        count === 1 ? singular : plural
+      )
   };
   vm.runInNewContext(source, context);
   context.showFeed.mockImplementation(() => {
@@ -86,6 +92,17 @@ test('an upload scan does not reload or rerender the visible feed', async () => 
   expect(context.showFeed).not.toHaveBeenCalled();
 });
 
+test('a failed upload scan shows a friendly message without exposing the technical error', async () => {
+  const { context } = runtime({
+    work: Promise.reject(new Error('Feed scheduler is unavailable: IndexedDB transaction failed'))
+  });
+
+  await context.checkForNewVideos();
+
+  expect(document.getElementById('status').textContent).toContain('Could not check for new videos.');
+  expect(document.getElementById('status').textContent).not.toContain('IndexedDB transaction failed');
+});
+
 test('Show verifies the discovered identities before clearing pending state', async () => {
   const loadData = jest.fn(async () => {});
   const { context, stored } = runtime({ videoIds: ['video-1', 'video-2'], loadData });
@@ -100,6 +117,7 @@ test('Show verifies the discovered identities before clearing pending state', as
   expect(stored['ytvht.pendingFeedDiscovery.v1'].videoIds).toEqual([]);
   expect(context.newlyShownFeedVideoIds).toEqual(['video-1', 'video-2']);
   expect(context.subscriptionsChronological).toBe(true);
+  expect(context.subscriptionSort).toBe('discovered_desc');
   expect(document.getElementById('search').value).toBe('');
   expect(context.showFeed).toHaveBeenCalledTimes(1);
 });
@@ -148,16 +166,37 @@ test('Show recovers retained IDs from a stale pending discovery after retention'
   expect(document.getElementById('status').textContent).toContain('1 new video shown.');
 });
 
-test('Show reports discovered videos excluded by active filters', async () => {
-  const { context } = runtime({
-    videoIds: ['video-1', 'video-2'],
-    visibleIds: ['video-1']
+test('Show clears a wholly stale pending discovery instead of offering a permanent Retry', async () => {
+  const incomplete = new Error('The local inventory is still missing 2 discovered videos.');
+  incomplete.code = 'pending_inventory_incomplete';
+  const loadData = jest.fn()
+    .mockRejectedValueOnce(incomplete)
+    .mockResolvedValueOnce(undefined);
+  const { context, stored } = runtime({
+    videoIds: ['expired-1', 'expired-2'], inventoryIds: [], visibleIds: [], loadData
   });
 
   await context.showPendingFeedVideos();
 
+  expect(context.pendingFeedDiscovery.videoIds).toEqual([]);
+  expect(stored['ytvht.pendingFeedDiscovery.v1'].videoIds).toEqual([]);
+  expect(document.getElementById('status').textContent).toContain('2 stale discoveries were removed');
+  expect(document.querySelector('#status button')).toBeNull();
+});
+
+test('Show explains exactly why discovered videos are not shown', async () => {
+  const { context } = runtime({
+    videoIds: ['video-1', 'video-2'],
+    inventoryIds: ['video-1', 'video-2'],
+    visibleIds: ['video-1']
+  });
+  context.allVideos[1].isShort = true;
+  context.isShort = (video) => video.isShort === true;
+
+  await context.showPendingFeedVideos();
+
   expect(document.getElementById('status').textContent).toContain('1 new video shown.');
-  expect(document.getElementById('status').textContent).toContain('1 new video is hidden by active filters.');
+  expect(document.getElementById('status').textContent).toContain('1 new video is hidden: Shorts (1).');
 });
 
 test('concurrent scan requests reuse the active page work promise', () => {

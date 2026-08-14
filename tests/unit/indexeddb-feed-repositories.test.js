@@ -102,9 +102,17 @@ function createRepositoryStorage(IndexedDBStorage) {
     home_impressions: createMemoryStore('videoId'),
     feed_sync_runs: createMemoryStore('runId')
   };
+  const transactions = [];
   const storage = new IndexedDBStorage();
-  storage._withStore = async (storeName, _mode, callback) => callback(stores[storeName]);
-  storage._withStores = async (storeNames, _mode, callback) => callback(Object.fromEntries(storeNames.map((name) => [name, stores[name]])));
+  storage._withStore = async (storeName, mode, callback, operation = '') => {
+    transactions.push({ operation, stores: [storeName], mode });
+    return callback(stores[storeName]);
+  };
+  storage._withStores = async (storeNames, mode, callback, operation = '') => {
+    transactions.push({ operation, stores: storeNames, mode });
+    return callback(Object.fromEntries(storeNames.map((name) => [name, stores[name]])));
+  };
+  storage._testTransactions = transactions;
   return storage;
 }
 
@@ -248,6 +256,37 @@ describe('v6 IndexedDB feed repositories', () => {
       scanLeaseUntil: null,
       scanRunId: null,
       nextEligibleCheckAt: 200
+    }));
+  });
+
+  test('feed mutations always request readwrite transactions', async () => {
+    const { IndexedDBStorage } = require('../../src/indexeddb-storage.js');
+    const storage = createRepositoryStorage(IndexedDBStorage);
+
+    await storage.putSubscriptionRecord({
+      channelId: CHANNEL_ID, source: 'manual', followedAt: 10
+    });
+    await storage.putSubscriptionFeedVideo({
+      videoId: 'mutation-check', channelId: CHANNEL_ID, publishedAt: 10
+    });
+    await storage.putChannelSyncState({ channelId: CHANNEL_ID, scanLeaseUntil: 0 });
+    await storage.claimChannelSyncState(CHANNEL_ID, { runId: 'mutation-run', now: 10, leaseMs: 30 });
+    await storage.releaseChannelSyncState(CHANNEL_ID, 'mutation-run');
+    await storage.putFeedSyncRun({ runId: 'mutation-run', completedAt: 20 });
+    await storage.deleteSubscriptionFeedVideosByChannelId(CHANNEL_ID);
+
+    const mutationOperations = Object.fromEntries(storage._testTransactions
+      .filter((transaction) => transaction.operation)
+      .map((transaction) => [transaction.operation, transaction.mode]));
+
+    expect(mutationOperations).toEqual(expect.objectContaining({
+      putSubscriptionRecord: 'readwrite',
+      putSubscriptionFeedVideo: 'readwrite',
+      putChannelSyncState: 'readwrite',
+      claimChannelSyncState: 'readwrite',
+      releaseChannelSyncState: 'readwrite',
+      putFeedSyncRun: 'readwrite',
+      deleteSubscriptionFeedVideosByChannelId: 'readwrite'
     }));
   });
 

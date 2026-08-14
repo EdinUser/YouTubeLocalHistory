@@ -1,7 +1,7 @@
 # YT re:Watch roadmap
 
-This roadmap describes the intended direction after the stable v5.0 release,
-published on 9 August 2026.
+This roadmap describes the intended direction after the stable v5.1 release,
+published on 14 August 2026.
 It is not a promise of dates or final scope. Priorities may change when design,
 privacy, browser-policy, or technical findings require it.
 
@@ -9,9 +9,11 @@ Only completed work belongs in the
 [changelog](changelog.md). Work listed here is not part of the current stable
 release unless its release notes say otherwise.
 
-## v5.1 — Optional OAuth and expanded YouTube imports
+## Future discovery — Optional OAuth and expanded YouTube imports
 
-The planned direction for v5.1 is to make supported YouTube data easier to
+Status: discovery required; no target version
+
+The planned direction is to make supported YouTube data easier to
 bring into re:Watch without changing the extension's local-first storage
 model.
 
@@ -26,34 +28,16 @@ Planned areas include:
   what remains local.
 
 Imported YouTube playlist references will open their original playlist on
-YouTube. They are not the same as extension-managed local playlists, and v5.1
-does not promise local management of their videos.
+YouTube. They are not the same as extension-managed local playlists.
 
 ### History import
 
 YouTube history exports and page formats are unstable. History import will
 remain experimental or under investigation until a reliable, privacy-safe
-workflow can be verified. It is not a guaranteed part of v5.1.
+workflow can be verified. It is not assigned to a numbered release.
 
-## v5.2 — Extension-managed playlists
-
-The planned direction for v5.2 is playlist creation and management owned by
-re:Watch rather than the user's YouTube account.
-
-The feature is expected to explore:
-
-- creating, renaming, and deleting local playlists;
-- adding, removing, and reordering locally saved videos;
-- integrating local playlist actions into appropriate re:Watch and YouTube
-  surfaces;
-- keeping extension-owned playlists clearly separate from YouTube-account
-  playlists;
-- backup, restore, migration, and preservation guarantees;
-- reliable Chrome and Firefox behavior when YouTube surfaces change.
-
-This feature requires a complete interaction, storage, migration, privacy,
-and cross-browser design before implementation. Synchronization with playlists
-in the user's YouTube account is not promised by this roadmap.
+It is not a guaranteed part of a numbered release until its permissions,
+token storage, privacy behavior, and cross-browser design are verified.
 
 ## Future discovery — Cross-device synchronization
 
@@ -112,10 +96,10 @@ assigned to a release version.
 When a planned release becomes testable, development builds may use semantic
 pre-release versions such as:
 
-- `v5.1.0-alpha.1` for incomplete developer testing;
-- `v5.1.0-beta.1` for broader testing of mostly complete behavior;
-- `v5.1.0-rc.1` for an intended release candidate;
-- `v5.1.0` for the stable release.
+- `v5.2.0-alpha.1` for incomplete developer testing;
+- `v5.2.0-beta.1` for broader testing of mostly complete behavior;
+- `v5.2.0-rc.1` for an intended release candidate;
+- `v5.2.0` for the stable release.
 
 Every pre-release should state what is incomplete, list known limitations and
 data risks, explain any backup requirements, and provide a feedback channel.

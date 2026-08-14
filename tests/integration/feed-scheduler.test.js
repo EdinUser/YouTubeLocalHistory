@@ -1,6 +1,6 @@
 const contracts = require('../../src/feed-contracts.js');
 const { ingestRssScan } = require('../../src/feed-ingestion.js');
-const { FeedScheduler } = require('../../src/feed-scheduler.js');
+const { DEFAULTS, FeedScheduler } = require('../../src/feed-scheduler.js');
 const feedViewData = require('../../src/feed-view-data.js');
 const fs = require('fs');
 const path = require('path');
@@ -126,6 +126,70 @@ describe('shared feed scheduler', () => {
     }));
   });
 
+  test('uses lower concurrency for a large first-time initialization than for routine checks', async () => {
+    const storage = createStorage([
+      { channelId: CHANNEL_A, source: 'manual' },
+      { channelId: CHANNEL_B, source: 'takeout_csv' },
+    ]);
+    const scheduler = new FeedScheduler({ storage, clock: () => 100 });
+    await scheduler.initializeSubscriptions();
+    const runBatch = jest.spyOn(scheduler, 'runBatch').mockResolvedValue({ total: 0, completed: 0 });
+
+    await scheduler.runInitialization();
+
+    expect(DEFAULTS).toEqual(expect.objectContaining({
+      concurrency: 4,
+      initializationConcurrency: 2,
+      retryConcurrency: 1,
+      initializationBatchSize: 30,
+    }));
+    expect(runBatch).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({
+      kind: 'initialization',
+      concurrency: 2,
+    }));
+  });
+
+  test('uses one worker for retry-only work without blocking an untried initial import', async () => {
+    const storage = createStorage([{ channelId: CHANNEL_A, source: 'manual' }]);
+    await storage.putChannelSyncState({
+      channelId: CHANNEL_A,
+      initializationState: 'pending',
+      lastAttemptAt: 1,
+      lastRssError: { code: 'http', status: 404, occurredAt: 1 },
+      nextEligibleCheckAt: 0,
+    });
+    const scheduler = new FeedScheduler({ storage, clock: () => 100 });
+    const runBatch = jest.spyOn(scheduler, 'runBatch').mockResolvedValue({ total: 0, completed: 0 });
+
+    await scheduler.runInitialization();
+
+    expect(runBatch).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({
+      kind: 'initialization', concurrency: 1,
+    }));
+  });
+
+  test('keeps untried channels ahead of retrying channels during initial import', async () => {
+    const storage = createStorage([
+      { channelId: CHANNEL_A, source: 'manual' },
+      { channelId: CHANNEL_B, source: 'takeout_csv' },
+    ]);
+    await storage.putChannelSyncState({
+      channelId: CHANNEL_A, initializationState: 'pending', lastAttemptAt: 1, nextEligibleCheckAt: 0
+    });
+    await storage.putChannelSyncState({
+      channelId: CHANNEL_B, initializationState: 'pending', nextEligibleCheckAt: 0
+    });
+    const scheduler = new FeedScheduler({
+      storage, clock: () => 100,
+      fetchChannelRss: jest.fn(async (channelId) => successfulScan(channelId, 100)),
+      ingestRssScan,
+    });
+
+    await scheduler.runInitialization({ limit: 1, concurrency: 1, runId: 'untried-first' });
+
+    expect(scheduler.fetchChannelRss).toHaveBeenCalledWith(CHANNEL_B, expect.any(Object));
+  });
+
   test('selects pending initialization before applying its finite batch limit', async () => {
     const storage = createStorage([
       { channelId: CHANNEL_A, source: 'manual' },
@@ -205,8 +269,8 @@ describe('shared feed scheduler', () => {
       channelId: CHANNEL_A, fetchedAt: now, error: { code: 'network', message: 'offline' },
     });
     const fetchChannelRss = jest.fn(async () => failedScan);
-    const one = new FeedScheduler({ storage, clock: () => now, fetchChannelRss, ingestRssScan, retryBaseMs: 100, retryMaxMs: 100 });
-    const two = new FeedScheduler({ storage, clock: () => now, fetchChannelRss, ingestRssScan, retryBaseMs: 100, retryMaxMs: 100 });
+    const one = new FeedScheduler({ storage, clock: () => now, fetchChannelRss, ingestRssScan, retryBaseMs: 100, retryMaxMs: 100, retryJitterRatio: 0 });
+    const two = new FeedScheduler({ storage, clock: () => now, fetchChannelRss, ingestRssScan, retryBaseMs: 100, retryMaxMs: 100, retryJitterRatio: 0 });
 
     await Promise.all([one.runForeground({ runId: 'one' }), two.runForeground({ runId: 'two' })]);
     expect(fetchChannelRss).toHaveBeenCalledTimes(1);
@@ -215,7 +279,7 @@ describe('shared feed scheduler', () => {
     }));
   });
 
-  test('marks an unavailable RSS channel complete and defers another 404 for a long interval', async () => {
+  test('treats a 404 RSS response as temporary and keeps the channel eligible for backoff retry', async () => {
     const storage = createStorage([{ channelId: CHANNEL_A, source: 'manual' }]);
     await storage.putChannelSyncState({ channelId: CHANNEL_A, initializationState: 'pending', nextEligibleCheckAt: 0 });
     const now = 500;
@@ -225,14 +289,88 @@ describe('shared feed scheduler', () => {
       error: { code: 'http', status: 404, message: 'RSS feed unavailable' }
     }));
     const scheduler = new FeedScheduler({
-      storage, clock: () => now, fetchChannelRss, ingestRssScan, unavailableChannelRetryMs: 1000
+      storage, clock: () => now, fetchChannelRss, ingestRssScan,
+      transientHttpRetryBaseMs: 1000, transientHttpRetryMaxMs: 1000, retryJitterRatio: 0
     });
 
     await scheduler.runInitialization({ runId: 'unavailable' });
 
     expect(storage.state(CHANNEL_A)).toEqual(expect.objectContaining({
-      initializationState: 'complete', unavailableStatus: 404, unavailableAt: now,
-      retryAfter: null, nextEligibleCheckAt: 1500, scanLeaseUntil: null
+      initializationState: 'pending', failureCount: 1,
+      retryAfter: 1500, nextEligibleCheckAt: 1500, scanLeaseUntil: null
+    }));
+  });
+
+  test('retains previously cached videos when an RSS feed returns 404', async () => {
+    const storage = createStorage([{ channelId: CHANNEL_A, source: 'manual' }]);
+    storage.feedVideos.set('cached-video', { videoId: 'cached-video', channelId: CHANNEL_A, publishedAt: 1 });
+    await storage.putChannelSyncState({
+      channelId: CHANNEL_A,
+      initializationState: 'complete', failureCount: 0,
+      nextEligibleCheckAt: 0,
+    });
+    const scheduler = new FeedScheduler({
+      storage, clock: () => 100,
+      fetchChannelRss: jest.fn(async () => contracts.createRssScanResult({
+        channelId: CHANNEL_A, fetchedAt: 100,
+        error: { code: 'http', status: 404, message: 'RSS request failed with HTTP 404' }
+      })),
+      ingestRssScan,
+      retryJitterRatio: 0,
+    });
+
+    await scheduler.runForeground({ runId: 'rss-404' });
+
+    expect(storage.feedVideos.has('cached-video')).toBe(true);
+    expect(storage.state(CHANNEL_A)).toEqual(expect.objectContaining({
+      failureCount: 1,
+      lastRssError: expect.objectContaining({ code: 'http', status: 404, occurredAt: 100 })
+    }));
+  });
+
+  test('records the earliest durable retry and clears a channel diagnostic after a success', async () => {
+    const storage = createStorage([{ channelId: CHANNEL_A, channelTitle: 'PewDiePie', source: 'manual' }]);
+    await storage.putChannelSyncState({
+      channelId: CHANNEL_A,
+      initializationState: 'pending',
+      nextEligibleCheckAt: 900,
+      lastRssError: { code: 'http', status: 404, message: 'RSS request failed with HTTP 404', occurredAt: 100 },
+    });
+    const scheduler = new FeedScheduler({
+      storage, clock: () => 1000,
+      fetchChannelRss: jest.fn(async (channelId) => successfulScan(channelId, 1000)),
+      ingestRssScan,
+    });
+
+    await expect(scheduler.getNextEligibleCheckAt()).resolves.toBe(900);
+    await expect(scheduler.getRetryDiagnostics()).resolves.toEqual([
+      expect.objectContaining({ channelId: CHANNEL_A, channelTitle: 'PewDiePie', status: 404 })
+    ]);
+    await scheduler.runForeground({ runId: 'recovered-rss' });
+    await expect(scheduler.getRetryDiagnostics()).resolves.toEqual([]);
+  });
+
+  test('backs off 5xx RSS responses longer than ordinary network failures', async () => {
+    const storage = createStorage([{ channelId: CHANNEL_A, source: 'manual' }]);
+    await storage.putChannelSyncState({ channelId: CHANNEL_A, initializationState: 'pending', nextEligibleCheckAt: 0 });
+    const now = 500;
+    const fetchChannelRss = jest.fn(async () => contracts.createRssScanResult({
+      channelId: CHANNEL_A,
+      fetchedAt: now,
+      error: { code: 'http', status: 500, message: 'RSS request failed with HTTP 500' }
+    }));
+    const scheduler = new FeedScheduler({
+      storage, clock: () => now, fetchChannelRss, ingestRssScan,
+      retryBaseMs: 100,
+      transientHttpRetryBaseMs: 1000,
+      transientHttpRetryMaxMs: 1000,
+      retryJitterRatio: 0,
+    });
+
+    await scheduler.runForeground({ runId: 'server-error' });
+
+    expect(storage.state(CHANNEL_A)).toEqual(expect.objectContaining({
+      failureCount: 1, retryAfter: 1500, nextEligibleCheckAt: 1500,
     }));
   });
 

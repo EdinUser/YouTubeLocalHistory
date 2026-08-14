@@ -110,7 +110,7 @@ function showWatchLater() {
     channelActive = false;
     watchLaterActive = true;
 
-    ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection',
+    ['feedTitleBar', 'grid', 'localSearchResults', 'empty', 'ytSection',
         'analyticsSection', 'subscriptionsSection', 'playlistsSection',
         'historySection', 'settingsSection', 'channelSection'].forEach((id) => {
         const el = document.getElementById(id);

@@ -94,7 +94,7 @@ function showHistory() {
     settingsActive = false;
     channelActive = false;
     watchLaterActive = false;
-    ['localHeading', 'grid', 'localSearchResults', 'empty', 'ytSection',
+    ['feedTitleBar', 'grid', 'localSearchResults', 'empty', 'ytSection',
         'analyticsSection', 'subscriptionsSection', 'playlistsSection', 'settingsSection', 'channelSection', 'watchLaterSection'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';

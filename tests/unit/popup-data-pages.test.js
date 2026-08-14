@@ -4,7 +4,7 @@ const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'popup-data-pages.js'), 'utf8');
 
-test('paginates Continue Watching after filtering unfinished videos', async () => {
+test('paginates the complete regular-video history without an unfinished-only projection', async () => {
   const getVideosPage = jest.fn(async (options) => ({
     records: [{ videoId: 'on-page-two' }],
     pagination: { totalPages: 3, totalRecords: 25 }
@@ -22,9 +22,9 @@ test('paginates Continue Watching after filtering unfinished videos', async () =
 
   await context.loadHistoryPage();
 
-  expect(getVideosPage).toHaveBeenCalledWith(expect.objectContaining({
-    page: 2, pageSize: 10, unfinishedOnly: true
-  }));
+  expect(getVideosPage).toHaveBeenCalledWith({
+    page: 2, pageSize: 10, searchQuery: ''
+  });
   expect(context.totalPages).toBe(3);
   expect(context.allHistoryRecords).toEqual([{ videoId: 'on-page-two' }]);
 });

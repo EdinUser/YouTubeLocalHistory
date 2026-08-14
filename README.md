@@ -11,7 +11,7 @@ YT re:Watch keeps its history inside your browser profile. It works while you sw
 
 📚 [User guide](./docs/index.md) · [Complete walkthrough](./docs/detailed_guide.md) · [FAQ](./docs/faq.md) · [Changelog](./CHANGELOG.md)
 
-## What v5 includes
+## What v5.1 includes
 
 - **Local watch history and resume:** saves progress for regular videos and Shorts and restores it across YouTube's single-page navigation.
 - **Viewed overlays:** adds progress indicators to re:Watch cards and supported YouTube thumbnail layouts.
@@ -19,7 +19,7 @@ YT re:Watch keeps its history inside your browser profile. It works while you sw
 - **Local feed:** public channel RSS builds a cached Home, chronological Subscriptions, and Shorts inventory.
 - **Channels management:** review followed channels, import subscriptions from Google Takeout, and explicitly restore channels kept in the Ignored list after a local unfollow.
 - **Local search:** searches saved history, cached feed videos, and channels without sending the typed query to YouTube.
-- **History, Watch Later, and playlist references:** keep viewing records and saved YouTube playlist links in one full-page interface.
+- **History, Watch Later, and local playlists:** keep viewing records, saved YouTube playlist links, and extension-managed playlists in one full-page interface.
 - **Private analytics:** watch time, completion, hourly/daily activity, top channels, skipped channels, and unfinished long videos are calculated locally.
 - **Manual portability:** back up and restore the documented profile data using a JSON file.
 - **Chrome and Firefox support:** deterministic packaged-extension suites cover the same core product behavior in both browsers.
@@ -40,7 +40,7 @@ The full feed page contains:
 | **Subscriptions** | Cached uploads from locally followed channels in chronological order |
 | **Watch Later** | Locally saved videos, newest first |
 | **Shorts** | Known short-form videos and watched Shorts |
-| **Playlists** | Saved YouTube playlist references that open on YouTube |
+| **Playlists** | Local playlists you manage, alongside saved YouTube playlist references that open on YouTube |
 | **History** | Locally recorded videos, progress, duration, and watched time |
 | **Channels** | Following and, when needed, Ignored channel management |
 | **Analytics** | Locally calculated watch statistics and insights |
@@ -65,11 +65,11 @@ A local unfollow stops future scans and removes that channel's cached feed inven
 
 The feed is best-effort discovery rather than a mirror of a signed-in YouTube account. Public RSS may not represent membership, age-restricted, region-restricted, removed, or otherwise unavailable videos. YouTube applies its own access rules when a video is opened.
 
-## Playlists in v5
+## Playlists in v5.1
 
 v5 stores references to YouTube playlists encountered while the extension is active. A saved reference keeps useful public metadata and opens the original playlist on YouTube.
 
-v5 does **not** crawl or hydrate every video in a playlist in the background. Creating and managing extension-owned playlists is planned separately and is not part of the stable v5 promise.
+re:Watch does **not** crawl or hydrate every video in a YouTube playlist in the background. You can create and manage extension-owned local playlists separately; they never modify a YouTube-account playlist.
 
 ## Privacy and network boundaries
 
