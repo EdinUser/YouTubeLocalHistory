@@ -11,6 +11,7 @@ const FEED_SETTINGS_DEFAULTS = {
     localFeedEnabled: true,
     hideAccountUI: false,
     hideRecommendations: true,
+    aiLabeledVideoHandling: 'off',
     defaultFeedPage: 'last',
     feedRefreshMinutes: 60
 };
@@ -65,6 +66,8 @@ async function loadFeedSettingsForm() {
         ? refreshValue
         : '60';
     document.getElementById('feedSettingAutoClean').value = String(settings.autoCleanPeriod);
+    const aiHandling = document.getElementById('feedSettingAiLabeledVideoHandling');
+    if (aiHandling) aiHandling.value = settings.aiLabeledVideoHandling || 'off';
     applyFeedTheme(settings.themePreference);
     applyAccentColor(settings.overlayColor || settings.accentColor || 'blue');
 }
@@ -95,6 +98,7 @@ async function saveFeedSettings() {
         overlayColor: color,
         overlayLabelSize: 'medium',
         defaultFeedPage: document.getElementById('feedSettingDefaultPage')?.value || 'last',
+        aiLabeledVideoHandling: document.getElementById('feedSettingAiLabeledVideoHandling')?.value || 'off',
         feedRefreshMinutes: cleanRefresh,
         autoCleanPeriod: autoCleanValue === 'forever' ? 'forever' : Number(autoCleanValue)
     };

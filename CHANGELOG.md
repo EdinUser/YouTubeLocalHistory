@@ -2,6 +2,23 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [5.2.0] - Unreleased
+
+### Added
+
+- Added experimental **AI-labeled video handling**. When enabled, it can badge,
+  dim, or hide videos that YouTube itself marks as made with AI.
+- Added a dedicated IndexedDB cache for YouTube disclosure results, with
+  long-lived positive and unlabeled results plus bounded retry backoff for
+  unavailable or malformed responses.
+
+### Privacy and reliability
+
+- The feature defaults to Off and clearly explains that it makes paced direct
+  YouTube lookups for previously unchecked cards near the viewport.
+- It reflects only YouTube's disclosure, not a general AI detector; an
+  unmarked video is not confirmed non-AI.
+
 ## [5.1.0] - 2026-08-14
 
 ### Added

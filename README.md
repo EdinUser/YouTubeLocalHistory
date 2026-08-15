@@ -11,10 +11,11 @@ YT re:Watch keeps its history inside your browser profile. It works while you sw
 
 📚 [User guide](./docs/index.md) · [Complete walkthrough](./docs/detailed_guide.md) · [FAQ](./docs/faq.md) · [Changelog](./CHANGELOG.md)
 
-## What v5.1 includes
+## What v5.2 includes
 
 - **Local watch history and resume:** saves progress for regular videos and Shorts and restores it across YouTube's single-page navigation.
 - **Viewed overlays:** adds progress indicators to re:Watch cards and supported YouTube thumbnail layouts.
+- **Experimental AI-label handling:** optionally badges, dims, or hides videos that YouTube itself discloses as made with AI.
 - **Local channel follows:** follow or unfollow channels inside re:Watch without changing a YouTube account subscription.
 - **Local feed:** public channel RSS builds a cached Home, chronological Subscriptions, and Shorts inventory.
 - **Channels management:** review followed channels, import subscriptions from Google Takeout, and explicitly restore channels kept in the Ignored list after a local unfollow.
@@ -65,7 +66,7 @@ A local unfollow stops future scans and removes that channel's cached feed inven
 
 The feed is best-effort discovery rather than a mirror of a signed-in YouTube account. Public RSS may not represent membership, age-restricted, region-restricted, removed, or otherwise unavailable videos. YouTube applies its own access rules when a video is opened.
 
-## Playlists in v5.1
+## Playlists in v5.2
 
 v5 stores references to YouTube playlists encountered while the extension is active. A saved reference keeps useful public metadata and opens the original playlist on YouTube.
 

@@ -130,5 +130,12 @@
   "global_search_placeholder": {
     "message": "Alle Inhalte durchsuchen...",
     "description": "Placeholder text for the global search input"
-  }
+  },
+  "settings_ai_labeled_video_label": { "message": "Umgang mit KI-gekennzeichneten Videos", "description": "AI setting" },
+  "settings_ai_labeled_video_off": { "message": "Aus", "description": "AI setting option" },
+  "settings_ai_labeled_video_badge": { "message": "Abzeichen", "description": "AI setting option" },
+  "settings_ai_labeled_video_dim": { "message": "Abdunkeln", "description": "AI setting option" },
+  "settings_ai_labeled_video_hide": { "message": "Ausblenden", "description": "AI setting option" },
+  "settings_ai_labeled_video_help": { "message": "Verwendet die YouTube-Kennzeichnung, keine KI-Erkennung. Experimentell und nicht vollständig zuverlässig.", "description": "AI setting help" },
+  "settings_ai_labeled_video_info": { "message": "Wenn aktiviert, sendet re:Watch für ungeprüfte Videos nahe dem Bildschirm eine zusätzliche YouTube-Anfrage. Ergebnisse werden lokal gespeichert. Es verwendet nur YouTubes Made-with-AI-Kennzeichnung und kann KI-Videos übersehen.", "description": "AI setting information" }
 }

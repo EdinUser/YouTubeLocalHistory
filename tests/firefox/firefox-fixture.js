@@ -66,6 +66,9 @@ function createFirefoxOptions(profileDir, locale = 'en') {
     .setPreference('datareporting.healthreport.uploadEnabled', false)
     .setPreference('datareporting.policy.dataSubmissionEnabled', false)
     .setPreference('toolkit.telemetry.enabled', false)
+    // Keep automated playback silent while preserving media timing/events that
+    // the live resume and playlist canaries need.
+    .setPreference('media.volume_scale', '0.0')
     .setPreference('intl.locale.requested', locale)
     .setPreference('intl.accept_languages', locale)
     .setPreference('intl.locale.matchOS', false)

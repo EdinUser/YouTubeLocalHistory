@@ -91,6 +91,7 @@
         localFeedEnabled: true,
         hideAccountUI: false,
         hideRecommendations: true,
+        aiLabeledVideoHandling: 'off',
         feedRefreshMinutes: 60,
         version: EXTENSION_VERSION
     };
@@ -150,6 +151,7 @@
     const pendingOperations = new Map();
     const ENABLE_NATIVE_THUMBNAIL_OVERLAYS = true;
     let processExistingThumbnails = null;
+    let aiLabels = null;
 
     // Last video handled by the tracker; prevents duplicate SPA setup.
     let lastProcessedVideoId = null;
@@ -596,6 +598,13 @@
 
         const video = getPrimaryVideo();
         if (!video) return;
+        // YouTube keeps the target watch URL and video ID while a pre-roll is
+        // playing. Never persist the advertisement's media time as progress
+        // for the requested video.
+        if (isYouTubeAdPlaying(video)) {
+            log('[SAVE] Skipping timestamp while a YouTube ad is playing');
+            return;
+        }
 
         // Playlist-aware pause/ignore logic
         try {
@@ -1965,6 +1974,11 @@
     processExistingThumbnails = thumbnailHelpers.processExistingThumbnails;
     thumbnailHelpers.startRemovedElementCleanupObserver();
     startNativeThumbnailOverlays();
+    aiLabels = window.YTVHTAiLabels?.create?.({
+        log,
+        getSettings: () => currentSettings,
+        db: ytIndexedDBStorage
+    }) || { start: () => {}, stop: () => {}, update: () => {} };
 
     messageListener = window.YTVHTContentMessages.create({
         log,
@@ -2001,6 +2015,7 @@
                 getAccentOverlayColor(settings)
             );
             if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS) processExistingThumbnails?.();
+            aiLabels?.update(settings);
         })().catch((error) => {
             log('[Overlay] Could not refresh settings:', error);
         }).finally(() => {
@@ -2052,6 +2067,7 @@
             );
 
             startNativeThumbnailOverlays();
+            aiLabels?.start(currentSettings);
 
             // Intercept video link clicks to add timestamps
             interceptVideoLinkClicks();

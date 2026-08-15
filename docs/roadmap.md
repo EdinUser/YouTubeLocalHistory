@@ -9,6 +9,17 @@ Only completed work belongs in the
 [changelog](changelog.md). Work listed here is not part of the current stable
 release unless its release notes say otherwise.
 
+## v5.2 — Experimental AI-labeled video handling
+
+Status: planned experimental feature
+
+An opt-in setting will let users badge, dim, or hide videos that YouTube itself
+marks as made with AI. It is not a general AI detector: an unmarked video is
+not confirmed non-AI. When enabled, re:Watch will make a paced direct YouTube
+lookup only for previously unchecked cards near the viewport and cache the
+result locally. The implementation remains conditional on packaged Chrome and
+Firefox canaries because the YouTube response is undocumented.
+
 ## Future discovery — Optional OAuth and expanded YouTube imports
 
 Status: discovery required; no target version

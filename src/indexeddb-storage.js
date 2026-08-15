@@ -20,9 +20,9 @@
             : (typeof self !== 'undefined' ? self : this));
 
     const DB_NAME = 'YTLH_HybridDB';
-    // Version 6 adds durable local-unsubscribe tombstones. Existing v5
-    // subscriptions and cached feed records remain untouched by the upgrade.
-    const DB_VERSION = 6;
+    // Version 7 adds a separate per-video AI-disclosure cache. Existing
+    // history, subscriptions, and cached feed records remain untouched.
+    const DB_VERSION = 7;
 
     const STORE_VIDEOS = 'videos';
     const STORE_PLAYLISTS = 'playlists';
@@ -35,6 +35,9 @@
     const STORE_HOME_IMPRESSIONS = 'home_impressions';
     const STORE_FEED_SYNC_RUNS = 'feed_sync_runs';
     const STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES = 'local_unsubscribe_tombstones';
+    // Results are intentionally separate from history and feed records. A
+    // large AI-label cache must not cause settings or video history writes.
+    const STORE_AI_LABEL_RESULTS = 'ai_label_results';
     const EXPLICIT_SUBSCRIPTION_SOURCES = ['takeout_csv', 'oauth', 'manual'];
 
     // ----- Forgiving, YouTube-like search matcher -----------------------------
@@ -238,6 +241,16 @@
                 }
                 if (!feedSyncRunsStore.indexNames.contains('completedAt')) {
                     feedSyncRunsStore.createIndex('completedAt', 'completedAt', { unique: false });
+                }
+
+                let aiLabelResultsStore;
+                if (!db.objectStoreNames.contains(STORE_AI_LABEL_RESULTS)) {
+                    aiLabelResultsStore = db.createObjectStore(STORE_AI_LABEL_RESULTS, { keyPath: 'videoId' });
+                } else {
+                    aiLabelResultsStore = tx.objectStore(STORE_AI_LABEL_RESULTS);
+                }
+                if (!aiLabelResultsStore.indexNames.contains('expiresAt')) {
+                    aiLabelResultsStore.createIndex('expiresAt', 'expiresAt', { unique: false });
                 }
             };
 
@@ -1056,6 +1069,23 @@
             });
         }
 
+        // --- AI-label lookup cache -----------------------------------------
+
+        async getAiLabelResult(videoId) {
+            return this._getRecord(STORE_AI_LABEL_RESULTS, videoId);
+        }
+
+        async putAiLabelResult(record) {
+            if (!record || !record.videoId || !['ai', 'unlabeled', 'unknown'].includes(record.status)) {
+                throw new Error('AI label result must include a videoId and valid status');
+            }
+            return this._putRecord(STORE_AI_LABEL_RESULTS, record, 'videoId', 'putAiLabelResult');
+        }
+
+        async clearAiLabelResults() {
+            return this._withStore(STORE_AI_LABEL_RESULTS, 'readwrite', (store) => this._request(store, 'clear'), 'clearAiLabelResults');
+        }
+
         // --- Utilities ------------------------------------------------------
 
         async clearHistory() {
@@ -1075,7 +1105,8 @@
                 STORE_CHANNEL_SYNC_STATE,
                 STORE_HOME_IMPRESSIONS,
                 STORE_FEED_SYNC_RUNS,
-                STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES
+                STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES,
+                STORE_AI_LABEL_RESULTS
             ];
             return this._withStores(storeNames, 'readwrite', (stores) => {
                 storeNames.forEach((storeName) => stores[storeName].clear());
@@ -1095,6 +1126,7 @@
             STORE_SUBSCRIPTION_FEED_VIDEOS,
             STORE_CHANNEL_SYNC_STATE,
             STORE_HOME_IMPRESSIONS,
+            STORE_AI_LABEL_RESULTS,
             STORE_FEED_SYNC_RUNS,
             STORE_LOCAL_UNSUBSCRIBE_TOMBSTONES,
             EXPLICIT_SUBSCRIPTION_SOURCES,

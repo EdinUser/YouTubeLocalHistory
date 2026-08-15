@@ -597,6 +597,26 @@
             font-weight: 500;
             color: var(--text);
         }
+        .settings-info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            margin-left: 4px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #0f0f0f;
+            font-size: 12px;
+            cursor: help;
+        }
+        .setting-help {
+            grid-column: 1 / -1;
+            margin-top: -8px;
+            color: var(--text-2);
+            font-size: 12px;
+            line-height: 1.4;
+        }
         .setting-field select {
             width: 100%;
             border-radius: 10px;
@@ -1924,6 +1944,19 @@
                                 <option value="180" data-i18n="feed_180_days">180 days</option>
                                 <option value="forever" selected data-i18n="feed_forever">Forever</option>
                             </select>
+                        </div>
+                        <div class="setting-field">
+                            <label for="feedSettingAiLabeledVideoHandling">
+                                <span data-i18n="settings_ai_labeled_video_label">AI-labeled video handling</span>
+                                <span class="settings-info-icon" data-i18n-title="settings_ai_labeled_video_info" title="When enabled, re:Watch makes an extra YouTube request for each previously unchecked video near your screen. Results are cached locally. It only uses YouTube's Made with AI disclosure and is experimental: it can miss AI-made videos; an unmarked video is not confirmed non-AI.">ⓘ</span>
+                            </label>
+                            <select id="feedSettingAiLabeledVideoHandling">
+                                <option value="off" data-i18n="settings_ai_labeled_video_off">Off</option>
+                                <option value="badge" data-i18n="settings_ai_labeled_video_badge">Badge</option>
+                                <option value="dim" data-i18n="settings_ai_labeled_video_dim">Dim</option>
+                                <option value="hide" data-i18n="settings_ai_labeled_video_hide">Hide</option>
+                            </select>
+                            <span class="setting-help" data-i18n="settings_ai_labeled_video_help">Uses YouTube's own disclosure, not AI detection. Experimental and not fully reliable.</span>
                         </div>
                     </section>
                     <section class="settings-block">
