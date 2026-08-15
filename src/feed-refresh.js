@@ -295,7 +295,10 @@ async function showPendingFeedVideos(onReady) {
         if (search) search.value = '';
         shortsOnly = false;
         subscriptionsChronological = true;
-        subscriptionSort = 'discovered_desc';
+        // Keep the order the user selected before opening the new-videos view.
+        // A newly detected older upload can therefore appear farther down when
+        // Subscriptions is ordered by upload date, instead of changing the
+        // entire inventory to detection time.
         if (typeof onReady === 'function') onReady();
         else showFeed();
         const visibleCount = visiblePendingFeedVideoCount(videoIds);
