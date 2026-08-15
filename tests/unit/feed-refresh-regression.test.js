@@ -117,9 +117,19 @@ test('Show verifies the discovered identities before clearing pending state', as
   expect(stored['ytvht.pendingFeedDiscovery.v1'].videoIds).toEqual([]);
   expect(context.newlyShownFeedVideoIds).toEqual(['video-1', 'video-2']);
   expect(context.subscriptionsChronological).toBe(true);
-  expect(context.subscriptionSort).toBe('discovered_desc');
+  expect(context.subscriptionSort).toBe('published_desc');
   expect(document.getElementById('search').value).toBe('');
   expect(context.showFeed).toHaveBeenCalledTimes(1);
+});
+
+test('Show preserves a previously selected Subscriptions order', async () => {
+  const { context } = runtime({ videoIds: ['video-1'] });
+  context.subscriptionSort = 'published_asc';
+
+  await context.showPendingFeedVideos();
+
+  expect(context.subscriptionsChronological).toBe(true);
+  expect(context.subscriptionSort).toBe('published_asc');
 });
 
 test('a failed Show preserves identities and exposes a working Retry action', async () => {
