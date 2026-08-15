@@ -130,5 +130,12 @@
   "global_search_placeholder": {
     "message": "Търсене във всички съдържание...",
     "description": "Placeholder text for the global search input"
-  }
+  },
+  "settings_ai_labeled_video_label": { "message": "Обработка на видеа с AI етикет", "description": "AI setting" },
+  "settings_ai_labeled_video_off": { "message": "Изключено", "description": "AI setting option" },
+  "settings_ai_labeled_video_badge": { "message": "Значка", "description": "AI setting option" },
+  "settings_ai_labeled_video_dim": { "message": "Затъмни", "description": "AI setting option" },
+  "settings_ai_labeled_video_hide": { "message": "Скрий", "description": "AI setting option" },
+  "settings_ai_labeled_video_help": { "message": "Използва етикета на YouTube, не AI разпознаване. Експериментално и не напълно надеждно.", "description": "AI setting help" },
+  "settings_ai_labeled_video_info": { "message": "При включване re:Watch прави допълнителна заявка към YouTube за непроверени видеа близо до екрана. Резултатите се пазят локално. Функцията използва само етикета Made with AI на YouTube и може да пропусне AI видеа.", "description": "AI setting information" }
 }

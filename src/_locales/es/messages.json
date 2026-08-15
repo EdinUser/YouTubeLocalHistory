@@ -130,5 +130,12 @@
   "global_search_placeholder": {
     "message": "Buscar en todo el contenido...",
     "description": "Placeholder text for the global search input"
-  }
+  },
+  "settings_ai_labeled_video_label": { "message": "Gestión de vídeos etiquetados con IA", "description": "AI setting" },
+  "settings_ai_labeled_video_off": { "message": "Desactivado", "description": "AI setting option" },
+  "settings_ai_labeled_video_badge": { "message": "Insignia", "description": "AI setting option" },
+  "settings_ai_labeled_video_dim": { "message": "Atenuar", "description": "AI setting option" },
+  "settings_ai_labeled_video_hide": { "message": "Ocultar", "description": "AI setting option" },
+  "settings_ai_labeled_video_help": { "message": "Usa la divulgación de YouTube, no detección de IA. Es experimental y no totalmente fiable.", "description": "AI setting help" },
+  "settings_ai_labeled_video_info": { "message": "Al activarse, re:Watch envía una solicitud adicional a YouTube para vídeos sin comprobar cerca de la pantalla. Los resultados se guardan localmente. Solo usa la divulgación Made with AI de YouTube y puede no detectar vídeos de IA.", "description": "AI setting information" }
 }

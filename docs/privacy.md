@@ -1,5 +1,15 @@
 # Privacy and data
 
+## Experimental AI-labeled video handling
+
+This feature is off by default. If enabled, re:Watch sends a direct request to
+YouTube for each previously unchecked video that approaches the viewport. The
+request can use the ordinary YouTube page context and credentials. The result
+(video ID, observed YouTube disclosure state, and cache expiry) stays in the
+browser's IndexedDB cache; re:Watch sends no result or telemetry to another
+service. The feature only reflects YouTube's own disclosure and is not a
+reliable way to identify every AI-made video.
+
 YT re:Watch is local-first. Its history, progress, subscriptions, cached feed records, analytics, settings, local playlists, playlist references, and ignored-channel records are stored in the extension profile on the current device.
 
 ## What stays local
@@ -26,7 +36,7 @@ The feed needs public information to discover uploads and identify channels.
 - Local feed search does not send a remote search request.
 - Saving a playlist reference does not fetch or import its member videos in the background.
 
-re:Watch does not use OAuth in v5.1 and does not change subscriptions, playlists, history, or other data in the user's YouTube account.
+re:Watch does not use OAuth in v5.2 and does not change subscriptions, playlists, history, or other data in the user's YouTube account.
 
 ## What re:Watch does not hide
 

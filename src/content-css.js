@@ -263,6 +263,17 @@
             .ytvht-close:hover {
                 opacity: 1 !important;
             }
+            .ytvht-ai-labeled { position: relative !important; }
+            .ytvht-ai-label {
+                position: absolute !important; top: 8px !important; right: 8px !important;
+                z-index: 2147483647 !important; padding: 3px 6px !important;
+                border-radius: 4px !important; background: #7c3aed !important;
+                color: #fff !important; font: 700 12px/1 Arial, sans-serif !important;
+                pointer-events: none !important;
+            }
+            .ytvht-ai-dimmed { opacity: .42 !important; transition: opacity .15s ease !important; }
+            .ytvht-ai-dimmed:hover, .ytvht-ai-dimmed:focus-within { opacity: .82 !important; }
+            .ytvht-ai-hidden { display: none !important; }
         `;
         document.head.appendChild(style);
     }

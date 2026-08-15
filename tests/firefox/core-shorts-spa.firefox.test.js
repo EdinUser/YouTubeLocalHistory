@@ -188,6 +188,15 @@ function assertStoredShortMatchesActive(record, active) {
   assert.equal(record?.channelId, active.channelId);
 }
 
+function assertStoredShortIsComplete(record, videoId) {
+  assert.equal(record?.videoId, videoId);
+  assert.equal(record?.isShorts, true);
+  assert.equal(record?.url, `https://www.youtube.com/shorts/${videoId}`);
+  assert.ok(normalizeText(record?.title), 'the stored Short should have a title');
+  assert.ok(normalizeText(record?.channelName), 'the stored Short should have a channel name');
+  assert.ok(normalizeText(record?.channelId), 'the stored Short should have a channel ID');
+}
+
 async function openShortsFromYouTubeMenu(driver) {
   await driver.get(HOME_URL);
   await sleep(750);
@@ -217,7 +226,6 @@ async function openShortsFromYouTubeMenu(driver) {
     target.click();
     return { ok: true };
   }));
-  await waitForActiveShort(driver);
 }
 
 async function dispatchTrackedSave(driver) {
@@ -255,6 +263,22 @@ async function waitForStoredShort(session, videoId, active, timeoutMs = 15000) {
   return result.record;
 }
 
+async function waitForStoredShortMatchesCurrentActive(session, videoId, timeoutMs = 15000) {
+  const result = await waitUntil(`stored Short ${videoId} matching the settled active reel`, timeoutMs, async () => {
+    const [record, active] = await Promise.all([
+      getStoredVideo(session, videoId),
+      activeShortState(session.driver),
+    ]);
+    const metadataMatches = !!record
+      && isReadyOrganicShortState(active, { expectedVideoId: videoId })
+      && normalizeText(record.title) === normalizeText(active.title)
+      && normalizeText(record.channelName) === normalizeText(active.channelName)
+      && record.channelId === active.channelId;
+    return { ok: metadataMatches, record, active };
+  });
+  return result.record;
+}
+
 async function advanceShortsViewport(driver, attempt) {
   const controls = await driver.findElements(By.css([
     '#navigation-button-down button',
@@ -282,6 +306,20 @@ async function advanceToNextShort(driver, previousVideoId) {
   });
 }
 
+async function findFirstOrganicShort(driver) {
+  return advanceToNextOrganicShort({
+    previousVideoId: '',
+    maxAttempts: 6,
+    // Inspect the entry reel first. If YouTube opens on an ad or another
+    // metadata-incomplete reel, traverse just as we do after a scroll.
+    advance: (attempt) => attempt === 0
+      ? Promise.resolve()
+      : advanceShortsViewport(driver, attempt - 1),
+    waitForOrganic: () => waitForActiveShort(driver, '', '', 10000),
+    readState: () => activeShortState(driver),
+  });
+}
+
 async function verifyDirectLoad(session, active) {
   await removeStoredVideo(session, active.videoId);
   await session.driver.get(`https://www.youtube.com/shorts/${active.videoId}`);
@@ -294,10 +332,13 @@ async function verifyDirectLoad(session, active) {
     throw error;
   }
   const direct = await waitForActiveShort(session.driver, '', active.videoId);
-  const savedDirect = await dispatchTrackedSave(session.driver);
-  assert.equal(savedDirect.videoId, direct.videoId);
-  const record = await waitForStoredShort(session, direct.videoId, savedDirect);
-  assertStoredShortMatchesActive(record, savedDirect);
+  const postSaveState = await dispatchTrackedSave(session.driver);
+  assert.equal(postSaveState.videoId, direct.videoId);
+  // YouTube may temporarily detach the channel bar while processing the
+  // synthetic media events. The extension intentionally preserves the last
+  // complete snapshot, so compare storage with the settled pre-save state.
+  const record = await waitForStoredShortMatchesCurrentActive(session, direct.videoId);
+  assertStoredShortIsComplete(record, direct.videoId);
 }
 
 async function verifyFeedPlacement(session, videoIds) {
@@ -330,22 +371,22 @@ async function main() {
     await setExtensionSettings(session, DEFAULT_SETTINGS);
     await openShortsFromYouTubeMenu(session.driver);
 
-    const first = await waitForActiveShort(session.driver);
+    const first = await findFirstOrganicShort(session.driver);
     await removeStoredVideo(session, first.videoId);
-    const savedFirst = await dispatchTrackedSave(session.driver);
-    assert.equal(savedFirst.videoId, first.videoId);
-    const initialRecord = await waitForStoredShort(session, first.videoId, savedFirst);
-    assertStoredShortMatchesActive(initialRecord, savedFirst);
+    const postSaveFirst = await dispatchTrackedSave(session.driver);
+    assert.equal(postSaveFirst.videoId, first.videoId);
+    const initialRecord = await waitForStoredShortMatchesCurrentActive(session, first.videoId);
+    assertStoredShortIsComplete(initialRecord, first.videoId);
 
     await removeStoredVideo(session, first.videoId);
     const second = await advanceToNextShort(session.driver, first.videoId);
-    const savedSecond = await dispatchTrackedSave(session.driver);
-    assert.equal(savedSecond.videoId, second.videoId);
-    const secondRecord = await waitForStoredShort(session, second.videoId, savedSecond);
-    assertStoredShortMatchesActive(secondRecord, savedSecond);
+    const postSaveSecond = await dispatchTrackedSave(session.driver);
+    assert.equal(postSaveSecond.videoId, second.videoId);
+    const secondRecord = await waitForStoredShortMatchesCurrentActive(session, second.videoId);
+    assertStoredShortIsComplete(secondRecord, second.videoId);
 
-    const outgoingRecord = await waitForStoredShort(session, first.videoId, savedFirst, 10000);
-    assertStoredShortMatchesActive(outgoingRecord, savedFirst);
+    const outgoingRecord = await waitForStoredShort(session, first.videoId, initialRecord, 10000);
+    assertStoredShortMatchesActive(outgoingRecord, initialRecord);
 
     await verifyDirectLoad(session, second);
     await verifyFeedPlacement(session, [first.videoId, second.videoId]);

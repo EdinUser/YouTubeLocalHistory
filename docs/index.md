@@ -5,7 +5,7 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 [Install for Chrome](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba){ .md-button .md-button--primary }
 [Install for Firefox](https://addons.mozilla.org/firefox/addon/yt-rewatch/){ .md-button }
 
-## What v5.1 includes
+## What v5.2 includes
 
 | Area | What it does |
 | --- | --- |
@@ -19,6 +19,7 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 | Playlist references | Saves links to YouTube playlists without importing their members |
 | Local playlists | Creates and manages extension-owned playlists without changing YouTube account playlists |
 | Backup | Exports and restores the documented local profile data |
+| Experimental AI labels | Optionally badges, dims, or hides YouTube-disclosed AI videos |
 
 The feed's Home and Subscriptions views use stable 50-card pages. Search is local: it searches records already saved by re:Watch and does not send a remote YouTube search request.
 
@@ -73,7 +74,7 @@ There is no automatic cross-device synchronization. Use export and restore to mo
 - [Detailed guide](detailed_guide.md)
 - [Frequently asked questions](faq.md)
 - [Troubleshooting](troubleshooting.md)
-- [v5.1 release notes](changelog.md)
+- [v5.2 release notes](changelog.md)
 - [Roadmap](roadmap.md)
 
 For support, use the [community forum](https://community.kirilov.dev/t/re-watch), [Telegram community](https://t.me/+eFftKWGVvSpiZjZk), [Discord community](https://discord.gg/9fuvSzP7Qr), or [GitHub issues](https://github.com/EdinUser/YouTubeLocalHistory/issues).

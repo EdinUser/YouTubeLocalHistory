@@ -1,5 +1,14 @@
 # Changelog
 
+## v5.2.0 — Unreleased
+
+- Added experimental **AI-labeled video handling** with Off, Badge, Dim, and
+  Hide modes for videos YouTube itself discloses as made with AI.
+- Added a dedicated IndexedDB cache, viewport-driven one-at-a-time lookups,
+  long cache lifetimes, and bounded retry backoff to keep request volume low.
+- The setting explains that it makes direct YouTube requests when enabled and
+  is not a general or fully reliable AI detector.
+
 ## v5.1.0 — 14 August 2026
 
 - Added extension-managed local playlists, including creation, rename, deletion, ordering, and video actions that remain separate from the user's YouTube account playlists.

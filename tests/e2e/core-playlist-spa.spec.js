@@ -15,6 +15,7 @@ const PLAYLIST_ID = 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR';
 const PLAYLIST_URL = `https://www.youtube.com/playlist?list=${PLAYLIST_ID}`;
 const PRIMARY_VIDEO_SELECTOR = '#movie_player video.html5-main-video, ytd-player video.html5-main-video';
 const SAVE_TIME = 20;
+const MINIMUM_SAVED_TIME = 10;
 const DEFAULT_SETTINGS = {
   autoCleanPeriod: 90,
   paginationCount: 10,
@@ -90,38 +91,143 @@ async function clickPlaylistItem(page, item) {
   await page.waitForSelector(PRIMARY_VIDEO_SELECTOR, { timeout: 30000 });
 }
 
+async function skipYouTubeAdIfPossible(page) {
+  const skipButton = page
+    .locator('.ytp-skip-ad-button:visible, .ytp-ad-skip-button:visible, .ytp-ad-skip-button-modern:visible, button:visible')
+    .filter({ hasText: /skip/i })
+    .first();
+
+  if (await skipButton.isVisible({ timeout: 250 }).catch(() => false)) {
+    const clicked = await skipButton.click({ timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!clicked) return false;
+    await page.waitForTimeout(500);
+    return true;
+  }
+  return false;
+}
+
+async function waitForMainPlaylistMedia(page, videoId) {
+  const deadline = Date.now() + 90000;
+  let nextForcedLoadAt = Date.now() + 10000;
+  let forcedLoadAttempts = 0;
+  let lastState = null;
+
+  while (Date.now() < deadline) {
+    const skipped = await skipYouTubeAdIfPossible(page);
+    const forceContentLoad = !skipped
+      && forcedLoadAttempts < 3
+      && Date.now() >= nextForcedLoadAt;
+    lastState = await page.evaluate(({ selector, expectedVideoId, skippedAd, forceLoad }) => {
+      const video = document.querySelector(selector);
+      const player = document.querySelector('#movie_player');
+      const playerVideoId = typeof player?.getVideoData === 'function'
+        ? player.getVideoData()?.video_id || ''
+        : '';
+      const adPlaying = !!player && (
+        player.classList.contains('ad-showing')
+        || player.classList.contains('ad-interrupting')
+      );
+      let forcedContentLoad = false;
+      // Headless Chromium can leave an unskippable pre-roll paused or reject
+      // media seeks. Let it complete through real playback at an accelerated
+      // rate, then use the player API as a bounded fallback. The clicked URL
+      // and player identity were already verified by clickPlaylistItem().
+      if (video && adPlaying && !skippedAd) {
+        video.muted = true;
+        if (typeof player?.mute === 'function') player.mute();
+        video.playbackRate = 16;
+        if (video.paused) {
+          if (typeof player?.playVideo === 'function') player.playVideo();
+          video.play().catch(() => {});
+        }
+        if (forceLoad && typeof player?.loadVideoById === 'function') {
+          try {
+            player.loadVideoById(expectedVideoId, 0);
+            forcedContentLoad = true;
+          } catch (_) {
+            // Keep accelerated playback as the fallback if this page does not
+            // expose YouTube's player API in the expected form.
+          }
+        }
+      } else if (video && video.playbackRate !== 1) {
+        video.playbackRate = 1;
+      }
+      return {
+        found: !!video,
+        duration: video && Number.isFinite(video.duration) ? video.duration : 0,
+        currentTime: video?.currentTime || 0,
+        paused: video?.paused ?? true,
+        playbackRate: video?.playbackRate || 0,
+        playerVideoId,
+        adPlaying,
+        forcedContentLoad,
+        canForceContentLoad: typeof player?.loadVideoById === 'function',
+        ready: !!video
+          && !adPlaying
+          && playerVideoId === expectedVideoId
+          && Number.isFinite(video.duration)
+          && video.duration > 30,
+      };
+    }, {
+      selector: PRIMARY_VIDEO_SELECTOR,
+      expectedVideoId: videoId,
+      skippedAd: skipped,
+      forceLoad: forceContentLoad,
+    });
+    if (forceContentLoad) {
+      forcedLoadAttempts += 1;
+      nextForcedLoadAt = Date.now() + 10000;
+    }
+    if (lastState.ready) return;
+    await page.waitForTimeout(1000);
+  }
+
+  throw new Error(`Expected the main playlist media after any pre-roll ad; last state: ${JSON.stringify(lastState)}`);
+}
+
 async function saveCurrentPlaylistVideo(context, page, videoId) {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const video = document.querySelector('#movie_player video.html5-main-video, ytd-player video.html5-main-video');
-          return video && Number.isFinite(video.duration) ? video.duration : 0;
-        }),
-      { timeout: 60000 }
-    )
-    .toBeGreaterThan(SAVE_TIME + 10);
+  await waitForMainPlaylistMedia(page, videoId);
 
   let lastSavedTime = 0;
   for (let attempt = 0; attempt < 30; attempt++) {
-    await page.evaluate(({ time, selector }) => {
+    const mediaTime = await page.evaluate(async ({ time, selector }) => {
+      const player = document.querySelector('#movie_player');
       const video = document.querySelector(selector);
       if (!video) throw new Error('Playlist video element not found');
       video.muted = true;
+      if (typeof player?.mute === 'function') player.mute();
+      if (typeof player?.seekTo === 'function') {
+        player.seekTo(time, true);
+      } else {
+        video.currentTime = time;
+      }
+
+      const deadline = Date.now() + 3000;
+      while (video.currentTime < time - 1 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      if (typeof player?.pauseVideo === 'function') player.pauseVideo();
       video.pause();
-      video.currentTime = time;
       video.dispatchEvent(new Event('timeupdate'));
-      video.dispatchEvent(new Event('seeked'));
       video.dispatchEvent(new Event('pause'));
+      return video.currentTime;
     }, { time: SAVE_TIME, selector: PRIMARY_VIDEO_SELECTOR });
     await page.waitForTimeout(900);
 
     const record = await getStoredVideo(context, videoId);
     lastSavedTime = record && typeof record.time === 'number' ? record.time : 0;
-    if (lastSavedTime >= SAVE_TIME - 1) return;
+    // This is a live canary for SPA video identity. YouTube may clamp a seek
+    // to its currently buffered range, so require a meaningful saved position
+    // rather than an exact external-media timestamp. Only inspect storage
+    // after the real player has accepted the seek.
+    if (mediaTime < MINIMUM_SAVED_TIME) continue;
+    if (lastSavedTime >= MINIMUM_SAVED_TIME) return;
   }
 
-  throw new Error(`Expected Chromium to save ${videoId} at ${SAVE_TIME}s; last saved time was ${lastSavedTime}s`);
+  throw new Error(`Expected Chromium to save ${videoId} beyond ${MINIMUM_SAVED_TIME}s; last saved time was ${lastSavedTime}s`);
 }
 
 async function expectPlaylistReference(context, videoId) {

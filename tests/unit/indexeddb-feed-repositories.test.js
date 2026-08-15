@@ -116,7 +116,7 @@ function createRepositoryStorage(IndexedDBStorage) {
   return storage;
 }
 
-describe('v6 IndexedDB feed repositories', () => {
+describe('v7 IndexedDB feed repositories', () => {
   const CHANNEL_ID = 'UC1234567890abcdefghijkl';
 
   afterEach(() => {
@@ -126,7 +126,7 @@ describe('v6 IndexedDB feed repositories', () => {
     delete global.ytIndexedDBStorage;
   });
 
-  test('creates the v6 tombstone store without changing the existing feed indexes', async () => {
+  test('creates the v7 AI-label cache without changing the existing feed indexes', async () => {
     const schema = createSchemaDatabase();
     global.indexedDB = {
       open: jest.fn(() => {
@@ -143,10 +143,13 @@ describe('v6 IndexedDB feed repositories', () => {
     const dbModule = require('../../src/indexeddb-storage.js');
     await dbModule.openDatabase();
 
-    expect(dbModule.DB_VERSION).toBe(6);
+    expect(dbModule.DB_VERSION).toBe(7);
     expect(schema.stores.get(dbModule.STORE_SUBSCRIPTIONS).keyPath).toBe('channelId');
     expect(Array.from(schema.stores.get(dbModule.STORE_SUBSCRIPTIONS)._indexes.keys()))
       .toEqual(expect.arrayContaining(['followedAt', 'source']));
+    expect(schema.stores.get(dbModule.STORE_AI_LABEL_RESULTS).keyPath).toBe('videoId');
+    expect(Array.from(schema.stores.get(dbModule.STORE_AI_LABEL_RESULTS)._indexes.keys()))
+      .toEqual(expect.arrayContaining(['expiresAt']));
     expect(Array.from(schema.stores.get(dbModule.STORE_SUBSCRIPTION_FEED_VIDEOS)._indexes.keys()))
       .toEqual(expect.arrayContaining(['publishedAt', 'channelId', 'lastSeenInFeedAt']));
     expect(Array.from(schema.stores.get(dbModule.STORE_CHANNEL_SYNC_STATE)._indexes.keys()))

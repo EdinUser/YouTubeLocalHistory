@@ -85,7 +85,7 @@ async function waitForPrimaryVideo(page) {
 
 async function skipYouTubeAdIfPossible(page) {
   const skipButton = page
-    .locator('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button')
+    .locator('.ytp-skip-ad-button:visible, .ytp-ad-skip-button:visible, .ytp-ad-skip-button-modern:visible, button:visible')
     .filter({ hasText: /skip/i })
     .first();
 

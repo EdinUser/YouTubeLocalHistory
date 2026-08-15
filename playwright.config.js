@@ -27,7 +27,7 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: ['**/extension-*.spec.js', '**/core-*.spec.js', '**/static-*.spec.js'],
+      testIgnore: ['**/extension-*.spec.js', '**/core-*.spec.js', '**/static-*.spec.js', '**/ai-labeled-videos*.spec.js'],
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chromium',
@@ -35,7 +35,7 @@ module.exports = defineConfig({
     },
     {
       name: 'chromium-extension',
-      testMatch: ['**/core-*.spec.js'],
+      testMatch: ['**/core-*.spec.js', '**/ai-labeled-videos.canary.spec.js'],
       // Extension loads via tests/e2e/extension-fixture.js (launchPersistentContext); keep one worker for stability.
       workers: 1,
       use: {
@@ -45,7 +45,7 @@ module.exports = defineConfig({
     },
     {
       name: 'chromium-extension-static',
-      testMatch: ['**/static-*.spec.js'],
+      testMatch: ['**/static-*.spec.js', '**/ai-labeled-videos.spec.js'],
       // Static replay still uses the real extension context and extension storage.
       workers: 1,
       use: {

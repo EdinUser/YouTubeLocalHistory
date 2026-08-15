@@ -497,6 +497,9 @@ function init() {
     document.getElementById('feedSettingAutoClean')?.addEventListener('change', () => {
         saveCurrentFeedSettings('history cleanup');
     });
+    document.getElementById('feedSettingAiLabeledVideoHandling')?.addEventListener('change', () => {
+        saveCurrentFeedSettings('AI-labeled video handling');
+    });
     initFeedDataSettings();
     document.getElementById('unwatched').addEventListener('change', render);
     hideMembers?.addEventListener('change', () => {
