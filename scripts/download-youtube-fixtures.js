@@ -3,6 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('@playwright/test');
+const { sanitizeYouTubeFixturePage } = require('./youtube-fixture-sanitizer');
+const { sanitizeFixtureDirectory } = require('./sanitize-youtube-fixtures');
 
 const rootDir = path.resolve(__dirname, '..');
 const defaultManifestPath = path.join(rootDir, 'tests', 'fixtures', 'youtube-pages', 'pages.json');
@@ -195,12 +197,7 @@ async function annotateCapture(page, fixture, capturedAt) {
 }
 
 async function sanitizeCapture(page) {
-  await page.evaluate(() => {
-    document.querySelectorAll('script, iframe, noscript').forEach((node) => node.remove());
-    document
-      .querySelectorAll('link[rel="preload"], link[rel="modulepreload"], link[rel="preconnect"], link[rel="dns-prefetch"]')
-      .forEach((node) => node.remove());
-  });
+  await sanitizeYouTubeFixturePage(page);
 }
 
 async function captureFixture(browser, fixture, outputDir, options) {
@@ -289,6 +286,13 @@ async function main() {
   if (options.withRss) {
     await captureRssFixtures(options.rssOutputDir, Math.min(options.timeoutMs, 10000));
     console.log(`[fixtures] Wrote ${liveRssChannels.length} RSS fixture(s) to ${path.relative(rootDir, options.rssOutputDir)}`);
+  }
+
+  // Reparse the saved files in an isolated browser context after the complete
+  // capture. This removes screenshot artifacts and provides one final
+  // no-network sanitization pass before the fixtures are reviewed or tested.
+  if (options.sanitize) {
+    await sanitizeFixtureDirectory(options.outputDir);
   }
 
   console.log(`[fixtures] Wrote ${selected.length} fixture(s) to ${path.relative(rootDir, options.outputDir)}`);

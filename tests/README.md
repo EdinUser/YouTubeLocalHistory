@@ -52,6 +52,15 @@ rather than current YouTube content, consent, throttling, or SPA timing.
 Independent test groups continue after a failure, and the command returns
 nonzero after every group has reported.
 
+### Run Only the Cross-browser Static Fixtures
+
+```bash
+npm run test:static
+```
+
+Builds both browser packages and runs only the committed, sanitized static HTML
+fixture suites. It does not contact YouTube.
+
 ### Run Every Available Test Locally
 ```bash
 npm run test:local:full
