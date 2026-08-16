@@ -1,7 +1,7 @@
-# Optional E2E: run manually from the Actions tab (workflow_dispatch).
-# Requires a virtual display for headed Chromium + extensions on Linux (xvfb).
+# Optional deterministic Chromium E2E: run manually from the Actions tab.
+# This workflow intentionally replays fixtures and does not contact YouTube.
 
-name: E2E (Playwright)
+name: E2E (offline Playwright)
 
 on:
   workflow_dispatch:
@@ -27,5 +27,5 @@ jobs:
       - name: Build unpacked extension
         run: npm run build:e2e
 
-      - name: Run Chromium extension E2E tests
-        run: xvfb-run --auto-servernum npm run test:e2e
+      - name: Run offline Chromium extension E2E tests
+        run: npm run test:e2e:offline

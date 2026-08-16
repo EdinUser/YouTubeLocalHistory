@@ -10,6 +10,14 @@ on:
       - main
       - develop
 
+env:
+  # CI is a deterministic release gate. Never let an inherited environment
+  # value turn an external YouTube check into a PR or merge requirement.
+  RUN_LIVE_RSS: "0"
+  RUN_LIVE_CHANNEL_METADATA: "0"
+  RUN_LIVE_AI_LABEL_CANARY: "0"
+  RUN_LIVE_PERMISSION_CANARY: "0"
+
 jobs:
   validate-pr-route:
     name: validate-pr-route
@@ -22,10 +30,11 @@ jobs:
             exit 1
           fi
 
-  test:
-    name: Run Jest Tests
+  deterministic-offline:
+    name: Deterministic offline browser gate
     needs: validate-pr-route
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -39,5 +48,60 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test 
+      - name: Install Chromium for packaged extension tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Firefox for packaged extension tests
+        uses: browser-actions/setup-firefox@v1
+
+      - name: Run deterministic local gate
+        run: npm run test:local:offline
+
+  quality:
+    name: Lint and documentation safety
+    needs: validate-pr-route
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint source
+        run: npm run lint
+
+      - name: Check documentation safety
+        run: npm run docs:safety
+
+  documentation-build:
+    name: Build documentation and screenshots
+    needs: validate-pr-route
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for deterministic screenshots
+        run: npx playwright install --with-deps chromium
+
+      - name: Build strict MkDocs site
+        run: npm run docs:build
