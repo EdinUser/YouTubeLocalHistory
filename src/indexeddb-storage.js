@@ -1075,6 +1075,16 @@
             return this._getRecord(STORE_AI_LABEL_RESULTS, videoId);
         }
 
+        async listAiLabelResults() {
+            return this._withStore(STORE_AI_LABEL_RESULTS, 'readonly', (store) => {
+                return new Promise((resolve, reject) => {
+                    const request = store.getAll();
+                    request.onsuccess = () => resolve(request.result || []);
+                    request.onerror = () => reject(request.error);
+                });
+            });
+        }
+
         async putAiLabelResult(record) {
             if (!record || !record.videoId || !['ai', 'unlabeled', 'unknown'].includes(record.status)) {
                 throw new Error('AI label result must include a videoId and valid status');

@@ -3,12 +3,19 @@
 ## Experimental AI-labeled video handling
 
 This feature is off by default. If enabled, re:Watch sends a direct request to
-YouTube for each previously unchecked video that approaches the viewport. The
-request can use the ordinary YouTube page context and credentials. The result
-(video ID, observed YouTube disclosure state, and cache expiry) stays in the
-browser's IndexedDB cache; re:Watch sends no result or telemetry to another
+YouTube only for each previously unchecked card that approaches the viewport
+on an open YouTube page. The request can use the ordinary YouTube page context
+and credentials. re:Watch's own views never start these checks or send their
+local history, subscription, or saved-video IDs to YouTube; they can only show
+results already cached from YouTube-page browsing. The result (video ID,
+observed YouTube disclosure state, and cache expiry) stays in the extension's
+private IndexedDB storage; re:Watch sends no result or telemetry to another
 service. The feature only reflects YouTube's own disclosure and is not a
 reliable way to identify every AI-made video.
+
+This restriction prevents a local re:Watch view from revealing which videos
+exist in your local history, subscriptions, or saved lists merely because you
+opened, paged through, or scrolled that view.
 
 YT re:Watch is local-first. Its history, progress, subscriptions, cached feed records, analytics, settings, local playlists, playlist references, and ignored-channel records are stored in the extension profile on the current device.
 
@@ -18,6 +25,7 @@ YT re:Watch is local-first. Its history, progress, subscriptions, cached feed re
 - playback positions, durations, and completion state;
 - re:Watch channel subscriptions and ignored-channel tombstones;
 - cached feed inventory and scheduling state;
+- AI-label cache entries (video ID, observed disclosure state, and expiry);
 - playlist references;
 - extension-managed local playlists;
 - analytics snapshots and presentation settings;
@@ -45,6 +53,9 @@ The extension is not an anonymity tool. Google, YouTube, the browser, the networ
 ## Retention and deletion
 
 Records remain until they are removed in re:Watch, reset from Settings, or deleted with the browser profile/extension data.
+
+AI-label cache entries expire automatically. They are rebuildable and are not
+included in backups; **Reset all data** also clears them.
 
 Removing a local subscription creates an ignored-channel tombstone. That record prevents a later import from silently restoring the channel. When tombstones exist, **Channels → Ignored** provides restore and forget actions.
 

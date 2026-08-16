@@ -148,6 +148,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
         }
 
+        // Content scripts run IndexedDB under youtube.com, while extension
+        // pages and this background context share the extension origin. Keep
+        // AI-disclosure results here so local re:Watch views can safely render
+        // the result already obtained while browsing YouTube.
+        if (message.type === 'aiLabelCache') {
+            if (!isLocalSubscriptionSender(sender)) {
+                sendResponse({ error: 'AI label cache requests must come from a YouTube tab.' });
+                return;
+            }
+            if (typeof ytIndexedDBStorage === 'undefined') {
+                sendResponse({ error: 'Extension database is unavailable. Reload the extension.' });
+                return;
+            }
+            try {
+                const args = message.args || {};
+                let result;
+                if (message.operation === 'get') {
+                    result = await ytIndexedDBStorage.getAiLabelResult(args.videoId);
+                } else if (message.operation === 'put') {
+                    result = await ytIndexedDBStorage.putAiLabelResult(args.record);
+                    chrome.runtime.sendMessage({
+                        type: 'aiLabelCacheUpdated',
+                        videoId: args.record && args.record.videoId
+                    }).catch(() => {});
+                } else {
+                    throw new Error('Unknown AI label cache operation.');
+                }
+                sendResponse({ result });
+            } catch (error) {
+                sendResponse({ error: error && error.message ? error.message : String(error) });
+            }
+            return;
+        }
+
         // Handle content script storage RPC calls (ytStorageCall)
         if (message.type === 'ytStorageCall') {
             if (typeof ytStorage === 'undefined') {

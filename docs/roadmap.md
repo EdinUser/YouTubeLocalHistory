@@ -9,16 +9,38 @@ Only completed work belongs in the
 [changelog](changelog.md). Work listed here is not part of the current stable
 release unless its release notes say otherwise.
 
-## v5.2 — Experimental AI-labeled video handling
+## Future implementation — Optional AI checks for local re:Watch views
 
-Status: planned experimental feature
+Status: discovery and privacy review required; no target version
 
-An opt-in setting will let users badge, dim, or hide videos that YouTube itself
-marks as made with AI. It is not a general AI detector: an unmarked video is
-not confirmed non-AI. When enabled, re:Watch will make a paced direct YouTube
-lookup only for previously unchecked cards near the viewport and cache the
-result locally. The implementation remains conditional on packaged Chrome and
-Firefox canaries because the YouTube response is undocumented.
+AI-labeled video handling currently checks cards only while the user is
+browsing an open YouTube page. re:Watch’s own Home, Subscriptions, History,
+Shorts, Watch Later, channel, and playlist views use cached results only; they
+never send their local video IDs to YouTube.
+
+A future version may offer an explicit, user-started workflow to check local
+videos with YouTube’s **Made with AI** disclosure. This must not run merely
+because a re:Watch view is opened, rendered, paged, or scrolled. Before any
+check starts, the interface must explain that video IDs from the selected local
+view will be sent to YouTube and show the number of videos that can be checked.
+
+The workflow should:
+
+- let the user choose a narrow scope, such as currently visible videos or a
+  selected local list, and confirm it before sending requests;
+- use an open YouTube tab’s runtime context instead of opening background tabs
+  or relying on an undocumented extension-page request contract;
+- deduplicate fresh cached, queued, and in-flight video IDs;
+- use a bounded, visibility-prioritized queue with a strict global concurrency
+  and request-start rate limit; and
+- allow cancellation, drop stale work after navigation or scope changes, and
+  leave cards unchanged for `unknown` results.
+
+The feature must retain re:Watch’s local-data guarantee: in extension-owned
+views, **Hide** remains a visible AI badge plus dimming, never deletion or
+removal of a local history or saved-video record. It also requires updated
+privacy copy, browser-specific packaged tests, and a review of the live
+YouTube canary before it can be assigned to a release.
 
 ## Future discovery — Optional OAuth and expanded YouTube imports
 

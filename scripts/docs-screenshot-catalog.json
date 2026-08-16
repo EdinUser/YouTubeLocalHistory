@@ -145,8 +145,8 @@
       "capture": { "type": "viewport" },
       "readySelector": "#settingsSection",
       "display": { "width": 1440, "height": 960 },
-      "alt": "The re:Watch Settings tab showing appearance, feed, import, backup, and data controls.",
-      "caption": "Settings collects appearance, local-feed, import, backup, and data-management controls."
+      "alt": "The re:Watch Settings tab showing the AI-labeled video handling control alongside feed, import, backup, and data controls.",
+      "caption": "Settings collects appearance, local-feed, experimental AI-label handling, import, backup, and data-management controls."
     }
   ]
 }

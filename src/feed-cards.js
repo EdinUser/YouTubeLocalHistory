@@ -4,6 +4,62 @@ const COMPLETED_RATIO = typeof ytvhtFeedContracts === 'undefined'
     ? 0.9
     : ytvhtFeedContracts.WATCH_COMPLETION_RATIO;
 
+// Extension pages never start AI-disclosure requests. Those requests require a
+// live YouTube page context, and using local history/feed data to initiate them
+// would disclose that local library to YouTube. These cards reflect only fresh
+// cached results. Hide becomes dim here so local records remain discoverable.
+let aiLabelSettingsPromise = null;
+let aiLabelSettingsGeneration = 0;
+
+function clearCachedAiLabel(card) {
+    card.classList.remove('ytvht-feed-ai-labeled', 'ytvht-feed-ai-dimmed');
+    card.querySelectorAll('.ytvht-feed-ai-label').forEach((badge) => badge.remove());
+    delete card.dataset.ytvhtAiStatus;
+}
+
+function invalidateCachedAiLabelPresentation() {
+    aiLabelSettingsPromise = null;
+    aiLabelSettingsGeneration += 1;
+}
+
+async function applyCachedAiLabel(card, videoId) {
+    if (!card || !videoId) return;
+    const generation = aiLabelSettingsGeneration;
+    clearCachedAiLabel(card);
+    try {
+        aiLabelSettingsPromise = aiLabelSettingsPromise || ytStorage.getSettings();
+        const settings = await aiLabelSettingsPromise;
+        if (generation !== aiLabelSettingsGeneration) return;
+        const mode = settings?.aiLabeledVideoHandling || 'off';
+        if (!['badge', 'dim', 'hide'].includes(mode)) return;
+
+        const cached = await ytIndexedDBStorage.getAiLabelResult(videoId);
+        if (generation !== aiLabelSettingsGeneration || cached?.status !== 'ai' ||
+            Number(cached.expiresAt) <= Date.now()) return;
+
+        card.dataset.ytvhtAiStatus = 'ai';
+        card.classList.add('ytvht-feed-ai-labeled');
+        // Never hide a local record. In extension-owned views, Hide has the
+        // same presentation as Dim while retaining the explicit disclosure.
+        if (mode === 'dim' || mode === 'hide') card.classList.add('ytvht-feed-ai-dimmed');
+        const thumbnail = card.querySelector('.ytvht-thumb-wrap');
+        if (!thumbnail) return;
+        const badge = document.createElement('span');
+        badge.className = 'ytvht-feed-ai-label';
+        badge.textContent = 'AI';
+        badge.title = 'YouTube marked this video as Made with AI';
+        thumbnail.appendChild(badge);
+    } catch (_) {
+        // A cache read must never prevent an extension card from rendering.
+    }
+}
+
+function refreshCachedAiLabels() {
+    document.querySelectorAll('[data-ytvht-video-id]').forEach((card) => {
+        applyCachedAiLabel(card, card.dataset.ytvhtVideoId);
+    });
+}
+
 // Add the watched overlay to a thumbnail wrapper: a progress bar (how far you
 // got) plus a label that only says "viewed" when you actually finished — for a
 // partial watch it shows the percent instead, so a 2-minute peek isn't "viewed".
@@ -585,6 +641,7 @@ function buildCard(video) {
 
     card.appendChild(thumbLink);
     card.appendChild(body);
+    applyCachedAiLabel(card, video.videoId);
     return card;
 }
 

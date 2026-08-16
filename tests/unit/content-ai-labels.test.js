@@ -2,7 +2,7 @@ require('../../src/content-ai-labels');
 
 describe('AI-label response parser', () => {
   const parser = () => window.YTVHTAiLabels.create({
-    db: { getAiLabelResult: jest.fn(), putAiLabelResult: jest.fn() }
+    cache: { getAiLabelResult: jest.fn(), putAiLabelResult: jest.fn() }
   }).parse;
 
   test('recognizes YouTube metadata badge label AI', () => {
@@ -96,5 +96,12 @@ describe('AI-label response parser', () => {
 
     expect(source).toContain('if (!stopped && nextMode === mode) return');
     expect(source).toContain('return { start, stop, update, parse, TTL }');
+  });
+
+  test('accepts an extension-owned shared cache instead of requiring the page-origin database', () => {
+    const cache = { getAiLabelResult: jest.fn(), putAiLabelResult: jest.fn() };
+    const instance = window.YTVHTAiLabels.create({ cache });
+
+    expect(instance).toBeDefined();
   });
 });

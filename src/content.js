@@ -1974,10 +1974,44 @@
     processExistingThumbnails = thumbnailHelpers.processExistingThumbnails;
     thumbnailHelpers.startRemovedElementCleanupObserver();
     startNativeThumbnailOverlays();
+    const aiLabelCache = {
+        async getAiLabelResult(videoId) {
+            const response = await chrome.runtime.sendMessage({
+                type: 'aiLabelCache', operation: 'get', args: { videoId }
+            });
+            if (response?.error) throw new Error(response.error);
+            return response?.result || null;
+        },
+        async putAiLabelResult(record) {
+            const response = await chrome.runtime.sendMessage({
+                type: 'aiLabelCache', operation: 'put', args: { record }
+            });
+            if (response?.error) throw new Error(response.error);
+            return response?.result || null;
+        }
+    };
+    let legacyAiLabelCacheMigration = null;
+    async function migrateLegacyAiLabelCache() {
+        if (legacyAiLabelCacheMigration) return legacyAiLabelCacheMigration;
+        legacyAiLabelCacheMigration = (async () => {
+            // Before v5.2.0, this cache was opened by content scripts and was
+            // consequently scoped to youtube.com. Copy it locally into the
+            // extension-origin background cache, then remove the old derived
+            // data. This migration makes no YouTube request.
+            const records = await ytIndexedDBStorage.listAiLabelResults();
+            if (!records.length) return;
+            await Promise.all(records.map((record) => aiLabelCache.putAiLabelResult(record)));
+            await ytIndexedDBStorage.clearAiLabelResults();
+        })().catch((error) => {
+            legacyAiLabelCacheMigration = null;
+            log('[AI labels] Could not migrate legacy cache', error);
+        });
+        return legacyAiLabelCacheMigration;
+    }
     aiLabels = window.YTVHTAiLabels?.create?.({
         log,
         getSettings: () => currentSettings,
-        db: ytIndexedDBStorage
+        cache: aiLabelCache
     }) || { start: () => {}, stop: () => {}, update: () => {} };
 
     messageListener = window.YTVHTContentMessages.create({
@@ -2067,6 +2101,7 @@
             );
 
             startNativeThumbnailOverlays();
+            await migrateLegacyAiLabelCache();
             aiLabels?.start(currentSettings);
 
             // Intercept video link clicks to add timestamps

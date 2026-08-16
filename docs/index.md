@@ -23,6 +23,13 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 
 The feed's Home and Subscriptions views use stable 50-card pages. Search is local: it searches records already saved by re:Watch and does not send a remote YouTube search request.
 
+## AI-labeled videos
+
+The experimental **AI-labeled video handling** setting is off by default. When
+enabled, it can badge, dim, or hide cards that YouTube itself discloses as made
+with AI. It is not a general AI detector, and an unmarked video is not confirmed
+non-AI. [Learn how it works and what it sends to YouTube](ai-labeled-videos.md).
+
 ## Start in three steps
 
 1. Install the extension and open YouTube.
@@ -72,6 +79,7 @@ There is no automatic cross-device synchronization. Use export and restore to mo
 ## Learn more
 
 - [Detailed guide](detailed_guide.md)
+- [AI-labeled video handling](ai-labeled-videos.md)
 - [Frequently asked questions](faq.md)
 - [Troubleshooting](troubleshooting.md)
 - [v5.2 release notes](changelog.md)

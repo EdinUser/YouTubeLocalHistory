@@ -140,11 +140,11 @@
   "settings_ai_labeled_video_dim": { "message": "Dim", "description": "Dim AI-labeled videos" },
   "settings_ai_labeled_video_hide": { "message": "Hide", "description": "Hide AI-labeled videos" },
   "settings_ai_labeled_video_help": {
-    "message": "Uses YouTube's own disclosure, not AI detection. Experimental and not fully reliable.",
+    "message": "Checks only cards on open YouTube pages. re:Watch views show cached labels and never start checks.",
     "description": "Explanation for the AI-label setting"
   },
   "settings_ai_labeled_video_info": {
-    "message": "When enabled, re:Watch makes an extra YouTube request for each previously unchecked video near your screen. Results are cached locally. It only uses YouTube's Made with AI disclosure and is experimental: it can miss AI-made videos; an unmarked video is not confirmed non-AI.",
+    "message": "Checks run only for cards on open YouTube pages. re:Watch views never start checks; they only show cached results and keep local videos visible. The feature uses YouTube's Made with AI disclosure, not general AI detection, and can miss AI-made videos.",
     "description": "Privacy and reliability information for AI-label handling"
   }
 }

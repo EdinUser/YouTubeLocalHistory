@@ -70,6 +70,11 @@ async function getLocalSubscription(context, channelId) {
   return serviceWorker.evaluate((id) => ytIndexedDBStorage.getSubscriptionRecord(id), channelId);
 }
 
+async function getAiLabelResult(context, videoId) {
+  const serviceWorker = await getServiceWorker(context);
+  return serviceWorker.evaluate((id) => ytIndexedDBStorage.getAiLabelResult(id), videoId);
+}
+
 async function getStoredPlaylist(context, playlistId) {
   const serviceWorker = await getServiceWorker(context);
   return serviceWorker.evaluate((id) => ytStorage.getPlaylist(id), playlistId);
@@ -77,6 +82,7 @@ async function getStoredPlaylist(context, playlistId) {
 
 module.exports = {
   getExtensionStorage,
+  getAiLabelResult,
   getLocalSubscription,
   getStoredPlaylist,
   getServiceWorker,

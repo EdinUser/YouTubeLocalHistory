@@ -136,6 +136,6 @@
   "settings_ai_labeled_video_badge": { "message": "Значка", "description": "AI setting option" },
   "settings_ai_labeled_video_dim": { "message": "Затъмни", "description": "AI setting option" },
   "settings_ai_labeled_video_hide": { "message": "Скрий", "description": "AI setting option" },
-  "settings_ai_labeled_video_help": { "message": "Използва етикета на YouTube, не AI разпознаване. Експериментално и не напълно надеждно.", "description": "AI setting help" },
-  "settings_ai_labeled_video_info": { "message": "При включване re:Watch прави допълнителна заявка към YouTube за непроверени видеа близо до екрана. Резултатите се пазят локално. Функцията използва само етикета Made with AI на YouTube и може да пропусне AI видеа.", "description": "AI setting information" }
+  "settings_ai_labeled_video_help": { "message": "Проверява само карти в отворени страници на YouTube. Изгледите на re:Watch показват кеширани етикети и не стартират проверки.", "description": "AI setting help" },
+  "settings_ai_labeled_video_info": { "message": "Проверките се извършват само за карти в отворени страници на YouTube. Изгледите на re:Watch не стартират проверки; те показват само кеширани резултати и запазват локалните видеа видими. Функцията използва етикета Made with AI на YouTube, не общо AI разпознаване, и може да пропусне AI видеа.", "description": "AI setting information" }
 }

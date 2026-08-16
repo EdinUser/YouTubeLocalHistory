@@ -797,6 +797,15 @@
             position: absolute; left: 0; bottom: 0; height: var(--overlay-bar-height);
             background: var(--accent); border-radius: 0 3px 0 0; z-index: 2;
         }
+        .ytvht-feed-ai-labeled { position: relative; }
+        .ytvht-feed-ai-label {
+            position: absolute; top: 8px; right: 8px; z-index: 4;
+            padding: 3px 6px; border-radius: 4px; background: #7c3aed; color: #fff;
+            font: 700 12px/1 Arial, sans-serif; pointer-events: none;
+        }
+        .ytvht-feed-ai-dimmed { opacity: .42; transition: opacity .15s ease; }
+        .ytvht-feed-ai-dimmed:hover,
+        .ytvht-feed-ai-dimmed:focus-within { opacity: .82; }
         .ytvht-card-body { display: flex; gap: 12px; margin-top: 12px; }
         .ytvht-avatar-link { flex: 0 0 36px; display: block; }
         .ytvht-card-avatar {
@@ -1948,7 +1957,7 @@
                         <div class="setting-field">
                             <label for="feedSettingAiLabeledVideoHandling">
                                 <span data-i18n="settings_ai_labeled_video_label">AI-labeled video handling</span>
-                                <span class="settings-info-icon" data-i18n-title="settings_ai_labeled_video_info" title="When enabled, re:Watch makes an extra YouTube request for each previously unchecked video near your screen. Results are cached locally. It only uses YouTube's Made with AI disclosure and is experimental: it can miss AI-made videos; an unmarked video is not confirmed non-AI.">ⓘ</span>
+                                <span class="settings-info-icon" data-i18n-title="settings_ai_labeled_video_info" title="Checks run only for cards on open YouTube pages. re:Watch views never start checks; they only show cached results and keep local videos visible.">ⓘ</span>
                             </label>
                             <select id="feedSettingAiLabeledVideoHandling">
                                 <option value="off" data-i18n="settings_ai_labeled_video_off">Off</option>
@@ -1956,7 +1965,7 @@
                                 <option value="dim" data-i18n="settings_ai_labeled_video_dim">Dim</option>
                                 <option value="hide" data-i18n="settings_ai_labeled_video_hide">Hide</option>
                             </select>
-                            <span class="setting-help" data-i18n="settings_ai_labeled_video_help">Uses YouTube's own disclosure, not AI detection. Experimental and not fully reliable.</span>
+                            <span class="setting-help" data-i18n="settings_ai_labeled_video_help">Checks only cards on open YouTube pages. re:Watch views show cached labels and never start checks.</span>
                         </div>
                     </section>
                     <section class="settings-block">

@@ -24,7 +24,7 @@
     function create(dependencies) {
         const log = dependencies.log || (() => {});
         const getSettings = dependencies.getSettings;
-        const db = dependencies.db;
+        const cache = dependencies.cache;
         let mode = 'off';
         let observer = null;
         let mutationObserver = null;
@@ -182,7 +182,7 @@
 
         async function process(id) {
             if (stopped || mode === 'off') return;
-            const cached = await db.getAiLabelResult(id).catch(() => null);
+            const cached = await cache.getAiLabelResult(id).catch(() => null);
             if (cached && cached.cacheVersion === CACHE_VERSION && Number(cached.expiresAt) > Date.now()) {
                 diagnostic('Using cached result', { videoId: id, status: cached.status });
                 resolvedStatuses.set(id, cached.status);
@@ -202,7 +202,7 @@
                 failureCount,
                 cacheVersion: CACHE_VERSION
             };
-            await db.putAiLabelResult(record).catch((error) => log('[AI labels] Cache write failed', error));
+            await cache.putAiLabelResult(record).catch((error) => log('[AI labels] Cache write failed', error));
             diagnostic('YouTube disclosure result', { videoId: id, status });
             resolvedStatuses.set(id, status);
             apply(id, status);
