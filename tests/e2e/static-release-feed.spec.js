@@ -248,6 +248,13 @@ test('feed video menus unsubscribe from Home and follow again from History', asy
 
 test('real IndexedDB v5 data survives the v7 tombstone and AI-cache store upgrades', async ({ context }) => {
   const { page, pageErrors } = await openFeed(context);
+  // Chromium may initialize the MV3 worker's same-origin database before this migration setup.
+  const worker = await getServiceWorker(context);
+  await worker.evaluate(async () => {
+    const openConnection = await ytIndexedDBStorage._getDB();
+    openConnection.close();
+    ytIndexedDBStorage._dbPromise = null;
+  });
   const preserved = await page.evaluate(async () => {
     const databaseName = 'YTLH_HybridDB';
     const channelId = 'UCv5upgradefixture00000001';
