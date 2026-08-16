@@ -52,9 +52,30 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Install Firefox for packaged extension tests
+        id: firefox
         uses: browser-actions/setup-firefox@v1
 
+      - name: Install Firefox language packs for localization tests
+        env:
+          FIREFOX_VERSION: ${{ steps.firefox.outputs.firefox-version }}
+          FIREFOX_LANGPACK_DIR: ${{ runner.temp }}/firefox-langpacks
+        run: |
+          mkdir -p "$FIREFOX_LANGPACK_DIR"
+          declare -A packs=(
+            [bg]='langpack-bg@firefox.mozilla.org.xpi'
+            [de]='langpack-de@firefox.mozilla.org.xpi'
+            [es-ES]='langpack-es-ES@firefox.mozilla.org.xpi'
+            [fr]='langpack-fr@firefox.mozilla.org.xpi'
+          )
+          for locale in "${!packs[@]}"; do
+            curl --fail --location --retry 3 \
+              --output "$FIREFOX_LANGPACK_DIR/${packs[$locale]}" \
+              "https://ftp.mozilla.org/pub/firefox/releases/$FIREFOX_VERSION/linux-x86_64/xpi/$locale.xpi"
+          done
+
       - name: Run deterministic local gate
+        env:
+          FIREFOX_LANGPACK_DIR: ${{ runner.temp }}/firefox-langpacks
         run: npm run test:local:offline
 
   quality:
