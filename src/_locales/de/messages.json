@@ -136,6 +136,6 @@
   "settings_ai_labeled_video_badge": { "message": "Abzeichen", "description": "AI setting option" },
   "settings_ai_labeled_video_dim": { "message": "Abdunkeln", "description": "AI setting option" },
   "settings_ai_labeled_video_hide": { "message": "Ausblenden", "description": "AI setting option" },
-  "settings_ai_labeled_video_help": { "message": "Verwendet die YouTube-Kennzeichnung, keine KI-Erkennung. Experimentell und nicht vollständig zuverlässig.", "description": "AI setting help" },
-  "settings_ai_labeled_video_info": { "message": "Wenn aktiviert, sendet re:Watch für ungeprüfte Videos nahe dem Bildschirm eine zusätzliche YouTube-Anfrage. Ergebnisse werden lokal gespeichert. Es verwendet nur YouTubes Made-with-AI-Kennzeichnung und kann KI-Videos übersehen.", "description": "AI setting information" }
+  "settings_ai_labeled_video_help": { "message": "Prüft nur Karten auf geöffneten YouTube-Seiten. re:Watch-Ansichten zeigen zwischengespeicherte Kennzeichnungen und starten keine Prüfungen.", "description": "AI setting help" },
+  "settings_ai_labeled_video_info": { "message": "Prüfungen laufen nur für Karten auf geöffneten YouTube-Seiten. re:Watch-Ansichten starten keine Prüfungen; sie zeigen nur zwischengespeicherte Ergebnisse und lassen lokale Videos sichtbar. Die Funktion nutzt YouTubes Made-with-AI-Hinweis, keine allgemeine KI-Erkennung, und kann KI-Videos übersehen.", "description": "AI setting information" }
 }

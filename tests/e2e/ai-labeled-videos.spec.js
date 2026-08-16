@@ -4,7 +4,7 @@
  * /next response is replayed locally.
  */
 const { test, expect } = require('./extension-fixture');
-const { setExtensionSettings } = require('./chromium-extension-storage');
+const { getAiLabelResult, setExtensionSettings } = require('./chromium-extension-storage');
 
 const AI_VIDEO_ID = 'AiLabel0001';
 const REGULAR_VIDEO_ID = 'Regular0001';
@@ -61,10 +61,66 @@ for (const mode of ['badge', 'dim', 'hide']) {
     const page = await context.newPage();
     await configure(page, context, mode);
     await expectAiCard(page, mode);
+    await expect.poll(() => getAiLabelResult(context, AI_VIDEO_ID)).toMatchObject({
+      videoId: AI_VIDEO_ID,
+      status: 'ai'
+    });
     await expect(page.locator('#regular-card')).not.toHaveClass(/ytvht-ai-labeled|ytvht-ai-dimmed|ytvht-ai-hidden/);
     await page.close();
   });
 }
+
+test('migrates legacy YouTube-origin AI cache records into isolated extension storage without a lookup', async ({ context }) => {
+  const page = await context.newPage();
+  const lookupCount = await configure(page, context, 'off');
+  const legacyRecord = {
+    videoId: AI_VIDEO_ID,
+    status: 'ai',
+    checkedAt: Date.now(),
+    expiresAt: Date.now() + 60_000,
+    failureCount: 0,
+    cacheVersion: 2
+  };
+  await page.evaluate(async (record) => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('YTLH_HybridDB', 7);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains('ai_label_results')) {
+          request.result.createObjectStore('ai_label_results', { keyPath: 'videoId' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction('ai_label_results', 'readwrite');
+      const request = transaction.objectStore('ai_label_results').put(record);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+  }, legacyRecord);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => getAiLabelResult(context, AI_VIDEO_ID)).toMatchObject(legacyRecord);
+  expect(lookupCount()).toBe(0);
+  await expect.poll(() => page.evaluate(async (videoId) => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('YTLH_HybridDB', 7);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const result = await new Promise((resolve, reject) => {
+      const transaction = db.transaction('ai_label_results', 'readonly');
+      const request = transaction.objectStore('ai_label_results').get(videoId);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return result;
+  }, AI_VIDEO_ID)).toBeNull();
+  await page.close();
+});
 
 test('AI cached result survives focus, Viewed redraw, and a rebuilt card without another lookup', async ({ context }) => {
   const page = await context.newPage();

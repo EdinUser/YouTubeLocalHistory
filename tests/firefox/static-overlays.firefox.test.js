@@ -49,24 +49,7 @@ function readCapture(fixtureName) {
   const metadataPath = path.join(fixtureDir, 'metadata.json');
 
   if (!fs.existsSync(htmlPath) || !fs.existsSync(metadataPath)) {
-    throw new Error(
-      `Missing ${fixtureName} capture. Run: npm run fixtures:youtube:download -- --only ${fixtureName} --headless`
-    );
-  }
-
-  return {
-    html: fs.readFileSync(htmlPath, 'utf8'),
-    metadata: JSON.parse(fs.readFileSync(metadataPath, 'utf8')),
-  };
-}
-
-function readOptionalCapture(fixtureName) {
-  const fixtureDir = path.join(CAPTURE_DIR, fixtureName);
-  const htmlPath = path.join(fixtureDir, 'page.html');
-  const metadataPath = path.join(fixtureDir, 'metadata.json');
-
-  if (!fs.existsSync(htmlPath) || !fs.existsSync(metadataPath)) {
-    return null;
+    throw new Error(`Missing committed static fixture: ${fixtureName}`);
   }
 
   return {
@@ -442,8 +425,8 @@ async function runScenario(name, fn) {
 async function main() {
   const playlist = readCapture('controlled-playlist');
   const channel = readCapture('controlled-channel-videos');
-  const watch = readOptionalCapture('rick-watch');
-  const channelHeader = readOptionalCapture('controlled-channel-header');
+  const watch = readCapture('rick-watch');
+  const channelHeader = readCapture('controlled-channel-header');
   const server = await startStaticFixtureServer({
     '/playlist': playlist.html,
     '/channel-videos': channel.html,

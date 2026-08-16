@@ -136,6 +136,6 @@
   "settings_ai_labeled_video_badge": { "message": "Badge", "description": "AI setting option" },
   "settings_ai_labeled_video_dim": { "message": "Atténuer", "description": "AI setting option" },
   "settings_ai_labeled_video_hide": { "message": "Masquer", "description": "AI setting option" },
-  "settings_ai_labeled_video_help": { "message": "Utilise la divulgation de YouTube, pas une détection IA. Expérimental et pas entièrement fiable.", "description": "AI setting help" },
-  "settings_ai_labeled_video_info": { "message": "Une fois activé, re:Watch envoie une requête YouTube supplémentaire pour les vidéos non vérifiées près de l’écran. Les résultats restent locaux. Il utilise uniquement la divulgation Made with AI de YouTube et peut manquer des vidéos IA.", "description": "AI setting information" }
+  "settings_ai_labeled_video_help": { "message": "Ne vérifie que les cartes des pages YouTube ouvertes. Les vues re:Watch affichent les étiquettes en cache et ne lancent jamais de vérification.", "description": "AI setting help" },
+  "settings_ai_labeled_video_info": { "message": "Les vérifications ne concernent que les cartes des pages YouTube ouvertes. Les vues re:Watch ne lancent aucune vérification ; elles affichent uniquement les résultats en cache et gardent les vidéos locales visibles. La fonction utilise la divulgation Made with AI de YouTube, pas une détection générale d’IA, et peut manquer des vidéos créées avec IA.", "description": "AI setting information" }
 }

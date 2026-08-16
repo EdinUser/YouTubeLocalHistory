@@ -25,6 +25,7 @@ Runs the widest available local command: refreshes captured fixtures, runs Jest,
 ## Focused suites
 
 ```bash
+npm run test:static               # committed static HTML fixtures in Chrome + Firefox
 npm test                         # all Jest suites
 npm run test:unit
 npm run test:integration
@@ -40,6 +41,10 @@ npm run test:canary:firefox      # Firefox live site + permission canaries
 npm run test:permissions-canary:live
 npm run test:playlist-canary:live
 ```
+
+`test:static` is the focused cross-browser fixture command. It builds both
+packages and runs the versioned, sanitized HTML suites without contacting
+YouTube.
 
 `npm run test:e2e` runs the configured Chromium Playwright projects and includes live specs. Use `test:e2e:offline` when external YouTube must not affect the result.
 
@@ -58,13 +63,15 @@ The consent helper targets the main page and known consent frames, using semanti
 
 ## Captured YouTube DOM
 
-Deterministic browser tests use reference documents under `helpers/important/` and captured fixtures under `tests/fixtures/youtube/`. They exercise selectors and extension behavior without requesting live YouTube.
+Deterministic browser tests use the committed, sanitized fixtures under
+`tests/fixtures/youtube-pages/captures/`. They exercise selectors and extension
+behavior without requesting live YouTube.
 
 When a live canary exposes new markup:
 
-1. capture the smallest relevant subtree;
-2. remove personal/session data;
-3. add or update the fixture;
+1. refresh the smallest relevant fixture;
+2. run the final sanitizer and remove any DOM that is not required by the test;
+3. review and add or update the fixture;
 4. reproduce the issue in Chrome and Firefox fixture suites;
 5. change production logic only after the deterministic regression is present.
 

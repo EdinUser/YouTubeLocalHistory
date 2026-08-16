@@ -182,6 +182,7 @@ function buildResultRow(video, opts) {
     }
     actions.appendChild(buildVideoMenu(video, opts.menuOptions));
     row.appendChild(actions);
+    applyCachedAiLabel(row, video.videoId);
     return row;
 }
 

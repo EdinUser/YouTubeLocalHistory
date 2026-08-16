@@ -1,6 +1,7 @@
 # YouTube Page Fixtures
 
-This folder contains the manifest for opt-in static YouTube DOM captures.
+This folder contains reviewed, sanitized static YouTube DOM fixtures. They are
+committed so offline tests never need to contact YouTube.
 
 Run:
 
@@ -8,15 +9,27 @@ Run:
 npm run fixtures:youtube:download
 ```
 
-The runner writes generated files to:
+The runner refreshes files in:
 
 ```text
 tests/fixtures/youtube-pages/captures/
 ```
 
-That directory is ignored on purpose. Captured YouTube HTML can contain volatile markup, generated identifiers, consent state, and accidental local signals. Treat it as local test input unless a fixture has been deliberately reviewed and sanitized.
+The downloader automatically runs the final sanitizer. To sanitize existing
+fixtures again without downloading them, run:
 
-By default the runner strips page scripts, iframes, `noscript`, and preload hints from `page.html` after the rendered DOM is captured. Use `--preserve-scripts` only for debugging the downloader itself.
+```bash
+npm run fixtures:youtube:sanitize
+```
+
+The sanitizer removes scripts, external resource URLs, inline event handlers,
+tracking-style data attributes, consent and browser chrome, and screenshots.
+Review the resulting diff before committing. The tests must continue to run
+with no request to YouTube or another third party.
+
+By default the runner removes executable and network-capable markup from
+`page.html` after the rendered DOM is captured. `--preserve-scripts` disables
+this protection only for local downloader debugging; never commit such output.
 
 Use these captures for deterministic DOM regression tests. Do not use them as proof that live YouTube playback, ads, consent, or browser media behavior still works.
 

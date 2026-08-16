@@ -149,6 +149,12 @@ The live YouTube/public-metadata warning suite is deliberately separate:
 npm run test:canary
 ```
 
+To exercise only the versioned static HTML fixtures in both browsers:
+
+```bash
+npm run test:static
+```
+
 To run every available local and live group, including fresh fixture capture:
 
 ```bash

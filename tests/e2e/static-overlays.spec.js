@@ -31,7 +31,7 @@ function readCapture(fixtureName) {
   const metadataPath = path.join(fixtureDir, 'metadata.json');
 
   if (!fs.existsSync(htmlPath) || !fs.existsSync(metadataPath)) {
-    return null;
+    throw new Error(`Missing committed static fixture: ${fixtureName}`);
   }
 
   return {
@@ -81,6 +81,9 @@ async function routeCapturedPage(page, url, html) {
     await route.fulfill({
       status: 200,
       contentType: 'text/html; charset=utf-8',
+      headers: {
+        'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data: chrome-extension: moz-extension:;",
+      },
       body: html,
     });
   });

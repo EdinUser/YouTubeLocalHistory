@@ -19,7 +19,6 @@ test-results/
 playwright-report/
 playwright/.cache/
 yt-storage.json
-tests/fixtures/youtube-pages/captures/
 tests/fixtures/feed/live/
 
 # IDE and editor files

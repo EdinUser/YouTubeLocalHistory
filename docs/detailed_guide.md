@@ -161,6 +161,26 @@ Additional insights include unfinished videos and skipped, watched, and completi
 - Change the viewed-overlay text, color, and size.
 - YouTube thumbnail overlays are best effort because YouTube can change its page structure.
 
+### AI-labeled video handling
+
+Under **History & feed**, choose **Off**, **Badge**, **Dim**, or **Hide** for
+videos that YouTube itself discloses as **Made with AI**. The feature is off by
+default and experimental. It is not a general AI detector: an unmarked video
+is not confirmed non-AI.
+
+When enabled, re:Watch checks previously unchecked cards only on open,
+supported YouTube pages as they approach the viewport and caches the result
+locally. **Badge** adds an AI marker, **Dim** also de-emphasizes the card, and
+**Hide** removes disclosed cards from those YouTube lists. re:Watch’s own views
+never start AI checks or send their local video IDs to YouTube; they display
+cached AI results only, and **Hide** dims rather than removes a local card. See
+[AI-labeled video handling](ai-labeled-videos.md) for supported surfaces,
+limits, and privacy details.
+
+That separation protects the local library: browsing, paging through, or
+scrolling a re:Watch view does not reveal its History, subscription, or saved
+video IDs to YouTube.
+
 ### Retention
 
 Choose an automatic cleanup period from 1–180 days, or **Forever**. Popup/history pagination preferences affect their respective lists; Home and Subscriptions always use stable 50-card pages.

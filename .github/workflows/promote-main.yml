@@ -11,7 +11,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout develop
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.MAIN_PROMOTION_TOKEN }}

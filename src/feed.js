@@ -173,6 +173,10 @@ function onStorageChanged(changes, area) {
         const settings = changes.settings.newValue || {};
         applyFeedTheme(settings.themePreference || 'system');
         applyAccentColor(settings.overlayColor || settings.accentColor || 'blue');
+        if (typeof invalidateCachedAiLabelPresentation === 'function') {
+            invalidateCachedAiLabelPresentation();
+            refreshCachedAiLabels();
+        }
         if (pageFeedWorkTimer !== null) {
             feedRefreshIntervalMs().then(schedulePageFeedWork).catch(() => {});
         }
@@ -206,7 +210,12 @@ function onStorageChanged(changes, area) {
 }
 
 globalThis.chrome?.runtime?.onMessage?.addListener((message) => {
-    if (!message || message.type !== 'localSubscriptionChanged' || !subscriptionsActive) return;
+    if (!message) return;
+    if (message.type === 'aiLabelCacheUpdated' && typeof refreshCachedAiLabels === 'function') {
+        refreshCachedAiLabels();
+        return;
+    }
+    if (message.type !== 'localSubscriptionChanged' || !subscriptionsActive) return;
     renderSubscriptions().then(async () => {
         const subscription = await ytIndexedDBStorage.getSubscriptionRecord(message.channelId);
         if (subscription) await hydrateVisibleChannelMetadata([subscription]);
