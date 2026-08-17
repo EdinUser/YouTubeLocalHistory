@@ -29,6 +29,25 @@
             || !!document.querySelector('ytd-app[dark]');
     }
 
+    function isAcknowledged(announcement) {
+        try {
+            // Any stored value is terminal. Treat malformed site storage as
+            // acknowledged so a storage problem cannot turn into a nag.
+            return window.localStorage.getItem(announcement.storageKey) !== null;
+        } catch (_) {
+            return true;
+        }
+    }
+
+    function acknowledge(announcement) {
+        try {
+            window.localStorage.setItem(announcement.storageKey, '1');
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
     function mount(announcement) {
         if (document.getElementById(ROOT_ID)) return;
         const host = document.createElement('section');
@@ -63,10 +82,14 @@
 
         const remove = () => host.remove();
         shadow.querySelector('.dismiss').addEventListener('click', async () => {
-            if ((await sendMessage('dismissAnnouncement', { announcementId: announcement.id }))?.ok) remove();
+            if (!acknowledge(announcement)) return;
+            await sendMessage('releaseAnnouncement', { announcementId: announcement.id });
+            remove();
         });
         shadow.querySelector('.action').addEventListener('click', async () => {
-            if ((await sendMessage('runAnnouncementAction', { announcementId: announcement.id }))?.ok) remove();
+            if (!(await sendMessage('runAnnouncementAction', { announcementId: announcement.id }))?.ok) return;
+            if (!acknowledge(announcement)) return;
+            remove();
         });
         document.body.appendChild(host);
 
@@ -77,8 +100,12 @@
 
     async function showNextAnnouncement() {
         if (document.getElementById(ROOT_ID)) return;
-        const result = await sendMessage('claimNextAnnouncement');
-        if (result?.announcement && document.body) mount(result.announcement);
+        if (location.hostname !== 'www.youtube.com') return;
+        const result = await sendMessage('getAnnouncements');
+        const announcement = (result?.announcements || []).find((candidate) => !isAcknowledged(candidate));
+        if (!announcement) return;
+        const claim = await sendMessage('claimAnnouncement', { announcementId: announcement.id });
+        if (claim?.show && document.body) mount(announcement);
     }
 
     if (document.body) showNextAnnouncement();

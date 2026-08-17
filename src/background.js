@@ -42,21 +42,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         console.log('Background script received message:', message.type, 'from sender:', sender.tab ? 'content' : 'popup');
 
-        if (message.type === 'claimNextAnnouncement') {
+        if (message.type === 'getAnnouncements') {
             if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {
-                sendResponse({ announcement: null });
+                sendResponse({ announcements: [] });
+                return;
+            }
+            sendResponse({ announcements: Object.values(ANNOUNCEMENTS) });
+            return;
+        }
+
+        if (message.type === 'claimAnnouncement') {
+            if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {
+                sendResponse({ show: false });
+                return;
+            }
+            if (!ANNOUNCEMENTS[message.announcementId]) {
+                sendResponse({ show: false });
                 return;
             }
             try {
-                sendResponse({ announcement: await claimNextAnnouncement(sender.tab.id) });
+                sendResponse({ show: await claimAnnouncement(message.announcementId, sender.tab.id) });
             } catch (error) {
                 console.warn('[Announcements] could not claim an announcement', error);
-                sendResponse({ announcement: null });
+                sendResponse({ show: false });
             }
             return;
         }
 
-        if (message.type === 'dismissAnnouncement' || message.type === 'runAnnouncementAction') {
+        if (message.type === 'releaseAnnouncement' || message.type === 'runAnnouncementAction') {
             if (!isLocalSubscriptionSender(sender)) {
                 sendResponse({ ok: false });
                 return;
@@ -67,10 +80,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 return;
             }
             try {
-                const state = message.type === 'runAnnouncementAction'
-                    ? await runAnnouncementAction(announcement)
-                    : 'dismissed';
-                await completeAnnouncement(message.announcementId, state);
+                if (message.type === 'runAnnouncementAction') await runAnnouncementAction(announcement);
+                await releaseAnnouncement(message.announcementId);
                 sendResponse({ ok: true });
             } catch (error) {
                 console.warn('[Announcements] could not complete an announcement', error);
@@ -262,13 +273,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.tabs?.onRemoved?.addListener((tabId) => {
-    chrome.storage.local.get(ANNOUNCEMENT_OWNERS_STORAGE_KEY).then((stored) => {
-        const owners = stored[ANNOUNCEMENT_OWNERS_STORAGE_KEY] || {};
+    stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY).then((owners) => {
+        owners = owners || {};
         const remainingOwners = Object.fromEntries(
             Object.entries(owners).filter(([, ownerTabId]) => ownerTabId !== tabId)
         );
         if (Object.keys(remainingOwners).length !== Object.keys(owners).length) {
-            return chrome.storage.local.set({ [ANNOUNCEMENT_OWNERS_STORAGE_KEY]: remainingOwners });
+            return stateManager.set({ [ANNOUNCEMENT_OWNERS_STATE_KEY]: remainingOwners });
         }
     }).catch(() => {});
 });
@@ -351,10 +362,7 @@ function createContextMenus() {
 
 // MV3 service workers are torn down and restarted; re-create the menu on both
 // install/update and browser startup so it's always present.
-const ANNOUNCEMENT_STATES_STORAGE_KEY = 'extensionAnnouncementsV1';
-const ANNOUNCEMENT_OWNERS_STORAGE_KEY = 'extensionAnnouncementOwnersV1';
-const ANNOUNCEMENT_PENDING = 'pending';
-const ANNOUNCEMENT_TERMINAL_STATES = new Set(['dismissed', 'settings-opened']);
+const ANNOUNCEMENT_OWNERS_STATE_KEY = 'announcementOwners';
 let announcementClaimQueue = Promise.resolve();
 const ANNOUNCEMENTS = {
     'ai-label-controls-v1': {
@@ -365,40 +373,10 @@ const ANNOUNCEMENTS = {
         body: 'Choose whether AI-labeled videos are shown, dimmed, or hidden in re:Watch.',
         actionLabelKey: 'ai_label_announcement_settings',
         actionLabel: 'See it in Settings',
+        storageKey: '__rwui_notice_7',
         action: { type: 'open-extension-page', path: 'feed.html#settings' }
     }
 };
-
-function isValidAnnouncementState(state) {
-    return state === ANNOUNCEMENT_PENDING || ANNOUNCEMENT_TERMINAL_STATES.has(state);
-}
-
-async function getAnnouncementData() {
-    const stored = await chrome.storage.local.get([
-        ANNOUNCEMENT_STATES_STORAGE_KEY,
-        ANNOUNCEMENT_OWNERS_STORAGE_KEY
-    ]);
-    const rawStates = stored[ANNOUNCEMENT_STATES_STORAGE_KEY];
-    const rawOwners = stored[ANNOUNCEMENT_OWNERS_STORAGE_KEY];
-    return {
-        hasStoredStates: Object.prototype.hasOwnProperty.call(stored, ANNOUNCEMENT_STATES_STORAGE_KEY),
-        states: rawStates && typeof rawStates === 'object' && !Array.isArray(rawStates) ? rawStates : null,
-        owners: rawOwners && typeof rawOwners === 'object' && !Array.isArray(rawOwners) ? rawOwners : {}
-    };
-}
-
-async function ensureAnnouncementStates() {
-    const { hasStoredStates, states } = await getAnnouncementData();
-    // A malformed persisted value is treated as acknowledged. This failure
-    // mode is deliberately quiet: a storage problem must never become a nag.
-    if (hasStoredStates && !states) return;
-    const currentStates = states || {};
-    const nextStates = { ...currentStates };
-    Object.keys(ANNOUNCEMENTS).forEach((id) => {
-        if (!(id in nextStates)) nextStates[id] = ANNOUNCEMENT_PENDING;
-    });
-    await chrome.storage.local.set({ [ANNOUNCEMENT_STATES_STORAGE_KEY]: nextStates });
-}
 
 async function announcementOwnerIsLive(tabId) {
     if (!Number.isInteger(tabId) || !chrome.tabs?.get) return false;
@@ -410,54 +388,42 @@ async function announcementOwnerIsLive(tabId) {
     }
 }
 
-function claimNextAnnouncement(tabId) {
-    const claim = announcementClaimQueue.then(() => claimNextAnnouncementUnlocked(tabId));
+function claimAnnouncement(announcementId, tabId) {
+    const claim = announcementClaimQueue.then(() => claimAnnouncementUnlocked(announcementId, tabId));
     // Keep the queue usable after a storage/API failure while returning the
     // failure to this caller for normal message handling.
     announcementClaimQueue = claim.catch(() => {});
     return claim;
 }
 
-async function claimNextAnnouncementUnlocked(tabId) {
-    const { states, owners } = await getAnnouncementData();
-    if (!states) return null;
-    for (const announcement of Object.values(ANNOUNCEMENTS)) {
-        if (states[announcement.id] !== ANNOUNCEMENT_PENDING) continue;
-        const ownerTabId = owners[announcement.id];
-        if (ownerTabId !== tabId && await announcementOwnerIsLive(ownerTabId)) continue;
-        await chrome.storage.local.set({
-            [ANNOUNCEMENT_OWNERS_STORAGE_KEY]: { ...owners, [announcement.id]: tabId }
-        });
-        return announcement;
-    }
-    return null;
+async function claimAnnouncementUnlocked(announcementId, tabId) {
+    const owners = (await stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY)) || {};
+    const ownerTabId = owners[announcementId];
+    if (ownerTabId !== tabId && await announcementOwnerIsLive(ownerTabId)) return false;
+    await stateManager.set({
+        [ANNOUNCEMENT_OWNERS_STATE_KEY]: { ...owners, [announcementId]: tabId }
+    });
+    return true;
 }
 
-async function completeAnnouncement(announcementId, state) {
-    const { states, owners } = await getAnnouncementData();
-    if (!states || !isValidAnnouncementState(state)) return;
+async function releaseAnnouncement(announcementId) {
+    const owners = (await stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY)) || {};
     const nextOwners = { ...owners };
     delete nextOwners[announcementId];
-    await chrome.storage.local.set({
-        [ANNOUNCEMENT_STATES_STORAGE_KEY]: { ...states, [announcementId]: state },
-        [ANNOUNCEMENT_OWNERS_STORAGE_KEY]: nextOwners
-    });
+    await stateManager.set({ [ANNOUNCEMENT_OWNERS_STATE_KEY]: nextOwners });
 }
 
 async function runAnnouncementAction(announcement) {
     if (announcement.action?.type === 'open-extension-page') {
         await chrome.tabs.create({ url: chrome.runtime.getURL(announcement.action.path) });
-        return 'settings-opened';
+        return;
     }
     throw new Error(`Unsupported announcement action: ${announcement.action?.type || 'none'}`);
 }
 
 async function injectAnnouncementsIntoOpenYouTubeTabs() {
     if (!chrome.tabs?.query || !chrome.scripting?.executeScript) return;
-    const { states } = await getAnnouncementData();
-    if (!states) return;
-    if (!Object.keys(ANNOUNCEMENTS).some((id) => states[id] === ANNOUNCEMENT_PENDING)) return;
-    const tabs = await chrome.tabs.query({ url: ['*://*.youtube.com/*'] });
+    const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
     await Promise.all(tabs.filter((tab) => Number.isInteger(tab.id)).map((tab) =>
         chrome.scripting.executeScript({
             target: { tabId: tab.id },
@@ -468,8 +434,8 @@ async function injectAnnouncementsIntoOpenYouTubeTabs() {
 
 chrome.runtime.onInstalled.addListener((details) => {
     createContextMenus();
-    ensureAnnouncementStates()
-        .then(() => details.reason === 'update' && injectAnnouncementsIntoOpenYouTubeTabs())
+    Promise.resolve(details.reason === 'install' || details.reason === 'update')
+        .then((shouldInject) => shouldInject && injectAnnouncementsIntoOpenYouTubeTabs())
         .catch((error) => console.warn('[Announcements] setup failed', error));
 });
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(createContextMenus);
