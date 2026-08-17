@@ -137,5 +137,9 @@
   "settings_ai_labeled_video_dim": { "message": "Atenuar", "description": "AI setting option" },
   "settings_ai_labeled_video_hide": { "message": "Ocultar", "description": "AI setting option" },
   "settings_ai_labeled_video_help": { "message": "Solo comprueba tarjetas de páginas de YouTube abiertas. Las vistas de re:Watch muestran etiquetas almacenadas y nunca inician comprobaciones.", "description": "AI setting help" },
-  "settings_ai_labeled_video_info": { "message": "Las comprobaciones solo se ejecutan para tarjetas de páginas de YouTube abiertas. Las vistas de re:Watch no inician comprobaciones; solo muestran resultados almacenados y mantienen visibles los vídeos locales. La función usa la divulgación Made with AI de YouTube, no una detección general de IA, y puede omitir vídeos creados con IA.", "description": "AI setting information" }
+  "settings_ai_labeled_video_info": { "message": "Las comprobaciones solo se ejecutan para tarjetas de páginas de YouTube abiertas. Las vistas de re:Watch no inician comprobaciones; solo muestran resultados almacenados y mantienen visibles los vídeos locales. La función usa la divulgación Made with AI de YouTube, no una detección general de IA, y puede omitir vídeos creados con IA.", "description": "AI setting information" },
+  "ai_label_announcement_title": { "message": "Nuevos controles para etiquetas de IA", "description": "Título del anuncio único de la función de etiquetas de IA" },
+  "ai_label_announcement_body": { "message": "Elige si los vídeos con etiqueta de IA se muestran, atenúan u ocultan en re:Watch.", "description": "Texto del anuncio único de la función de etiquetas de IA" },
+  "announcement_dismiss": { "message": "Descartar", "description": "Descartar un anuncio de función de la extensión" },
+  "ai_label_announcement_settings": { "message": "Ver en Configuración", "description": "Abrir la configuración del Feed desde el anuncio" }
 }
