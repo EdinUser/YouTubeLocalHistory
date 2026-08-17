@@ -42,6 +42,7 @@ copy_common_files() {
        "$PROJECT_ROOT/src/content-info.js" \
        "$PROJECT_ROOT/src/content-thumbnails.js" \
        "$PROJECT_ROOT/src/content-ai-labels.js" \
+       "$PROJECT_ROOT/src/content-announcement.js" \
        "$PROJECT_ROOT/src/content-ai-labels-page.js" \
        "$PROJECT_ROOT/src/content-messages.js" \
        "$PROJECT_ROOT/src/popup.html" \

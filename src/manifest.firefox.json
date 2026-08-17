@@ -46,6 +46,7 @@
                 "content-info.js",
                 "content-thumbnails.js",
                 "content-ai-labels.js",
+                "content-announcement.js",
                 "content-messages.js",
                 "content.js",
                 "content-subscriptions.js"

@@ -137,5 +137,9 @@
   "settings_ai_labeled_video_dim": { "message": "Затъмни", "description": "AI setting option" },
   "settings_ai_labeled_video_hide": { "message": "Скрий", "description": "AI setting option" },
   "settings_ai_labeled_video_help": { "message": "Проверява само карти в отворени страници на YouTube. Изгледите на re:Watch показват кеширани етикети и не стартират проверки.", "description": "AI setting help" },
-  "settings_ai_labeled_video_info": { "message": "Проверките се извършват само за карти в отворени страници на YouTube. Изгледите на re:Watch не стартират проверки; те показват само кеширани резултати и запазват локалните видеа видими. Функцията използва етикета Made with AI на YouTube, не общо AI разпознаване, и може да пропусне AI видеа.", "description": "AI setting information" }
+  "settings_ai_labeled_video_info": { "message": "Проверките се извършват само за карти в отворени страници на YouTube. Изгледите на re:Watch не стартират проверки; те показват само кеширани резултати и запазват локалните видеа видими. Функцията използва етикета Made with AI на YouTube, не общо AI разпознаване, и може да пропусне AI видеа.", "description": "AI setting information" },
+  "ai_label_announcement_title": { "message": "Нови контроли за AI етикети", "description": "Заглавие на еднократното съобщение за функцията за AI етикети" },
+  "ai_label_announcement_body": { "message": "Изберете дали видеата с AI етикет да се показват, затъмняват или скриват в re:Watch.", "description": "Текст на еднократното съобщение за функцията за AI етикети" },
+  "announcement_dismiss": { "message": "Отказ", "description": "Скриване на съобщение за функция на разширението" },
+  "ai_label_announcement_settings": { "message": "Виж в настройките", "description": "Отваряне на настройките за Feed от съобщението" }
 }

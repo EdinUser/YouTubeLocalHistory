@@ -41,6 +41,54 @@ const stateManager = {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         console.log('Background script received message:', message.type, 'from sender:', sender.tab ? 'content' : 'popup');
+
+        if (message.type === 'getAnnouncements') {
+            if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {
+                sendResponse({ announcements: [] });
+                return;
+            }
+            sendResponse({ announcements: Object.values(ANNOUNCEMENTS) });
+            return;
+        }
+
+        if (message.type === 'claimAnnouncement') {
+            if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {
+                sendResponse({ show: false });
+                return;
+            }
+            if (!ANNOUNCEMENTS[message.announcementId]) {
+                sendResponse({ show: false });
+                return;
+            }
+            try {
+                sendResponse({ show: await claimAnnouncement(message.announcementId, sender.tab.id) });
+            } catch (error) {
+                console.warn('[Announcements] could not claim an announcement', error);
+                sendResponse({ show: false });
+            }
+            return;
+        }
+
+        if (message.type === 'releaseAnnouncement' || message.type === 'runAnnouncementAction') {
+            if (!isLocalSubscriptionSender(sender)) {
+                sendResponse({ ok: false });
+                return;
+            }
+            const announcement = ANNOUNCEMENTS[message.announcementId];
+            if (!announcement) {
+                sendResponse({ ok: false });
+                return;
+            }
+            try {
+                if (message.type === 'runAnnouncementAction') await runAnnouncementAction(announcement);
+                await releaseAnnouncement(message.announcementId);
+                sendResponse({ ok: true });
+            } catch (error) {
+                console.warn('[Announcements] could not complete an announcement', error);
+                sendResponse({ ok: false });
+            }
+            return;
+        }
         
         if (message.type === 'openPopup') {
             const popupId = await stateManager.get('activePopupWindowId');
@@ -224,6 +272,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Indicates async response
 });
 
+chrome.tabs?.onRemoved?.addListener((tabId) => {
+    stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY).then((owners) => {
+        owners = owners || {};
+        const remainingOwners = Object.fromEntries(
+            Object.entries(owners).filter(([, ownerTabId]) => ownerTabId !== tabId)
+        );
+        if (Object.keys(remainingOwners).length !== Object.keys(owners).length) {
+            return stateManager.set({ [ANNOUNCEMENT_OWNERS_STATE_KEY]: remainingOwners });
+        }
+    }).catch(() => {});
+});
+
 function isLocalSubscriptionSender(sender) {
     const senderUrl = sender && sender.url || '';
     // The loopback origin is injected only by the Firefox E2E build to replay
@@ -302,7 +362,82 @@ function createContextMenus() {
 
 // MV3 service workers are torn down and restarted; re-create the menu on both
 // install/update and browser startup so it's always present.
-chrome.runtime.onInstalled.addListener(createContextMenus);
+const ANNOUNCEMENT_OWNERS_STATE_KEY = 'announcementOwners';
+let announcementClaimQueue = Promise.resolve();
+const ANNOUNCEMENTS = {
+    'ai-label-controls-v1': {
+        id: 'ai-label-controls-v1',
+        titleKey: 'ai_label_announcement_title',
+        title: 'New AI-label controls',
+        bodyKey: 'ai_label_announcement_body',
+        body: 'Choose whether AI-labeled videos are shown, dimmed, or hidden in re:Watch.',
+        actionLabelKey: 'ai_label_announcement_settings',
+        actionLabel: 'See it in Settings',
+        storageKey: '__rwui_notice_7',
+        action: { type: 'open-extension-page', path: 'feed.html#settings' }
+    }
+};
+
+async function announcementOwnerIsLive(tabId) {
+    if (!Number.isInteger(tabId) || !chrome.tabs?.get) return false;
+    try {
+        await chrome.tabs.get(tabId);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function claimAnnouncement(announcementId, tabId) {
+    const claim = announcementClaimQueue.then(() => claimAnnouncementUnlocked(announcementId, tabId));
+    // Keep the queue usable after a storage/API failure while returning the
+    // failure to this caller for normal message handling.
+    announcementClaimQueue = claim.catch(() => {});
+    return claim;
+}
+
+async function claimAnnouncementUnlocked(announcementId, tabId) {
+    const owners = (await stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY)) || {};
+    const ownerTabId = owners[announcementId];
+    if (ownerTabId !== tabId && await announcementOwnerIsLive(ownerTabId)) return false;
+    await stateManager.set({
+        [ANNOUNCEMENT_OWNERS_STATE_KEY]: { ...owners, [announcementId]: tabId }
+    });
+    return true;
+}
+
+async function releaseAnnouncement(announcementId) {
+    const owners = (await stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY)) || {};
+    const nextOwners = { ...owners };
+    delete nextOwners[announcementId];
+    await stateManager.set({ [ANNOUNCEMENT_OWNERS_STATE_KEY]: nextOwners });
+}
+
+async function runAnnouncementAction(announcement) {
+    if (announcement.action?.type === 'open-extension-page') {
+        await chrome.tabs.create({ url: chrome.runtime.getURL(announcement.action.path) });
+        return;
+    }
+    throw new Error(`Unsupported announcement action: ${announcement.action?.type || 'none'}`);
+}
+
+async function injectAnnouncementsIntoOpenYouTubeTabs() {
+    if (!chrome.tabs?.query || !chrome.scripting?.executeScript) return;
+    const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
+    await Promise.all(tabs.filter((tab) => Number.isInteger(tab.id)).map((tab) =>
+        chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content-announcement.js']
+        }).catch(() => {})
+    ));
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
+    createContextMenus();
+    Promise.resolve(details.reason === 'install' || details.reason === 'update')
+        .then((shouldInject) => shouldInject && injectAnnouncementsIntoOpenYouTubeTabs())
+        .catch((error) => console.warn('[Announcements] setup failed', error));
+});
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(createContextMenus);
 
 // Extract a YouTube video id (and shorts flag) from any link/page URL.

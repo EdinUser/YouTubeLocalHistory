@@ -146,5 +146,9 @@
   "settings_ai_labeled_video_info": {
     "message": "Checks run only for cards on open YouTube pages. re:Watch views never start checks; they only show cached results and keep local videos visible. The feature uses YouTube's Made with AI disclosure, not general AI detection, and can miss AI-made videos.",
     "description": "Privacy and reliability information for AI-label handling"
-  }
+  },
+  "ai_label_announcement_title": { "message": "New AI-label controls", "description": "Title of the one-time AI-label feature announcement" },
+  "ai_label_announcement_body": { "message": "Choose whether AI-labeled videos are shown, dimmed, or hidden in re:Watch.", "description": "Body of the one-time AI-label feature announcement" },
+  "announcement_dismiss": { "message": "Dismiss", "description": "Dismiss an extension feature announcement" },
+  "ai_label_announcement_settings": { "message": "See it in Settings", "description": "Open Feed settings from the AI-label feature announcement" }
 }

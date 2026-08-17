@@ -36,7 +36,7 @@ async function configure(page, context, mode) {
   await page.route('https://www.youtube.com/ai-label-static', (route) => route.fulfill({
     status: 200, contentType: 'text/html', body: fixtureHtml(),
   }));
-  await page.route('https://www.youtube.com/youtubei/v1/next?**', async (route) => {
+  await page.route('**/youtubei/v1/next**', async (route) => {
     lookupCount += 1;
     const payload = route.request().postDataJSON();
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(nextResponse(payload.videoId === AI_VIDEO_ID)) });

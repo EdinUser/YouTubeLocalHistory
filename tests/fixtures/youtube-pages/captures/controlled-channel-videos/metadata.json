@@ -2,7 +2,7 @@
   "name": "controlled-channel-videos",
   "url": "https://www.youtube.com/@TodorKirilov/videos",
   "purpose": "Maintainer-controlled channel videos page for deterministic grid/list overlay regression tests.",
-  "capturedAt": "2026-08-16T03:35:59.350Z",
+  "capturedAt": "2026-08-16T05:50:40.232Z",
   "readySelector": "ytd-rich-grid-media, a[href*=\"watch?v=\"]",
   "viewport": {
     "width": 1440,

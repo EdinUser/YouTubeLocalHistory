@@ -2,7 +2,7 @@
   "name": "rick-watch",
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   "purpose": "Watch-page DOM fixture for content script initialization, video ID extraction, watch-page overlay/sidebar behavior, and SPA route fixtures. Do not use as proof that real playback resumes.",
-  "capturedAt": "2026-08-16T03:35:41.591Z",
+  "capturedAt": "2026-08-16T05:50:21.647Z",
   "readySelector": "ytd-watch-flexy, #movie_player, video",
   "viewport": {
     "width": 1440,

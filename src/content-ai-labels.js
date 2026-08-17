@@ -239,6 +239,15 @@
             cardsById.get(id).add(card);
             if (resolvedStatuses.has(id)) apply(id, resolvedStatuses.get(id));
             observer.observe(card);
+            // Firefox can omit the initial IntersectionObserver callback for
+            // an already-visible card during document startup. Queue such a
+            // card directly; later cards still use observer re-entry.
+            const bounds = card.getBoundingClientRect();
+            if (bounds.bottom > 0 && bounds.top < window.innerHeight &&
+                bounds.right > 0 && bounds.left < window.innerWidth) {
+                queuedIds.add(id);
+                drain();
+            }
         }
 
         function scan(root = document) {
