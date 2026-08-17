@@ -91,7 +91,7 @@ function assertPackageContract(buildDir, archivePath, expectedVersion) {
   const englishCatalog = JSON.parse(
     fs.readFileSync(path.join(buildDir, '_locales', 'en', 'messages.json'), 'utf8')
   );
-  expect(Object.keys(englishCatalog)).toHaveLength(435);
+  expect(Object.keys(englishCatalog)).toHaveLength(439);
   LOCALES.forEach((locale) => {
     const localePath = `_locales/${locale}/messages.json`;
     expect(entries).toContain(localePath);
