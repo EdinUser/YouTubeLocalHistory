@@ -520,6 +520,39 @@
             });
         }
 
+        function processThumbnailsForVideoIds(videoIds) {
+            const normalizedIds = Array.from(new Set((videoIds || [])
+                .map((videoId) => String(videoId || '').trim())
+                .filter((videoId) => /^[A-Za-z0-9_-]+$/.test(videoId))));
+            if (!normalizedIds.length) return;
+
+            const cardSelector = [
+                'ytd-playlist-panel-video-renderer',
+                'ytd-rich-item-renderer',
+                'ytd-grid-video-renderer',
+                'ytd-rich-grid-media',
+                'ytd-compact-video-renderer',
+                'ytd-compact-radio-renderer',
+                'ytd-video-renderer',
+                'yt-lockup-view-model'
+            ].join(', ');
+            const cards = new Set();
+
+            normalizedIds.forEach((videoId) => {
+                const selectors = [
+                    `[data-ytvht-video-id="${videoId}"]`,
+                    `a[href*="/watch?v=${videoId}"]`,
+                    `a[href*="/shorts/${videoId}"]`
+                ].join(', ');
+                document.querySelectorAll(selectors).forEach((node) => {
+                    const card = node.closest(cardSelector) || node;
+                    if (getVideoIdFromThumbnail(card) === videoId) cards.add(card);
+                });
+            });
+
+            cards.forEach((card) => processVideoElement(card));
+        }
+
         function processVideoElement(element) {
             const currentSettings = getCurrentSettings();
             if (!element || !element.isConnected) {
@@ -671,6 +704,7 @@
         return {
             thumbnailObserver,
             processExistingThumbnails,
+            processThumbnailsForVideoIds,
             processVideoElement,
             startRemovedElementCleanupObserver
         };

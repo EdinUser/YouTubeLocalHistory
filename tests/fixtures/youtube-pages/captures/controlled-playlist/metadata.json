@@ -2,7 +2,7 @@
   "name": "controlled-playlist",
   "url": "https://www.youtube.com/playlist?list=PLQga0f7orXVB8fZObVcpXuX-2swTybQqR",
   "purpose": "Maintainer-controlled playlist page for deterministic thumbnail/list overlay regression tests.",
-  "capturedAt": "2026-08-16T05:50:31.959Z",
+  "capturedAt": "2026-08-18T07:28:18.391Z",
   "readySelector": "ytd-playlist-video-renderer, a[href*=\"watch?v=\"]",
   "viewport": {
     "width": 1440,

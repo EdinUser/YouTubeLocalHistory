@@ -96,6 +96,35 @@
         }
     };
 
+    let storageDebugEnabled = false;
+
+    function updateStorageDebugSetting(settings) {
+        storageDebugEnabled = settings?.debug === true;
+    }
+
+    function debugLog(...args) {
+        if (typeof globalScope.ytvhtDebugLog === 'function') {
+            globalScope.ytvhtDebugLog(...args);
+        } else if (storageDebugEnabled) {
+            console.log(...args);
+        }
+    }
+
+    // The background worker supplies its own shared logger. Other extension
+    // contexts keep this module's informational output synchronized with the
+    // same persisted debug setting.
+    if (typeof globalScope.ytvhtDebugLog !== 'function') {
+        storage.get(['settings'])
+            .then((result) => updateStorageDebugSetting(result?.settings))
+            .catch(() => {});
+        const storageChangeEvent = isFirefox ? browser.storage.onChanged : chrome.storage.onChanged;
+        storageChangeEvent?.addListener((changes, area) => {
+            if (area === 'local' && changes.settings) {
+                updateStorageDebugSetting(changes.settings.newValue);
+            }
+        });
+    }
+
     // Helper: format local date to YYYY-MM-DD without UTC conversion
     function formatLocalDayKey(date) {
         const y = date.getFullYear();
@@ -160,12 +189,12 @@
                 // Mark as migrated
                 await storage.set({'__migrated__': true});
                 this.migrated = true;
-                console.log('[Storage] Legacy migration completed successfully');
+                debugLog('[Storage] Legacy migration completed successfully');
 
                 // Now trigger hybrid migration (storage.local → IndexedDB)
                 await this.ensureHybridMigration();
             } catch (error) {
-                console.log('[Storage] Migration skipped or failed:', error.message);
+                console.warn('[Storage] Migration skipped or failed:', error.message);
                 this.migrated = true; // Don't try again
             }
         }
@@ -209,7 +238,7 @@
                         // Save all migrated data to storage
                         if (Object.keys(migrationData).length > 0) {
                             await storage.set(migrationData);
-                            console.log(`[Storage] Migrated ${Object.keys(migrationData).length} items from IndexedDB`);
+                            debugLog(`[Storage] Migrated ${Object.keys(migrationData).length} items from IndexedDB`);
                         }
 
                         db.close();
@@ -294,13 +323,13 @@
          */
         async migrateVideosToIndexedDB() {
             if (!this._isIndexedDBAvailable()) {
-                console.log('[Storage] IndexedDB not available, skipping video migration');
+                debugLog('[Storage] IndexedDB not available, skipping video migration');
                 return;
             }
 
             const state = await this._getMigrationState('videos');
             if (state.status === 'complete') {
-                console.log('[Storage] Video migration already complete');
+                debugLog('[Storage] Video migration already complete');
                 return;
             }
 
@@ -317,7 +346,7 @@
                 if (videoKeys.length === 0) {
                     state.status = 'complete';
                     await this._setMigrationState('videos', state);
-                    console.log('[Storage] No videos to migrate');
+                    debugLog('[Storage] No videos to migrate');
                     return;
                 }
 
@@ -330,7 +359,7 @@
                     batches.push(videoKeys.slice(i, i + this.MIGRATION_BATCH_SIZE));
                 }
 
-                console.log(`[Storage] Starting video migration: ${videoKeys.length} videos in ${batches.length} batches`);
+                debugLog(`[Storage] Starting video migration: ${videoKeys.length} videos in ${batches.length} batches`);
 
                 for (const batch of batches) {
                     for (const key of batch) {
@@ -388,12 +417,12 @@
                 })) {
                     state.status = 'complete';
                     await this._setMigrationState('videos', state);
-                    console.log(`[Storage] Video migration complete: ${state.migratedCount} migrated, ${state.errorCount} errors`);
+                    debugLog(`[Storage] Video migration complete: ${state.migratedCount} migrated, ${state.errorCount} errors`);
 
                     // Rebuild stats if needed
                     await this.rebuildStatsFromIndexedDB();
                 } else {
-                    console.log(`[Storage] Video migration progress: ${state.migratedCount} migrated, ${remainingVideoKeys.length} remaining`);
+                    debugLog(`[Storage] Video migration progress: ${state.migratedCount} migrated, ${remainingVideoKeys.length} remaining`);
                 }
             } catch (error) {
                 console.error('[Storage] Video migration error:', error);
@@ -407,13 +436,13 @@
          */
         async migratePlaylistsToIndexedDB() {
             if (!this._isIndexedDBAvailable()) {
-                console.log('[Storage] IndexedDB not available, skipping playlist migration');
+                debugLog('[Storage] IndexedDB not available, skipping playlist migration');
                 return;
             }
 
             const state = await this._getMigrationState('playlists');
             if (state.status === 'complete') {
-                console.log('[Storage] Playlist migration already complete');
+                debugLog('[Storage] Playlist migration already complete');
                 return;
             }
 
@@ -428,7 +457,7 @@
                 if (playlistKeys.length === 0) {
                     state.status = 'complete';
                     await this._setMigrationState('playlists', state);
-                    console.log('[Storage] No playlists to migrate');
+                    debugLog('[Storage] No playlists to migrate');
                     return;
                 }
 
@@ -440,7 +469,7 @@
                     batches.push(playlistKeys.slice(i, i + this.MIGRATION_BATCH_SIZE));
                 }
 
-                console.log(`[Storage] Starting playlist migration: ${playlistKeys.length} playlists in ${batches.length} batches`);
+                debugLog(`[Storage] Starting playlist migration: ${playlistKeys.length} playlists in ${batches.length} batches`);
 
                 for (const batch of batches) {
                     for (const key of batch) {
@@ -493,9 +522,9 @@
                 })) {
                     state.status = 'complete';
                     await this._setMigrationState('playlists', state);
-                    console.log(`[Storage] Playlist migration complete: ${state.migratedCount} migrated, ${state.errorCount} errors`);
+                    debugLog(`[Storage] Playlist migration complete: ${state.migratedCount} migrated, ${state.errorCount} errors`);
                 } else {
-                    console.log(`[Storage] Playlist migration progress: ${state.migratedCount} migrated, ${remainingPlaylistKeys.length} remaining`);
+                    debugLog(`[Storage] Playlist migration progress: ${state.migratedCount} migrated, ${remainingPlaylistKeys.length} remaining`);
                 }
             } catch (error) {
                 console.error('[Storage] Playlist migration error:', error);
@@ -515,11 +544,11 @@
                 const existingStats = await this.getStats();
                 // Only rebuild if stats are missing or effectively empty
                 if (existingStats.totalWatchSeconds > 0 || existingStats.counters.videos > 0) {
-                    console.log('[Storage] Stats already exist, skipping rebuild');
+                    debugLog('[Storage] Stats already exist, skipping rebuild');
                     return;
                 }
 
-                console.log('[Storage] Rebuilding stats from IndexedDB...');
+                debugLog('[Storage] Rebuilding stats from IndexedDB...');
                 const videos = await ytIndexedDBStorage.getAllVideos();
 
                 const stats = {
@@ -570,7 +599,7 @@
                 }
 
                 await this.setStats(stats);
-                console.log('[Storage] Stats rebuilt successfully');
+                debugLog('[Storage] Stats rebuilt successfully');
             } catch (error) {
                 console.error('[Storage] Failed to rebuild stats:', error);
             }
@@ -722,7 +751,7 @@
                         // Service worker might be sleeping - wait and retry
                         // Use longer delays for later attempts
                         const waitTime = delay * Math.pow(2, attempt); // Exponential backoff: 200ms, 400ms, 800ms, 1600ms
-                        console.log(`[Storage] Extension context invalidated, retrying in ${waitTime}ms (attempt ${attempt + 1}/${retries + 1})`);
+                        debugLog(`[Storage] Extension context invalidated, retrying in ${waitTime}ms (attempt ${attempt + 1}/${retries + 1})`);
                         await new Promise(resolve => setTimeout(resolve, waitTime));
                         continue;
                     }

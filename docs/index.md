@@ -11,7 +11,7 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 | --- | --- |
 | History | Keeps watched videos, progress, duration, and resume points locally |
 | Home | Builds a mixed local feed from followed channels |
-| Subscriptions | Shows a chronological inventory of cached subscription videos |
+| Subscriptions | Shows cached subscription videos ordered by upload or detection time |
 | Shorts | Separates watched Shorts from ordinary history |
 | Watch Later | Keeps videos explicitly saved for later, independently of a YouTube account |
 | Channels | Manages local follows and reviewable ignored-channel records |
@@ -44,7 +44,7 @@ The feed renders cached local records first.
 
 - **Check** scans eligible followed channels and updates cached feed records.
 - **Reload** rebuilds the visible view from local storage without starting a network scan.
-- **Show** opens the complete chronological subscription inventory after a scan or import handoff.
+- **Show** reloads the complete subscription inventory after a scan or import handoff while preserving the selected upload-date or detection-date order.
 
 Public YouTube RSS feeds provide new uploads. re:Watch does not use OAuth, mutate the user's YouTube subscriptions, or perform remote search.
 

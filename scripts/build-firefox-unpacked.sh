@@ -14,6 +14,15 @@ cp "$ROOT"/src/*.js "$ROOT"/src/*.html "$ROOT/build/e2e/firefox/"
 cp "$ROOT/src/icon"*.png "$ROOT/build/e2e/firefox/"
 cp "$ROOT/src/manifest.firefox.json" "$ROOT/build/e2e/firefox/manifest.json"
 
+# Enable production-owned diagnostic counters only in the generated E2E build.
+node - "$ROOT/build/e2e/firefox/background.js" "$ROOT/build/e2e/firefox/content.js" <<'NODE'
+const fs = require('node:fs');
+const marker = 'globalThis.__YTVHT_TEST__ = globalThis.__YTVHT_TEST__ || {};\n';
+for (const file of process.argv.slice(2)) {
+  fs.writeFileSync(file, marker + fs.readFileSync(file, 'utf8'));
+}
+NODE
+
 node - "$ROOT/build/e2e/firefox/manifest.json" <<'NODE'
 const fs = require('node:fs');
 

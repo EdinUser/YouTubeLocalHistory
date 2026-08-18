@@ -1,4 +1,37 @@
-console.log('YouTube Video History Tracker background script running.');
+let backgroundDebugEnabled = false;
+
+function debugLog(...args) {
+    if (backgroundDebugEnabled) console.log(...args);
+}
+
+function updateBackgroundDebugSetting(settings) {
+    backgroundDebugEnabled = settings?.debug === true;
+}
+
+function recordTestMessage(message) {
+    const metrics = globalThis.__YTVHT_TEST__?.backgroundMetrics;
+    if (!metrics) return;
+    metrics.messageTypes = metrics.messageTypes || {};
+    metrics.storageMethods = metrics.storageMethods || {};
+    metrics.messageTypes[message.type] = (metrics.messageTypes[message.type] || 0) + 1;
+    if (message.type === 'ytStorageCall' && message.method) {
+        metrics.storageMethods[message.method] = (metrics.storageMethods[message.method] || 0) + 1;
+    }
+}
+
+// Keep informational service-worker traces behind the user-facing debug
+// setting. Warnings and errors remain unconditional below.
+globalThis.ytvhtDebugLog = debugLog;
+chrome.storage.local.get(['settings'], (result) => {
+    if (chrome.runtime.lastError) return;
+    updateBackgroundDebugSetting(result?.settings);
+    debugLog('YouTube Video History Tracker background script running.');
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.settings) {
+        updateBackgroundDebugSetting(changes.settings.newValue);
+    }
+});
 
 // Load shared storage modules when this file runs as a Chrome MV3 service worker.
 if (typeof importScripts === 'function') {
@@ -40,7 +73,8 @@ const stateManager = {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
-        console.log('Background script received message:', message.type, 'from sender:', sender.tab ? 'content' : 'popup');
+        recordTestMessage(message);
+        debugLog('Background script received message:', message.type, 'from sender:', sender.tab ? 'content' : 'popup');
 
         if (message.type === 'getAnnouncements') {
             if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {

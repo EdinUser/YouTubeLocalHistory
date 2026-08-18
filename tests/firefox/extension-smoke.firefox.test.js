@@ -32,12 +32,55 @@ async function main() {
     await session.driver.get('about:blank');
     await session.driver.wait(until.elementLocated(By.css('body')), 10000);
 
+    await setExtensionStorage(session, {
+      video_firefoxpopupstable: {
+        videoId: 'firefoxpopupstable',
+        title: 'Firefox stable popup fixture',
+        channelName: 'Firefox popup fixture channel',
+        url: 'https://www.youtube.com/watch?v=firefoxpopupstable',
+        thumbnail: 'https://i.ytimg.com/vi/firefoxpopupstable/mqdefault.jpg',
+        time: 30,
+        duration: 120,
+        timestamp: Date.now(),
+      },
+    });
     const popupUrl = await openFirefoxExtensionPage(session, 'popup.html');
     assert.equal(
       await session.driver.executeScript(() => typeof browser !== 'undefined' && !!browser.storage && !!browser.storage.local),
       true,
       'extension page should expose browser.storage.local'
     );
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) await openFirefoxExtensionPage(session, 'popup.html');
+      await session.driver.wait(until.elementLocated(By.css('#ytvhtHistoryTable .video-cell')), 10000);
+      const popupState = await session.driver.executeAsyncScript((done) => {
+        (async () => {
+          const samples = [];
+          for (let index = 0; index < 12; index += 1) {
+            const cell = document.querySelector('.video-cell');
+            samples.push({
+              bodySkeleton: document.body.classList.contains('loading-skeleton'),
+              opacity: cell ? getComputedStyle(cell).opacity : null,
+              pulseAnimations: document.getAnimations().filter((animation) =>
+                String(animation.animationName || '').toLowerCase().includes('pulse')
+              ).length,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          done({
+            samples,
+            iconComplete: document.querySelector('.popup-title-icon')?.complete === true,
+            version: document.querySelector('#ytvhtHeaderVersion')?.textContent || '',
+          });
+        })().catch((error) => done({ error: error.message }));
+      });
+      assert.equal(popupState.error, undefined, popupState.error);
+      assert.equal(popupState.iconComplete, true, 'popup title icon should load');
+      assert.match(popupState.version, /^v\d+\.\d+\.\d+/, 'popup should show the extension version');
+      assert.equal(popupState.samples.every((sample) => !sample.bodySkeleton), true, 'popup must not enter skeleton mode');
+      assert.equal(popupState.samples.every((sample) => sample.opacity === '1'), true, 'popup content opacity must remain stable');
+      assert.equal(popupState.samples.every((sample) => sample.pulseAnimations === 0), true, 'popup must not run pulse animations');
+    }
 
     await openFirefoxExtensionPage(session, 'feed.html');
     await session.driver.wait(until.elementLocated(By.css('#refresh')), 10000);
@@ -135,6 +178,69 @@ async function main() {
     await session.driver.wait(async () => session.driver.executeScript(() =>
       document.querySelector('#localSearchResults')?.textContent.includes('Firefox local fixture upload')
     ), 10000, 'local search should render the fixture inventory');
+
+    await session.driver.executeAsyncScript((done) => {
+      (async () => {
+        const channelId = 'UCfirefoxsortreload00001';
+        const thumbnailUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+        await ytIndexedDBStorage.putSubscriptionRecord({
+          channelId,
+          channelTitle: 'Firefox sort reload fixture',
+          source: 'manual',
+          followedAt: 1,
+        });
+        await ytIndexedDBStorage.putChannelSyncState({
+          channelId,
+          initializationState: 'complete',
+          lastSuccessfulCheckAt: Date.now(),
+          nextEligibleCheckAt: 4102444800000,
+        });
+        const now = Date.now();
+        for (const [videoId, title, publishedAt] of [
+          ['fxsortnew01', 'Firefox sort newest', now - 1000],
+          ['fxsortmid001', 'Firefox sort middle', now - 2000],
+          ['fxsortold001', 'Firefox sort oldest', now - 3000],
+        ]) {
+          await ytIndexedDBStorage.putSubscriptionFeedVideo({
+            videoId, channelId, title, thumbnailUrl,
+            publishedAt, discoveredAt: now,
+            lastSeenInFeedAt: publishedAt, durationSeconds: null, isShort: null, source: 'rss',
+          });
+        }
+        document.querySelector('#search').value = '';
+        await loadData();
+        subscriptionsChronological = true;
+        showFeed();
+        const sort = document.querySelector('#subscriptionSort');
+        sort.value = 'published_asc';
+        sort.dispatchEvent(new Event('change', { bubbles: true }));
+        done({ ok: true });
+      })().catch((error) => done({ ok: false, error: error.message }));
+    }).then((result) => assert.equal(result.ok, true, result.error));
+    const getFirefoxSortTitles = () => session.driver.executeScript(() => [...document.querySelectorAll('#grid .ytvht-card-title')]
+      .map((element) => element.textContent.trim())
+      .filter((title) => title.startsWith('Firefox sort')));
+    await session.driver.wait(async () => (await getFirefoxSortTitles()).length === 3, 10000, 'sorted fixture videos should render');
+    assert.deepEqual(await getFirefoxSortTitles(), ['Firefox sort oldest', 'Firefox sort middle', 'Firefox sort newest']);
+
+    await session.driver.navigate().refresh();
+    await session.driver.wait(async () => session.driver.executeScript(() =>
+      !document.documentElement.classList.contains('app-loading') && !!document.querySelector('#subscriptionSort')
+    ), 15000, 'feed should reload for persisted sort verification');
+    await session.driver.executeAsyncScript((done) => {
+      loadData().then(() => {
+        subscriptionsChronological = true;
+        showFeed();
+        done({ ok: true });
+      }).catch((error) => done({ ok: false, error: error.message }));
+    }).then((result) => assert.equal(result.ok, true, result.error));
+    assert.equal(
+      await session.driver.executeScript(() => document.querySelector('#subscriptionSort').value),
+      'published_asc',
+      'subscription sort selection should persist through reload'
+    );
+    await session.driver.wait(async () => (await getFirefoxSortTitles()).length === 3, 10000, 'reloaded sorted videos should render');
+    assert.deepEqual(await getFirefoxSortTitles(), ['Firefox sort oldest', 'Firefox sort middle', 'Firefox sort newest']);
 
     await setExtensionStorage(session, { __firefox_e2e_smoke__: { ok: true } });
     assert.deepEqual(

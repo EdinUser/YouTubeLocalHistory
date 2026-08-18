@@ -33,6 +33,7 @@
         let activeLookups = 0;
         let timer = null;
         let nextRequestAt = 0;
+        let debug = false;
         let pageBridgeReady = false;
         let pageBridgePromise = null;
         let nextRequestId = 0;
@@ -42,11 +43,7 @@
         const queuedIds = new Set();
 
         function diagnostic(message, data) {
-            // This is intentionally visible while the experimental option is
-            // enabled. It gives users a way to distinguish a real YouTube
-            // response from an unchanged card when the external contract
-            // changes.
-            console.info('[YTVHT AI]', message, data || '');
+            log(`[YTVHT AI] ${message}`, data);
         }
 
         function videoIdFor(card) {
@@ -100,7 +97,11 @@
         function parse(response) {
             const contents = response?.contents?.twoColumnWatchNextResults?.results?.results?.contents;
             if (!Array.isArray(contents)) return 'unknown';
-            return contents.some((item) => item?.videoPrimaryInfoRenderer?.badges?.some((badge) => {
+            const primaryInfo = contents.find((item) => item?.videoPrimaryInfoRenderer)?.videoPrimaryInfoRenderer;
+            // Removed/private videos can return HTTP 200 with an item section
+            // but no video metadata. Do not cache that as a valid no-label result.
+            if (!primaryInfo) return 'unknown';
+            return primaryInfo.badges?.some((badge) => {
                 const renderer = badge?.metadataBadgeRenderer;
                 // `label` is the stable signal observed in the response. The
                 // accessibility text is a defensive fallback for a renderer
@@ -108,7 +109,7 @@
                 return renderer?.label === 'AI' || /made with ai/i.test(
                     renderer?.accessibilityData?.label || ''
                 );
-            })) ? 'ai' : 'unlabeled';
+            }) ? 'ai' : 'unlabeled';
         }
 
         function ensurePageBridge() {
@@ -156,7 +157,7 @@
                 };
                 window.addEventListener('message', onMessage);
                 signal?.addEventListener('abort', onAbort, { once: true });
-                window.postMessage({ channel: PAGE_CHANNEL, type: 'lookup', requestId, token, payload }, location.origin);
+                window.postMessage({ channel: PAGE_CHANNEL, type: 'lookup', requestId, token, payload, debug }, location.origin);
             });
         }
 
@@ -258,6 +259,7 @@
 
         function start(settings) {
             stop();
+            debug = settings?.debug === true;
             mode = MODES.has(settings?.aiLabeledVideoHandling) ? settings.aiLabeledVideoHandling : 'off';
             if (mode === 'off') return;
             diagnostic('Enabled', { mode });
@@ -302,11 +304,15 @@
             const nextMode = MODES.has(settings?.aiLabeledVideoHandling)
                 ? settings.aiLabeledVideoHandling
                 : 'off';
+            const nextDebug = settings?.debug === true;
             // A focus refresh reads the same setting most of the time. Do
             // not tear down visual state and make already-known AI cards
             // flash back to normal merely because the YouTube tab regained
             // focus.
-            if (!stopped && nextMode === mode) return;
+            if (!stopped && nextMode === mode) {
+                debug = nextDebug;
+                return;
+            }
             start(settings);
         }
 

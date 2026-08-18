@@ -76,6 +76,20 @@ async function seedStoredVideo(context, videoId, overrides = {}) {
   });
 }
 
+async function resetBackgroundMetrics(context) {
+  const serviceWorker = await getServiceWorker(context);
+  await serviceWorker.evaluate(() => {
+    globalThis.__YTVHT_TEST__.backgroundMetrics = { messageTypes: {}, storageMethods: {} };
+  });
+}
+
+async function getBackgroundMetrics(context) {
+  const serviceWorker = await getServiceWorker(context);
+  return serviceWorker.evaluate(() => structuredClone(
+    globalThis.__YTVHT_TEST__?.backgroundMetrics || { messageTypes: {}, storageMethods: {} }
+  ));
+}
+
 async function routeCapturedPage(page, url, html) {
   await page.route(url, async (route) => {
     await route.fulfill({
@@ -524,6 +538,41 @@ test.describe('Static overlays (captured YouTube DOM)', () => {
 
     await expectSavedOverlayVisible(page, appendedVideoId);
     await expectNoDuplicateOverlays(page, appendedVideoId);
+  });
+
+  test('startup, focus, and progress writes do not repeat page-wide storage lookups', async ({ context, page }) => {
+    const capture = readCapture('controlled-channel-videos');
+    const [targetVideoId] = extractVideoIdsFromHtml(capture.html);
+    expect(targetVideoId, 'controlled channel fixture should contain a watch video').toBeTruthy();
+
+    await resetBackgroundMetrics(context);
+    await openCapturedPage(page, CHANNEL_VIDEOS_URL, capture.html);
+    await page.waitForTimeout(2300);
+
+    const cardCount = await page.locator([
+      'ytd-playlist-panel-video-renderer',
+      'ytd-rich-item-renderer',
+      'ytd-grid-video-renderer',
+      'ytd-rich-grid-media',
+      'ytd-compact-video-renderer',
+      'ytd-compact-radio-renderer',
+      'ytd-video-renderer',
+      'yt-lockup-view-model'
+    ].join(', ')).count();
+    const startupMetrics = await getBackgroundMetrics(context);
+    const startupGetVideoCalls = startupMetrics.storageMethods.getVideo || 0;
+    expect(startupGetVideoCalls).toBeGreaterThan(0);
+    expect(startupGetVideoCalls).toBeLessThanOrEqual(cardCount * 2 + 2);
+
+    for (let index = 0; index < 3; index += 1) {
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await page.waitForTimeout(100);
+    }
+    expect((await getBackgroundMetrics(context)).storageMethods.getVideo || 0).toBe(startupGetVideoCalls);
+
+    await seedStoredVideo(context, targetVideoId, { time: 30, duration: 120 });
+    await expectSavedOverlayVisible(page, targetVideoId, '25%');
+    expect((await getBackgroundMetrics(context)).storageMethods.getVideo || 0).toBe(startupGetVideoCalls);
   });
 
   test('captured watch page marks saved recommendation items only', async ({ context, page }) => {

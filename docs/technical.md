@@ -81,12 +81,16 @@ The interface distinguishes network work from presentation:
 
 - Check asks the scheduler to scan eligible channels.
 - Reload reconstructs projections from local storage.
-- Show changes to the chronological inventory.
+- Show reloads the complete subscription inventory without replacing its selected ordering.
 - Opening Home regenerates local ranking without initiating a Home-owned request.
 
 ## Views and pagination
 
-`feed-view-data.js` creates canonical projections. Home ranks the ready inventory with freshness, affinity, impression, and channel-diversity signals. Subscriptions sorts regular feed records newest first.
+`feed-view-data.js` creates canonical projections. Home ranks the ready inventory
+with freshness, affinity, impression, and channel-diversity signals.
+Subscriptions defaults to canonical newest-first pagination and can apply a
+persisted upload-date or detection-date ordering without pinning newly
+discovered records outside that selection.
 
 Home and Subscriptions use stable 50-record keyset pages. Page traversal must neither duplicate records nor allow a concurrent ordering change to corrupt the current boundary.
 

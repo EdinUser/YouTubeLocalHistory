@@ -203,26 +203,25 @@ async function initStorage() {
     try {
         // Ensure migration is complete
         await ytStorage.ensureMigrated();
-
-        // Load initial data
-        await loadCurrentPages();
+        let initialLoadActive = true;
+        let initialReloadQueued = false;
 
         // Set up message listener for updates
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (message.type === 'videoUpdateFromBackground') {
                 log('Received video update from background:', message.data);
+                if (initialLoadActive) {
+                    initialReloadQueued = true;
+                    return;
+                }
                 updateVideoRecord(message.data);
             } else if (message.type === 'storageUpdate') {
                 log('Received storage update:', message.changes);
+                if (initialLoadActive) {
+                    initialReloadQueued = true;
+                    return;
+                }
                 handleStorageUpdates(message.changes);
-            }
-        });
-
-        // Get any updates that happened while popup was closed
-        chrome.runtime.sendMessage({type: 'getLatestUpdate'}, (response) => {
-            if (response?.lastUpdate) {
-                log('Received latest update from background:', response.lastUpdate);
-                updateVideoRecord(response.lastUpdate);
             }
         });
 
@@ -235,6 +234,10 @@ async function initStorage() {
 
                 if (videoChanges.length > 0) {
                     console.log('[Popup] Storage changes detected (not during sync):', videoChanges.length, 'items');
+                    if (initialLoadActive) {
+                        initialReloadQueued = true;
+                        return;
+                    }
                     // Process each change individually
                     videoChanges.forEach(([key, change]) => {
                         if (key.startsWith('video_')) {
@@ -255,6 +258,14 @@ async function initStorage() {
                 }
             }
         });
+
+        // Read one authoritative startup snapshot after listeners are active.
+        // If a write overlaps that read, repeat it before the popup renders.
+        do {
+            initialReloadQueued = false;
+            await loadCurrentPages({ renderActive: false });
+        } while (initialReloadQueued);
+        initialLoadActive = false;
 
         return true;
     } catch (error) {

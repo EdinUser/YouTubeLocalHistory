@@ -142,6 +142,29 @@
             font-size: 16px;
             margin: 0 0 10px;
         }
+        .popup-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .popup-title-icon {
+            width: 28px;
+            height: 28px;
+            object-fit: contain;
+            flex: 0 0 auto;
+        }
+        .popup-title-text {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+        .popup-title-row h1 { margin: 0; }
+        .popup-title-version {
+            font-size: 10px;
+            font-weight: 400;
+            opacity: 0.7;
+        }
         p {
             margin: 0 0 10px;
         }
@@ -574,22 +597,6 @@
         body.density-high .video-channel,
         body.density-high .video-date {
             font-size: 11px;
-        }
-
-        /* Loading skeleton */
-        body.loading-skeleton .video-cell {
-            background: var(--card-bg);
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-
-        body.loading-skeleton .video-thumbnail {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         /* Responsive breakpoints */
@@ -1048,7 +1055,13 @@
     </style>
 </head>
 <body>
-    <h1 data-i18n="popup_title">YT re:Watch</h1>
+    <div class="popup-title-row">
+        <img class="popup-title-icon" src="icon48.png" alt="" aria-hidden="true">
+        <div class="popup-title-text">
+            <h1 data-i18n="popup_title">YT re:Watch</h1>
+            <span class="popup-title-version" id="ytvhtHeaderVersion"></span>
+        </div>
+    </div>
     <div class="controls">
         <div class="left-controls">
             <!-- Theme is controlled from Settings → Theme (applies instantly). -->

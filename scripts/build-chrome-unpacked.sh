@@ -25,4 +25,13 @@ cp "$ROOT"/src/*.js "$ROOT"/src/*.html "$ROOT/build/e2e/chrome/"
 cp "$ROOT/src/icon"*.png "$ROOT/build/e2e/chrome/"
 cp "$ROOT/src/manifest.chrome.json" "$ROOT/build/e2e/chrome/manifest.json"
 
+# Enable production-owned diagnostic counters only in the generated E2E build.
+node - "$ROOT/build/e2e/chrome/background.js" "$ROOT/build/e2e/chrome/content.js" <<'NODE'
+const fs = require('node:fs');
+const marker = 'globalThis.__YTVHT_TEST__ = globalThis.__YTVHT_TEST__ || {};\n';
+for (const file of process.argv.slice(2)) {
+  fs.writeFileSync(file, marker + fs.readFileSync(file, 'utf8'));
+}
+NODE
+
 echo "Unpacked Chrome E2E extension: $ROOT/build/e2e/chrome"

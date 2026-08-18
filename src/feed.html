@@ -65,8 +65,9 @@
             background: var(--bg);
             border-bottom: 1px solid var(--border);
         }
-        .brand { font-size: 18px; font-weight: 700; margin-right: 4px; white-space: nowrap; }
+        .brand { display: inline-flex; align-items: center; font-size: 18px; font-weight: 700; margin-right: 4px; white-space: nowrap; }
         .brand small { font-weight: 400; color: var(--text-2); font-size: 13px; margin-left: 6px; }
+        .brand .brand-version { font-size: 11px; opacity: 0.8; }
         .spacer { flex: 1 1 auto; }
         .count { font-size: 13px; color: var(--text-2); white-space: nowrap; }
         /* Group related controls so the bar reads as: brand · search · filters …… count · actions */
@@ -137,6 +138,13 @@
         .feed-title-icon svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .feed-title-text h2 { margin: 0; font-size: 24px; line-height: 1.15; }
         .feed-title-text p { margin: 4px 0 0; color: var(--text-2); font-size: 13px; line-height: 1.35; }
+        body:not(.sidebar-collapsed) .feed-title-text.nav-mirrored-title { align-self: center; }
+        body:not(.sidebar-collapsed) .feed-title-text.nav-mirrored-title h2 { display: none; }
+        body:not(.sidebar-collapsed) .feed-title-text.nav-mirrored-title p {
+            margin-top: 0;
+            font-size: 15px;
+            line-height: 1.45;
+        }
         .feed-title-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; min-height: 32px; }
         .feed-title-actions .count, .feed-title-actions .subs-count, .feed-title-actions .playlists-count, .feed-title-actions .history-count { white-space: nowrap; }
         .status-row { display: contents; }
@@ -1530,7 +1538,7 @@
         }
         .icon-btn:hover { background: var(--chip); }
         .icon-btn span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 2px; }
-        .brand-logo { color: var(--accent); margin-right: 2px; }
+        .brand-logo { width: 26px; height: 26px; margin-right: 6px; object-fit: contain; }
         .mast-search { min-width: 0; display: flex; justify-content: center; }
         .mast-search input[type="search"] { width: 100%; max-width: 560px; }
         .mast-right { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
@@ -1632,7 +1640,7 @@
                 <span></span><span></span><span></span>
             </button>
             <div class="brand" id="brandHome" role="button" tabindex="0" title="Back to your feed" data-i18n-title="feed_back_to_feed" style="cursor:pointer;">
-                <span class="brand-logo">▶</span>YT re:Watch
+                <img class="brand-logo" src="icon48.png" alt="" aria-hidden="true">YT re:Watch<small class="brand-version" id="feedVersion"></small>
             </div>
         </div>
         <div class="mast-search">
@@ -1709,7 +1717,7 @@
             <header class="feed-title-bar" id="feedTitleBar">
                 <div class="feed-title-block">
                     <span class="feed-title-icon" id="feedTitleIcon" aria-hidden="true"></span>
-                    <div class="feed-title-text">
+                    <div class="feed-title-text nav-mirrored-title">
                         <h2 id="localHeading" data-i18n="feed_your_feed">Your feed</h2>
                         <p id="feedTitleDescription"></p>
                     </div>
@@ -1777,7 +1785,7 @@
             <!-- Local subscriptions manager -->
             <section class="subs-view" id="subscriptionsSection" style="display:none;">
                 <div class="subs-toolbar feed-title-bar">
-                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-4 2.5-6 5.5-6s5 2 5.5 6"></path><circle cx="17" cy="9" r="2.2"></circle><path d="M15.5 14c3.2-.5 5 1.2 5.5 4"></path></svg></span><div class="feed-title-text"><h2 class="subs-title" data-i18n="feed_channels">Channels</h2><p data-i18n="feed_title_channels_description">Manage channels followed by re:Watch.</p></div></div>
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-4 2.5-6 5.5-6s5 2 5.5 6"></path><circle cx="17" cy="9" r="2.2"></circle><path d="M15.5 14c3.2-.5 5 1.2 5.5 4"></path></svg></span><div class="feed-title-text nav-mirrored-title"><h2 class="subs-title" data-i18n="feed_channels">Channels</h2><p data-i18n="feed_title_channels_description">Manage channels followed by re:Watch.</p></div></div>
                     <div class="feed-title-actions">
                         <div class="subs-count" id="subscriptionsCount"></div>
                         <div class="subs-tabs" id="subscriptionTabs" role="tablist" aria-label="Channels" data-i18n-aria-label="feed_channels" hidden>
@@ -1801,7 +1809,7 @@
             <!-- Saved playlists -->
             <section class="playlists-view" id="playlistsSection" style="display:none;">
                 <div class="playlists-toolbar feed-title-bar">
-                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h10M4 11h10M4 16h7"></path><path d="m15 14 5 3-5 3v-6Z"></path></svg></span><div class="feed-title-text"><h2 class="playlists-title" data-i18n="tab_playlists">Playlists</h2><p data-i18n="feed_title_playlists_description">Saved locally in this browser.</p></div></div>
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h10M4 11h10M4 16h7"></path><path d="m15 14 5 3-5 3v-6Z"></path></svg></span><div class="feed-title-text nav-mirrored-title"><h2 class="playlists-title" data-i18n="tab_playlists">Playlists</h2><p data-i18n="feed_title_playlists_description">Saved locally in this browser.</p></div></div>
                     <div class="feed-title-actions"><div class="playlists-count" id="playlistsCount"></div></div>
                 </div>
                 <div class="playlists-list" id="playlistsList"></div>
@@ -1813,7 +1821,7 @@
             <!-- Local watch history -->
             <section class="history-view" id="historySection" style="display:none;">
                 <div class="history-toolbar feed-title-bar">
-                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7"></path><path d="M4 4v5h5"></path><path d="M12 7v5l3 2"></path></svg></span><div class="feed-title-text"><h2 class="history-title" data-i18n="feed_history">History</h2><p data-i18n="feed_title_history_description">Watch history stored locally in this browser.</p></div></div>
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7"></path><path d="M4 4v5h5"></path><path d="M12 7v5l3 2"></path></svg></span><div class="feed-title-text nav-mirrored-title"><h2 class="history-title" data-i18n="feed_history">History</h2><p data-i18n="feed_title_history_description">Watch history stored locally in this browser.</p></div></div>
                     <div class="feed-title-actions"><div class="history-count" id="historyCount"></div></div>
                 </div>
                 <div class="history-list" id="historyList"></div>
@@ -1824,7 +1832,7 @@
             <!-- Locally saved Watch Later videos -->
             <section class="history-view" id="watchLaterSection" style="display:none;">
                 <div class="history-toolbar feed-title-bar">
-                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5v5l3.2 2"></path></svg></span><div class="feed-title-text"><h2 class="history-title" data-i18n="feed_nav_watch_later">Watch Later</h2><p data-i18n="feed_title_watch_later_description">Videos saved locally to watch later.</p></div></div>
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5v5l3.2 2"></path></svg></span><div class="feed-title-text nav-mirrored-title"><h2 class="history-title" data-i18n="feed_nav_watch_later">Watch Later</h2><p data-i18n="feed_title_watch_later_description">Videos saved locally to watch later.</p></div></div>
                     <div class="feed-title-actions"><div class="history-count" id="watchLaterCount"></div><button class="btn" id="reloadWatchLater" type="button" data-i18n="feed_reload_view">Reload view</button></div>
                 </div>
                 <div class="history-list" id="watchLaterList"></div>
@@ -1833,7 +1841,7 @@
 
             <!-- Analytics view (hidden until the Analytics nav item is clicked) -->
             <div id="analyticsSection" style="display:none;">
-                <header class="feed-title-bar"><div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7"></path><path d="M2 20h20"></path></svg></span><div class="feed-title-text"><h2 data-i18n="tab_analytics">Analytics</h2><p data-i18n="feed_analytics_subtitle">your watch stats, kept locally</p></div></div></header>
+                <header class="feed-title-bar"><div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7"></path><path d="M2 20h20"></path></svg></span><div class="feed-title-text nav-mirrored-title"><h2 data-i18n="tab_analytics">Analytics</h2><p data-i18n="feed_analytics_subtitle">your watch stats, kept locally</p></div></div></header>
                 <div class="an-cards" id="anCards"></div>
                 <div class="an-charts">
                     <div class="an-chart">
@@ -1890,7 +1898,7 @@
 
             <section class="settings-view" id="settingsSection" style="display:none;">
                 <div class="settings-header feed-title-bar">
-                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H10v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3V10h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.16 4.1l.06.06A1.7 1.7 0 0 0 9.1 4.6a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 .4-1.1V3h3.5v.1a1.7 1.7 0 0 0 1.1 1.6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1V14h-.1a1.7 1.7 0 0 0-1.7 1Z"></path></svg></span><div class="feed-title-text"><h2 class="settings-title" data-i18n="tab_settings">Settings</h2><p class="settings-subtitle" data-i18n="feed_settings_subtitle">Everything stays local in this browser.</p></div></div>
+                    <div class="feed-title-block"><span class="feed-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H10v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3V10h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.16 4.1l.06.06A1.7 1.7 0 0 0 9.1 4.6a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 .4-1.1V3h3.5v.1a1.7 1.7 0 0 0 1.1 1.6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1V14h-.1a1.7 1.7 0 0 0-1.7 1Z"></path></svg></span><div class="feed-title-text nav-mirrored-title"><h2 class="settings-title" data-i18n="tab_settings">Settings</h2><p class="settings-subtitle" data-i18n="feed_settings_subtitle">Everything stays local in this browser.</p></div></div>
                     <div class="settings-header-actions">
                         <span class="settings-message" id="feedSettingsMessage"></span>
                     </div>

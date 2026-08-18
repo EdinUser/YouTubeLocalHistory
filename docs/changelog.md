@@ -4,10 +4,25 @@
 
 - Added experimental **AI-labeled video handling** with Off, Badge, Dim, and
   Hide modes for videos YouTube itself discloses as made with AI.
-- Added a dedicated IndexedDB cache, viewport-driven one-at-a-time lookups,
-  long cache lifetimes, and bounded retry backoff to keep request volume low.
+- Added a dedicated IndexedDB cache, paced viewport-driven lookups with at most
+  two requests in flight, long cache lifetimes, and bounded retry backoff to
+  keep request volume low.
 - The setting explains that it makes direct YouTube requests when enabled and
   is not a general or fully reliable AI detector.
+- Fixed Subscriptions so the chosen upload-date or detection-date order survives
+  **Reload view** and **Show**, without pinning newly discovered videos ahead of
+  the selected order.
+- Fixed popup startup and live-update races that could make already-loaded
+  content pulse or render repeatedly after a YouTube tab had been open longer.
+- Added the installed extension version and consistent re:Watch icon branding
+  to both the popup and full-page feed.
+- Refined full-page headers to avoid duplicate nearby titles when the sidebar is
+  expanded, while keeping the current view title visible in collapsed mode.
+- Reduced redundant overlay and thumbnail work by targeting changed video IDs,
+  coalescing startup scans, and limiting focus rescans to presentation changes.
+- Made background, storage, and AI-label informational output respect debug mode.
+- Treats removed or incomplete AI-label responses as indeterminate and uses
+  bounded live Chrome/Firefox canary fallbacks when an external fixture changes.
 
 ## v5.1.0 — 14 August 2026
 

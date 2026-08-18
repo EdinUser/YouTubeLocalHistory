@@ -305,6 +305,10 @@ async function getStartupFeedView() {
 }
 
 function init() {
+    const version = chrome.runtime.getManifest().version;
+    const versionLabel = document.getElementById('feedVersion');
+    if (versionLabel) versionLabel.textContent = `v${version}`;
+
     const searchInput = document.getElementById('search');
     searchInput.addEventListener('input', () => {
         searchVisibleLimit = SEARCH_PAGE_SIZE;
@@ -529,7 +533,10 @@ function init() {
         }
     });
     document.getElementById('subscriptionSort')?.addEventListener('change', (event) => {
-        subscriptionSort = event.target.value;
+        subscriptionSort = normalizeSubscriptionSort(event.target.value);
+        try {
+            localStorage.setItem(SUBSCRIPTION_SORT_STORAGE_KEY, subscriptionSort);
+        } catch (_) { /* keep the in-memory preference */ }
         newlyShownFeedVideoIds = [];
         render();
     });
