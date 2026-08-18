@@ -17,7 +17,21 @@ function isShort(v) {
 // and Shorts shows only Shorts.
 let shortsOnly = false;
 let subscriptionsChronological = false;
-let subscriptionSort = ytvhtSubscriptionSort.DEFAULT_SUBSCRIPTION_SORT;
+const SUBSCRIPTION_SORT_STORAGE_KEY = 'ytvht.subscriptionSort.v1';
+const SUBSCRIPTION_SORT_VALUES = new Set(['published_desc', 'published_asc', 'discovered_desc']);
+function normalizeSubscriptionSort(value) {
+    return SUBSCRIPTION_SORT_VALUES.has(value)
+        ? value
+        : ytvhtSubscriptionSort.DEFAULT_SUBSCRIPTION_SORT;
+}
+function loadSubscriptionSort() {
+    try {
+        return normalizeSubscriptionSort(localStorage.getItem(SUBSCRIPTION_SORT_STORAGE_KEY));
+    } catch (_) {
+        return ytvhtSubscriptionSort.DEFAULT_SUBSCRIPTION_SORT;
+    }
+}
+let subscriptionSort = loadSubscriptionSort();
 const VISIBLE_FEED_LIMIT = 300;
 const FEED_RENDER_PAGE_SIZE = typeof ytvhtFeedContracts !== 'undefined'
     ? Number(ytvhtFeedContracts.FEED_PAGE_SIZE || 50)
@@ -454,14 +468,7 @@ function currentView() {
             rememberHomeRecommendations(homeList);
             return { list: homeList, q };
         }
-        const sorted = sortList(list, sort);
-        if (subscriptionsChronological && newlyShownFeedVideoIds.length) {
-            const highlighted = new Set(newlyShownFeedVideoIds);
-            const newlyShown = sorted.filter((video) => highlighted.has(video.videoId));
-            const remaining = sorted.filter((video) => !highlighted.has(video.videoId));
-            return { list: newlyShown.concat(remaining).slice(0, VISIBLE_FEED_LIMIT), q };
-        }
-        return { list: sorted.slice(0, VISIBLE_FEED_LIMIT), q };
+        return { list: sortList(list, sort).slice(0, VISIBLE_FEED_LIMIT), q };
     }
 
     // Query: YouTube-style search over feed + history. Match every word in any
@@ -679,14 +686,6 @@ function subscriptionVideoPassesFilters(video) {
     return true;
 }
 
-function subscriptionPinnedVideos() {
-    if (!newlyShownFeedVideoIds.length) return [];
-    const byId = new Map(allVideos.map((video) => [video.videoId, video]));
-    return newlyShownFeedVideoIds
-        .map((videoId) => byId.get(videoId))
-        .filter(subscriptionVideoPassesFilters);
-}
-
 function appendBufferedSubscriptionVideos(state, grid, targetCount) {
     const next = state.videos.slice(state.renderedCount, targetCount);
     appendFeedCards(grid, next);
@@ -752,13 +751,13 @@ async function fillSubscriptionPage(state, grid, empty, targetCount) {
 function startSubscriptionPagination(grid, empty) {
     const filtered = allVideos.filter(subscriptionVideoPassesFilters);
     const useInMemorySort = subscriptionSort !== 'published_desc';
-    const pinned = useInMemorySort
+    const initialVideos = useInMemorySort
         ? ytvhtSubscriptionSort.sortSubscriptionVideos(filtered, subscriptionSort)
-        : subscriptionPinnedVideos();
+        : [];
     const state = {
         generation: feedPaginationGeneration,
-        videos: pinned.slice(),
-        seenVideoIds: new Set(pinned.map((video) => video.videoId)),
+        videos: initialVideos.slice(),
+        seenVideoIds: new Set(initialVideos.map((video) => video.videoId)),
         cursor: null,
         exhausted: useInMemorySort,
         renderedCount: 0,
@@ -793,6 +792,8 @@ function render() {
     const { list, q, metadataCandidates = [] } = subscriptionsBrowse
         ? { list: [], q: '' }
         : currentView();
+    const titleText = heading?.closest('.feed-title-text');
+    if (titleText) titleText.classList.toggle('nav-mirrored-title', !q);
     const visibleList = q ? list.slice(0, searchVisibleLimit) : list;
     document.body.classList.toggle('shorts-mode', shortsOnly && !q);
     grid.textContent = '';

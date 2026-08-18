@@ -17,3 +17,21 @@ test('announcements use an opaque YouTube-local acknowledgement and a session-on
   expect(renderer).toContain('window.localStorage.setItem(announcement.storageKey, \'1\')');
   expect(renderer).toContain('window.localStorage.getItem(announcement.storageKey) !== null');
 });
+
+test('background and storage informational traces follow the persisted debug setting', () => {
+  const background = read('src/background.js');
+  const storage = read('src/storage.js');
+
+  expect(background).toContain('let backgroundDebugEnabled = false');
+  expect(background).toContain("backgroundDebugEnabled = settings?.debug === true");
+  expect(background).toContain("debugLog('Background script received message:'");
+  expect(background).not.toContain("console.log('Background script received message:'");
+  expect(background).toContain("chrome.storage.onChanged.addListener((changes, area) => {");
+  expect(background).toContain('function recordTestMessage(message)');
+  expect(background).toContain("if (message.type === 'ytStorageCall' && message.method)");
+
+  expect(storage).toContain('let storageDebugEnabled = false');
+  expect(storage).toContain("if (typeof globalScope.ytvhtDebugLog === 'function')");
+  expect(storage).toContain("debugLog('[Storage] Video migration already complete')");
+  expect(storage).not.toContain("console.log('[Storage] Video migration already complete')");
+});

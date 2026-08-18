@@ -20,6 +20,11 @@ describe('AI-label response parser', () => {
       ] } } } }
     })).toBe('unlabeled');
     expect(parser()({ contents: {} })).toBe('unknown');
+    expect(parser()({
+      contents: { twoColumnWatchNextResults: { results: { results: { contents: [
+        { itemSectionRenderer: { contents: [] } }
+      ] } } } }
+    })).toBe('unknown');
   });
 
   test('does not treat generic information badges as AI labels', () => {
@@ -61,7 +66,19 @@ describe('AI-label response parser', () => {
     expect(source).toContain('cacheVersion: CACHE_VERSION');
     expect(source).toContain('pageWorldLookup');
     expect(source).not.toContain("fetch(new URL('/youtubei/");
-    expect(source).toContain("console.info('[YTVHT AI]'");
+    expect(source).toContain('log(`[YTVHT AI] ${message}`, data)');
+    expect(source).not.toContain("console.info('[YTVHT AI]'");
+  });
+
+  test('keeps page-world request traces behind debug mode', () => {
+    const source = require('fs').readFileSync(
+      require('path').join(__dirname, '..', '..', 'src', 'content-ai-labels-page.js'),
+      'utf8'
+    );
+
+    expect(source).toContain('const debug = event.data.debug === true');
+    expect(source).toContain("if (debug) console.info('[YTVHT AI] Page-world lookup started'");
+    expect(source).toContain("if (debug) console.info('[YTVHT AI] Page-world lookup finished'");
   });
 
   test('keeps observing returned cards so virtualized YouTube DOM updates reapply cached results', () => {
@@ -88,13 +105,15 @@ describe('AI-label response parser', () => {
     expect(source).toContain('activeLookups >= MAX_CONCURRENT_LOOKUPS');
   });
 
-  test('does not restart unchanged AI handling on a focus settings refresh', () => {
+  test('does not restart unchanged AI handling during startup or a focus settings refresh', () => {
     const source = require('fs').readFileSync(
       require('path').join(__dirname, '..', '..', 'src', 'content-ai-labels.js'),
       'utf8'
     );
 
-    expect(source).toContain('if (!stopped && nextMode === mode) return');
+    expect(source.match(/if \(!stopped && nextMode === mode\) \{/g)).toHaveLength(2);
+    expect(source).toContain('Keep an in-flight scan instead of aborting');
+    expect(source).toContain('debug = nextDebug');
     expect(source).toContain('return { start, stop, update, parse, TTL }');
   });
 

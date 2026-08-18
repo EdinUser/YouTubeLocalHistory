@@ -24,6 +24,16 @@ async function waitForFeed(session) {
   )), 15000, 'feed page should finish loading');
 }
 
+async function clickStatusAction(session) {
+  const clicked = await session.driver.executeScript(() => {
+    const button = document.querySelector('#status button');
+    if (!button) return false;
+    button.click();
+    return true;
+  });
+  assert.equal(clicked, true, 'feed status action should be available');
+}
+
 async function runScenario(name, options, fn) {
   const timeout = setTimeout(() => {
     console.error(`Firefox packaged feed test "${name}" exceeded ${TEST_TIMEOUT_MS}ms`);
@@ -637,7 +647,7 @@ async function main() {
         if (original) original.call(this, options);
       };
     });
-    await session.driver.findElement(By.css('#status button')).click();
+    await clickStatusAction(session);
     await session.driver.wait(async () => session.driver.executeScript((id) => (
       document.querySelector('.ytvht-feed-card')?.dataset.ytvhtVideoId === id &&
       window.__phase2ScrolledTo?.videoId === id
@@ -669,7 +679,7 @@ async function main() {
     await session.driver.executeAsyncScript((id, done) => {
       showNewFeedVideos([id]).then(() => done()).catch((error) => done({ error: error.message }));
     }, retryVideoId);
-    await session.driver.findElement(By.css('#status button')).click();
+    await clickStatusAction(session);
     await session.driver.wait(async () => session.driver.executeScript(() => (
       document.querySelector('#status')?.textContent.includes('1 stale discovery was removed from the new-videos notice.')
     )), 15000, 'missing discovery should be removed as stale');
@@ -698,7 +708,7 @@ async function main() {
       })().catch((error) => done({ ok: false, error: error.message }));
     }, filteredVideoId, channelId);
     assert.equal(filterSeeded.ok, true, filterSeeded.error);
-    await session.driver.findElement(By.css('#status button')).click();
+    await clickStatusAction(session);
     await session.driver.wait(async () => session.driver.executeScript(() => (
       document.querySelector('#status')?.textContent.includes('0 new videos shown. 1 new video is hidden: Shorts (1).')
     )), 15000, 'Show should report a pending video hidden by filters');

@@ -21,8 +21,9 @@
 
         const controller = new AbortController();
         controllers.set(requestId, controller);
+        const debug = event.data.debug === true;
         try {
-            console.info('[YTVHT AI] Page-world lookup started', { videoId: event.data.payload?.videoId });
+            if (debug) console.info('[YTVHT AI] Page-world lookup started', { videoId: event.data.payload?.videoId });
             const response = await fetch('/youtubei/v1/next?prettyPrint=false&alt=json', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -31,7 +32,7 @@
                 body: JSON.stringify(event.data.payload)
             });
             const responseData = response.ok ? await response.json() : null;
-            console.info('[YTVHT AI] Page-world lookup finished', {
+            if (debug) console.info('[YTVHT AI] Page-world lookup finished', {
                 videoId: event.data.payload?.videoId,
                 httpStatus: response.status
             });

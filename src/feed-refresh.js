@@ -105,10 +105,14 @@ function syncFeedStatusRow() {
     row.hidden = !status.textContent && subscriptionSortControl.hidden;
 }
 
-function pendingFeedHiddenReasons(videoIds) {
+function pendingFeedVisibility(videoIds) {
     const pendingIds = new Set(videoIds || []);
     const counts = new Map();
-    const add = (label) => counts.set(label, (counts.get(label) || 0) + 1);
+    let hiddenCount = 0;
+    const add = (label) => {
+        hiddenCount += 1;
+        counts.set(label, (counts.get(label) || 0) + 1);
+    };
     const isUnwatchedOnly = document.getElementById('unwatched')?.checked;
     const hidesMembers = document.getElementById('hideMembers')?.checked;
     const videos = (allVideos || []).filter((video) => pendingIds.has(video?.videoId));
@@ -125,7 +129,11 @@ function pendingFeedHiddenReasons(videoIds) {
         }
     });
 
-    return Array.from(counts, ([label, count]) => `${label} (${feedFormatNumber(count)})`).join(', ');
+    return {
+        visibleCount: Math.max(0, videos.length - hiddenCount),
+        hiddenCount,
+        reasons: Array.from(counts, ([label, count]) => `${label} (${feedFormatNumber(count)})`).join(', ')
+    };
 }
 
 function setRefreshUi(busy) {
@@ -261,21 +269,43 @@ async function showNewFeedVideos(videoIds) {
     return pendingFeedDiscovery;
 }
 
-function visiblePendingFeedVideoCount(videoIds) {
-    const pending = new Set(videoIds);
-    return Array.from(document.querySelectorAll('[data-ytvht-video-id]'))
-        .filter((card) => pending.has(card.dataset.ytvhtVideoId)).length;
-}
-
 function scrollToShownFeedVideos(videoIds) {
     const pending = new Set(videoIds);
-    const firstCard = Array.from(document.querySelectorAll('[data-ytvht-video-id]'))
+    const findCard = () => Array.from(document.querySelectorAll('[data-ytvht-video-id]'))
         .find((card) => pending.has(card.dataset.ytvhtVideoId));
-    if (firstCard && typeof firstCard.scrollIntoView === 'function') {
+    const scrollToCard = () => {
+        const firstCard = findCard();
+        if (!firstCard || typeof firstCard.scrollIntoView !== 'function') return false;
         firstCard.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    } else if (typeof window.scrollTo === 'function') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return true;
+    };
+    if (scrollToCard()) return Promise.resolve(true);
+
+    const grid = document.getElementById('grid');
+    if (!grid || typeof MutationObserver === 'undefined') {
+        if (typeof window.scrollTo === 'function') window.scrollTo({ top: 0, behavior: 'smooth' });
+        return Promise.resolve(false);
     }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (found) => {
+            if (settled) return;
+            settled = true;
+            observer.disconnect();
+            clearTimeout(timeout);
+            if (!found && typeof window.scrollTo === 'function') {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            resolve(found);
+        };
+        const observer = new MutationObserver(() => {
+            if (scrollToCard()) finish(true);
+        });
+        const timeout = setTimeout(() => finish(false), 1500);
+        observer.observe(grid, { childList: true, subtree: true });
+        if (scrollToCard()) finish(true);
+    });
 }
 
 async function showPendingFeedVideos(onReady) {
@@ -301,8 +331,7 @@ async function showPendingFeedVideos(onReady) {
         // entire inventory to detection time.
         if (typeof onReady === 'function') onReady();
         else showFeed();
-        const visibleCount = visiblePendingFeedVideoCount(videoIds);
-        const hiddenCount = Math.max(0, videoIds.length - visibleCount);
+        const { visibleCount, hiddenCount, reasons } = pendingFeedVisibility(videoIds);
         let message = feedPlural(
             'feed_new_videos_shown',
             visibleCount,
@@ -310,18 +339,16 @@ async function showPendingFeedVideos(onReady) {
             '$1 new videos shown.'
         );
         if (hiddenCount) {
-            const reasons = pendingFeedHiddenReasons(videoIds)
-                || tFeed('feed_hidden_reason_unavailable', 'a saved visibility preference');
             message += ` ${feedPlural(
                 'feed_new_videos_hidden_by_filters',
                 hiddenCount,
                 '$1 new video is hidden: $2.',
                 '$1 new videos are hidden: $2.',
-                [reasons]
+                [reasons || tFeed('feed_hidden_reason_unavailable', 'a saved visibility preference')]
             )}`;
         }
         setStatus(message, false);
-        scrollToShownFeedVideos(videoIds);
+        await scrollToShownFeedVideos(videoIds);
     } catch (error) {
         // Pending discoveries created before a retention pass can include IDs
         // that were legitimately removed before the user clicks Show. Recover

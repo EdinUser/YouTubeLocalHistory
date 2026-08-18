@@ -23,6 +23,7 @@ test('packaged local search stays local and Show opens the chronological subscri
   const youtubeRequests = [];
 
   await page.goto(`${extensionOrigin}/feed.html`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).not.toHaveClass(/app-loading/);
   await page.evaluate(async () => {
     clearPageFeedWorkTimer();
     if (pageFeedWorkPromise) {
@@ -231,4 +232,111 @@ test('page-active idle work runs eligible dormant maintenance only after foregro
   });
   await expect.poll(() => page.evaluate(async () => Boolean((await ytIndexedDBStorage.getChannelSyncState('UC5555555555abcdefghijkl'))?.dormantMaintenanceAt))).toBe(true);
   await page.close();
+});
+
+test('subscription sort selection and ordering survive a packaged feed reload', async ({ context }) => {
+  const worker = context.serviceWorkers().find((item) => item.url().includes('background.js'))
+    || await context.waitForEvent('serviceworker', { predicate: (item) => item.url().includes('background.js') });
+  const extensionOrigin = `${new URL(worker.url()).protocol}//${new URL(worker.url()).host}`;
+  const page = await context.newPage();
+
+  await page.goto(`${extensionOrigin}/feed.html`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(async () => {
+    clearPageFeedWorkTimer();
+    const channelId = 'UCsortreloadfixture000001';
+    const thumbnailUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+    await ytIndexedDBStorage.putSubscriptionRecord({
+      channelId,
+      channelTitle: 'Sort reload fixture',
+      source: 'manual',
+      followedAt: 1
+    });
+    await ytIndexedDBStorage.putChannelSyncState({
+      channelId,
+      initializationState: 'complete',
+      lastSuccessfulCheckAt: Date.now(),
+      nextEligibleCheckAt: 4102444800000
+    });
+    const now = Date.now();
+    for (const [videoId, title, publishedAt] of [
+      ['sortnewest01', 'Sort newest', now - 1000],
+      ['sortmiddle01', 'Sort middle', now - 2000],
+      ['sortoldest01', 'Sort oldest', now - 3000]
+    ]) {
+      await ytIndexedDBStorage.putSubscriptionFeedVideo({
+        videoId, channelId, title, thumbnailUrl,
+        publishedAt, discoveredAt: now,
+        lastSeenInFeedAt: publishedAt, durationSeconds: null, isShort: null, source: 'rss'
+      });
+    }
+    await loadData();
+    subscriptionsChronological = true;
+    showFeed();
+    const sort = document.querySelector('#subscriptionSort');
+    sort.value = 'published_asc';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  const titles = page.locator('#grid .ytvht-card-title');
+  await expect(titles).toHaveText(['Sort oldest', 'Sort middle', 'Sort newest']);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).not.toHaveClass(/app-loading/);
+  await page.evaluate(async () => {
+    await loadData();
+    subscriptionsChronological = true;
+    showFeed();
+  });
+
+  await expect(page.locator('#subscriptionSort')).toHaveValue('published_asc');
+  await expect(titles).toHaveText(['Sort oldest', 'Sort middle', 'Sort newest']);
+  await page.close();
+});
+
+test('popup reopening renders stable content without pulse animations', async ({ context }) => {
+  const worker = context.serviceWorkers().find((item) => item.url().includes('background.js'))
+    || await context.waitForEvent('serviceworker', { predicate: (item) => item.url().includes('background.js') });
+  const extensionOrigin = `${new URL(worker.url()).protocol}//${new URL(worker.url()).host}`;
+  await worker.evaluate(async () => {
+    await chrome.storage.local.set({
+      video_popupstable: {
+        videoId: 'popupstable',
+        title: 'Stable popup fixture',
+        channelName: 'Popup fixture channel',
+        url: 'https://www.youtube.com/watch?v=popupstable',
+        thumbnail: 'https://i.ytimg.com/vi/popupstable/mqdefault.jpg',
+        time: 30,
+        duration: 120,
+        timestamp: Date.now()
+      }
+    });
+  });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const popup = await context.newPage();
+    await popup.goto(`${extensionOrigin}/popup.html`, { waitUntil: 'domcontentloaded' });
+    await expect(popup.locator('#ytvhtHistoryTable .video-cell')).toHaveCount(1);
+    await expect(popup.locator('#ytvhtHeaderVersion')).toHaveText(/^v\d+\.\d+\.\d+/);
+    await expect(popup.locator('.popup-title-icon')).toHaveJSProperty('complete', true);
+
+    const samples = await popup.evaluate(async () => {
+      const values = [];
+      for (let index = 0; index < 12; index += 1) {
+        const cell = document.querySelector('.video-cell');
+        values.push({
+          bodySkeleton: document.body.classList.contains('loading-skeleton'),
+          opacity: cell ? getComputedStyle(cell).opacity : null,
+          pulseAnimations: document.getAnimations().filter((animation) =>
+            String(animation.animationName || '').toLowerCase().includes('pulse')
+          ).length
+        });
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return values;
+    });
+
+    expect(samples.every((sample) => !sample.bodySkeleton)).toBe(true);
+    expect(samples.every((sample) => sample.opacity === '1')).toBe(true);
+    expect(samples.every((sample) => sample.pulseAnimations === 0)).toBe(true);
+    await popup.close();
+  }
 });

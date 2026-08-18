@@ -58,15 +58,17 @@ Home uses stable 50-card pages. Moving between pages does not duplicate cards or
 
 ![The re:Watch Subscriptions tab showing recent cached uploads from locally followed channels.](assets/guide/feed-subscriptions.png)
 
-*Subscriptions lists cached uploads in chronological order.*
+*Subscriptions lists cached uploads in the selected upload-date or detection-date order.*
 
-Subscriptions is the complete chronological inventory of regular cached uploads. It also uses stable 50-card pages.
+Subscriptions is the complete inventory of regular cached uploads. Choose
+upload-date or detection-date ordering; the selection remains active through
+**Reload** and **Show**. The view also uses stable 50-card pages.
 
 ### Check, Reload, and Show
 
 - **Check** scans eligible followed channels and updates cached feed records. The status beside it reports progress, scheduling, and outcomes.
 - **Reload** renders current local storage again without starting a feed request.
-- **Show** opens the chronological Subscriptions inventory after a scan or subscription-import handoff.
+- **Show** reloads the complete Subscriptions inventory after a scan or subscription-import handoff and retains its selected ordering.
 
 The interface renders cached data before initialization work completes, so an existing feed remains usable during a scan.
 

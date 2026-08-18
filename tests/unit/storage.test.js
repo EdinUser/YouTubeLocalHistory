@@ -55,6 +55,9 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
             fakeLocalData = {};
             if (callback) callback();
           })
+        },
+        onChanged: {
+          addListener: jest.fn()
         }
       },
       runtime: {
@@ -95,6 +98,7 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
     delete global.ytIndexedDBStorage;
     delete global.chrome;
     delete global.browser;
+    delete global.ytvhtDebugLog;
   });
 
   describe('getVideo (local first, then IndexedDB)', () => {
@@ -158,6 +162,23 @@ describe('SimpleStorage / ytStorage (hybrid storage)', () => {
       await expect(ytStorage.getVideo('stale-content-script')).resolves.toBeNull();
       expect(global.chrome.runtime.sendMessage).not.toHaveBeenCalled();
       expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('debug logging', () => {
+    test('keeps informational storage traces quiet until debug mode is enabled', async () => {
+      const consoleLog = jest.spyOn(console, 'log').mockImplementation(() => {});
+      await Promise.resolve();
+
+      await ytStorage.rebuildStatsFromIndexedDB();
+      expect(consoleLog).not.toHaveBeenCalledWith('[Storage] Rebuilding stats from IndexedDB...');
+
+      const onChanged = global.chrome.storage.onChanged.addListener.mock.calls[0][0];
+      onChanged({ settings: { newValue: { debug: true } } }, 'local');
+      await ytStorage.rebuildStatsFromIndexedDB();
+
+      expect(consoleLog).toHaveBeenCalledWith('[Storage] Rebuilding stats from IndexedDB...');
+      consoleLog.mockRestore();
     });
   });
 

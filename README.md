@@ -38,7 +38,7 @@ The full feed page contains:
 | View | Purpose |
 | --- | --- |
 | **Home** | A locally regenerated mix of cached videos using freshness, watch activity, and local feedback |
-| **Subscriptions** | Cached uploads from locally followed channels in chronological order |
+| **Subscriptions** | Cached uploads from locally followed channels, sortable by upload or detection time |
 | **Watch Later** | Locally saved videos, newest first |
 | **Shorts** | Known short-form videos and watched Shorts |
 | **Playlists** | Local playlists you manage, alongside saved YouTube playlist references that open on YouTube |
@@ -47,7 +47,9 @@ The full feed page contains:
 | **Analytics** | Locally calculated watch statistics and insights |
 | **Settings** | Appearance, retention, feed timing, imports, backup/restore, and reset controls |
 
-Home and Subscriptions render stable 50-card pages as you scroll. Checking for new videos is separate from reloading the current local view, so a background scan does not unexpectedly replace or reorder visible cards. When uploads are found, re:Watch offers a deliberate **Show** action.
+Home and Subscriptions render stable 50-card pages as you scroll. Subscriptions retains its selected upload-date or detection-date ordering through **Reload view** and **Show**. Checking for new videos is separate from reloading the current local view, so a background scan does not unexpectedly replace or reorder visible cards. When uploads are found, re:Watch offers a deliberate **Show** action.
+
+The compact popup and full-page interface show the installed extension version beside the re:Watch icon, making it easier to identify the active build when reporting a problem.
 
 Watch Later is independent of YouTube's account playlist. Right-click a recognized video or Short and choose **Save to Watch Later (local)**, or use a re:Watch video menu; the full-page Watch Later view provides newest-first Open and Remove actions.
 
