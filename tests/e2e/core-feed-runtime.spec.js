@@ -23,6 +23,7 @@ test('packaged local search stays local and Show opens the chronological subscri
   const youtubeRequests = [];
 
   await page.goto(`${extensionOrigin}/feed.html`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).not.toHaveClass(/app-loading/);
   await page.evaluate(async () => {
     clearPageFeedWorkTimer();
     if (pageFeedWorkPromise) {
