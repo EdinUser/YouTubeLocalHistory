@@ -105,13 +105,14 @@ describe('AI-label response parser', () => {
     expect(source).toContain('activeLookups >= MAX_CONCURRENT_LOOKUPS');
   });
 
-  test('does not restart unchanged AI handling on a focus settings refresh', () => {
+  test('does not restart unchanged AI handling during startup or a focus settings refresh', () => {
     const source = require('fs').readFileSync(
       require('path').join(__dirname, '..', '..', 'src', 'content-ai-labels.js'),
       'utf8'
     );
 
-    expect(source).toContain('if (!stopped && nextMode === mode) {');
+    expect(source.match(/if \(!stopped && nextMode === mode\) \{/g)).toHaveLength(2);
+    expect(source).toContain('Keep an in-flight scan instead of aborting');
     expect(source).toContain('debug = nextDebug');
     expect(source).toContain('return { start, stop, update, parse, TTL }');
   });

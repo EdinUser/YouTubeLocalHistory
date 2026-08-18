@@ -258,9 +258,20 @@
         }
 
         function start(settings) {
+            const nextMode = MODES.has(settings?.aiLabeledVideoHandling)
+                ? settings.aiLabeledVideoHandling
+                : 'off';
+            const nextDebug = settings?.debug === true;
+            // Focus/settings refresh and general content initialization can
+            // converge on startup. Keep an in-flight scan instead of aborting
+            // it and caching the aborted request as an unknown result.
+            if (!stopped && nextMode === mode) {
+                debug = nextDebug;
+                return;
+            }
             stop();
-            debug = settings?.debug === true;
-            mode = MODES.has(settings?.aiLabeledVideoHandling) ? settings.aiLabeledVideoHandling : 'off';
+            debug = nextDebug;
+            mode = nextMode;
             if (mode === 'off') return;
             diagnostic('Enabled', { mode });
             stopped = false;
