@@ -63,6 +63,8 @@ function switchTab(tab) {
 document.addEventListener('DOMContentLoaded', async function () {
     try {
         log('Starting initialization...');
+        const headerVersion = document.getElementById('ytvhtHeaderVersion');
+        if (headerVersion) headerVersion.textContent = `v${EXTENSION_VERSION}`;
 
         // Load settings first
         const settings = await loadSettings();
@@ -124,9 +126,14 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         if (chrome.storage && chrome.storage.onChanged) {
             chrome.storage.onChanged.addListener((changes, area) => {
-                if (area !== 'local' || !changes.settings || !changes.settings.newValue) return;
-                const updated = changes.settings.newValue;
-                applyPopupAccent(updated.overlayColor || updated.accentColor || 'blue');
+                if (area !== 'local') return;
+                if (changes.settings?.newValue) {
+                    const updated = changes.settings.newValue;
+                    applyPopupAccent(updated.overlayColor || updated.accentColor || 'blue');
+                }
+                if (changes.systemTheme?.newValue && (globalThis.currentSettings?.themePreference || 'system') === 'system') {
+                    applyTheme('system');
+                }
             });
         }
 
@@ -273,35 +280,16 @@ document.addEventListener('DOMContentLoaded', async function () {
         log('Current extension tab:', currentTab);
         switchTab(currentTab);
         // Tabs
-        videosTab.addEventListener('click', () => {
-            switchTab('videos');
-            displayHistoryPage();
-        });
-        shortsTab.addEventListener('click', () => {
-            switchTab('shorts');
-            displayShortsPage();
-        });
-        playlistsTab.addEventListener('click', () => {
-            switchTab('playlists');
-            // Load playlists if not already loaded
-            if (allPlaylists.length === 0) {
-                loadPlaylistsPage({ page: currentPlaylistPage });
-            }
-            displayPlaylistsPage();
-        });
+        videosTab.addEventListener('click', () => switchTab('videos'));
+        shortsTab.addEventListener('click', () => switchTab('shorts'));
+        playlistsTab.addEventListener('click', () => switchTab('playlists'));
         const subscriptionsTab = document.getElementById('ytvhtTabSubscriptions');
         if (subscriptionsTab) {
-            subscriptionsTab.addEventListener('click', () => {
-                switchTab('subscriptions');
-                displaySubscriptionsPage();
-            });
+            subscriptionsTab.addEventListener('click', () => switchTab('subscriptions'));
         }
         const watchlaterTab = document.getElementById('ytvhtTabWatchlater');
         if (watchlaterTab) {
-            watchlaterTab.addEventListener('click', () => {
-                switchTab('watchlater');
-                displayWatchLaterPage();
-            });
+            watchlaterTab.addEventListener('click', () => switchTab('watchlater'));
         }
         const clearWatchlaterBtn = document.getElementById('ytvhtClearWatchlater');
         if (clearWatchlaterBtn) {
@@ -429,20 +417,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                 }
             });
         }
-
-        // Load initial data
-        await loadCurrentPages();
-
-        // Pre-render all first pages immediately for instant tab switching
-        displayHistoryPage();
-        displayShortsPage();
-        displayPlaylistsPage();
-
-        // Playlists are already loaded by loadCurrentPages() above
-        // Analytics can access allPlaylists (current page) or load more if needed
-
-        // Enable progressive content loading
-        progressiveContentLoading();
 
         // Set up responsive table handling
         setupResponsiveTables();

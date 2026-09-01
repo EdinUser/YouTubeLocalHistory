@@ -5,13 +5,13 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 [Install for Chrome](https://chromewebstore.google.com/detail/local-youtube-video-histo/pebiokefjgdbfnkolmblaaladkmpilba){ .md-button .md-button--primary }
 [Install for Firefox](https://addons.mozilla.org/firefox/addon/yt-rewatch/){ .md-button }
 
-## What v5.1 includes
+## What v5.2 includes
 
 | Area | What it does |
 | --- | --- |
 | History | Keeps watched videos, progress, duration, and resume points locally |
 | Home | Builds a mixed local feed from followed channels |
-| Subscriptions | Shows a chronological inventory of cached subscription videos |
+| Subscriptions | Shows cached subscription videos ordered by upload or detection time |
 | Shorts | Separates watched Shorts from ordinary history |
 | Watch Later | Keeps videos explicitly saved for later, independently of a YouTube account |
 | Channels | Manages local follows and reviewable ignored-channel records |
@@ -19,8 +19,16 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 | Playlist references | Saves links to YouTube playlists without importing their members |
 | Local playlists | Creates and manages extension-owned playlists without changing YouTube account playlists |
 | Backup | Exports and restores the documented local profile data |
+| Experimental AI labels | Optionally badges, dims, or hides YouTube-disclosed AI videos |
 
 The feed's Home and Subscriptions views use stable 50-card pages. Search is local: it searches records already saved by re:Watch and does not send a remote YouTube search request.
+
+## AI-labeled videos
+
+The experimental **AI-labeled video handling** setting is off by default. When
+enabled, it can badge, dim, or hide cards that YouTube itself discloses as made
+with AI. It is not a general AI detector, and an unmarked video is not confirmed
+non-AI. [Learn how it works and what it sends to YouTube](ai-labeled-videos.md).
 
 ## Start in three steps
 
@@ -28,15 +36,18 @@ The feed's Home and Subscriptions views use stable 50-card pages. Search is loca
 2. Watch a video. re:Watch records meaningful playback and updates the local resume point.
 3. Follow channels from supported YouTube surfaces, add them in **Channels**, or import a subscriptions file in **Settings**.
 
-Click the extension button for quick actions. Open the full re:Watch page for Home, Subscriptions, Shorts, Watch Later, playlists, History, Channels, Analytics, and Settings.
+Click the extension button for quick actions. On first use, the welcome notice
+can open that same browser popup for you. Open the full re:Watch page for Home,
+Subscriptions, Shorts, Watch Later, playlists, History, Channels, Analytics,
+and Settings.
 
 ## Feed refresh controls
 
 The feed renders cached local records first.
 
-- **Check** scans eligible followed channels and updates cached feed records.
-- **Reload** rebuilds the visible view from local storage without starting a network scan.
-- **Show** opens the complete chronological subscription inventory after a scan or import handoff.
+- **Reload videos** scans eligible followed channels and updates cached feed records.
+- **Refresh** rebuilds the visible view from local storage without starting a network scan.
+- **Show** reloads the complete subscription inventory after a scan or import handoff while preserving the selected upload-date or detection-date order.
 
 Public YouTube RSS feeds provide new uploads. re:Watch does not use OAuth, mutate the user's YouTube subscriptions, or perform remote search.
 
@@ -71,9 +82,10 @@ There is no automatic cross-device synchronization. Use export and restore to mo
 ## Learn more
 
 - [Detailed guide](detailed_guide.md)
+- [AI-labeled video handling](ai-labeled-videos.md)
 - [Frequently asked questions](faq.md)
 - [Troubleshooting](troubleshooting.md)
-- [v5.1 release notes](changelog.md)
+- [v5.2 release notes](changelog.md)
 - [Roadmap](roadmap.md)
 
 For support, use the [community forum](https://community.kirilov.dev/t/re-watch), [Telegram community](https://t.me/+eFftKWGVvSpiZjZk), [Discord community](https://discord.gg/9fuvSzP7Qr), or [GitHub issues](https://github.com/EdinUser/YouTubeLocalHistory/issues).

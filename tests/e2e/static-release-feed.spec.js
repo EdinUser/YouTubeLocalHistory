@@ -60,9 +60,9 @@ for (const locale of LOCALES) {
       await page.locator('#navPlaylists').click();
       await expect(page.locator('.playlists-title')).toHaveText(messages.tab_playlists);
       await page.locator('#navHistory').click();
-      await expect(page.locator('.history-title')).toHaveText(messages.feed_history);
+      await expect(page.locator('#historySection .history-title')).toHaveText(messages.feed_history);
       await page.locator('#analyticsToggle').click();
-      await expect(page.locator('#analyticsSection .section-h')).toContainText(messages.tab_analytics);
+      await expect(page.locator('#analyticsSection h2[data-i18n="tab_analytics"]')).toContainText(messages.tab_analytics);
       await page.locator('#navSettings').click();
       await expect(page.locator('.settings-title')).toHaveText(messages.tab_settings);
       const missingScripts = await page.evaluate(async () => {
@@ -246,9 +246,9 @@ test('feed video menus unsubscribe from Home and follow again from History', asy
   await page.close();
 });
 
-test('real IndexedDB v5 data survives the v6 tombstone-store upgrade', async ({ context }) => {
-  const { page, pageErrors } = await openFeed(context);
-  const preserved = await page.evaluate(async () => {
+test('real IndexedDB v5 data survives the v7 tombstone and AI-cache store upgrades', async ({ context }) => {
+  const worker = await getServiceWorker(context);
+  await worker.evaluate(async () => {
     const databaseName = 'YTLH_HybridDB';
     const channelId = 'UCv5upgradefixture00000001';
     const videoId = 'V5Upgrade01';
@@ -284,6 +284,14 @@ test('real IndexedDB v5 data survives the v6 tombstone-store upgrade', async ({ 
       };
       request.onerror = () => reject(request.error);
     });
+  });
+
+  // Seed before opening feed.html: opening it first can race the worker's v7
+  // initialization and make Chromium reject the intentional v5 open.
+  const { page, pageErrors } = await openFeed(context);
+  const preserved = await page.evaluate(async () => {
+    const channelId = 'UCv5upgradefixture00000001';
+    const videoId = 'V5Upgrade01';
 
     const [history, subscription, feedVideo, syncState] = await Promise.all([
       ytIndexedDBStorage.getVideo('LegacyHistory01'),
@@ -302,8 +310,9 @@ test('real IndexedDB v5 data survives the v6 tombstone-store upgrade', async ({ 
     };
   });
 
-  expect(preserved.version).toBe(6);
+  expect(preserved.version).toBe(7);
   expect(preserved.stores).toContain('local_unsubscribe_tombstones');
+  expect(preserved.stores).toContain('ai_label_results');
   expect(preserved.history).toEqual(expect.objectContaining({
     videoId: 'LegacyHistory01', title: 'Preserved legacy history', time: 12,
   }));
@@ -519,8 +528,9 @@ test('feed scan, reload, and Show keep distinct browser semantics', async ({ con
   }, { channelId, videoIds: seedVideoIds });
 
   const { page, pageErrors } = await openFeed(context);
-  await expect(page.locator('#refresh')).toHaveText('Check for new videos');
-  await expect(page.locator('#reloadView')).toHaveText('Reload view');
+  await expect(page.locator('#refresh')).toHaveText('Reload videos');
+  await expect(page.locator('#reloadView')).toHaveText('Refresh');
+  await expect(page.locator('#feedTitleBar #refresh + #reloadView')).toHaveCount(1);
   await expect(page.locator('.ytvht-feed-card')).not.toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 500));
 
@@ -595,26 +605,8 @@ test('feed scan, reload, and Show keep distinct browser semantics', async ({ con
 
   await page.evaluate(async (id) => showNewFeedVideos([id]), retryVideoId);
   await page.locator('#status button').click();
-  await expect(page.locator('#status')).toContainText('Could not show new videos');
-  await expect(page.locator('#status button')).toHaveText('Retry');
-  expect(await page.evaluate(() => pendingFeedDiscovery.videoIds)).toEqual([retryVideoId]);
-  await page.evaluate(async ({ id, channelId: fixtureChannelId }) => {
-    await ytIndexedDBStorage.putSubscriptionFeedVideo({
-      videoId: id,
-      channelId: fixtureChannelId,
-      title: 'Retry fixture',
-      thumbnailUrl: '',
-      publishedAt: 1950000000000,
-      discoveredAt: Date.now(),
-      lastSeenInFeedAt: Date.now(),
-      durationSeconds: 900,
-      isShort: false,
-      source: 'rss',
-    });
-  }, { id: retryVideoId, channelId });
-  await page.locator('#status button').click();
-  await expect(page.locator('.ytvht-feed-card').first())
-    .toHaveAttribute('data-ytvht-video-id', retryVideoId);
+  await expect(page.locator('#status')).toContainText('1 stale discovery was removed from the new-videos notice.');
+  expect(await page.evaluate(() => pendingFeedDiscovery.videoIds)).toEqual([]);
 
   await page.evaluate(async ({ id, channelId: fixtureChannelId }) => {
     await ytIndexedDBStorage.putSubscriptionFeedVideo({
@@ -632,7 +624,7 @@ test('feed scan, reload, and Show keep distinct browser semantics', async ({ con
     await showNewFeedVideos([id]);
   }, { id: filteredVideoId, channelId });
   await page.locator('#status button').click();
-  await expect(page.locator('#status')).toContainText('1 new video is hidden by active filters.');
+  await expect(page.locator('#status')).toContainText('0 new videos shown. 1 new video is hidden: Shorts (1).');
 
   const concurrent = await page.evaluate(async () => {
     clearPageFeedWorkTimer();

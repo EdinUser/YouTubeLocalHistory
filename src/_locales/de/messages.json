@@ -130,5 +130,19 @@
   "global_search_placeholder": {
     "message": "Alle Inhalte durchsuchen...",
     "description": "Placeholder text for the global search input"
-  }
+  },
+  "settings_ai_labeled_video_label": { "message": "Umgang mit KI-gekennzeichneten Videos", "description": "AI setting" },
+  "settings_ai_labeled_video_off": { "message": "Aus", "description": "AI setting option" },
+  "settings_ai_labeled_video_badge": { "message": "Abzeichen", "description": "AI setting option" },
+  "settings_ai_labeled_video_dim": { "message": "Abdunkeln", "description": "AI setting option" },
+  "settings_ai_labeled_video_hide": { "message": "Ausblenden", "description": "AI setting option" },
+  "settings_ai_labeled_video_help": { "message": "Prüft nur Karten auf geöffneten YouTube-Seiten. re:Watch-Ansichten zeigen zwischengespeicherte Kennzeichnungen und starten keine Prüfungen.", "description": "AI setting help" },
+  "settings_ai_labeled_video_info": { "message": "Prüfungen laufen nur für Karten auf geöffneten YouTube-Seiten. re:Watch-Ansichten starten keine Prüfungen; sie zeigen nur zwischengespeicherte Ergebnisse und lassen lokale Videos sichtbar. Die Funktion nutzt YouTubes Made-with-AI-Hinweis, keine allgemeine KI-Erkennung, und kann KI-Videos übersehen.", "description": "AI setting information" },
+  "ai_label_announcement_title": { "message": "Neue Steuerelemente für KI-Kennzeichnungen", "description": "Titel der einmaligen Ankündigung der KI-Kennzeichnungsfunktion" },
+  "ai_label_announcement_body": { "message": "Lege fest, ob KI-gekennzeichnete Videos in re:Watch angezeigt, abgeblendet oder ausgeblendet werden.", "description": "Text der einmaligen Ankündigung der KI-Kennzeichnungsfunktion" },
+  "announcement_dismiss": { "message": "Schließen", "description": "Eine Funktionsankündigung schließen" },
+  "ai_label_announcement_settings": { "message": "In Einstellungen ansehen", "description": "Feed-Einstellungen über die Ankündigung öffnen" },
+  "welcome_announcement_title": { "message": "YT re:Watch ist bereit", "description": "Titel der einmaligen Einführungsankündigung" },
+  "welcome_announcement_body": { "message": "Dein Wiedergabefortschritt bleibt in diesem Browser privat. Öffne re:Watch, um weiterzusehen und deinen lokalen Feed zu erkunden.", "description": "Text der einmaligen Einführungsankündigung" },
+  "welcome_announcement_open": { "message": "YT re:Watch öffnen", "description": "Erweiterungsfenster aus der Einführungsankündigung öffnen" }
 }

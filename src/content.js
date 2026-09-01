@@ -91,6 +91,7 @@
         localFeedEnabled: true,
         hideAccountUI: false,
         hideRecommendations: true,
+        aiLabeledVideoHandling: 'off',
         feedRefreshMinutes: 60,
         version: EXTENSION_VERSION
     };
@@ -150,6 +151,9 @@
     const pendingOperations = new Map();
     const ENABLE_NATIVE_THUMBNAIL_OVERLAYS = true;
     let processExistingThumbnails = null;
+    let processThumbnailsForVideoIds = null;
+    let nativeThumbnailOverlaysStarted = false;
+    let aiLabels = null;
 
     // Last video handled by the tracker; prevents duplicate SPA setup.
     let lastProcessedVideoId = null;
@@ -331,6 +335,7 @@
         if (!ENABLE_NATIVE_THUMBNAIL_OVERLAYS || !document.body || !thumbnailObserver || !processExistingThumbnails) {
             return;
         }
+        if (nativeThumbnailOverlaysStarted) return;
 
         try {
             thumbnailObserver.observe(document.body, {
@@ -339,12 +344,16 @@
                 attributes: true,
                 attributeFilter: ['src', 'href', 'data-visibility-tracking']
             });
+            nativeThumbnailOverlaysStarted = true;
         } catch (error) {
-            log('[Overlay] Thumbnail observer already active or failed to start', error);
+            log('[Overlay] Thumbnail observer failed to start', error);
+            return;
         }
 
         processExistingThumbnails();
-        setTimeout(processExistingThumbnails, 2000);
+        setTimeout(() => {
+            processExistingThumbnails();
+        }, 2000);
     }
 
     function clearNativeThumbnailOverlayArtifacts() {
@@ -596,6 +605,13 @@
 
         const video = getPrimaryVideo();
         if (!video) return;
+        // YouTube keeps the target watch URL and video ID while a pre-roll is
+        // playing. Never persist the advertisement's media time as progress
+        // for the requested video.
+        if (isYouTubeAdPlaying(video)) {
+            log('[SAVE] Skipping timestamp while a YouTube ad is playing');
+            return;
+        }
 
         // Playlist-aware pause/ignore logic
         try {
@@ -1904,7 +1920,6 @@
                     log('[SPA] Reused video element is already tracked; preserving its listeners and restore state.');
                 }
                 tryToSavePlaylist();
-                showExtensionInfo();
 
                 // Start observing for video changes
                 videoObserver.observe(document.body, {
@@ -1963,8 +1978,48 @@
     });
     thumbnailObserver = thumbnailHelpers.thumbnailObserver;
     processExistingThumbnails = thumbnailHelpers.processExistingThumbnails;
+    processThumbnailsForVideoIds = thumbnailHelpers.processThumbnailsForVideoIds;
     thumbnailHelpers.startRemovedElementCleanupObserver();
     startNativeThumbnailOverlays();
+    const aiLabelCache = {
+        async getAiLabelResult(videoId) {
+            const response = await chrome.runtime.sendMessage({
+                type: 'aiLabelCache', operation: 'get', args: { videoId }
+            });
+            if (response?.error) throw new Error(response.error);
+            return response?.result || null;
+        },
+        async putAiLabelResult(record) {
+            const response = await chrome.runtime.sendMessage({
+                type: 'aiLabelCache', operation: 'put', args: { record }
+            });
+            if (response?.error) throw new Error(response.error);
+            return response?.result || null;
+        }
+    };
+    let legacyAiLabelCacheMigration = null;
+    async function migrateLegacyAiLabelCache() {
+        if (legacyAiLabelCacheMigration) return legacyAiLabelCacheMigration;
+        legacyAiLabelCacheMigration = (async () => {
+            // Before v5.2.0, this cache was opened by content scripts and was
+            // consequently scoped to youtube.com. Copy it locally into the
+            // extension-origin background cache, then remove the old derived
+            // data. This migration makes no YouTube request.
+            const records = await ytIndexedDBStorage.listAiLabelResults();
+            if (!records.length) return;
+            await Promise.all(records.map((record) => aiLabelCache.putAiLabelResult(record)));
+            await ytIndexedDBStorage.clearAiLabelResults();
+        })().catch((error) => {
+            legacyAiLabelCacheMigration = null;
+            log('[AI labels] Could not migrate legacy cache', error);
+        });
+        return legacyAiLabelCacheMigration;
+    }
+    aiLabels = window.YTVHTAiLabels?.create?.({
+        log,
+        getSettings: () => currentSettings,
+        cache: aiLabelCache
+    }) || { start: () => {}, stop: () => {}, update: () => {} };
 
     messageListener = window.YTVHTContentMessages.create({
         log,
@@ -1991,16 +2046,25 @@
     // than keeping the color that was loaded when the tab was first opened.
     // This also covers settings edits made in another extension surface.
     let overlaySettingsRefresh = null;
+    function overlayPresentationChanged(previous, next) {
+        return ['overlayTitle', 'overlayLabelSize', 'overlayColor', 'accentColor']
+            .some((key) => previous?.[key] !== next?.[key]);
+    }
+
     function refreshOverlaySettingsFromStorage() {
         if (overlaySettingsRefresh) return overlaySettingsRefresh;
         overlaySettingsRefresh = (async () => {
+            const previousSettings = currentSettings;
             const settings = await loadSettings();
             currentSettings = settings;
             updateOverlayCSS(
                 OVERLAY_LABEL_SIZE_MAP[settings.overlayLabelSize] || OVERLAY_LABEL_SIZE_MAP.medium,
                 getAccentOverlayColor(settings)
             );
-            if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS) processExistingThumbnails?.();
+            if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS && overlayPresentationChanged(previousSettings, settings)) {
+                processExistingThumbnails?.();
+            }
+            aiLabels?.update(settings);
         })().catch((error) => {
             log('[Overlay] Could not refresh settings:', error);
         }).finally(() => {
@@ -2016,11 +2080,6 @@
         if (!document.hidden) refreshOverlaySettingsFromStorage();
     });
     window.addEventListener('focus', refreshOverlaySettingsFromStorage);
-
-    const { showExtensionInfo } = window.YTVHTContentInfo.create({
-        log,
-        storage
-    });
 
     const {
         maybeShowImportOverlayFromHash
@@ -2052,6 +2111,8 @@
             );
 
             startNativeThumbnailOverlays();
+            await migrateLegacyAiLabelCache();
+            aiLabels?.start(currentSettings);
 
             // Intercept video link clicks to add timestamps
             interceptVideoLinkClicks();
@@ -2147,30 +2208,22 @@
     // Direct playlist URLs may not trigger the normal page-data event.
     ensurePlaylistIgnoreToggles();
 
-    // Refresh extension-feed overlays when local history/playlists change.
+    // Refresh only cards affected by local history changes. A progress save
+    // occurs every five seconds while playing, so rescanning the whole YouTube
+    // grid here would multiply one write into hundreds of storage lookups.
+    const refreshChangedVideoThumbnails = (changes, area) => {
+        if (area !== 'local' || !ENABLE_NATIVE_THUMBNAIL_OVERLAYS || !processThumbnailsForVideoIds) return;
+        const videoIds = Object.keys(changes || {})
+            .filter((key) => key.startsWith('video_'))
+            .map((key) => key.slice('video_'.length))
+            .filter(Boolean);
+        if (videoIds.length) processThumbnailsForVideoIds(videoIds);
+    };
+
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
-        chrome.storage.onChanged.addListener((changes, area) => {
-            if (area === 'local') {
-                const hasVideoChanges = Object.keys(changes).some(key =>
-                    key.startsWith('video_') || key.startsWith('playlist_')
-                );
-                if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS && hasVideoChanges) {
-                    processExistingThumbnails();
-                }
-            }
-        });
+        chrome.storage.onChanged.addListener(refreshChangedVideoThumbnails);
     } else if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
-        browser.storage.onChanged.addListener((changes, area) => {
-            if (area === 'local') {
-                const hasVideoChanges = Object.keys(changes).some(key =>
-                    key.startsWith('video_') || key.startsWith('playlist_')
-                );
-                if (ENABLE_NATIVE_THUMBNAIL_OVERLAYS && hasVideoChanges) {
-                    // Use the improved processing function
-                    processExistingThumbnails();
-                }
-            }
-        });
+        browser.storage.onChanged.addListener(refreshChangedVideoThumbnails);
     }
 
     // Expose internal navigation helpers for tests only.

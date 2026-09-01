@@ -2,6 +2,64 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [5.2.0] - 2026-09-01
+
+### Added
+
+- Added experimental **AI-labeled video handling**. When enabled, it can badge,
+  dim, or hide videos that YouTube itself marks as made with AI.
+- Added a dedicated IndexedDB cache for YouTube disclosure results, with
+  long-lived positive and unlabeled results plus bounded retry backoff for
+  unavailable or malformed responses.
+- Added the installed extension version beside the YT re:Watch identity in the
+  popup and full-page feed, using the extension icon consistently in both.
+- Unified extension announcements into one branded re:Watch toast. The
+  first-use welcome and AI-label notices now share dismissal protection,
+  dark-mode styling, a single queue, and the re:Watch icon. The welcome action
+  opens the browser's normal extension popup.
+
+### Changed
+
+- Subscriptions now retains the selected upload-date or detection-date ordering
+  across **Reload view** and **Show**. Newly discovered records no longer jump
+  ahead of that selection, while the default newest-first view continues to use
+  canonical paginated order.
+- Refined full-page view headers so the content title appears when the sidebar
+  is collapsed and is hidden when the expanded sidebar already supplies the
+  same label. The remaining description is larger and vertically aligned with
+  the view icon.
+- Reduced redundant YouTube-card work by targeting thumbnail refreshes to the
+  changed video IDs, coalescing overlay startup, and reserving full focus-driven
+  rescans for actual overlay-presentation changes.
+- Routed background, storage, and AI-label informational traces through the
+  saved debug setting while keeping warnings and errors visible.
+- The full-page sidebar now starts expanded. **Reload videos** scans followed
+  channels for new uploads, while the adjacent **Refresh** button only redraws
+  the current local view.
+
+### Fixed
+
+- Fixed popup initialization and live updates so reopening it after a long-lived
+  YouTube tab does not overlap snapshots, rebuild the same content repeatedly,
+  or pulse while already-loaded data is being rendered.
+- Fixed **Show** after a subscription scan so asynchronously loaded cards settle
+  in the selected order before the view scrolls to the newly available records.
+- Treat removed, private, or otherwise incomplete YouTube AI-label responses as
+  indeterminate instead of caching them as valid unlabeled results.
+- Fixed **System default** appearance in Firefox so the extension popup follows
+  the full-page re:Watch theme instead of resolving a different browser surface
+  independently.
+
+### Privacy and reliability
+
+- The feature defaults to Off and clearly explains that it makes paced direct
+  YouTube lookups for previously unchecked cards near the viewport.
+- It reflects only YouTube's disclosure, not a general AI detector; an
+  unmarked video is not confirmed non-AI.
+- Live Chrome and Firefox canaries use a small curated disclosure set and a
+  bounded TimeLapse Lords channel-feed fallback to detect external fixture
+  removal without scanning an entire channel page.
+
 ## [5.1.0] - 2026-08-14
 
 ### Added

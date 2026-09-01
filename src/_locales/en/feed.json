@@ -12,8 +12,8 @@
     "description": "Search field placeholder"
   },
   "feed_refresh": {
-    "message": "Check for new videos",
-    "description": "Check for new subscription videos button label"
+    "message": "Reload videos",
+    "description": "Fetch new videos from local subscriptions"
   },
   "feed_create": {
     "message": "Create",
@@ -490,6 +490,10 @@
   "feed_reloading_view": {
     "message": "Reloading…",
     "description": "Local view reload in progress"
+  },
+  "feed_refresh_view": {
+    "message": "Refresh",
+    "description": "Refresh the current view from local storage"
   },
   "feed_view_reloaded": {
     "message": "View reloaded.",

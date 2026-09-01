@@ -37,7 +37,7 @@
         applyAccent(localStorage.getItem('ytvhtAccentColor') || 'blue');
 
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            chrome.storage.local.get(['settings', 'popupAccentColor'], (result) => {
+            chrome.storage.local.get(['settings', 'popupAccentColor', 'systemTheme'], (result) => {
                 const settings = result?.settings || {};
                 const themePreference = settings.themePreference || 'system';
                 const accentColor = settings.overlayColor ||
@@ -46,7 +46,10 @@
                     'blue';
                 localStorage.setItem('ytvhtThemePreference', themePreference);
                 localStorage.setItem('ytvhtAccentColor', accentColor);
-                applyThemePreference(themePreference);
+                applyThemePreference(themePreference === 'system' &&
+                    ['light', 'dark'].includes(result?.systemTheme)
+                    ? result.systemTheme
+                    : themePreference);
                 applyAccent(accentColor);
             });
         }

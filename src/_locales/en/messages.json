@@ -130,5 +130,28 @@
   "global_search_placeholder": {
     "message": "Search all content...",
     "description": "Placeholder text for the global search input"
-  }
+  },
+  "settings_ai_labeled_video_label": {
+    "message": "AI-labeled video handling",
+    "description": "Label for the YouTube AI disclosure handling setting"
+  },
+  "settings_ai_labeled_video_off": { "message": "Off", "description": "Disable AI-label lookups" },
+  "settings_ai_labeled_video_badge": { "message": "Badge", "description": "Show an AI badge" },
+  "settings_ai_labeled_video_dim": { "message": "Dim", "description": "Dim AI-labeled videos" },
+  "settings_ai_labeled_video_hide": { "message": "Hide", "description": "Hide AI-labeled videos" },
+  "settings_ai_labeled_video_help": {
+    "message": "Checks only cards on open YouTube pages. re:Watch views show cached labels and never start checks.",
+    "description": "Explanation for the AI-label setting"
+  },
+  "settings_ai_labeled_video_info": {
+    "message": "Checks run only for cards on open YouTube pages. re:Watch views never start checks; they only show cached results and keep local videos visible. The feature uses YouTube's Made with AI disclosure, not general AI detection, and can miss AI-made videos.",
+    "description": "Privacy and reliability information for AI-label handling"
+  },
+  "ai_label_announcement_title": { "message": "New AI-label controls", "description": "Title of the one-time AI-label feature announcement" },
+  "ai_label_announcement_body": { "message": "Choose whether AI-labeled videos are shown, dimmed, or hidden in re:Watch.", "description": "Body of the one-time AI-label feature announcement" },
+  "announcement_dismiss": { "message": "Dismiss", "description": "Dismiss an extension feature announcement" },
+  "ai_label_announcement_settings": { "message": "See it in Settings", "description": "Open Feed settings from the AI-label feature announcement" },
+  "welcome_announcement_title": { "message": "YT re:Watch is ready", "description": "Title of the one-time onboarding announcement" },
+  "welcome_announcement_body": { "message": "Your watch progress stays private in this browser. Open re:Watch to continue watching and explore your local feed.", "description": "Body of the one-time onboarding announcement" },
+  "welcome_announcement_open": { "message": "Open YT re:Watch", "description": "Open the extension popup from the onboarding announcement" }
 }

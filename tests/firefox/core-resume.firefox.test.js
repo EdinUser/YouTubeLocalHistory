@@ -182,7 +182,7 @@ async function openWatchPage(driver) {
 }
 
 async function skipYouTubeAdIfPossible(driver) {
-  const buttons = await driver.findElements(By.css('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button'));
+  const buttons = await driver.findElements(By.css('.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern, button'));
   for (const button of buttons) {
     const text = `${await button.getText().catch(() => '')} ${await button.getAttribute('aria-label').catch(() => '')}`.trim();
     if (/skip/i.test(text) && await button.isDisplayed().catch(() => false)) {

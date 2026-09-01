@@ -1,4 +1,37 @@
-console.log('YouTube Video History Tracker background script running.');
+let backgroundDebugEnabled = false;
+
+function debugLog(...args) {
+    if (backgroundDebugEnabled) console.log(...args);
+}
+
+function updateBackgroundDebugSetting(settings) {
+    backgroundDebugEnabled = settings?.debug === true;
+}
+
+function recordTestMessage(message) {
+    const metrics = globalThis.__YTVHT_TEST__?.backgroundMetrics;
+    if (!metrics) return;
+    metrics.messageTypes = metrics.messageTypes || {};
+    metrics.storageMethods = metrics.storageMethods || {};
+    metrics.messageTypes[message.type] = (metrics.messageTypes[message.type] || 0) + 1;
+    if (message.type === 'ytStorageCall' && message.method) {
+        metrics.storageMethods[message.method] = (metrics.storageMethods[message.method] || 0) + 1;
+    }
+}
+
+// Keep informational service-worker traces behind the user-facing debug
+// setting. Warnings and errors remain unconditional below.
+globalThis.ytvhtDebugLog = debugLog;
+chrome.storage.local.get(['settings'], (result) => {
+    if (chrome.runtime.lastError) return;
+    updateBackgroundDebugSetting(result?.settings);
+    debugLog('YouTube Video History Tracker background script running.');
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.settings) {
+        updateBackgroundDebugSetting(changes.settings.newValue);
+    }
+});
 
 // Load shared storage modules when this file runs as a Chrome MV3 service worker.
 if (typeof importScripts === 'function') {
@@ -40,28 +73,65 @@ const stateManager = {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
-        console.log('Background script received message:', message.type, 'from sender:', sender.tab ? 'content' : 'popup');
+        recordTestMessage(message);
+        debugLog('Background script received message:', message.type, 'from sender:', sender.tab ? 'content' : 'popup');
+
+        if (message.type === 'getAnnouncements') {
+            if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {
+                sendResponse({ announcements: [] });
+                return;
+            }
+            sendResponse({ announcements: await getAvailableAnnouncements() });
+            return;
+        }
+
+        if (message.type === 'claimAnnouncement') {
+            if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {
+                sendResponse({ show: false });
+                return;
+            }
+            if (!ANNOUNCEMENTS[message.announcementId]) {
+                sendResponse({ show: false });
+                return;
+            }
+            try {
+                sendResponse({ show: await claimAnnouncement(message.announcementId, sender.tab.id) });
+            } catch (error) {
+                console.warn('[Announcements] could not claim an announcement', error);
+                sendResponse({ show: false });
+            }
+            return;
+        }
+
+        if (message.type === 'releaseAnnouncement' || message.type === 'runAnnouncementAction') {
+            if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {
+                sendResponse({ ok: false });
+                return;
+            }
+            const announcement = ANNOUNCEMENTS[message.announcementId];
+            if (!announcement) {
+                sendResponse({ ok: false });
+                return;
+            }
+            try {
+                if (!await announcementIsOwnedBy(message.announcementId, sender.tab.id)) {
+                    sendResponse({ ok: false });
+                    return;
+                }
+                if (message.type === 'runAnnouncementAction') await runAnnouncementAction(announcement);
+                await releaseAnnouncement(message.announcementId, sender.tab.id);
+                sendResponse({ ok: true });
+            } catch (error) {
+                console.warn('[Announcements] could not complete an announcement', error);
+                sendResponse({ ok: false });
+            }
+            return;
+        }
         
         if (message.type === 'openPopup') {
-            const popupId = await stateManager.get('activePopupWindowId');
-            if (popupId) {
-                try {
-                    await chrome.windows.update(popupId, { focused: true });
-                    return;
-                } catch (e) {
-                    // Window no longer exists
-                }
-            }
-
-            const newWindow = await chrome.windows.create({
-                url: chrome.runtime.getURL("popup.html"),
-                type: "popup",
-                width: 600,
-                height: 500,
-                top: 100,
-                left: 100
-            });
-            await stateManager.set({ activePopupWindowId: newWindow.id });
+            await openPopupWindow();
+            sendResponse({ ok: true });
+            return;
         }
 
         if (message.type === 'videoUpdate') {
@@ -148,6 +218,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
         }
 
+        // Content scripts run IndexedDB under youtube.com, while extension
+        // pages and this background context share the extension origin. Keep
+        // AI-disclosure results here so local re:Watch views can safely render
+        // the result already obtained while browsing YouTube.
+        if (message.type === 'aiLabelCache') {
+            if (!isLocalSubscriptionSender(sender)) {
+                sendResponse({ error: 'AI label cache requests must come from a YouTube tab.' });
+                return;
+            }
+            if (typeof ytIndexedDBStorage === 'undefined') {
+                sendResponse({ error: 'Extension database is unavailable. Reload the extension.' });
+                return;
+            }
+            try {
+                const args = message.args || {};
+                let result;
+                if (message.operation === 'get') {
+                    result = await ytIndexedDBStorage.getAiLabelResult(args.videoId);
+                } else if (message.operation === 'put') {
+                    result = await ytIndexedDBStorage.putAiLabelResult(args.record);
+                    chrome.runtime.sendMessage({
+                        type: 'aiLabelCacheUpdated',
+                        videoId: args.record && args.record.videoId
+                    }).catch(() => {});
+                } else {
+                    throw new Error('Unknown AI label cache operation.');
+                }
+                sendResponse({ result });
+            } catch (error) {
+                sendResponse({ error: error && error.message ? error.message : String(error) });
+            }
+            return;
+        }
+
         // Handle content script storage RPC calls (ytStorageCall)
         if (message.type === 'ytStorageCall') {
             if (typeof ytStorage === 'undefined') {
@@ -188,6 +292,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     })();
     return true; // Indicates async response
+});
+
+chrome.tabs?.onRemoved?.addListener((tabId) => {
+    stateManager.get(ACTIVE_ANNOUNCEMENT_STATE_KEY).then((activeAnnouncement) => {
+        if (activeAnnouncement?.tabId === tabId) {
+            return stateManager.set({ [ACTIVE_ANNOUNCEMENT_STATE_KEY]: null });
+        }
+    }).catch(() => {});
 });
 
 function isLocalSubscriptionSender(sender) {
@@ -268,7 +380,149 @@ function createContextMenus() {
 
 // MV3 service workers are torn down and restarted; re-create the menu on both
 // install/update and browser startup so it's always present.
-chrome.runtime.onInstalled.addListener(createContextMenus);
+const ACTIVE_ANNOUNCEMENT_STATE_KEY = 'activeAnnouncement';
+let announcementClaimQueue = Promise.resolve();
+const ANNOUNCEMENTS = {
+    'welcome-v1': {
+        id: 'welcome-v1',
+        titleKey: 'welcome_announcement_title',
+        title: 'YT re:Watch is ready',
+        bodyKey: 'welcome_announcement_body',
+        body: 'Your watch progress stays private in this browser. Open re:Watch to continue watching and explore your local feed.',
+        actionLabelKey: 'welcome_announcement_open',
+        actionLabel: 'Open YT re:Watch',
+        storageKey: '__rwui_notice_8',
+        action: { type: 'open-popup' }
+    },
+    'ai-label-controls-v1': {
+        id: 'ai-label-controls-v1',
+        titleKey: 'ai_label_announcement_title',
+        title: 'New AI-label controls',
+        bodyKey: 'ai_label_announcement_body',
+        body: 'Choose whether AI-labeled videos are shown, dimmed, or hidden in re:Watch.',
+        actionLabelKey: 'ai_label_announcement_settings',
+        actionLabel: 'See it in Settings',
+        storageKey: '__rwui_notice_7',
+        action: { type: 'open-extension-page', path: 'feed.html#settings' }
+    }
+};
+
+async function getAvailableAnnouncements() {
+    // The old player-attached card used this extension-local flag. Honour it
+    // forever so an update never presents onboarding to someone who dismissed
+    // the legacy notice.
+    const legacyState = await chrome.storage.local.get(['infoShown']);
+    return Object.values(ANNOUNCEMENTS).filter((announcement) =>
+        announcement.id !== 'welcome-v1' || !legacyState.infoShown
+    );
+}
+
+async function announcementOwnerIsLive(tabId) {
+    if (!Number.isInteger(tabId) || !chrome.tabs?.get) return false;
+    try {
+        await chrome.tabs.get(tabId);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function claimAnnouncement(announcementId, tabId) {
+    const claim = announcementClaimQueue.then(() => claimAnnouncementUnlocked(announcementId, tabId));
+    // Keep the queue usable after a storage/API failure while returning the
+    // failure to this caller for normal message handling.
+    announcementClaimQueue = claim.catch(() => {});
+    return claim;
+}
+
+async function claimAnnouncementUnlocked(announcementId, tabId) {
+    const activeAnnouncement = await stateManager.get(ACTIVE_ANNOUNCEMENT_STATE_KEY);
+    if (activeAnnouncement && activeAnnouncement.tabId !== tabId
+        && await announcementOwnerIsLive(activeAnnouncement.tabId)) return false;
+    await stateManager.set({
+        [ACTIVE_ANNOUNCEMENT_STATE_KEY]: { id: announcementId, tabId }
+    });
+    return true;
+}
+
+async function releaseAnnouncement(announcementId, tabId) {
+    const activeAnnouncement = await stateManager.get(ACTIVE_ANNOUNCEMENT_STATE_KEY);
+    if (activeAnnouncement?.id === announcementId && activeAnnouncement.tabId === tabId) {
+        await stateManager.set({ [ACTIVE_ANNOUNCEMENT_STATE_KEY]: null });
+    }
+}
+
+async function announcementIsOwnedBy(announcementId, tabId) {
+    const activeAnnouncement = await stateManager.get(ACTIVE_ANNOUNCEMENT_STATE_KEY);
+    return activeAnnouncement?.id === announcementId && activeAnnouncement.tabId === tabId;
+}
+
+async function runAnnouncementAction(announcement) {
+    if (announcement.action?.type === 'open-extension-page') {
+        await chrome.tabs.create({ url: chrome.runtime.getURL(announcement.action.path) });
+        return;
+    }
+    if (announcement.action?.type === 'open-popup') {
+        await openExtensionActionPopup();
+        return;
+    }
+    throw new Error(`Unsupported announcement action: ${announcement.action?.type || 'none'}`);
+}
+
+async function openExtensionActionPopup() {
+    if (typeof chrome.action?.openPopup === 'function') {
+        try {
+            // This is the same browser-owned popup surface opened by clicking
+            // the toolbar icon. Pinning remains entirely the user's choice.
+            await chrome.action.openPopup();
+            return;
+        } catch (_) {
+            // Keep the onboarding action usable in older browsers and in
+            // environments where the browser refuses to open an action popup.
+        }
+    }
+    await openPopupWindow();
+}
+
+async function openPopupWindow() {
+    const popupId = await stateManager.get('activePopupWindowId');
+    if (popupId) {
+        try {
+            await chrome.windows.update(popupId, { focused: true });
+            return;
+        } catch (_) {
+            // The previous window has been closed.
+        }
+    }
+
+    const newWindow = await chrome.windows.create({
+        url: chrome.runtime.getURL('popup.html'),
+        type: 'popup',
+        width: 600,
+        height: 500,
+        top: 100,
+        left: 100
+    });
+    await stateManager.set({ activePopupWindowId: newWindow.id });
+}
+
+async function injectAnnouncementsIntoOpenYouTubeTabs() {
+    if (!chrome.tabs?.query || !chrome.scripting?.executeScript) return;
+    const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
+    await Promise.all(tabs.filter((tab) => Number.isInteger(tab.id)).map((tab) =>
+        chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content-announcement.js']
+        }).catch(() => {})
+    ));
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
+    createContextMenus();
+    Promise.resolve(details.reason === 'install' || details.reason === 'update')
+        .then((shouldInject) => shouldInject && injectAnnouncementsIntoOpenYouTubeTabs())
+        .catch((error) => console.warn('[Announcements] setup failed', error));
+});
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(createContextMenus);
 
 // Extract a YouTube video id (and shorts flag) from any link/page URL.

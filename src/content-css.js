@@ -213,56 +213,17 @@
             ytd-grid-video-renderer:hover .ytvht-remove-button {
                 opacity: 0.95 !important;
             }
-            .ytvht-info {
-                position: absolute !important;
-                top: -120px !important;
-                right: 0 !important;
-                background: var(--yt-spec-brand-background-primary, #0f0f0f) !important;
-                border: 1px solid var(--yt-spec-text-secondary, #aaa) !important;
-                border-radius: 8px !important;
-                padding: 12px !important;
-                width: 300px !important;
-                z-index: 9999 !important;
-                color: var(--yt-spec-text-primary, #fff) !important;
-                font-size: 14px !important;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+            .ytvht-ai-labeled { position: relative !important; }
+            .ytvht-ai-label {
+                position: absolute !important; top: 8px !important; right: 8px !important;
+                z-index: 2147483647 !important; padding: 3px 6px !important;
+                border-radius: 4px !important; background: #7c3aed !important;
+                color: #fff !important; font: 700 12px/1 Arial, sans-serif !important;
+                pointer-events: none !important;
             }
-            .ytvht-info-content {
-                display: flex !important;
-                align-items: start !important;
-                gap: 12px !important;
-            }
-            .ytvht-info-text {
-                flex-grow: 1 !important;
-            }
-            .ytvht-info-title {
-                font-weight: 500 !important;
-                margin-bottom: 8px !important;
-                color: #fff !important;
-            }
-            .ytvht-info-description {
-                color: #aaa !important;
-                line-height: 1.4 !important;
-            }
-            .ytvht-info-highlight {
-                color: #fff !important;
-                background: rgba(255,255,255,0.1) !important;
-                padding: 2px 6px !important;
-                border-radius: 4px !important;
-            }
-            .ytvht-close {
-                background: none !important;
-                border: none !important;
-                padding: 4px 8px !important;
-                cursor: pointer !important;
-                color: #aaa !important;
-                font-size: 20px !important;
-                opacity: 0.8 !important;
-                transition: opacity 0.2s !important;
-            }
-            .ytvht-close:hover {
-                opacity: 1 !important;
-            }
+            .ytvht-ai-dimmed { opacity: .42 !important; transition: opacity .15s ease !important; }
+            .ytvht-ai-dimmed:hover, .ytvht-ai-dimmed:focus-within { opacity: .82 !important; }
+            .ytvht-ai-hidden { display: none !important; }
         `;
         document.head.appendChild(style);
     }

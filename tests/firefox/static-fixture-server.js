@@ -14,6 +14,9 @@ function startStaticFixtureServer(routes) {
     response.writeHead(200, {
       'content-type': 'text/html; charset=utf-8',
       'cache-control': 'no-store',
+      // A static fixture must be incapable of loading the captured site's
+      // resources. Extension assets remain permitted for injected UI checks.
+      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data: chrome-extension: moz-extension:;",
     });
     response.end(route);
   });

@@ -62,12 +62,6 @@ global.window.YTVHTContentMessages = {
   create: () => jest.fn(),
 };
 
-global.window.YTVHTContentInfo = {
-  create: () => ({
-    showExtensionInfo: jest.fn(),
-  }),
-};
-
 global.window.YTVHTContentImport = {
   create: () => ({
     maybeShowImportOverlayFromHash: jest.fn(),

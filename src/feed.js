@@ -173,6 +173,10 @@ function onStorageChanged(changes, area) {
         const settings = changes.settings.newValue || {};
         applyFeedTheme(settings.themePreference || 'system');
         applyAccentColor(settings.overlayColor || settings.accentColor || 'blue');
+        if (typeof invalidateCachedAiLabelPresentation === 'function') {
+            invalidateCachedAiLabelPresentation();
+            refreshCachedAiLabels();
+        }
         if (pageFeedWorkTimer !== null) {
             feedRefreshIntervalMs().then(schedulePageFeedWork).catch(() => {});
         }
@@ -206,7 +210,12 @@ function onStorageChanged(changes, area) {
 }
 
 globalThis.chrome?.runtime?.onMessage?.addListener((message) => {
-    if (!message || message.type !== 'localSubscriptionChanged' || !subscriptionsActive) return;
+    if (!message) return;
+    if (message.type === 'aiLabelCacheUpdated' && typeof refreshCachedAiLabels === 'function') {
+        refreshCachedAiLabels();
+        return;
+    }
+    if (message.type !== 'localSubscriptionChanged' || !subscriptionsActive) return;
     renderSubscriptions().then(async () => {
         const subscription = await ytIndexedDBStorage.getSubscriptionRecord(message.channelId);
         if (subscription) await hydrateVisibleChannelMetadata([subscription]);
@@ -296,6 +305,10 @@ async function getStartupFeedView() {
 }
 
 function init() {
+    const version = chrome.runtime.getManifest().version;
+    const versionLabel = document.getElementById('feedVersion');
+    if (versionLabel) versionLabel.textContent = `v${version}`;
+
     const searchInput = document.getElementById('search');
     searchInput.addEventListener('input', () => {
         searchVisibleLimit = SEARCH_PAGE_SIZE;
@@ -388,7 +401,7 @@ function init() {
         showWatchLater();
     });
 
-    // Keep the compact icon rail by default, while preserving the user's last choice.
+    // Start with the full navigation for discoverability, while preserving the user's last choice.
     const menuToggle = document.getElementById('menuToggle');
     const setSidebarCollapsed = (collapsed) => {
         document.body.classList.toggle('sidebar-collapsed', collapsed);
@@ -398,7 +411,7 @@ function init() {
             item.title = collapsed ? item.textContent.trim() : item.dataset.expandedTitle;
         });
     };
-    setSidebarCollapsed(localStorage.getItem('ytvhtSidebarCollapsed') !== 'false');
+    setSidebarCollapsed(localStorage.getItem('ytvhtSidebarCollapsed') === 'true');
     if (menuToggle) {
         menuToggle.addEventListener('click', () => {
             const collapsed = !document.body.classList.contains('sidebar-collapsed');
@@ -497,6 +510,9 @@ function init() {
     document.getElementById('feedSettingAutoClean')?.addEventListener('change', () => {
         saveCurrentFeedSettings('history cleanup');
     });
+    document.getElementById('feedSettingAiLabeledVideoHandling')?.addEventListener('change', () => {
+        saveCurrentFeedSettings('AI-labeled video handling');
+    });
     initFeedDataSettings();
     document.getElementById('unwatched').addEventListener('change', render);
     hideMembers?.addEventListener('change', () => {
@@ -517,7 +533,10 @@ function init() {
         }
     });
     document.getElementById('subscriptionSort')?.addEventListener('change', (event) => {
-        subscriptionSort = event.target.value;
+        subscriptionSort = normalizeSubscriptionSort(event.target.value);
+        try {
+            localStorage.setItem(SUBSCRIPTION_SORT_STORAGE_KEY, subscriptionSort);
+        } catch (_) { /* keep the in-memory preference */ }
         newlyShownFeedVideoIds = [];
         render();
     });

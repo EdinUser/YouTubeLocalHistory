@@ -93,6 +93,27 @@ describe('playlist save rules (real content.js)', () => {
     expect(global.ytStorage.setVideo).not.toHaveBeenCalled();
   });
 
+  test('pre-roll progress is never saved under the requested playlist video', async () => {
+    const player = document.createElement('div');
+    player.id = 'movie_player';
+    player.classList.add('ad-showing');
+    const video = document.createElement('video');
+    video.className = 'html5-main-video';
+    Object.defineProperties(video, {
+      currentTime: { configurable: true, writable: true, value: 44 },
+      duration: { configurable: true, value: 45 },
+    });
+    player.appendChild(video);
+    document.body.appendChild(player);
+    global.ytStorage.getPlaylist.mockClear();
+    global.ytStorage.setVideo.mockClear();
+
+    await saveTimestamp();
+
+    expect(global.ytStorage.getPlaylist).not.toHaveBeenCalled();
+    expect(global.ytStorage.setVideo).not.toHaveBeenCalled();
+  });
+
   test.each([
     ['playlist page', `https://www.youtube.com/playlist?list=${PLAYLIST_ID}`, '<ytd-playlist-sidebar-primary-info-renderer hidden><div id="menu"></div></ytd-playlist-sidebar-primary-info-renderer><yt-page-header-view-model><div class="ytFlexibleActionsViewModelActionRow"></div></yt-page-header-view-model>'],
     ['playlist watch page', `https://www.youtube.com/watch?v=${VIDEO_ID}&list=${PLAYLIST_ID}`, '<ytd-playlist-panel-renderer><div id="header"></div></ytd-playlist-panel-renderer>'],

@@ -24,6 +24,16 @@ async function waitForFeed(session) {
   )), 15000, 'feed page should finish loading');
 }
 
+async function clickStatusAction(session) {
+  const clicked = await session.driver.executeScript(() => {
+    const button = document.querySelector('#status button');
+    if (!button) return false;
+    button.click();
+    return true;
+  });
+  assert.equal(clicked, true, 'feed status action should be available');
+}
+
 async function runScenario(name, options, fn) {
   const timeout = setTimeout(() => {
     console.error(`Firefox packaged feed test "${name}" exceeded ${TEST_TIMEOUT_MS}ms`);
@@ -65,8 +75,8 @@ async function main() {
       const surfaces = [
         ['#manage', '.subs-title', 'feed_channels'],
         ['#navPlaylists', '.playlists-title', 'tab_playlists'],
-        ['#navHistory', '.history-title', 'feed_history'],
-        ['#analyticsToggle', '#analyticsSection .section-h', 'tab_analytics'],
+        ['#navHistory', '#historySection .history-title', 'feed_history'],
+        ['#analyticsToggle', '#analyticsSection h2[data-i18n="tab_analytics"]', 'tab_analytics'],
         ['#navSettings', '.settings-title', 'tab_settings'],
       ];
       for (const [buttonSelector, textSelector, messageKey] of surfaces) {
@@ -330,7 +340,7 @@ async function main() {
     assert.equal(followed.subscription.source, 'manual');
   });
 
-  await runScenario('real IndexedDB v5 to v6 preservation', { locale: 'en' }, async (session) => {
+  await runScenario('real IndexedDB v5 to v7 preservation', { locale: 'en' }, async (session) => {
     await waitForFeed(session);
     const preserved = await session.driver.executeAsyncScript((done) => {
       (async () => {
@@ -344,7 +354,7 @@ async function main() {
           const request = indexedDB.deleteDatabase(databaseName);
           request.onsuccess = resolve;
           request.onerror = () => reject(request.error);
-          request.onblocked = () => reject(new Error('v6 database deletion was blocked'));
+          request.onblocked = () => reject(new Error('v7 database deletion was blocked'));
         });
         await new Promise((resolve, reject) => {
           const request = indexedDB.open(databaseName, 5);
@@ -387,8 +397,9 @@ async function main() {
       })().catch((error) => done({ ok: false, error: error.message }));
     });
     assert.equal(preserved.ok, true, preserved.error);
-    assert.equal(preserved.version, 6);
+    assert.equal(preserved.version, 7);
     assert.equal(preserved.stores.includes('local_unsubscribe_tombstones'), true);
+    assert.equal(preserved.stores.includes('ai_label_results'), true);
     assert.deepEqual(preserved.history, {
       videoId: 'FxLegacyHistory', title: 'Preserved Firefox history', time: 12,
     });
@@ -576,9 +587,11 @@ async function main() {
     const labels = await session.driver.executeScript(() => ({
       scan: document.querySelector('#refresh')?.textContent,
       reload: document.querySelector('#reloadView')?.textContent,
+      shareHeaderActions: document.querySelector('#refresh')?.parentElement === document.querySelector('#reloadView')?.parentElement,
     }));
-    assert.equal(labels.scan, 'Check for new videos');
-    assert.equal(labels.reload, 'Reload view');
+    assert.equal(labels.scan, 'Reload videos');
+    assert.equal(labels.reload, 'Refresh');
+    assert.equal(labels.shareHeaderActions, true);
     await session.driver.executeScript(() => window.scrollTo(0, 500));
 
     const stable = await session.driver.executeAsyncScript((id, fixtureChannelId, done) => {
@@ -636,7 +649,7 @@ async function main() {
         if (original) original.call(this, options);
       };
     });
-    await session.driver.findElement(By.css('#status button')).click();
+    await clickStatusAction(session);
     await session.driver.wait(async () => session.driver.executeScript((id) => (
       document.querySelector('.ytvht-feed-card')?.dataset.ytvhtVideoId === id &&
       window.__phase2ScrolledTo?.videoId === id
@@ -668,35 +681,15 @@ async function main() {
     await session.driver.executeAsyncScript((id, done) => {
       showNewFeedVideos([id]).then(() => done()).catch((error) => done({ error: error.message }));
     }, retryVideoId);
-    await session.driver.findElement(By.css('#status button')).click();
+    await clickStatusAction(session);
     await session.driver.wait(async () => session.driver.executeScript(() => (
-      document.querySelector('#status')?.textContent.includes('Could not show new videos') &&
-      document.querySelector('#status button')?.textContent === 'Retry'
-    )), 15000, 'missing discovery should expose Retry');
+      document.querySelector('#status')?.textContent.includes('1 stale discovery was removed from the new-videos notice.')
+    )), 15000, 'missing discovery should be removed as stale');
     const pendingRetryIds = await session.driver.executeAsyncScript((done) => {
       browser.storage.local.get('ytvht.pendingFeedDiscovery.v1')
         .then((stored) => done(stored['ytvht.pendingFeedDiscovery.v1']?.videoIds || []));
     });
-    assert.deepEqual(pendingRetryIds, [retryVideoId]);
-    const retrySeeded = await session.driver.executeAsyncScript((id, fixtureChannelId, done) => {
-      ytIndexedDBStorage.putSubscriptionFeedVideo({
-        videoId: id,
-        channelId: fixtureChannelId,
-        title: 'Firefox retry fixture',
-        thumbnailUrl: '',
-        publishedAt: 1950000000000,
-        discoveredAt: Date.now(),
-        lastSeenInFeedAt: Date.now(),
-        durationSeconds: 900,
-        isShort: false,
-        source: 'rss',
-      }).then(() => done({ ok: true })).catch((error) => done({ ok: false, error: error.message }));
-    }, retryVideoId, channelId);
-    assert.equal(retrySeeded.ok, true, retrySeeded.error);
-    await session.driver.findElement(By.css('#status button')).click();
-    await session.driver.wait(async () => session.driver.executeScript((id) => (
-      document.querySelector('.ytvht-feed-card')?.dataset.ytvhtVideoId === id
-    ), retryVideoId), 15000, 'Retry should show the recovered video');
+    assert.deepEqual(pendingRetryIds, []);
 
     const filterSeeded = await session.driver.executeAsyncScript((id, fixtureChannelId, done) => {
       (async () => {
@@ -717,9 +710,9 @@ async function main() {
       })().catch((error) => done({ ok: false, error: error.message }));
     }, filteredVideoId, channelId);
     assert.equal(filterSeeded.ok, true, filterSeeded.error);
-    await session.driver.findElement(By.css('#status button')).click();
+    await clickStatusAction(session);
     await session.driver.wait(async () => session.driver.executeScript(() => (
-      document.querySelector('#status')?.textContent.includes('1 new video is hidden by active filters.')
+      document.querySelector('#status')?.textContent.includes('0 new videos shown. 1 new video is hidden: Shorts (1).')
     )), 15000, 'Show should report a pending video hidden by filters');
 
   });

@@ -1,14 +1,23 @@
 name: Run Tests
 
 on:
-  push:
-    branches:
-      - main
-      - develop
   pull_request:
     branches:
       - main
       - develop
+  workflow_dispatch:
+
+concurrency:
+  group: run-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # CI is a deterministic release gate. Never let an inherited environment
+  # value turn an external YouTube check into a PR or merge requirement.
+  RUN_LIVE_RSS: "0"
+  RUN_LIVE_CHANNEL_METADATA: "0"
+  RUN_LIVE_AI_LABEL_CANARY: "0"
+  RUN_LIVE_PERMISSION_CANARY: "0"
 
 jobs:
   validate-pr-route:
@@ -22,22 +31,99 @@ jobs:
             exit 1
           fi
 
-  test:
-    name: Run Jest Tests
+  deterministic-offline:
+    name: Deterministic offline browser gate
+    needs: validate-pr-route
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for packaged extension tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Firefox for packaged extension tests
+        id: firefox
+        uses: browser-actions/setup-firefox@v1
+
+      - name: Install Firefox language packs for localization tests
+        env:
+          FIREFOX_VERSION: ${{ steps.firefox.outputs.firefox-version }}
+          FIREFOX_LANGPACK_DIR: ${{ runner.temp }}/firefox-langpacks
+        run: |
+          mkdir -p "$FIREFOX_LANGPACK_DIR"
+          declare -A packs=(
+            [bg]='langpack-bg@firefox.mozilla.org.xpi'
+            [de]='langpack-de@firefox.mozilla.org.xpi'
+            [es-ES]='langpack-es-ES@firefox.mozilla.org.xpi'
+            [fr]='langpack-fr@firefox.mozilla.org.xpi'
+          )
+          for locale in "${!packs[@]}"; do
+            curl --fail --location --retry 3 \
+              --output "$FIREFOX_LANGPACK_DIR/${packs[$locale]}" \
+              "https://ftp.mozilla.org/pub/firefox/releases/$FIREFOX_VERSION/linux-x86_64/xpi/$locale.xpi"
+          done
+
+      - name: Run deterministic local gate
+        env:
+          FIREFOX_LANGPACK_DIR: ${{ runner.temp }}/firefox-langpacks
+        run: npm run test:local:offline
+
+  quality:
+    name: Lint and documentation safety
     needs: validate-pr-route
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test 
+      - name: Lint source
+        run: npm run lint
+
+      - name: Check documentation safety
+        run: npm run docs:safety
+
+  documentation-build:
+    name: Build documentation and screenshots
+    needs: validate-pr-route
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for deterministic screenshots
+        run: npx playwright install --with-deps chromium
+
+      - name: Build strict MkDocs site
+        run: npm run docs:build

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 18 or newer;
+- Node.js 24.11 or newer;
 - npm and Git;
 - Bash (native, Git Bash, or WSL for the release scripts);
 - Chromium/Chrome for Playwright extension testing;

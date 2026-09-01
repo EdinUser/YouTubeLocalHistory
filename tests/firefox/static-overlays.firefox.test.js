@@ -49,24 +49,7 @@ function readCapture(fixtureName) {
   const metadataPath = path.join(fixtureDir, 'metadata.json');
 
   if (!fs.existsSync(htmlPath) || !fs.existsSync(metadataPath)) {
-    throw new Error(
-      `Missing ${fixtureName} capture. Run: npm run fixtures:youtube:download -- --only ${fixtureName} --headless`
-    );
-  }
-
-  return {
-    html: fs.readFileSync(htmlPath, 'utf8'),
-    metadata: JSON.parse(fs.readFileSync(metadataPath, 'utf8')),
-  };
-}
-
-function readOptionalCapture(fixtureName) {
-  const fixtureDir = path.join(CAPTURE_DIR, fixtureName);
-  const htmlPath = path.join(fixtureDir, 'page.html');
-  const metadataPath = path.join(fixtureDir, 'metadata.json');
-
-  if (!fs.existsSync(htmlPath) || !fs.existsSync(metadataPath)) {
-    return null;
+    throw new Error(`Missing committed static fixture: ${fixtureName}`);
   }
 
   return {
@@ -422,6 +405,31 @@ async function invokeChannelContextAction(session, channelId) {
   });
 }
 
+async function resetBackgroundMetrics(session) {
+  await withFirefoxExtensionPage(session, async () => {
+    const result = await session.driver.executeAsyncScript((done) => {
+      browser.runtime.getBackgroundPage().then((background) => {
+        background.__YTVHT_TEST__.backgroundMetrics = { messageTypes: {}, storageMethods: {} };
+        done({ ok: true });
+      }).catch((error) => done({ ok: false, error: error.message }));
+    });
+    assert.equal(result.ok, true, result.error);
+  });
+}
+
+async function getBackgroundMetrics(session) {
+  return withFirefoxExtensionPage(session, async () => {
+    const result = await session.driver.executeAsyncScript((done) => {
+      browser.runtime.getBackgroundPage().then((background) => done({
+        ok: true,
+        value: background.__YTVHT_TEST__?.backgroundMetrics || { messageTypes: {}, storageMethods: {} },
+      })).catch((error) => done({ ok: false, error: error.message }));
+    });
+    assert.equal(result.ok, true, result.error);
+    return result.value;
+  });
+}
+
 async function runScenario(name, fn) {
   const timeout = setTimeout(() => {
     console.error(`Firefox static overlay test "${name}" exceeded ${TEST_TIMEOUT_MS}ms`);
@@ -442,8 +450,8 @@ async function runScenario(name, fn) {
 async function main() {
   const playlist = readCapture('controlled-playlist');
   const channel = readCapture('controlled-channel-videos');
-  const watch = readOptionalCapture('rick-watch');
-  const channelHeader = readOptionalCapture('controlled-channel-header');
+  const watch = readCapture('rick-watch');
+  const channelHeader = readCapture('controlled-channel-header');
   const server = await startStaticFixtureServer({
     '/playlist': playlist.html,
     '/channel-videos': channel.html,
@@ -592,6 +600,51 @@ async function main() {
 
       await expectSavedOverlayVisible(session.driver, appendedVideoId, '25%', 'appended channel overlay visible');
       await expectNoDuplicateOverlays(session.driver, appendedVideoId);
+    });
+
+    await runScenario('startup focus and progress storage volume', async (session) => {
+      const [targetVideoId] = extractVideoIdsFromHtml(channel.html);
+      assert.ok(targetVideoId, 'controlled channel fixture should contain a watch video');
+
+      await resetBackgroundMetrics(session);
+      await openFixturePage(session.driver, `${server.origin}/channel-videos`);
+      await sleep(2300);
+
+      const cardCount = await session.driver.executeScript(() => document.querySelectorAll([
+        'ytd-playlist-panel-video-renderer',
+        'ytd-rich-item-renderer',
+        'ytd-grid-video-renderer',
+        'ytd-rich-grid-media',
+        'ytd-compact-video-renderer',
+        'ytd-compact-radio-renderer',
+        'ytd-video-renderer',
+        'yt-lockup-view-model'
+      ].join(', ')).length);
+      const startupMetrics = await getBackgroundMetrics(session);
+      const startupGetVideoCalls = startupMetrics.storageMethods.getVideo || 0;
+      assert.ok(startupGetVideoCalls > 0, 'startup should exercise background archive lookups');
+      assert.ok(
+        startupGetVideoCalls <= cardCount * 2 + 2,
+        `startup getVideo calls should fit one initial and one safety scan: ${startupGetVideoCalls} for ${cardCount} cards`
+      );
+
+      for (let index = 0; index < 3; index += 1) {
+        await session.driver.executeScript(() => window.dispatchEvent(new Event('focus')));
+        await sleep(100);
+      }
+      assert.equal(
+        (await getBackgroundMetrics(session)).storageMethods.getVideo || 0,
+        startupGetVideoCalls,
+        'unchanged focus refreshes must not trigger page-wide video lookups'
+      );
+
+      await seedStoredVideo(session, targetVideoId, { time: 30, duration: 120 });
+      await expectSavedOverlayVisible(session.driver, targetVideoId, '25%', 'targeted progress overlay visible');
+      assert.equal(
+        (await getBackgroundMetrics(session)).storageMethods.getVideo || 0,
+        startupGetVideoCalls,
+        'a local progress write must not fall through to archive lookups for unrelated cards'
+      );
     });
 
     if (watch) {

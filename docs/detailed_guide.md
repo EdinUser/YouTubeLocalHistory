@@ -16,7 +16,7 @@ YT re:Watch records YouTube history and progress in the current browser profile.
 2. Select **Add to Firefox**, then confirm the requested permissions.
 3. Pin the re:Watch button if desired.
 
-Visit YouTube and play a video normally. re:Watch begins saving after meaningful playback, then updates the position as you continue. The record is separate from YouTube's account history.
+Visit YouTube and play a video normally. re:Watch begins saving after meaningful playback, then updates the position as you continue. The record is separate from YouTube's account history. On first use, a re:Watch welcome notice can open the same compact popup as the toolbar button.
 
 ## Interface overview
 
@@ -58,15 +58,17 @@ Home uses stable 50-card pages. Moving between pages does not duplicate cards or
 
 ![The re:Watch Subscriptions tab showing recent cached uploads from locally followed channels.](assets/guide/feed-subscriptions.png)
 
-*Subscriptions lists cached uploads in chronological order.*
+*Subscriptions lists cached uploads in the selected upload-date or detection-date order.*
 
-Subscriptions is the complete chronological inventory of regular cached uploads. It also uses stable 50-card pages.
+Subscriptions is the complete inventory of regular cached uploads. Choose
+upload-date or detection-date ordering; the selection remains active through
+**Reload** and **Show**. The view also uses stable 50-card pages.
 
-### Check, Reload, and Show
+### Reload videos, Refresh, and Show
 
-- **Check** scans eligible followed channels and updates cached feed records. The status beside it reports progress, scheduling, and outcomes.
-- **Reload** renders current local storage again without starting a feed request.
-- **Show** opens the chronological Subscriptions inventory after a scan or subscription-import handoff.
+- **Reload videos** scans eligible followed channels and updates cached feed records. The status beside it reports progress, scheduling, and outcomes.
+- **Refresh** renders current local storage again without starting a feed request.
+- **Show** reloads the complete Subscriptions inventory after a scan or subscription-import handoff and retains its selected ordering.
 
 The interface renders cached data before initialization work completes, so an existing feed remains usable during a scan.
 
@@ -160,6 +162,26 @@ Additional insights include unfinished videos and skipped, watched, and completi
 - Choose System, Light, or Dark theme.
 - Change the viewed-overlay text, color, and size.
 - YouTube thumbnail overlays are best effort because YouTube can change its page structure.
+
+### AI-labeled video handling
+
+Under **History & feed**, choose **Off**, **Badge**, **Dim**, or **Hide** for
+videos that YouTube itself discloses as **Made with AI**. The feature is off by
+default and experimental. It is not a general AI detector: an unmarked video
+is not confirmed non-AI.
+
+When enabled, re:Watch checks previously unchecked cards only on open,
+supported YouTube pages as they approach the viewport and caches the result
+locally. **Badge** adds an AI marker, **Dim** also de-emphasizes the card, and
+**Hide** removes disclosed cards from those YouTube lists. re:Watch’s own views
+never start AI checks or send their local video IDs to YouTube; they display
+cached AI results only, and **Hide** dims rather than removes a local card. See
+[AI-labeled video handling](ai-labeled-videos.md) for supported surfaces,
+limits, and privacy details.
+
+That separation protects the local library: browsing, paging through, or
+scrolling a re:Watch view does not reveal its History, subscription, or saved
+video IDs to YouTube.
 
 ### Retention
 

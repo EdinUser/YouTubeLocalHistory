@@ -13,6 +13,7 @@ plugins:
 nav:
   - Home: index.md
   - Detailed Guide: detailed_guide.md
+  - AI-labeled videos: ai-labeled-videos.md
   - Privacy and Data: privacy.md
   - Roadmap: roadmap.md
   - Changelog: changelog.md

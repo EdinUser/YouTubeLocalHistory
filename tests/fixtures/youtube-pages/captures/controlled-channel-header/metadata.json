@@ -1,0 +1,13 @@
+{
+  "name": "controlled-channel-header",
+  "url": "https://www.youtube.com/@NerdroticDaily",
+  "purpose": "Handle-based channel-header DOM fixture for the re:Watch local-subscribe companion attachment next to YouTube's own Subscribe control.",
+  "capturedAt": "2026-08-18T07:28:35.269Z",
+  "readySelector": "#subscribe-button, ytd-c4-tabbed-header-renderer #buttons",
+  "viewport": {
+    "width": 1440,
+    "height": 1100
+  },
+  "sanitized": true,
+  "source": "scripts/download-youtube-fixtures.js"
+}

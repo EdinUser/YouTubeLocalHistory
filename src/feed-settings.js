@@ -11,6 +11,7 @@ const FEED_SETTINGS_DEFAULTS = {
     localFeedEnabled: true,
     hideAccountUI: false,
     hideRecommendations: true,
+    aiLabeledVideoHandling: 'off',
     defaultFeedPage: 'last',
     feedRefreshMinutes: 60
 };
@@ -23,10 +24,21 @@ const ACCENT_COLORS = {
     orange: '#ff9f2f'
 };
 
+let systemThemeListenerInitialized = false;
+
+function persistSystemTheme(theme) {
+    if (!globalThis.chrome?.storage?.local) return;
+    chrome.storage.local.get(['systemTheme'], (result) => {
+        if (result?.systemTheme !== theme) chrome.storage.local.set({ systemTheme: theme });
+    });
+}
+
 function applyFeedTheme(preference) {
     const dark = preference === 'dark' ||
         (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    const theme = dark ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+    if (preference === 'system') persistSystemTheme(theme);
 }
 
 function applyAccentColor(color) {
@@ -44,6 +56,17 @@ async function initializeFeedAppearance() {
     const settings = { ...FEED_SETTINGS_DEFAULTS, ...stored };
     applyFeedTheme(settings.themePreference);
     applyAccentColor(settings.overlayColor || settings.accentColor || 'blue');
+    if (!systemThemeListenerInitialized && window.matchMedia) {
+        const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        if (typeof systemThemeQuery.addEventListener !== 'function') return settings;
+        systemThemeListenerInitialized = true;
+        systemThemeQuery.addEventListener('change', async () => {
+            const currentSettings = (await ytStorage.getSettings()) || {};
+            if ((currentSettings.themePreference || 'system') === 'system') {
+                applyFeedTheme('system');
+            }
+        });
+    }
     return settings;
 }
 
@@ -65,6 +88,8 @@ async function loadFeedSettingsForm() {
         ? refreshValue
         : '60';
     document.getElementById('feedSettingAutoClean').value = String(settings.autoCleanPeriod);
+    const aiHandling = document.getElementById('feedSettingAiLabeledVideoHandling');
+    if (aiHandling) aiHandling.value = settings.aiLabeledVideoHandling || 'off';
     applyFeedTheme(settings.themePreference);
     applyAccentColor(settings.overlayColor || settings.accentColor || 'blue');
 }
@@ -95,6 +120,7 @@ async function saveFeedSettings() {
         overlayColor: color,
         overlayLabelSize: 'medium',
         defaultFeedPage: document.getElementById('feedSettingDefaultPage')?.value || 'last',
+        aiLabeledVideoHandling: document.getElementById('feedSettingAiLabeledVideoHandling')?.value || 'off',
         feedRefreshMinutes: cleanRefresh,
         autoCleanPeriod: autoCleanValue === 'forever' ? 'forever' : Number(autoCleanValue)
     };

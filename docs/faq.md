@@ -52,13 +52,15 @@ Yes. Use the global playlist pause setting or the ignore toggle on a saved playl
 
 ### Where do Home and Subscriptions videos come from?
 
-From public RSS uploads cached for channels followed in re:Watch. Home arranges that local inventory; Subscriptions shows it chronologically.
+From public RSS uploads cached for channels followed in re:Watch. Home arranges
+that local inventory; Subscriptions can order it by upload date or by when
+re:Watch detected it.
 
 ### What is the difference between Check, Reload, and Show?
 
 - **Check** scans eligible channel feeds and updates local records.
 - **Reload** redraws from local storage without starting a scan.
-- **Show** opens the full chronological Subscriptions inventory.
+- **Show** reloads the full Subscriptions inventory while retaining its selected upload-date or detection-date order.
 
 ### Does feed search query YouTube?
 

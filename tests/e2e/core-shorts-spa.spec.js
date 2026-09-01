@@ -122,6 +122,17 @@ function expectStoredShortMatchesActive(record, active) {
   expect(record.channelId).toBe(active.channelId);
 }
 
+function expectStoredShortIsComplete(record, videoId) {
+  expect(record).toMatchObject({
+    videoId,
+    isShorts: true,
+    url: `https://www.youtube.com/shorts/${videoId}`,
+  });
+  expect(normalizeText(record.title)).not.toBe('');
+  expect(normalizeText(record.channelName)).not.toBe('');
+  expect(normalizeText(record.channelId)).not.toBe('');
+}
+
 async function waitForStoredShortMatchesActive(context, active, timeout = 15000) {
   const expected = {
     videoId: active.videoId,
@@ -144,6 +155,27 @@ async function waitForStoredShortMatchesActive(context, active, timeout = 15000)
     };
   }, { timeout }).toEqual(expected);
   return getStoredVideo(context, active.videoId);
+}
+
+async function waitForStoredShortMatchesCurrentActive(context, page, videoId, timeout = 15000) {
+  let lastState = null;
+  try {
+    await expect.poll(async () => {
+      const [record, active] = await Promise.all([
+        getStoredVideo(context, videoId),
+        activeShortState(page),
+      ]);
+      lastState = { record, active };
+      if (!record || !isReadyOrganicShortState(active, { expectedVideoId: videoId })) return false;
+      return normalizeText(record.title) === normalizeText(active.title)
+        && normalizeText(record.channelName) === normalizeText(active.channelName)
+        && record.channelId === active.channelId;
+    }, { timeout }).toBe(true);
+  } catch (error) {
+    error.message = `${error.message}\nLast converging Shorts state: ${JSON.stringify(lastState)}`;
+    throw error;
+  }
+  return getStoredVideo(context, videoId);
 }
 
 async function extensionOrigin(context) {
@@ -212,15 +244,32 @@ async function advanceToNextShort(page, previousVideoId) {
   });
 }
 
+async function findFirstOrganicShort(page) {
+  return advanceToNextOrganicShort({
+    previousVideoId: '',
+    maxAttempts: 6,
+    // Inspect the entry reel first. If YouTube opens on an ad or another
+    // metadata-incomplete reel, traverse just as we do after a scroll.
+    advance: (attempt) => attempt === 0
+      ? Promise.resolve()
+      : advanceShortsViewport(page, attempt - 1),
+    waitForOrganic: () => waitForActiveShort(page, '', '', 10000),
+    readState: () => activeShortState(page),
+  });
+}
+
 async function verifyDirectLoad(page, context, active) {
   await removeStoredVideo(context, active.videoId);
   await page.goto(`https://www.youtube.com/shorts/${active.videoId}`, { waitUntil: 'domcontentloaded' });
   await dismissYouTubeConsent(page);
   const direct = await waitForActiveShort(page, '', active.videoId);
-  const savedDirect = await dispatchTrackedSave(page);
-  expect(savedDirect.videoId).toBe(direct.videoId);
-  const record = await waitForStoredShortMatchesActive(context, savedDirect);
-  expectStoredShortMatchesActive(record, savedDirect);
+  const postSaveState = await dispatchTrackedSave(page);
+  expect(postSaveState.videoId).toBe(direct.videoId);
+  // YouTube may temporarily detach the channel bar while processing the
+  // synthetic media events. The extension intentionally preserves the last
+  // complete snapshot, so compare storage with the settled pre-save state.
+  const record = await waitForStoredShortMatchesCurrentActive(context, page, direct.videoId);
+  expectStoredShortIsComplete(record, direct.videoId);
 }
 
 async function verifyFeedPlacement(context, videoIds) {
@@ -254,25 +303,25 @@ test.describe('Shorts SPA tracking (live YouTube)', () => {
       const blocked = await openShortsFromYouTubeMenu(page);
       test.skip(!!blocked, blocked);
 
-      const first = await waitForActiveShort(page);
+      const first = await findFirstOrganicShort(page);
       await removeStoredVideo(context, first.videoId);
-      const savedFirst = await dispatchTrackedSave(page);
-      expect(savedFirst.videoId).toBe(first.videoId);
+      const postSaveFirst = await dispatchTrackedSave(page);
+      expect(postSaveFirst.videoId).toBe(first.videoId);
 
-      const initialRecord = await waitForStoredShortMatchesActive(context, savedFirst);
-      expectStoredShortMatchesActive(initialRecord, savedFirst);
+      const initialRecord = await waitForStoredShortMatchesCurrentActive(context, page, first.videoId);
+      expectStoredShortIsComplete(initialRecord, first.videoId);
 
       // Establish that the transition itself, rather than an earlier timer,
       // is responsible for retaining the outgoing Short.
       await removeStoredVideo(context, first.videoId);
       const second = await advanceToNextShort(page, first.videoId);
-      const savedSecond = await dispatchTrackedSave(page);
-      expect(savedSecond.videoId).toBe(second.videoId);
+      const postSaveSecond = await dispatchTrackedSave(page);
+      expect(postSaveSecond.videoId).toBe(second.videoId);
 
-      const secondRecord = await waitForStoredShortMatchesActive(context, savedSecond);
-      expectStoredShortMatchesActive(secondRecord, savedSecond);
-      const outgoingRecord = await waitForStoredShortMatchesActive(context, savedFirst, 10000);
-      expectStoredShortMatchesActive(outgoingRecord, savedFirst);
+      const secondRecord = await waitForStoredShortMatchesCurrentActive(context, page, second.videoId);
+      expectStoredShortIsComplete(secondRecord, second.videoId);
+      const outgoingRecord = await waitForStoredShortMatchesActive(context, initialRecord, 10000);
+      expectStoredShortMatchesActive(outgoingRecord, initialRecord);
 
       await verifyDirectLoad(page, context, second);
       await verifyFeedPlacement(context, [first.videoId, second.videoId]);

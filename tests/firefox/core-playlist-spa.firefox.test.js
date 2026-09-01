@@ -12,6 +12,7 @@ const PLAYLIST_ID = 'PLQga0f7orXVB8fZObVcpXuX-2swTybQqR';
 const PLAYLIST_URL = `https://www.youtube.com/playlist?list=${PLAYLIST_ID}`;
 const PRIMARY_VIDEO_SELECTOR = '#movie_player video.html5-main-video, ytd-player video.html5-main-video';
 const SAVE_TIME = 20;
+const MINIMUM_SAVED_TIME = 10;
 const TEST_TIMEOUT_MS = 240000;
 const DEFAULT_SETTINGS = {
   autoCleanPeriod: 90,
@@ -202,51 +203,145 @@ async function clickPlaylistItem(driver, item) {
 }
 
 async function skipYouTubeAdIfPossible(driver) {
-  const buttons = await driver.findElements(By.css('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button'));
+  const buttons = await driver.findElements(By.css('.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern, button'));
   for (const button of buttons) {
     const text = `${await button.getText().catch(() => '')} ${await button.getAttribute('aria-label').catch(() => '')}`.trim();
     if (/skip/i.test(text) && await button.isDisplayed().catch(() => false)) {
-      await button.click().catch(() => {});
+      const clicked = await button.click()
+        .then(() => true)
+        .catch(() => false);
+      if (!clicked) continue;
       await sleep(500);
-      return;
+      return true;
     }
   }
+  return false;
+}
+
+async function waitForMainPlaylistMedia(driver, videoId) {
+  const deadline = Date.now() + 90000;
+  let nextForcedLoadAt = Date.now() + 10000;
+  let forcedLoadAttempts = 0;
+  let lastState = null;
+
+  while (Date.now() < deadline) {
+    const skipped = await skipYouTubeAdIfPossible(driver);
+    const forceContentLoad = !skipped
+      && forcedLoadAttempts < 3
+      && Date.now() >= nextForcedLoadAt;
+    lastState = await driver.executeScript((selector, expectedVideoId, skippedAd, forceLoad) => {
+      const video = document.querySelector(selector);
+      const player = document.querySelector('#movie_player');
+      const playerVideoId = typeof player?.getVideoData === 'function'
+        ? player.getVideoData()?.video_id || ''
+        : '';
+      const adPlaying = !!player && (
+        player.classList.contains('ad-showing')
+        || player.classList.contains('ad-interrupting')
+      );
+      let forcedContentLoad = false;
+      // Firefox can leave an unskippable pre-roll paused during automation.
+      // Let it complete through accelerated playback, then use the same
+      // bounded player-API fallback as the Chromium playlist canary.
+      if (video && adPlaying && !skippedAd) {
+        video.muted = true;
+        if (typeof player?.mute === 'function') player.mute();
+        video.playbackRate = 16;
+        if (video.paused) {
+          if (typeof player?.playVideo === 'function') player.playVideo();
+          video.play().catch(() => {});
+        }
+        if (forceLoad && typeof player?.loadVideoById === 'function') {
+          try {
+            player.loadVideoById(expectedVideoId, 0);
+            forcedContentLoad = true;
+          } catch (_) {
+            // Keep accelerated playback as the fallback if this page does not
+            // expose YouTube's player API in the expected form.
+          }
+        }
+      } else if (video && video.playbackRate !== 1) {
+        video.playbackRate = 1;
+      }
+      return {
+        found: !!video,
+        duration: video && Number.isFinite(video.duration) ? video.duration : 0,
+        currentTime: video?.currentTime || 0,
+        paused: video?.paused ?? true,
+        playbackRate: video?.playbackRate || 0,
+        playerVideoId,
+        adPlaying,
+        forcedContentLoad,
+        canForceContentLoad: typeof player?.loadVideoById === 'function',
+        ready: !!video
+          && !adPlaying
+          && playerVideoId === expectedVideoId
+          && Number.isFinite(video.duration)
+          && video.duration > 30,
+      };
+    }, PRIMARY_VIDEO_SELECTOR, videoId, skipped, forceContentLoad);
+    if (forceContentLoad) {
+      forcedLoadAttempts += 1;
+      nextForcedLoadAt = Date.now() + 10000;
+    }
+    if (lastState.ready) return;
+    await sleep(1000);
+  }
+
+  throw new Error(`Expected the main playlist media after any pre-roll ad; last state: ${JSON.stringify(lastState)}`);
 }
 
 async function saveCurrentPlaylistVideo(session, videoId) {
   const { driver } = session;
-  await waitUntil('real playlist video instead of ad', 90000, async () => {
-    await skipYouTubeAdIfPossible(driver);
-    const state = await driver.executeScript((selector) => {
-      const video = document.querySelector(selector);
-      return {
-        found: !!video,
-        duration: video && Number.isFinite(video.duration) ? video.duration : 0,
-      };
-    }, PRIMARY_VIDEO_SELECTOR);
-    return { ...state, ok: state.found && state.duration > SAVE_TIME + 10 };
-  });
+  await waitForMainPlaylistMedia(driver, videoId);
 
   let lastSavedTime = 0;
   for (let attempt = 0; attempt < 30; attempt++) {
-    await driver.executeScript((time, selector) => {
-      const video = document.querySelector(selector);
-      if (!video) throw new Error('Playlist video element not found');
-      video.muted = true;
-      video.pause();
-      video.currentTime = time;
-      video.dispatchEvent(new Event('timeupdate'));
-      video.dispatchEvent(new Event('seeked'));
-      video.dispatchEvent(new Event('pause'));
+    const seekResult = await driver.executeAsyncScript((time, selector, done) => {
+      const run = async () => {
+        const player = document.querySelector('#movie_player');
+        const video = document.querySelector(selector);
+        if (!video) throw new Error('Playlist video element not found');
+        video.muted = true;
+        if (typeof player?.mute === 'function') player.mute();
+        if (typeof player?.seekTo === 'function') {
+          player.seekTo(time, true);
+        } else {
+          video.currentTime = time;
+        }
+
+        const deadline = Date.now() + 3000;
+        while (video.currentTime < time - 1 && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        if (typeof player?.pauseVideo === 'function') player.pauseVideo();
+        video.pause();
+        video.dispatchEvent(new Event('timeupdate'));
+        video.dispatchEvent(new Event('pause'));
+        return video.currentTime;
+      };
+
+      run()
+        .then((value) => done({ ok: true, value }))
+        .catch((error) => done({ ok: false, error: error?.message || String(error) }));
     }, SAVE_TIME, PRIMARY_VIDEO_SELECTOR);
+    if (!seekResult?.ok) {
+      throw new Error(seekResult?.error || 'Failed to seek the Firefox playlist video');
+    }
+    const mediaTime = seekResult.value;
     await sleep(900);
 
     const record = await getStoredVideo(session, videoId);
     lastSavedTime = record && typeof record.time === 'number' ? record.time : 0;
-    if (lastSavedTime >= SAVE_TIME - 1) return;
+    // YouTube may clamp a seek to its currently buffered range. Match the
+    // Chromium canary by requiring meaningful saved progress only after the
+    // real player has accepted the seek.
+    if (mediaTime < MINIMUM_SAVED_TIME) continue;
+    if (lastSavedTime >= MINIMUM_SAVED_TIME) return;
   }
 
-  throw new Error(`Expected Firefox to save ${videoId} at ${SAVE_TIME}s; last saved time was ${lastSavedTime}s`);
+  throw new Error(`Expected Firefox to save ${videoId} beyond ${MINIMUM_SAVED_TIME}s; last saved time was ${lastSavedTime}s`);
 }
 
 async function expectPlaylistReference(session, videoId) {

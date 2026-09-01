@@ -11,10 +11,11 @@ YT re:Watch keeps its history inside your browser profile. It works while you sw
 
 📚 [User guide](./docs/index.md) · [Complete walkthrough](./docs/detailed_guide.md) · [FAQ](./docs/faq.md) · [Changelog](./CHANGELOG.md)
 
-## What v5.1 includes
+## What v5.2 includes
 
 - **Local watch history and resume:** saves progress for regular videos and Shorts and restores it across YouTube's single-page navigation.
 - **Viewed overlays:** adds progress indicators to re:Watch cards and supported YouTube thumbnail layouts.
+- **Experimental AI-label handling:** optionally badges, dims, or hides videos that YouTube itself discloses as made with AI.
 - **Local channel follows:** follow or unfollow channels inside re:Watch without changing a YouTube account subscription.
 - **Local feed:** public channel RSS builds a cached Home, chronological Subscriptions, and Shorts inventory.
 - **Channels management:** review followed channels, import subscriptions from Google Takeout, and explicitly restore channels kept in the Ignored list after a local unfollow.
@@ -37,7 +38,7 @@ The full feed page contains:
 | View | Purpose |
 | --- | --- |
 | **Home** | A locally regenerated mix of cached videos using freshness, watch activity, and local feedback |
-| **Subscriptions** | Cached uploads from locally followed channels in chronological order |
+| **Subscriptions** | Cached uploads from locally followed channels, sortable by upload or detection time |
 | **Watch Later** | Locally saved videos, newest first |
 | **Shorts** | Known short-form videos and watched Shorts |
 | **Playlists** | Local playlists you manage, alongside saved YouTube playlist references that open on YouTube |
@@ -46,7 +47,9 @@ The full feed page contains:
 | **Analytics** | Locally calculated watch statistics and insights |
 | **Settings** | Appearance, retention, feed timing, imports, backup/restore, and reset controls |
 
-Home and Subscriptions render stable 50-card pages as you scroll. Checking for new videos is separate from reloading the current local view, so a background scan does not unexpectedly replace or reorder visible cards. When uploads are found, re:Watch offers a deliberate **Show** action.
+Home and Subscriptions render stable 50-card pages as you scroll. Subscriptions retains its selected upload-date or detection-date ordering through **Reload view** and **Show**. Checking for new videos is separate from reloading the current local view, so a background scan does not unexpectedly replace or reorder visible cards. When uploads are found, re:Watch offers a deliberate **Show** action.
+
+The compact popup and full-page interface show the installed extension version beside the re:Watch icon, making it easier to identify the active build when reporting a problem.
 
 Watch Later is independent of YouTube's account playlist. Right-click a recognized video or Short and choose **Save to Watch Later (local)**, or use a re:Watch video menu; the full-page Watch Later view provides newest-first Open and Remove actions.
 
@@ -65,7 +68,7 @@ A local unfollow stops future scans and removes that channel's cached feed inven
 
 The feed is best-effort discovery rather than a mirror of a signed-in YouTube account. Public RSS may not represent membership, age-restricted, region-restricted, removed, or otherwise unavailable videos. YouTube applies its own access rules when a video is opened.
 
-## Playlists in v5.1
+## Playlists in v5.2
 
 v5 stores references to YouTube playlists encountered while the extension is active. A saved reference keeps useful public metadata and opens the original playlist on YouTube.
 
@@ -146,6 +149,12 @@ The live YouTube/public-metadata warning suite is deliberately separate:
 
 ```bash
 npm run test:canary
+```
+
+To exercise only the versioned static HTML fixtures in both browsers:
+
+```bash
+npm run test:static
 ```
 
 To run every available local and live group, including fresh fixture capture:

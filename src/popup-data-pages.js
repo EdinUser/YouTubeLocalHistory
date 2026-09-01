@@ -90,8 +90,9 @@ async function loadPlaylistsPage(options = {}) {
 }
 
 // Unified lazy loading function for all data types
-async function loadCurrentPages() {
+async function loadCurrentPages(options = {}) {
     try {
+        const { renderActive = true } = options;
         console.log('[Search] loadCurrentPages called with searchQuery:', searchQuery);
 
         // Load all current pages in parallel
@@ -106,6 +107,8 @@ async function loadCurrentPages() {
             shorts: shortsResult.records?.length || 0,
             playlists: playlistsResult.records?.length || 0
         });
+
+        if (!renderActive) return { videosResult, shortsResult, playlistsResult };
 
         // Update display for current active tab
         const activeTab = document.querySelector('.tab-bar .tab.active');
@@ -159,31 +162,6 @@ function adjustContentDensity(records) {
 
     container.className += ' ' + densityClass;
     log(`Applied density class: ${densityClass} for ${records.length} records`);
-}
-
-// Progressive content loading
-async function progressiveContentLoading() {
-    const container = document.body || document.documentElement;
-    log('Starting progressive content loading');
-
-    // Phase 1: Show skeleton/structure immediately
-    container.className += ' loading-skeleton';
-    log('Applied loading-skeleton class');
-
-    // Phase 2: Load critical data (first page) - already handled by loadCurrentPages()
-
-    // Phase 3: Load secondary data (stats, etc.) in background
-    setTimeout(async () => {
-        try {
-            // Load analytics data in background
-            const stats = await ytStorage.getStats();
-            updateAnalytics();
-            container.className = container.className.replace(' loading-skeleton', '');
-        } catch (error) {
-            console.log('Background data loading failed:', error);
-            container.className = container.className.replace(' loading-skeleton', '');
-        }
-    }, 100);
 }
 
 // Filter records based on search query
