@@ -36,14 +36,17 @@ non-AI. [Learn how it works and what it sends to YouTube](ai-labeled-videos.md).
 2. Watch a video. re:Watch records meaningful playback and updates the local resume point.
 3. Follow channels from supported YouTube surfaces, add them in **Channels**, or import a subscriptions file in **Settings**.
 
-Click the extension button for quick actions. Open the full re:Watch page for Home, Subscriptions, Shorts, Watch Later, playlists, History, Channels, Analytics, and Settings.
+Click the extension button for quick actions. On first use, the welcome notice
+can open that same browser popup for you. Open the full re:Watch page for Home,
+Subscriptions, Shorts, Watch Later, playlists, History, Channels, Analytics,
+and Settings.
 
 ## Feed refresh controls
 
 The feed renders cached local records first.
 
-- **Check** scans eligible followed channels and updates cached feed records.
-- **Reload** rebuilds the visible view from local storage without starting a network scan.
+- **Reload videos** scans eligible followed channels and updates cached feed records.
+- **Refresh** rebuilds the visible view from local storage without starting a network scan.
 - **Show** reloads the complete subscription inventory after a scan or import handoff while preserving the selected upload-date or detection-date order.
 
 Public YouTube RSS feeds provide new uploads. re:Watch does not use OAuth, mutate the user's YouTube subscriptions, or perform remote search.

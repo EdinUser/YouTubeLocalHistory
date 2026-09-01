@@ -43,7 +43,6 @@
                 "content-url.js",
                 "content-import.js",
                 "content-playlists.js",
-                "content-info.js",
                 "content-thumbnails.js",
                 "content-ai-labels.js",
                 "content-announcement.js",

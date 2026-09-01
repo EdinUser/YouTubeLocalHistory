@@ -11,10 +11,7 @@
     "message": "Buscar en tu historial y suscripciones",
     "description": "Search field placeholder"
   },
-  "feed_refresh": {
-    "message": "Buscar vídeos nuevos",
-    "description": "Check for new subscription videos button label"
-  },
+  "feed_refresh": { "message": "Recargar vídeos" },
   "feed_create": {
     "message": "Crear",
     "description": "Create button label"
@@ -467,6 +464,7 @@
   "feed_subscription_sort_detected": { "message": "Añadidos a re:Watch" },
   "feed_reload_view": { "message": "Recargar vista" },
   "feed_reloading_view": { "message": "Recargando…" },
+  "feed_refresh_view": { "message": "Actualizar" },
   "feed_view_reloaded": { "message": "Vista recargada." },
   "feed_reload_view_failed": { "message": "No se pudo recargar la vista: $1." },
   "feed_pending_inventory_incomplete": { "message": "Aún faltan $1 vídeos detectados en el inventario local." },

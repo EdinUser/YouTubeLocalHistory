@@ -401,7 +401,7 @@ function init() {
         showWatchLater();
     });
 
-    // Keep the compact icon rail by default, while preserving the user's last choice.
+    // Start with the full navigation for discoverability, while preserving the user's last choice.
     const menuToggle = document.getElementById('menuToggle');
     const setSidebarCollapsed = (collapsed) => {
         document.body.classList.toggle('sidebar-collapsed', collapsed);
@@ -411,7 +411,7 @@ function init() {
             item.title = collapsed ? item.textContent.trim() : item.dataset.expandedTitle;
         });
     };
-    setSidebarCollapsed(localStorage.getItem('ytvhtSidebarCollapsed') !== 'false');
+    setSidebarCollapsed(localStorage.getItem('ytvhtSidebarCollapsed') === 'true');
     if (menuToggle) {
         menuToggle.addEventListener('click', () => {
             const collapsed = !document.body.classList.contains('sidebar-collapsed');

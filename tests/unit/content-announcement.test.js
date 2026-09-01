@@ -12,6 +12,17 @@ const ANNOUNCEMENT = {
   actionLabel: 'See it in Settings',
 };
 
+const WELCOME_ANNOUNCEMENT = {
+  id: 'welcome-v1',
+  storageKey: '__rwui_notice_8',
+  titleKey: 'welcome_announcement_title',
+  title: 'YT re:Watch is ready',
+  bodyKey: 'welcome_announcement_body',
+  body: 'Your watch progress stays private in this browser.',
+  actionLabelKey: 'welcome_announcement_open',
+  actionLabel: 'Open YT re:Watch',
+};
+
 const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
@@ -23,6 +34,7 @@ function loadAnnouncement(messageHandler = () => ({ ok: true })) {
     i18n: { getMessage: jest.fn(() => '') },
     runtime: {
       lastError: null,
+      getURL: jest.fn((path) => `chrome-extension://test/${path}`),
       sendMessage: jest.fn((message, callback) => callback(messageHandler(message))),
     },
   };
@@ -55,6 +67,7 @@ describe('extension feature announcement toast', () => {
 
     expect(toast()).not.toBeNull();
     expect(toast().shadowRoot.querySelector('h2').textContent).toBe(ANNOUNCEMENT.title);
+    expect(toast().shadowRoot.querySelector('.brand-icon').src).toBe('chrome-extension://test/icon48.png');
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
       { type: 'claimAnnouncement', announcementId: ANNOUNCEMENT.id },
       expect.any(Function)
@@ -126,5 +139,25 @@ describe('extension feature announcement toast', () => {
     document.documentElement.removeAttribute('dark');
     await flush();
     expect(toast().dataset.theme).toBe('light');
+  });
+
+  test('uses the same toast for onboarding and opens the extension popup action', async () => {
+    loadAnnouncement((message) => {
+      if (message.type === 'getAnnouncements') return { announcements: [WELCOME_ANNOUNCEMENT] };
+      if (message.type === 'claimAnnouncement') return { show: true };
+      if (message.type === 'runAnnouncementAction') return { ok: true };
+      return { ok: true };
+    });
+    await flush();
+
+    expect(toast().shadowRoot.querySelector('h2').textContent).toBe(WELCOME_ANNOUNCEMENT.title);
+    toast().shadowRoot.querySelector('.action').click();
+    await flush();
+
+    expect(window.localStorage.getItem(WELCOME_ANNOUNCEMENT.storageKey)).toBe('1');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      { type: 'runAnnouncementAction', announcementId: WELCOME_ANNOUNCEMENT.id },
+      expect.any(Function)
+    );
   });
 });

@@ -81,7 +81,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ announcements: [] });
                 return;
             }
-            sendResponse({ announcements: Object.values(ANNOUNCEMENTS) });
+            sendResponse({ announcements: await getAvailableAnnouncements() });
             return;
         }
 
@@ -104,7 +104,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         if (message.type === 'releaseAnnouncement' || message.type === 'runAnnouncementAction') {
-            if (!isLocalSubscriptionSender(sender)) {
+            if (!isLocalSubscriptionSender(sender) || !Number.isInteger(sender.tab?.id)) {
                 sendResponse({ ok: false });
                 return;
             }
@@ -114,8 +114,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 return;
             }
             try {
+                if (!await announcementIsOwnedBy(message.announcementId, sender.tab.id)) {
+                    sendResponse({ ok: false });
+                    return;
+                }
                 if (message.type === 'runAnnouncementAction') await runAnnouncementAction(announcement);
-                await releaseAnnouncement(message.announcementId);
+                await releaseAnnouncement(message.announcementId, sender.tab.id);
                 sendResponse({ ok: true });
             } catch (error) {
                 console.warn('[Announcements] could not complete an announcement', error);
@@ -125,25 +129,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         
         if (message.type === 'openPopup') {
-            const popupId = await stateManager.get('activePopupWindowId');
-            if (popupId) {
-                try {
-                    await chrome.windows.update(popupId, { focused: true });
-                    return;
-                } catch (e) {
-                    // Window no longer exists
-                }
-            }
-
-            const newWindow = await chrome.windows.create({
-                url: chrome.runtime.getURL("popup.html"),
-                type: "popup",
-                width: 600,
-                height: 500,
-                top: 100,
-                left: 100
-            });
-            await stateManager.set({ activePopupWindowId: newWindow.id });
+            await openPopupWindow();
+            sendResponse({ ok: true });
+            return;
         }
 
         if (message.type === 'videoUpdate') {
@@ -307,13 +295,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.tabs?.onRemoved?.addListener((tabId) => {
-    stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY).then((owners) => {
-        owners = owners || {};
-        const remainingOwners = Object.fromEntries(
-            Object.entries(owners).filter(([, ownerTabId]) => ownerTabId !== tabId)
-        );
-        if (Object.keys(remainingOwners).length !== Object.keys(owners).length) {
-            return stateManager.set({ [ANNOUNCEMENT_OWNERS_STATE_KEY]: remainingOwners });
+    stateManager.get(ACTIVE_ANNOUNCEMENT_STATE_KEY).then((activeAnnouncement) => {
+        if (activeAnnouncement?.tabId === tabId) {
+            return stateManager.set({ [ACTIVE_ANNOUNCEMENT_STATE_KEY]: null });
         }
     }).catch(() => {});
 });
@@ -396,9 +380,20 @@ function createContextMenus() {
 
 // MV3 service workers are torn down and restarted; re-create the menu on both
 // install/update and browser startup so it's always present.
-const ANNOUNCEMENT_OWNERS_STATE_KEY = 'announcementOwners';
+const ACTIVE_ANNOUNCEMENT_STATE_KEY = 'activeAnnouncement';
 let announcementClaimQueue = Promise.resolve();
 const ANNOUNCEMENTS = {
+    'welcome-v1': {
+        id: 'welcome-v1',
+        titleKey: 'welcome_announcement_title',
+        title: 'YT re:Watch is ready',
+        bodyKey: 'welcome_announcement_body',
+        body: 'Your watch progress stays private in this browser. Open re:Watch to continue watching and explore your local feed.',
+        actionLabelKey: 'welcome_announcement_open',
+        actionLabel: 'Open YT re:Watch',
+        storageKey: '__rwui_notice_8',
+        action: { type: 'open-popup' }
+    },
     'ai-label-controls-v1': {
         id: 'ai-label-controls-v1',
         titleKey: 'ai_label_announcement_title',
@@ -411,6 +406,16 @@ const ANNOUNCEMENTS = {
         action: { type: 'open-extension-page', path: 'feed.html#settings' }
     }
 };
+
+async function getAvailableAnnouncements() {
+    // The old player-attached card used this extension-local flag. Honour it
+    // forever so an update never presents onboarding to someone who dismissed
+    // the legacy notice.
+    const legacyState = await chrome.storage.local.get(['infoShown']);
+    return Object.values(ANNOUNCEMENTS).filter((announcement) =>
+        announcement.id !== 'welcome-v1' || !legacyState.infoShown
+    );
+}
 
 async function announcementOwnerIsLive(tabId) {
     if (!Number.isInteger(tabId) || !chrome.tabs?.get) return false;
@@ -431,20 +436,25 @@ function claimAnnouncement(announcementId, tabId) {
 }
 
 async function claimAnnouncementUnlocked(announcementId, tabId) {
-    const owners = (await stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY)) || {};
-    const ownerTabId = owners[announcementId];
-    if (ownerTabId !== tabId && await announcementOwnerIsLive(ownerTabId)) return false;
+    const activeAnnouncement = await stateManager.get(ACTIVE_ANNOUNCEMENT_STATE_KEY);
+    if (activeAnnouncement && activeAnnouncement.tabId !== tabId
+        && await announcementOwnerIsLive(activeAnnouncement.tabId)) return false;
     await stateManager.set({
-        [ANNOUNCEMENT_OWNERS_STATE_KEY]: { ...owners, [announcementId]: tabId }
+        [ACTIVE_ANNOUNCEMENT_STATE_KEY]: { id: announcementId, tabId }
     });
     return true;
 }
 
-async function releaseAnnouncement(announcementId) {
-    const owners = (await stateManager.get(ANNOUNCEMENT_OWNERS_STATE_KEY)) || {};
-    const nextOwners = { ...owners };
-    delete nextOwners[announcementId];
-    await stateManager.set({ [ANNOUNCEMENT_OWNERS_STATE_KEY]: nextOwners });
+async function releaseAnnouncement(announcementId, tabId) {
+    const activeAnnouncement = await stateManager.get(ACTIVE_ANNOUNCEMENT_STATE_KEY);
+    if (activeAnnouncement?.id === announcementId && activeAnnouncement.tabId === tabId) {
+        await stateManager.set({ [ACTIVE_ANNOUNCEMENT_STATE_KEY]: null });
+    }
+}
+
+async function announcementIsOwnedBy(announcementId, tabId) {
+    const activeAnnouncement = await stateManager.get(ACTIVE_ANNOUNCEMENT_STATE_KEY);
+    return activeAnnouncement?.id === announcementId && activeAnnouncement.tabId === tabId;
 }
 
 async function runAnnouncementAction(announcement) {
@@ -452,7 +462,48 @@ async function runAnnouncementAction(announcement) {
         await chrome.tabs.create({ url: chrome.runtime.getURL(announcement.action.path) });
         return;
     }
+    if (announcement.action?.type === 'open-popup') {
+        await openExtensionActionPopup();
+        return;
+    }
     throw new Error(`Unsupported announcement action: ${announcement.action?.type || 'none'}`);
+}
+
+async function openExtensionActionPopup() {
+    if (typeof chrome.action?.openPopup === 'function') {
+        try {
+            // This is the same browser-owned popup surface opened by clicking
+            // the toolbar icon. Pinning remains entirely the user's choice.
+            await chrome.action.openPopup();
+            return;
+        } catch (_) {
+            // Keep the onboarding action usable in older browsers and in
+            // environments where the browser refuses to open an action popup.
+        }
+    }
+    await openPopupWindow();
+}
+
+async function openPopupWindow() {
+    const popupId = await stateManager.get('activePopupWindowId');
+    if (popupId) {
+        try {
+            await chrome.windows.update(popupId, { focused: true });
+            return;
+        } catch (_) {
+            // The previous window has been closed.
+        }
+    }
+
+    const newWindow = await chrome.windows.create({
+        url: chrome.runtime.getURL('popup.html'),
+        type: 'popup',
+        width: 600,
+        height: 500,
+        top: 100,
+        left: 100
+    });
+    await stateManager.set({ activePopupWindowId: newWindow.id });
 }
 
 async function injectAnnouncementsIntoOpenYouTubeTabs() {

@@ -16,11 +16,18 @@
   content pulse or render repeatedly after a YouTube tab had been open longer.
 - Added the installed extension version and consistent re:Watch icon branding
   to both the popup and full-page feed.
+- Unified the first-use welcome and AI-label notices into one branded re:Watch
+  toast with dark-mode styling, one-at-a-time protection, and a normal browser
+  action-popup handoff.
 - Refined full-page headers to avoid duplicate nearby titles when the sidebar is
   expanded, while keeping the current view title visible in collapsed mode.
+- The full-page sidebar now starts expanded. **Reload videos** scans followed
+  channels, while the adjacent **Refresh** button redraws only the local view.
 - Reduced redundant overlay and thumbnail work by targeting changed video IDs,
   coalescing startup scans, and limiting focus rescans to presentation changes.
 - Made background, storage, and AI-label informational output respect debug mode.
+- Fixed Firefox **System default** appearance so the compact popup and full-page
+  re:Watch view use the same theme.
 - Treats removed or incomplete AI-label responses as indeterminate and uses
   bounded live Chrome/Firefox canary fallbacks when an external fixture changes.
 

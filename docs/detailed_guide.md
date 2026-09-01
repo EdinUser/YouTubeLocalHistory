@@ -16,7 +16,7 @@ YT re:Watch records YouTube history and progress in the current browser profile.
 2. Select **Add to Firefox**, then confirm the requested permissions.
 3. Pin the re:Watch button if desired.
 
-Visit YouTube and play a video normally. re:Watch begins saving after meaningful playback, then updates the position as you continue. The record is separate from YouTube's account history.
+Visit YouTube and play a video normally. re:Watch begins saving after meaningful playback, then updates the position as you continue. The record is separate from YouTube's account history. On first use, a re:Watch welcome notice can open the same compact popup as the toolbar button.
 
 ## Interface overview
 
@@ -64,10 +64,10 @@ Subscriptions is the complete inventory of regular cached uploads. Choose
 upload-date or detection-date ordering; the selection remains active through
 **Reload** and **Show**. The view also uses stable 50-card pages.
 
-### Check, Reload, and Show
+### Reload videos, Refresh, and Show
 
-- **Check** scans eligible followed channels and updates cached feed records. The status beside it reports progress, scheduling, and outcomes.
-- **Reload** renders current local storage again without starting a feed request.
+- **Reload videos** scans eligible followed channels and updates cached feed records. The status beside it reports progress, scheduling, and outcomes.
+- **Refresh** renders current local storage again without starting a feed request.
 - **Show** reloads the complete Subscriptions inventory after a scan or subscription-import handoff and retains its selected ordering.
 
 The interface renders cached data before initialization work completes, so an existing feed remains usable during a scan.

@@ -141,5 +141,8 @@
   "ai_label_announcement_title": { "message": "Нови контроли за AI етикети", "description": "Заглавие на еднократното съобщение за функцията за AI етикети" },
   "ai_label_announcement_body": { "message": "Изберете дали видеата с AI етикет да се показват, затъмняват или скриват в re:Watch.", "description": "Текст на еднократното съобщение за функцията за AI етикети" },
   "announcement_dismiss": { "message": "Отказ", "description": "Скриване на съобщение за функция на разширението" },
-  "ai_label_announcement_settings": { "message": "Виж в настройките", "description": "Отваряне на настройките за Feed от съобщението" }
+  "ai_label_announcement_settings": { "message": "Виж в настройките", "description": "Отваряне на настройките за Feed от съобщението" },
+  "welcome_announcement_title": { "message": "YT re:Watch е готов", "description": "Заглавие на еднократното съобщение за започване" },
+  "welcome_announcement_body": { "message": "Напредъкът ви при гледане остава личен в този браузър. Отворете re:Watch, за да продължите да гледате и да разгледате локалния си Feed.", "description": "Текст на еднократното съобщение за започване" },
+  "welcome_announcement_open": { "message": "Отвори YT re:Watch", "description": "Отваряне на прозореца на разширението от съобщението за започване" }
 }

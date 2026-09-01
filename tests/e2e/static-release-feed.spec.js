@@ -528,8 +528,9 @@ test('feed scan, reload, and Show keep distinct browser semantics', async ({ con
   }, { channelId, videoIds: seedVideoIds });
 
   const { page, pageErrors } = await openFeed(context);
-  await expect(page.locator('#refresh')).toHaveText('Check for new videos');
-  await expect(page.locator('#reloadView')).toHaveText('Reload view');
+  await expect(page.locator('#refresh')).toHaveText('Reload videos');
+  await expect(page.locator('#reloadView')).toHaveText('Refresh');
+  await expect(page.locator('#feedTitleBar #refresh + #reloadView')).toHaveCount(1);
   await expect(page.locator('.ytvht-feed-card')).not.toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 500));
 

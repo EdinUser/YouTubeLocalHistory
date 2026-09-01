@@ -141,5 +141,8 @@
   "ai_label_announcement_title": { "message": "Neue Steuerelemente für KI-Kennzeichnungen", "description": "Titel der einmaligen Ankündigung der KI-Kennzeichnungsfunktion" },
   "ai_label_announcement_body": { "message": "Lege fest, ob KI-gekennzeichnete Videos in re:Watch angezeigt, abgeblendet oder ausgeblendet werden.", "description": "Text der einmaligen Ankündigung der KI-Kennzeichnungsfunktion" },
   "announcement_dismiss": { "message": "Schließen", "description": "Eine Funktionsankündigung schließen" },
-  "ai_label_announcement_settings": { "message": "In Einstellungen ansehen", "description": "Feed-Einstellungen über die Ankündigung öffnen" }
+  "ai_label_announcement_settings": { "message": "In Einstellungen ansehen", "description": "Feed-Einstellungen über die Ankündigung öffnen" },
+  "welcome_announcement_title": { "message": "YT re:Watch ist bereit", "description": "Titel der einmaligen Einführungsankündigung" },
+  "welcome_announcement_body": { "message": "Dein Wiedergabefortschritt bleibt in diesem Browser privat. Öffne re:Watch, um weiterzusehen und deinen lokalen Feed zu erkunden.", "description": "Text der einmaligen Einführungsankündigung" },
+  "welcome_announcement_open": { "message": "YT re:Watch öffnen", "description": "Erweiterungsfenster aus der Einführungsankündigung öffnen" }
 }

@@ -1920,7 +1920,6 @@
                     log('[SPA] Reused video element is already tracked; preserving its listeners and restore state.');
                 }
                 tryToSavePlaylist();
-                showExtensionInfo();
 
                 // Start observing for video changes
                 videoObserver.observe(document.body, {
@@ -2081,11 +2080,6 @@
         if (!document.hidden) refreshOverlaySettingsFromStorage();
     });
     window.addEventListener('focus', refreshOverlaySettingsFromStorage);
-
-    const { showExtensionInfo } = window.YTVHTContentInfo.create({
-        log,
-        storage
-    });
 
     const {
         maybeShowImportOverlayFromHash
