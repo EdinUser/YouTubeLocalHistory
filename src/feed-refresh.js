@@ -149,7 +149,7 @@ function setRefreshUi(busy) {
         btn.appendChild(spinner);
         btn.appendChild(document.createTextNode(tFeed('feed_refreshing', 'Checking…')));
     } else {
-        btn.textContent = tFeed('feed_refresh', 'Check for new videos');
+        btn.textContent = tFeed('feed_refresh', 'Reload videos');
     }
 }
 
@@ -166,7 +166,7 @@ function setReloadUi(busy) {
         btn.appendChild(spinner);
         btn.appendChild(document.createTextNode(tFeed('feed_reloading_view', 'Reloading…')));
     } else {
-        btn.textContent = tFeed('feed_reload_view', 'Reload view');
+        btn.textContent = tFeed('feed_refresh_view', 'Refresh');
     }
 }
 

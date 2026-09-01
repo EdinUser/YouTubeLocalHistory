@@ -21,11 +21,11 @@ These files run directly on YouTube pages through the manifest `content_scripts`
   rest of the extension.
 - `local-subscription-actions.js`: centralizes canonical local Follow/Unfollow
   behavior and bounded `@handle` resolution.
-- `content-css.js`: injects shared content-script CSS for playlist history controls, the active-info popup, and thumbnail viewed/progress overlays.
+- `content-css.js`: injects shared content-script CSS for playlist history controls and thumbnail viewed/progress overlays.
 - `content-url.js`: extracts YouTube video IDs and handles clean/timestamped YouTube URLs.
 - `content-import.js`: shows the in-page import overlay when YouTube opens with `#ytlh_import`.
 - `content-playlists.js`: reads playlist metadata from YouTube pages, saves playlist records, and adds the per-playlist History active/paused control. On playlist pages it creates a separate row below native actions and ignores hidden legacy headers; on playlist-backed watch pages it uses the playlist panel.
-- `content-info.js`: shows the one-time YT re:Watch active info popup.
+- `content-announcement.js`: renders the shared branded first-use and feature-announcement toast on YouTube pages. It acknowledges notices in YouTube local storage while the background worker keeps one notice active across tabs.
 - `content-thumbnails.js`: adds viewed/progress overlays to extension-feed thumbnails and best-effort viewed labels on supported YouTube thumbnail layouts. YouTube page markup changes often, so native YouTube overlays are intentionally conservative.
 - `content-messages.js`: handles popup/import messages sent to the YouTube tab.
 - `content.js`: remaining bootstrap and video tracking logic. It wires the helpers together, tracks video elements, saves/restores timestamps, detects SPA navigation, and registers listeners.
@@ -60,8 +60,9 @@ Files named `popup*.js` power the browser action popup:
 Files named `feed*.js` power the extension feed page:
 
 - `feed.js`: top-level page wiring and page-active scheduler coordination.
-- `feed-refresh.js`: reloads canonical projections and owns manual Check/Reload
-  status and notice behavior.
+- `feed-refresh.js`: reloads canonical projections and owns manual **Reload
+  videos** (network scan) and **Refresh** (local redraw) status and notice
+  behavior.
 - `feed-contracts.js`, `rss-parser.js`, `rss-client.js`, and
   `feed-ingestion.js`: normalize public channel RSS and idempotently upsert the
   canonical feed inventory and per-channel sync state.

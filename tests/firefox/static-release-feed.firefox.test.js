@@ -587,9 +587,11 @@ async function main() {
     const labels = await session.driver.executeScript(() => ({
       scan: document.querySelector('#refresh')?.textContent,
       reload: document.querySelector('#reloadView')?.textContent,
+      shareHeaderActions: document.querySelector('#refresh')?.parentElement === document.querySelector('#reloadView')?.parentElement,
     }));
-    assert.equal(labels.scan, 'Check for new videos');
-    assert.equal(labels.reload, 'Reload view');
+    assert.equal(labels.scan, 'Reload videos');
+    assert.equal(labels.reload, 'Refresh');
+    assert.equal(labels.shareHeaderActions, true);
     await session.driver.executeScript(() => window.scrollTo(0, 500));
 
     const stable = await session.driver.executeAsyncScript((id, fixtureChannelId, done) => {

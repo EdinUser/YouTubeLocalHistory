@@ -12,8 +12,8 @@
     "description": "Search field placeholder"
   },
   "feed_refresh": {
-    "message": "Nach neuen Videos suchen",
-    "description": "Check for new subscription videos button label"
+    "message": "Videos neu laden",
+    "description": "Neue Videos von lokalen Abonnements abrufen"
   },
   "feed_create": {
     "message": "Erstellen",
@@ -467,6 +467,7 @@
   "feed_subscription_sort_detected": { "message": "Zu re:Watch hinzugefügt" },
   "feed_reload_view": { "message": "Ansicht neu laden" },
   "feed_reloading_view": { "message": "Wird neu geladen…" },
+  "feed_refresh_view": { "message": "Aktualisieren" },
   "feed_view_reloaded": { "message": "Ansicht neu geladen." },
   "feed_reload_view_failed": { "message": "Die Ansicht konnte nicht neu geladen werden: $1." },
   "feed_pending_inventory_incomplete": { "message": "Im lokalen Bestand fehlen noch $1 gefundene Videos." },

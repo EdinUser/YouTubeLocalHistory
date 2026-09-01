@@ -141,5 +141,8 @@
   "ai_label_announcement_title": { "message": "Nouveaux contrôles des libellés IA", "description": "Titre de l’annonce unique de la fonctionnalité de libellés IA" },
   "ai_label_announcement_body": { "message": "Choisissez si les vidéos libellées IA sont affichées, atténuées ou masquées dans re:Watch.", "description": "Texte de l’annonce unique de la fonctionnalité de libellés IA" },
   "announcement_dismiss": { "message": "Fermer", "description": "Fermer une annonce de fonctionnalité de l’extension" },
-  "ai_label_announcement_settings": { "message": "Voir dans les paramètres", "description": "Ouvrir les paramètres du Feed depuis l’annonce" }
+  "ai_label_announcement_settings": { "message": "Voir dans les paramètres", "description": "Ouvrir les paramètres du Feed depuis l’annonce" },
+  "welcome_announcement_title": { "message": "YT re:Watch est prêt", "description": "Titre de l’annonce d’accueil unique" },
+  "welcome_announcement_body": { "message": "Votre progression de lecture reste privée dans ce navigateur. Ouvrez re:Watch pour continuer à regarder et explorer votre feed local.", "description": "Texte de l’annonce d’accueil unique" },
+  "welcome_announcement_open": { "message": "Ouvrir YT re:Watch", "description": "Ouvrir la fenêtre de l’extension depuis l’annonce d’accueil" }
 }

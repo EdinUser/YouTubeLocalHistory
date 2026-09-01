@@ -13,6 +13,10 @@ All notable changes to YT re:Watch will be documented in this file.
   unavailable or malformed responses.
 - Added the installed extension version beside the YT re:Watch identity in the
   popup and full-page feed, using the extension icon consistently in both.
+- Unified extension announcements into one branded re:Watch toast. The
+  first-use welcome and AI-label notices now share dismissal protection,
+  dark-mode styling, a single queue, and the re:Watch icon. The welcome action
+  opens the browser's normal extension popup.
 
 ### Changed
 
@@ -29,6 +33,9 @@ All notable changes to YT re:Watch will be documented in this file.
   rescans for actual overlay-presentation changes.
 - Routed background, storage, and AI-label informational traces through the
   saved debug setting while keeping warnings and errors visible.
+- The full-page sidebar now starts expanded. **Reload videos** scans followed
+  channels for new uploads, while the adjacent **Refresh** button only redraws
+  the current local view.
 
 ### Fixed
 
@@ -39,6 +46,9 @@ All notable changes to YT re:Watch will be documented in this file.
   in the selected order before the view scrolls to the newly available records.
 - Treat removed, private, or otherwise incomplete YouTube AI-label responses as
   indeterminate instead of caching them as valid unlabeled results.
+- Fixed **System default** appearance in Firefox so the extension popup follows
+  the full-page re:Watch theme instead of resolving a different browser surface
+  independently.
 
 ### Privacy and reliability
 

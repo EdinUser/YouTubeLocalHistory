@@ -1648,7 +1648,6 @@
         </div>
         <div class="mast-right">
             <span class="feed-sync-status" id="feedSyncStatus" hidden aria-live="polite"></span>
-            <button class="btn primary" id="refresh" data-i18n="feed_refresh">Check for new videos</button>
             <button class="btn primary" id="createPlaylist" type="button" style="display:none;" data-i18n="feed_create">Create</button>
             <button class="btn danger" id="clearSubscriptions" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
             <button class="btn danger" id="clearHistoryPage" type="button" style="display:none;" data-i18n="feed_clear_all">Clear all</button>
@@ -1730,7 +1729,8 @@
                         <option value="published_asc" data-i18n="feed_subscription_sort_oldest">Upload date: oldest</option>
                         <option value="discovered_desc" data-i18n="feed_subscription_sort_detected">Added to re:Watch</option>
                     </select>
-                    <button class="btn" id="reloadView" type="button" data-i18n="feed_reload_view">Reload view</button>
+                    <button class="btn primary" id="refresh" type="button" data-i18n="feed_refresh">Reload videos</button>
+                    <button class="btn" id="reloadView" type="button" data-i18n="feed_refresh_view">Refresh</button>
                 </div>
             </header>
             <div class="status" id="homeDebug" style="display:none;"></div>

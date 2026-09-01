@@ -17,6 +17,23 @@ async function getSystemColorScheme() {
     try {
         log('=== Starting theme detection ===');
 
+        // Firefox may expose a different media-query result to a browser-action
+        // panel than it does to an extension page. The feed records its result
+        // so every re:Watch surface follows one shared system appearance.
+        const storedTheme = await new Promise((resolve) => {
+            try {
+                chrome.storage.local.get(['systemTheme'], (result) => {
+                    resolve(['dark', 'light'].includes(result?.systemTheme) ? result.systemTheme : null);
+                });
+            } catch (_) {
+                resolve(null);
+            }
+        });
+        if (storedTheme) {
+            log(`[Theme Detection] Using shared extension system theme: ${storedTheme}`);
+            return storedTheme;
+        }
+
         // 1. First check prefers-color-scheme media query
         const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const lightMediaQuery = window.matchMedia('(prefers-color-scheme: light)');

@@ -61,7 +61,9 @@
                 :host { all: initial; position: fixed; right: 20px; bottom: 20px; z-index: 2147483646; font-family: Roboto, Arial, sans-serif; }
                 .toast { box-sizing: border-box; width: min(360px, calc(100vw - 40px)); padding: 16px; border: 1px solid #b8c8eb; border-radius: 12px; background: #f4f7ff; color: #172033; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); }
                 :host([data-theme="dark"]) .toast { border-color: #536889; background: #252b38; color: #edf2ff; box-shadow: 0 8px 24px rgb(0 0 0 / 42%); }
-                h2 { margin: 0 0 6px; font: 600 15px/20px Roboto, Arial, sans-serif; }
+                .heading { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+                .brand-icon { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 6px; }
+                h2 { margin: 0; font: 600 15px/20px Roboto, Arial, sans-serif; }
                 p { margin: 0; font: 400 14px/20px Roboto, Arial, sans-serif; }
                 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
                 button { min-height: 32px; border: 0; border-radius: 16px; padding: 0 13px; font: 500 14px/32px Roboto, Arial, sans-serif; cursor: pointer; }
@@ -72,10 +74,11 @@
                 :host([data-theme="dark"]) .action { background: #8ab4f8; color: #14213a; }
             </style>
             <div class="toast">
-                <h2></h2><p></p>
+                <div class="heading"><img class="brand-icon" alt=""><h2></h2></div><p></p>
                 <div class="actions"><button class="dismiss" type="button"></button><button class="action" type="button"></button></div>
             </div>`;
         shadow.querySelector('h2').textContent = message(announcement.titleKey, announcement.title);
+        shadow.querySelector('.brand-icon').src = chrome.runtime.getURL('icon48.png');
         shadow.querySelector('p').textContent = message(announcement.bodyKey, announcement.body);
         shadow.querySelector('.dismiss').textContent = message('announcement_dismiss', 'Dismiss');
         shadow.querySelector('.action').textContent = message(announcement.actionLabelKey, announcement.actionLabel);
@@ -85,11 +88,13 @@
             if (!acknowledge(announcement)) return;
             await sendMessage('releaseAnnouncement', { announcementId: announcement.id });
             remove();
+            showNextAnnouncement();
         });
         shadow.querySelector('.action').addEventListener('click', async () => {
             if (!(await sendMessage('runAnnouncementAction', { announcementId: announcement.id }))?.ok) return;
             if (!acknowledge(announcement)) return;
             remove();
+            showNextAnnouncement();
         });
         document.body.appendChild(host);
 

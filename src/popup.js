@@ -126,9 +126,14 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         if (chrome.storage && chrome.storage.onChanged) {
             chrome.storage.onChanged.addListener((changes, area) => {
-                if (area !== 'local' || !changes.settings || !changes.settings.newValue) return;
-                const updated = changes.settings.newValue;
-                applyPopupAccent(updated.overlayColor || updated.accentColor || 'blue');
+                if (area !== 'local') return;
+                if (changes.settings?.newValue) {
+                    const updated = changes.settings.newValue;
+                    applyPopupAccent(updated.overlayColor || updated.accentColor || 'blue');
+                }
+                if (changes.systemTheme?.newValue && (globalThis.currentSettings?.themePreference || 'system') === 'system') {
+                    applyTheme('system');
+                }
             });
         }
 
