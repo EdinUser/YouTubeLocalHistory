@@ -2,7 +2,7 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
-## [5.2.0] - Unreleased
+## [5.2.0] - 2026-09-01
 
 ### Added
 

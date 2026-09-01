@@ -1,6 +1,6 @@
 # Changelog
 
-## v5.2.0 — Unreleased
+## v5.2.0 — 1 September 2026
 
 - Added experimental **AI-labeled video handling** with Off, Badge, Dim, and
   Hide modes for videos YouTube itself discloses as made with AI.
