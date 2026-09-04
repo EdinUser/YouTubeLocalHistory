@@ -76,6 +76,7 @@ jobs:
 
       - name: Run deterministic local gate
         env:
+          FIREFOX_BINARY: ${{ steps.firefox.outputs.firefox-path }}
           FIREFOX_LANGPACK_DIR: ${{ runner.temp }}/firefox-langpacks
         run: npm run test:local:offline
 

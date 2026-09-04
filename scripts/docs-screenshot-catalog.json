@@ -48,7 +48,7 @@
       "readySelector": "#grid .ytvht-feed-card",
       "display": { "width": 1440, "height": 960 },
       "alt": "The re:Watch Subscriptions tab showing recent cached uploads from locally followed channels.",
-      "caption": "Subscriptions lists cached uploads from locally followed channels in chronological order."
+      "caption": "Subscriptions lists cached uploads in the selected upload-date or detection-date order; Reload videos checks for new uploads."
     },
     {
       "id": "feed-shorts",
@@ -117,8 +117,8 @@
       "capture": { "type": "viewport" },
       "readySelector": "#subscriptionsList .subs-card",
       "display": { "width": 1440, "height": 960 },
-      "alt": "The re:Watch Channels tab showing channels followed locally by the extension.",
-      "caption": "Channels manages the explicit channel list followed by re:Watch."
+      "alt": "The re:Watch Channels tab with sorting, per-channel checks, activity, next-check times, and RSS logs.",
+      "caption": "Sort local follows and check each channel's uploads, activity, and scan history."
     },
     {
       "id": "feed-analytics",

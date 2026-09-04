@@ -147,16 +147,55 @@ function setSubscriptionAddStatus(message, isError) {
     status.style.color = isError ? 'var(--danger-text)' : '';
 }
 
-function showSubscriptionRssLog(subscription) {
+const subscriptionCheckStates = new Map();
+
+async function checkSubscriptionForNewVideos(subscription, button) {
+    const channelId = subscription.channelId;
+    if (subscriptionCheckStates.get(channelId)?.busy) return;
+    const state = { busy: true, message: '' };
+    subscriptionCheckStates.set(channelId, state);
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = tFeed('feed_refreshing', 'Checking…');
+    try {
+        const scheduler = ensureSharedFeedScheduler();
+        if (!scheduler) throw new Error('Feed scheduler is unavailable');
+        const result = await scheduler.runManual({ channelIds: [channelId] });
+        const checked = Object.values(result.outcomes || {}).reduce((sum, count) => sum + count, 0);
+        const failed = Number(result.outcomes?.failed || 0) + Number(result.outcomes?.timed_out || 0);
+        state.message = tFeed('feed_reload_summary', 'Checked $1 channels · $2 failed · $3 deferred.', [
+            feedFormatNumber(checked), feedFormatNumber(failed), feedFormatNumber(result.skippedCount || 0)
+        ]);
+        if (result.insertedVideoIds?.length) await showRetainedNewFeedVideos(result.insertedVideoIds);
+    } catch (error) {
+        console.warn('[subscriptions] channel check failed', error && error.message);
+        state.message = tFeed('feed_refresh_failed_status', 'Could not check for new videos. Please try again.');
+    } finally {
+        state.busy = false;
+        button.disabled = false;
+        button.setAttribute('aria-busy', 'false');
+        button.textContent = tFeed('feed_channel_check', 'Check for new videos');
+        if (subscriptionsActive) await renderSubscriptions();
+    }
+}
+
+async function showSubscriptionRssLog(subscription) {
+    let attempts = [];
+    let readFailed = false;
+    try {
+        const current = await ytIndexedDBStorage.getChannelSyncState(subscription.channelId);
+        attempts = Array.isArray(current?.rssAttempts) ? current.rssAttempts.slice().reverse() : [];
+    } catch (_) { readFailed = true; }
     const dialog = document.createElement('dialog');
     dialog.className = 'rss-log-dialog';
     const title = document.createElement('h2');
     title.textContent = tFeed('feed_rss_log_title', 'RSS read log · $1', [subscription.channelName || subscription.channelId]);
     dialog.appendChild(title);
-    const attempts = Array.isArray(subscription.rssAttempts) ? subscription.rssAttempts.slice().reverse() : [];
     if (!attempts.length) {
         const empty = document.createElement('p');
-        empty.textContent = tFeed('feed_rss_log_empty', 'No RSS reads recorded yet.');
+        empty.textContent = readFailed
+            ? tFeed('feed_rss_log_failed', 'Could not load the RSS read log. Please try again.')
+            : tFeed('feed_rss_log_empty', 'No RSS reads recorded yet.');
         dialog.appendChild(empty);
     } else {
         const list = document.createElement('ol');
@@ -223,6 +262,74 @@ function setupSubscriptionAddForm() {
     });
 }
 
+const CHANNELS_SORT_KEY = 'ytvhtChannelsSort';
+const CHANNELS_SORT_DEFAULTS = Object.freeze({ name: 'asc', followedAt: 'desc', latestUploadAt: 'desc', activity: 'desc', lastAttemptAt: 'asc' });
+let channelsSortPreference = readChannelsSortPreference();
+
+function readChannelsSortPreference() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(CHANNELS_SORT_KEY));
+        if (Object.prototype.hasOwnProperty.call(CHANNELS_SORT_DEFAULTS, saved?.field) && ['asc', 'desc'].includes(saved.direction)) return saved;
+    } catch (_) { /* Use the default when preferences cannot be read. */ }
+    return { field: 'name', direction: 'asc' };
+}
+
+function sortChannelSubscriptions(subscriptions, preference = channelsSortPreference) {
+    const { field, direction } = preference;
+    const multiplier = direction === 'asc' ? 1 : -1;
+    const activity = { very_active: 6, active: 5, regular: 4, occasional: 3, reactivated: 2, rare: 1, dormant: 0 };
+    const names = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+    const compareNames = (a, b) => names.compare(
+        decodeHtmlEntities(a.channelName || a.channelTitle || a.channelId),
+        decodeHtmlEntities(b.channelName || b.channelTitle || b.channelId)
+    );
+    return [...subscriptions].sort((a, b) => {
+        if (field === 'name') return multiplier * compareNames(a, b) || a.channelId.localeCompare(b.channelId);
+        const left = field === 'activity' ? activity[a.activityClass] : Number(a[field] || 0);
+        const right = field === 'activity' ? activity[b.activityClass] : Number(b[field] || 0);
+        // Missing dates/activity stay last, except never-checked channels:
+        // those are the oldest checks and belong first in ascending order.
+        const missing = (value) => !Number.isFinite(value) || (field !== 'activity' && field !== 'lastAttemptAt' && value <= 0);
+        if (missing(left) !== missing(right)) return missing(left) ? 1 : -1;
+        const primary = missing(left) ? 0 : multiplier * (left - right);
+        const latestUpload = field === 'activity' ? Number(b.latestUploadAt || 0) - Number(a.latestUploadAt || 0) : 0;
+        return primary || latestUpload || compareNames(a, b) || a.channelId.localeCompare(b.channelId);
+    });
+}
+
+function setupChannelsSort() {
+    const select = document.getElementById('channelsSort');
+    const direction = document.getElementById('channelsSortDirection');
+    if (!select || !direction) return;
+    select.value = channelsSortPreference.field;
+    const ascending = channelsSortPreference.direction === 'asc';
+    const labels = channelsSortPreference.field === 'name'
+        ? ['feed_channels_sort_az', 'A–Z', 'feed_channels_sort_za', 'Z–A']
+        : channelsSortPreference.field === 'activity'
+            ? ['feed_channels_sort_least_active', 'Least active first', 'feed_channels_sort_most_active', 'Most active first']
+            : ['feed_channels_sort_oldest', 'Oldest first', 'feed_channels_sort_newest', 'Newest first'];
+    const offset = ascending ? 0 : 2;
+    direction.textContent = `${ascending ? '↑' : '↓'} ${tFeed(labels[offset], labels[offset + 1])}`;
+    direction.title = tFeed('feed_channels_sort_reverse', 'Reverse sort direction');
+    if (select.dataset.bound === 'true') return;
+    select.dataset.bound = 'true';
+    const apply = () => {
+        try { localStorage.setItem(CHANNELS_SORT_KEY, JSON.stringify(channelsSortPreference)); } catch (_) { /* Keep the selection for this page. */ }
+        setupChannelsSort();
+        channelMetadataObserver?.disconnect();
+        channelMetadataObserver = null;
+        renderSubscriptions();
+    };
+    select.addEventListener('change', () => {
+        channelsSortPreference = { field: select.value, direction: CHANNELS_SORT_DEFAULTS[select.value] };
+        apply();
+    });
+    direction.addEventListener('click', () => {
+        channelsSortPreference.direction = channelsSortPreference.direction === 'asc' ? 'desc' : 'asc';
+        apply();
+    });
+}
+
 async function renderSubscriptions() {
     const list = document.getElementById('subscriptionsList');
     const empty = document.getElementById('subscriptionsEmpty');
@@ -233,10 +340,12 @@ async function renderSubscriptions() {
     const ignoredTab = document.getElementById('channelsIgnoredTab');
     const addForm = document.getElementById('subscriptionAddForm');
     const addStatus = document.getElementById('subscriptionAddStatus');
+    const sortControls = document.getElementById('channelsSortControls');
     if (!list || !empty || !count) return;
 
     setupSubscriptionAddForm();
     setupSubscriptionTabs();
+    setupChannelsSort();
     let subscriptions = [];
     let ignoredChannels = [];
     let loadError = null;
@@ -257,6 +366,7 @@ async function renderSubscriptions() {
         loadError = error;
     }
     if (loadError) {
+        if (sortControls) sortControls.hidden = true;
         if (tabs) tabs.hidden = true;
         if (addForm) addForm.style.display = 'none';
         if (addStatus) addStatus.style.display = 'none';
@@ -268,6 +378,8 @@ async function renderSubscriptions() {
     }
     if (!ignoredChannels.length) channelsInternalTab = 'following';
     const showingIgnored = channelsInternalTab === 'ignored' && ignoredChannels.length > 0;
+    if (sortControls) sortControls.hidden = showingIgnored || subscriptions.length === 0;
+    subscriptions = sortChannelSubscriptions(subscriptions);
     if (tabs) tabs.hidden = ignoredChannels.length === 0;
     if (ignoredTab) {
         ignoredTab.hidden = ignoredChannels.length === 0;
@@ -350,10 +462,24 @@ async function renderSubscriptions() {
 
         const actions = document.createElement('div');
         actions.className = 'subs-actions';
+        const checkState = subscriptionCheckStates.get(sub.channelId);
+        const check = document.createElement('button');
+        check.className = 'btn';
+        check.dataset.action = 'check';
+        check.disabled = checkState?.busy === true;
+        check.setAttribute('aria-busy', check.disabled ? 'true' : 'false');
+        check.textContent = check.disabled ? tFeed('feed_refreshing', 'Checking…') : tFeed('feed_channel_check', 'Check for new videos');
+        check.addEventListener('click', () => checkSubscriptionForNewVideos(sub, check));
+        actions.appendChild(check);
         const log = document.createElement('button');
         log.className = 'btn';
+        log.dataset.action = 'log';
         log.textContent = tFeed('feed_rss_log', 'Log');
-        log.addEventListener('click', () => showSubscriptionRssLog(sub));
+        log.addEventListener('click', async () => {
+            log.disabled = true;
+            try { await showSubscriptionRssLog(sub); }
+            finally { log.disabled = false; }
+        });
         actions.appendChild(log);
         const unsubscribe = document.createElement('button');
         unsubscribe.className = 'btn';
@@ -376,6 +502,13 @@ async function renderSubscriptions() {
         });
         actions.appendChild(unsubscribe);
         row.appendChild(actions);
+        if (checkState?.message) {
+            const checkMessage = document.createElement('div');
+            checkMessage.className = 'subs-meta';
+            checkMessage.setAttribute('role', 'status');
+            checkMessage.textContent = checkState.message;
+            row.appendChild(checkMessage);
+        }
         list.appendChild(row);
     });
     if (showingIgnored) {

@@ -1,5 +1,20 @@
 # Changelog
 
+## v5.2.1 — 4 September 2026
+
+- Added Channels sorting by name, date followed, latest upload, activity, and last
+  checked. The selected order and direction are remembered; the default is name A–Z.
+- Fixed stalled subscription downloads and continuously blinking scan status.
+- **Reload videos** now checks followed channels and updates the visible list,
+  while preserving failure backoff and reporting failed or deferred checks.
+- Added a 300 ms debounce to feed and popup search. Enter and clearing remain immediate.
+- Repair old 30-day RSS error delays and recognize channels with frequent daily
+  uploads, promoting activity promptly and downgrading only after a quiet period.
+- Added a per-channel **Check for new videos** action in Channels. Activity and
+  scheduling refresh after a check, and **Log** always loads current scan records.
+- Updated development dependencies `fast-uri` to 3.1.7 and `@humanfs/node` to
+  0.16.8 to address five Dependabot alerts in URI handling and recursive file copying.
+
 ## v5.2.0 — 1 September 2026
 
 - Added experimental **AI-labeled video handling** with Off, Badge, Dim, and

@@ -21,7 +21,7 @@ async function main() {
     await setExtensionSettings(session, {
       aiLabeledVideoHandling: 'off',
       debug: false,
-      version: '5.2.0',
+      version: '5.2.1',
     });
     await session.driver.get(SEARCH_URL);
     await session.driver.wait(
@@ -130,7 +130,7 @@ async function main() {
     await setExtensionSettings(session, {
       aiLabeledVideoHandling: 'badge',
       debug: false,
-      version: '5.2.0',
+      version: '5.2.1',
     });
     assert.equal(await session.driver.executeScript(() => (
       document.querySelector('#ytvht-ai-live-canary-card')?.isConnected === true

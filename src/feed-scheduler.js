@@ -136,8 +136,31 @@
 
         async start() {
             const recoveredLeaseCount = await this.recoverExpiredLeases();
+            await this.repairLegacyUnavailableSchedules();
             const initializedChannelCount = await this.initializeSubscriptions();
             return { recoveredLeaseCount, initializedChannelCount };
+        }
+
+        async repairLegacyUnavailableSchedules() {
+            const at = nowFrom(this.clock);
+            const states = await this.storage.listChannelSyncStates();
+            const legacy = states.filter((state) => Number(state.unavailableStatus) === 404 &&
+                Number(state.scanLeaseUntil || 0) <= at);
+            let repaired = 0;
+            for (const state of legacy) {
+                // Before v5.1, a 404 imposed a 30-day wait. Queue a real check
+                // under today's policy; preserve any independent retry delay.
+                const runId = `legacy-repair-${at}-${++this.runSequence}`;
+                const claim = await this.storage.claimChannelSyncState(state.channelId, { runId, now: at, leaseMs: this.leaseMs });
+                if (!claim.claimed) continue;
+                const stillLegacy = Number(claim.state.unavailableStatus) === 404;
+                const released = await this.storage.releaseChannelSyncState(state.channelId, runId, stillLegacy ? {
+                    unavailableStatus: null, unavailableAt: null,
+                    nextEligibleCheckAt: Math.max(at, Number(claim.state.retryAfter || 0))
+                } : {});
+                if (stillLegacy && released) repaired += 1;
+            }
+            return repaired;
         }
 
         async getInitializationProgress() {
@@ -156,7 +179,8 @@
 
         async getNextEligibleCheckAt() {
             const eligible = (await this.storage.listChannelSyncStates())
-                .map((state) => Number(state && state.nextEligibleCheckAt || 0))
+                .map((state) => Math.max(Number(state && state.nextEligibleCheckAt || 0),
+                    Number(state && state.scanLeaseUntil || 0), Number(state && state.retryAfter || 0)))
                 .filter((at) => Number.isFinite(at) && at > 0);
             return eligible.length ? Math.min(...eligible) : Infinity;
         }
@@ -200,14 +224,36 @@
 
         async runForeground(options = {}) {
             const at = nowFrom(this.clock);
-            const states = await this.storage.getEligibleChannelSyncStates(at, Number(options.limit || this.foregroundBatchSize));
-            const selected = states.filter((state) => !this.isDormantState(state));
+            const states = await this.storage.getEligibleChannelSyncStates(at);
+            // Low-activity channels must not fill the batch before filtering.
+            const selected = states.filter((state) => !this.isDormantState(state) && Number(state.scanLeaseUntil || 0) <= at)
+                .slice(0, Number(options.limit || this.foregroundBatchSize));
             const retryOnly = selected.length > 0 && selected.every((state) => Boolean(state.lastRssError));
             return this.runBatch(selected, {
                 ...options,
                 concurrency: Number(options.concurrency || (retryOnly ? this.retryConcurrency : this.concurrency)),
                 kind: 'foreground'
             });
+        }
+
+        async runManual(options = {}) {
+            await this.initializeSubscriptions(options.channelIds);
+            const at = nowFrom(this.clock);
+            const [subscriptions, states] = await Promise.all([
+                this.storage.listSubscriptionRecords(), this.storage.listChannelSyncStates()
+            ]);
+            const requestedIds = options.channelIds ? new Set(uniqueChannelIds(options.channelIds)) : null;
+            const followedIds = new Set(subscriptions.filter((subscription) =>
+                contracts.canInitializeSubscription(subscription) && (!requestedIds || requestedIds.has(subscription.channelId)))
+                .map((subscription) => subscription.channelId));
+            // A manual reload bypasses successful-check intervals, including
+            // rare/dormant channels, but preserves failure backoff and leases.
+            const selected = states.filter((state) => followedIds.has(state.channelId) &&
+                Number(state.retryAfter || 0) <= at && Number(state.scanLeaseUntil || 0) <= at);
+            const result = await this.runBatch(selected, {
+                kind: 'manual', limit: selected.length || 1, concurrency: this.concurrency
+            });
+            return { ...result, skippedCount: result.skippedCount + followedIds.size - selected.length };
         }
 
         async runBatch(states, options = {}) {
@@ -248,7 +294,8 @@
             const workerCount = Math.min(Math.max(1, Number(options.concurrency || this.concurrency)), selected.length);
             await Promise.all(Array.from({ length: workerCount }, worker));
             this.cancelledRunIds.delete(runId);
-            const result = { runId, completed, total, insertedVideoCount, insertedVideoIds, active: false };
+            const skippedCount = total - Object.values(outcomes).reduce((sum, count) => sum + count, 0);
+            const result = { runId, completed, total, insertedVideoCount, insertedVideoIds, active: false, outcomes, skippedCount };
             await this.recordRunDiagnostic({ ...result, kind: options.kind || 'foreground', startedAt, completedAt: nowFrom(this.clock), outcomes });
             await this.cleanupRetainedFeedData();
             return result;

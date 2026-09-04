@@ -1,13 +1,14 @@
 (function (root) {
     'use strict';
 
-    const CLASSIFICATION_VERSION = 1;
+    const CLASSIFICATION_VERSION = 2;
     const ACTIVITY_CLASSES = Object.freeze([
         'unknown', 'very_active', 'active', 'regular', 'occasional', 'rare', 'dormant', 'reactivated'
     ]);
     const RING_LIMIT = 20;
     const DAY_MS = 24 * 60 * 60 * 1000;
     const SESSION_GAP_MS = 12 * 60 * 60 * 1000;
+    const QUIET_DAYS_BEFORE_DOWNGRADE = Object.freeze({ very_active: 2, active: 10, regular: 30, occasional: 90 });
 
     function median(values) {
         if (!values.length) return null;
@@ -57,6 +58,12 @@
         ).filter((value) => value > 0);
         const medianIntervalMs = median(intervals);
         const ageMs = Math.max(0, now - latest);
+        // The bounded RSS sample can contain an entire day's busy schedule
+        // inside one 12-hour session. Count uploads spread through the day,
+        // without mistaking a bulk upload within a few minutes for that rate.
+        const recentDay = timestamps.filter((timestamp) => timestamp >= now - DAY_MS && timestamp <= now);
+        const daySpanMs = recentDay.length ? recentDay[0] - recentDay[recentDay.length - 1] : 0;
+        if (recentDay.length >= 6 && daySpanMs >= 3 * 60 * 60 * 1000 && ageMs <= 12 * 60 * 60 * 1000) return 'very_active';
         if (sessions7d >= 10 || (medianIntervalMs && medianIntervalMs <= 12 * 60 * 60 * 1000 && ageMs <= 2 * DAY_MS)) return 'very_active';
         if (sessions7d >= 4 || (medianIntervalMs && medianIntervalMs <= 3 * DAY_MS && ageMs <= 10 * DAY_MS)) return 'active';
         if (sessions30d >= 2 || (medianIntervalMs && medianIntervalMs <= 14 * DAY_MS && ageMs <= 30 * DAY_MS)) return 'regular';
@@ -91,9 +98,16 @@
         const hasNewUpload = !!latestUploadAt && latestUploadAt > latestKnown;
         const observed = observedActivityClass(timestamps, now);
         const current = existing && existing.activityClass;
-        const activityClass = hasNewUpload && (current === 'dormant' || current === 'rare')
-            ? 'reactivated'
-            : stepTowardActivityClass(current, observed);
+        const strongActivity = observed === 'very_active' || observed === 'active';
+        let activityClass = hasNewUpload && (current === 'dormant' || current === 'rare') && !strongActivity
+            ? 'reactivated' : stepTowardActivityClass(current, observed);
+        if (strongActivity && classRank(observed) < classRank(current)) activityClass = observed;
+        const downgrading = classRank(current) !== null && classRank(observed) > classRank(current);
+        const quietDays = QUIET_DAYS_BEFORE_DOWNGRADE[current];
+        if (downgrading && ((quietDays && latestUploadAt && now - latestUploadAt < quietDays * DAY_MS) ||
+            (existing?.activityClassChangedAt && now - existing.activityClassChangedAt < DAY_MS))) {
+            activityClass = current;
+        }
         return {
             classificationVersion: CLASSIFICATION_VERSION,
             recentUploadTimestamps: timestamps,
@@ -110,6 +124,8 @@
             activityClass,
             classificationConfidence: Math.min(1, timestamps.length / 10),
             classificationUpdatedAt: now,
+            activityClassChangedAt: activityClass === current && existing?.activityClassChangedAt
+                ? existing.activityClassChangedAt : now,
             reactivatedAt: activityClass === 'reactivated' ? now : null,
             hasNewUpload
         };

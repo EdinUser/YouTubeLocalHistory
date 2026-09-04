@@ -6,6 +6,23 @@ let globalSearchInput = null; // Will be set in DOMContentLoaded
 let searchHistory = {}; // {query: frequency}
 let searchTimeout = null;
 const SEARCH_DEBOUNCE_DELAY = 1000; // 1 second
+let searchRenderTimeout = null;
+
+function cancelPendingPopupSearch() {
+    clearTimeout(searchRenderTimeout);
+    searchRenderTimeout = null;
+    clearTimeout(searchTimeout);
+    searchTimeout = null;
+}
+
+function schedulePopupSearch(query) {
+    cancelPendingPopupSearch();
+    searchRenderTimeout = setTimeout(() => {
+        searchRenderTimeout = null;
+        if (globalSearchInput && globalSearchInput.value !== query) return;
+        smartSearch(query).catch((error) => console.error('[Search] Search failed', error));
+    }, 300);
+}
 
 function recordSearch(query) {
     if (!query || query.trim().length <= 3) return; // Don't save searches 3 characters or shorter
@@ -301,5 +318,4 @@ function quickSelectVideo(videoId) {
         suggestions.style.display = 'none';
     }
 }
-
 

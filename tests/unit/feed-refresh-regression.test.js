@@ -44,6 +44,7 @@ function runtime({ videoIds = [], loadData, work, visibleIds = videoIds, invento
     loadData: loadData || jest.fn(async () => {}),
     showFeed: jest.fn(),
     refreshActiveFeedDataView: jest.fn(),
+    setPageActiveSyncStatus: jest.fn(),
     requestPageActiveFeedWork: jest.fn(async () => work || {
       result: { insertedVideoCount: 0, insertedVideoIds: [] },
       progress: { pending: 0 }
@@ -80,16 +81,37 @@ function runtime({ videoIds = [], loadData, work, visibleIds = videoIds, invento
   return { context, stored };
 }
 
-test('an upload scan does not reload or rerender the visible feed', async () => {
+test('manual reload updates the visible feed, consumes discoveries, and preserves the current query and sort', async () => {
   const { context } = runtime({
     work: { result: { insertedVideoCount: 2, insertedVideoIds: ['video-1', 'video-2'] }, progress: { pending: 0 } }
   });
 
   await context.checkForNewVideos();
 
-  expect(context.requestPageActiveFeedWork).toHaveBeenCalledTimes(1);
-  expect(context.loadData).not.toHaveBeenCalled();
+  expect(context.requestPageActiveFeedWork).toHaveBeenCalledWith({ manual: true });
+  expect(context.loadData).toHaveBeenCalledWith({ requireCanonicalInventory: true });
+  expect(context.refreshActiveFeedDataView).toHaveBeenCalledTimes(1);
+  expect(context.pendingFeedDiscovery.videoIds).toEqual([]);
+  expect(document.getElementById('search').value).toBe('keep me');
+  expect(context.subscriptionSort).toBe('published_desc');
   expect(context.showFeed).not.toHaveBeenCalled();
+});
+
+test('manual reload reports partial failures and deferred channels', async () => {
+  const { context } = runtime({ work: { result: {
+    outcomes: { updated: 2, unchanged: 3, failed: 1, timed_out: 1 }, skippedCount: 4
+  } } });
+  await context.checkForNewVideos();
+  expect(document.getElementById('status').textContent).toBe('Checked 7 channels · 2 failed · 4 deferred.');
+  expect(context.setPageActiveSyncStatus).toHaveBeenLastCalledWith('Checked 7 channels · 2 failed · 4 deferred.', false);
+});
+
+test('failed inventory reload preserves discoveries for retry', async () => {
+  const { context } = runtime({ videoIds: ['pending'], loadData: jest.fn(async () => { throw new Error('offline'); }) });
+  await context.checkForNewVideos();
+  expect(context.pendingFeedDiscovery.videoIds).toEqual(['pending']);
+  expect(context.refreshActiveFeedDataView).not.toHaveBeenCalled();
+  expect(document.getElementById('refresh').disabled).toBe(false);
 });
 
 test('a failed upload scan shows a friendly message without exposing the technical error', async () => {
@@ -216,7 +238,7 @@ test('concurrent scan requests reuse the active page work promise', () => {
     feedSource.indexOf('function onStorageChanged')
   );
   const gate = new Promise(() => {});
-  const context = { pageFeedWorkPromise: null, runPageActiveFeedWork: jest.fn() };
+  const context = { pageFeedWorkPromise: null, manualFeedWorkPromise: null, runPageActiveFeedWork: jest.fn() };
   context.runPageActiveFeedWork.mockImplementation(() => {
     context.pageFeedWorkPromise = gate;
     return gate;
