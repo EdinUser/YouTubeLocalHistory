@@ -1,4 +1,38 @@
 const { test, expect } = require('./extension-fixture');
+const { verifyFeedReloadAndSearch, verifyPopupSearchDebounce, verifyChannelSorting, verifyChannelSortingRestored } = require('../fixtures/feed/runtime-regressions');
+
+test('Channels supports five sorts in both directions and remembers the order across reloads', async ({ context }) => {
+  const worker = context.serviceWorkers().find(item => item.url().includes('background.js'))
+    || await context.waitForEvent('serviceworker', { predicate: item => item.url().includes('background.js') });
+  const workerUrl = new URL(worker.url());
+  const page = await context.newPage();
+  await page.goto(`${workerUrl.protocol}//${workerUrl.host}/feed.html`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).not.toHaveClass(/app-loading/);
+  expect(await page.evaluate(verifyChannelSorting)).toEqual({ orders: 10, field: 'activity', direction: 'asc' });
+  await expect(page.locator('#channelsSort')).toBeVisible();
+  await expect(page.locator('#channelsSortDirection')).toBeVisible();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).not.toHaveClass(/app-loading/);
+  expect(await page.evaluate(verifyChannelSortingRestored)).toEqual({ restored: true });
+  await page.close();
+});
+
+test('manual reload recovers subscription scanning and feed/popup searches debounce', async ({ context }) => {
+  const worker = context.serviceWorkers().find(item => item.url().includes('background.js'))
+    || await context.waitForEvent('serviceworker', { predicate: item => item.url().includes('background.js') });
+  const workerUrl = new URL(worker.url());
+  const extensionOrigin = `${workerUrl.protocol}//${workerUrl.host}`;
+  const page = await context.newPage();
+  await page.goto(`${extensionOrigin}/feed.html`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).not.toHaveClass(/app-loading/);
+  expect(await page.evaluate(verifyFeedReloadAndSearch)).toEqual({
+    automaticScans: 1, manualScans: 31, failed: 1, deferred: 2, searchRenders: 3
+  });
+  await page.goto(`${extensionOrigin}/popup.html`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('body')).not.toHaveClass(/loading-skeleton/);
+  expect(await page.evaluate(verifyPopupSearchDebounce)).toEqual({ searches: ['reload', 'enter'] });
+  await page.close();
+});
 
 test('packaged feed page exposes one live scheduler-status surface beside Refresh', async ({ context }) => {
   const worker = context.serviceWorkers().find((item) => item.url().includes('background.js'))

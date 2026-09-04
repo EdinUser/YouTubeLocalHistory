@@ -11,7 +11,7 @@ test('keeps a channel with no RSS upload evidence explicitly unknown', () => {
   const result = classifier.classifyChannelActivity({}, [], now);
 
   expect(result).toEqual(expect.objectContaining({
-    classificationVersion: 1,
+    classificationVersion: 2,
     activityClass: 'unknown',
     classificationConfidence: 0,
     recentUploadTimestamps: [],
@@ -42,16 +42,44 @@ test('does not mistake a daily batch of uploads for many independent publishing 
   expect(result.activityClass).toBe('active');
 });
 
-test('degrades a quiet channel one activity tier per successful observation', () => {
+test('degrades a quiet channel at most one activity tier per day', () => {
   const now = 1_000 * DAY;
   const oldTimestamps = Array.from({ length: 10 }, (_, index) => now - (200 + index) * DAY);
   const first = classifier.classifyChannelActivity({
     activityClass: 'very_active', latestUploadAt: now - 200 * DAY, recentUploadTimestamps: oldTimestamps
   }, [], now);
   const second = classifier.classifyChannelActivity({ ...first, activityClass: first.activityClass }, [], now);
+  const nextDay = classifier.classifyChannelActivity(second, [], now + DAY);
 
   expect(first.activityClass).toBe('active');
-  expect(second.activityClass).toBe('regular');
+  expect(second.activityClass).toBe('active');
+  expect(nextDay.activityClass).toBe('regular');
+});
+
+test('promotes frequent uploads spread throughout the day immediately, including formerly dormant channels', () => {
+  const now = 1_000 * DAY;
+  const uploads = entries(Array.from({ length: 20 }, (_, i) => now - i * 30 * 60 * 1000));
+  for (const activityClass of ['unknown', 'active', 'regular', 'rare', 'dormant', 'reactivated']) {
+    const result = classifier.classifyChannelActivity({ activityClass, latestUploadAt: now - 200 * DAY }, uploads, now);
+    expect(result.activityClass).toBe('very_active');
+    expect(result.uploadSessions7d).toBe(1);
+  }
+});
+
+test('a single bulk upload over a few minutes does not establish a very active cadence', () => {
+  const now = 1_000 * DAY;
+  const uploads = entries(Array.from({ length: 20 }, (_, i) => now - i * 60 * 1000));
+  expect(classifier.classifyChannelActivity({}, uploads, now).activityClass).toBe('occasional');
+});
+
+test('a short recent sample cannot downgrade an active channel and checks do not postpone eventual downgrades', () => {
+  const now = 1_000 * DAY;
+  const first = classifier.classifyChannelActivity({ activityClass: 'active', latestUploadAt: now }, entries([now]), now);
+  const hourly = classifier.classifyChannelActivity(first, [], now + 60 * 60 * 1000);
+  expect(first.activityClass).toBe('active');
+  expect(hourly.activityClass).toBe('active');
+  expect(hourly.activityClassChangedAt).toBe(first.activityClassChangedAt);
+  expect(classifier.classifyChannelActivity(hourly, [], now + 11 * DAY).activityClass).toBe('regular');
 });
 
 test('reactivates a dormant channel by one controlled tier when RSS finds a new upload', () => {

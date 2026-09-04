@@ -80,6 +80,8 @@ Files named `feed*.js` power the extension feed page:
 - `feed-subscription-import.js`, `feed-subscriptions-view.js`,
   `feed-subscribe-results.js`, and `feed-channel-view.js`: canonical local
   subscription acquisition and channel surfaces.
+  `feed-subscriptions-view.js` also owns the remembered Channels sort, per-channel
+  manual checks, and fresh reads of the RSS attempt log.
 - `feed-playlists-view.js`, `feed-playlist-import.js`,
   `feed-history-view.js`, `feed-analytics.js`, `feed-settings.js`, and
   `feed-backup.js`: individual feed sections and profile portability.

@@ -62,11 +62,11 @@ Home uses stable 50-card pages. Moving between pages does not duplicate cards or
 
 Subscriptions is the complete inventory of regular cached uploads. Choose
 upload-date or detection-date ordering; the selection remains active through
-**Reload** and **Show**. The view also uses stable 50-card pages.
+**Reload videos**, **Refresh**, and **Show**. The view also uses stable 50-card pages.
 
 ### Reload videos, Refresh, and Show
 
-- **Reload videos** scans eligible followed channels and updates cached feed records. The status beside it reports progress, scheduling, and outcomes.
+- **Reload videos** checks followed channels and updates the visible list, even when their normal check time is still in the future. It includes low-activity channels and preserves the selected ordering. Channels in failure backoff or already being scanned are deferred; the status reports checked, failed, and deferred counts.
 - **Refresh** renders current local storage again without starting a feed request.
 - **Show** reloads the complete Subscriptions inventory after a scan or subscription-import handoff and retains its selected ordering.
 
@@ -75,6 +75,8 @@ The interface renders cached data before initialization work completes, so an ex
 ### Local search
 
 Search matches locally saved history and cached feed records. It does not send the query to YouTube and cannot discover a video that the extension has never stored.
+
+Feed and popup searches run after a 300 ms pause in typing. Press Enter to search immediately. Clearing the field takes effect immediately and cancels a pending search.
 
 ### Card actions
 
@@ -124,11 +126,39 @@ The **Watch Later** sidebar view orders saved videos newest first. Each row open
 
 ## Channels { #channels }
 
-![The re:Watch Channels tab showing channels followed locally by the extension.](assets/guide/feed-channels.png)
+![The re:Watch Channels tab with sorting, per-channel checks, activity, next-check times, and RSS logs.](assets/guide/feed-channels.png)
 
-*Channels manages follows owned by re:Watch, not by the YouTube account.*
+*Sort local follows and check each channel's uploads, activity, and scan history.*
 
 Follow a channel from a supported YouTube channel/watch surface, a re:Watch video menu, or the Channels controls. You can also import subscriptions in Settings. re:Watch canonicalizes channel IDs and avoids duplicate follows.
+
+### Sort followed channels
+
+Use **Sort channels** and the direction button above the list. The default is **Name A–Z**, and the selected field and direction survive navigation and page reloads.
+
+| Sort | Initial direction | Meaning |
+| --- | --- | --- |
+| Name | A–Z | Channel name, with natural number ordering |
+| Date followed | Newest first | When the channel was added to re:Watch |
+| Latest upload | Newest first | Most recent upload observed by re:Watch |
+| Activity | Most active first | Observed publishing frequency; ties use latest upload first |
+| Last checked | Oldest first | Most recent check attempt, including failed attempts; never-checked channels come first |
+
+Missing upload dates and unknown activity are placed last in either direction. These controls apply to followed channels; the Ignored tab keeps its own list.
+
+### Check one channel and inspect its log
+
+Select **Check for new videos** on a channel card. The button shows that the check is running, then the card reports the result. A successful check refreshes its latest upload, recalculates activity, and sets the next check time. Newly discovered uploads are available through **Show**.
+
+The action checks only that channel and bypasses its normal successful-check interval. Failure backoff and an existing scan can still defer it. Use **Reload videos** in the feed to check all followed channels.
+
+**Log** loads the latest stored RSS attempts whenever it opens, including timestamps, HTTP status or failure code, and available details. An empty log means no RSS attempts have been recorded yet; it does not confirm a successful check.
+
+### Activity and next-check timing
+
+Activity is based on observed uploads, rather than the channel's lifetime video count. A busy recent upload pattern can raise its activity level immediately. Frequent uploads spread throughout a day are recognized even when the RSS sample covers less than a day; a short bulk-upload burst alone does not establish that cadence. Lower activity requires a quiet period and changes gradually.
+
+Version 5.2.1 also removes obsolete 30-day delays left by older RSS 404 handling when the scheduler starts. It preserves independent failure backoff and running checks. If a frequently publishing channel still looks stale, use **Check for new videos** and review **Log**.
 
 ### Ignored channels
 

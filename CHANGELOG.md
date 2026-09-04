@@ -2,6 +2,31 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
+## [5.2.1] - 2026-09-04
+
+### Added
+
+- Added Channels sorting by name, date followed, latest upload, activity, and last
+  checked, with a direction toggle and a remembered selection. Defaults to name A–Z.
+
+### Fixed
+
+- Fixed subscription scanning getting stuck behind low-activity channels and
+  repeatedly blinking its status without downloading videos.
+- Made **Reload videos** check all followed channels outside failure backoff or
+  an active scan, update the visible list, and report failed or deferred checks.
+- Debounced feed and popup search by 300 ms, with immediate Enter and clear actions.
+- Repaired obsolete 30-day RSS error schedules when the feed scheduler starts.
+- Recognize frequent uploads throughout the day, promote busy channels immediately,
+  and require a quiet period before gradually lowering their activity class.
+- Added **Check for new videos** to each followed channel, with updated activity,
+  next-check timing, and results. **Log** now reads the latest stored scan records.
+
+### Security
+
+- Updated development dependencies `fast-uri` to 3.1.7 and `@humanfs/node` to
+  0.16.8, addressing five Dependabot alerts in URI handling and recursive file copying.
+
 ## [5.2.0] - 2026-09-01
 
 ### Added

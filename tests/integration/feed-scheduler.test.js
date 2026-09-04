@@ -72,6 +72,59 @@ function successfulScan(channelId, fetchedAt = 100) {
 }
 
 describe('shared feed scheduler', () => {
+  test('startup repairs legacy 404 schedules once while preserving current backoff, history and live leases', async () => {
+    const storage = createStorage();
+    const future = 30 * 86400000;
+    const legacy = { channelId: CHANNEL_A, activityClass: 'active', unavailableStatus: 404,
+      unavailableAt: 100, nextEligibleCheckAt: future, retryAfter: null, lastSuccessfulCheckAt: 90 };
+    await storage.putChannelSyncState(legacy);
+    await storage.putChannelSyncState({ ...legacy, channelId: CHANNEL_B, scanLeaseUntil: 5000 });
+    await storage.putChannelSyncState({ channelId: HISTORY_ONLY, nextEligibleCheckAt: 9000, retryAfter: 9000 });
+    const scheduler = new FeedScheduler({ storage, clock: () => 1000 });
+    await scheduler.start();
+    expect(storage.state(CHANNEL_A)).toMatchObject({
+      activityClass: 'active', lastSuccessfulCheckAt: 90, nextEligibleCheckAt: 1000,
+      unavailableStatus: null, scanLeaseUntil: null
+    });
+    expect(storage.state(CHANNEL_A).rssAttempts).toBeUndefined();
+    expect(storage.state(CHANNEL_B).nextEligibleCheckAt).toBe(future);
+    expect(storage.state(HISTORY_ONLY).retryAfter).toBe(9000);
+    await expect(scheduler.repairLegacyUnavailableSchedules()).resolves.toBe(0);
+    expect(storage.durableHistory.get('history-1').position).toBe(42);
+  });
+
+  test('legacy repair claims current state before changing eligibility and preserves a concurrent retry delay', async () => {
+    const storage = createStorage();
+    await storage.putChannelSyncState({ channelId: CHANNEL_A, unavailableStatus: 404, nextEligibleCheckAt: 999999 });
+    const claim = storage.claimChannelSyncState.getMockImplementation();
+    storage.claimChannelSyncState.mockImplementation(async (id, options) => {
+      await storage.putChannelSyncState({ ...storage.state(id), retryAfter: 9000 });
+      return claim(id, options);
+    });
+    await expect(new FeedScheduler({ storage, clock: () => 1000 }).repairLegacyUnavailableSchedules()).resolves.toBe(1);
+    expect(storage.state(CHANNEL_A)).toMatchObject({ retryAfter: 9000, nextEligibleCheckAt: 9000 });
+  });
+
+  test('per-channel checking refreshes only the requested channel and recalculates its activity and next check', async () => {
+    const now = 1000 * 86400000;
+    const storage = createStorage([{ channelId: CHANNEL_A, source: 'manual' }, { channelId: CHANNEL_B, source: 'manual' }]);
+    for (const channelId of [CHANNEL_A, CHANNEL_B]) {
+      await storage.putChannelSyncState({ channelId, activityClass: 'dormant', latestUploadAt: now - 200 * 86400000,
+        initializationState: 'complete', nextEligibleCheckAt: now + 30 * 86400000 });
+    }
+    const fetchChannelRss = jest.fn(async channelId => contracts.createRssScanResult({ channelId, fetchedAt: now,
+      entries: Array.from({ length: 20 }, (_, i) => ({ videoId: `frequent-${i}`, title: 'Frequent upload', publishedAt: now - i * 1800000 })) }));
+    const scheduler = new FeedScheduler({ storage, clock: () => now, fetchChannelRss, successfulCheckIntervalMs: 3600000 });
+    await scheduler.runManual({ channelIds: [CHANNEL_A] });
+    expect(fetchChannelRss).toHaveBeenCalledTimes(1);
+    expect(fetchChannelRss).toHaveBeenCalledWith(CHANNEL_A, expect.any(Object));
+    expect(storage.state(CHANNEL_A)).toMatchObject({ activityClass: 'very_active', nextEligibleCheckAt: now + 3600000 });
+    expect(storage.state(CHANNEL_A).rssAttempts).toHaveLength(1);
+    expect(storage.state(CHANNEL_B).activityClass).toBe('dormant');
+    await expect(scheduler.runManual({ channelIds: [HISTORY_ONLY] })).resolves.toMatchObject({ total: 0 });
+    expect(fetchChannelRss).toHaveBeenCalledTimes(1);
+  });
+
   test('recovers expired leases and creates initialization state only for explicit subscriptions', async () => {
     const storage = createStorage([
       { channelId: CHANNEL_A, source: 'manual' },
@@ -106,6 +159,7 @@ describe('shared feed scheduler', () => {
     await expect(scheduler.runInitialization({ limit: 1, concurrency: 1, runId: 'initial-1' })).resolves.toEqual({
       runId: 'initial-1', completed: 1, total: 1, insertedVideoCount: 1,
       insertedVideoIds: [`video-${CHANNEL_A}`], active: false,
+      outcomes: { updated: 1, unchanged: 0, failed: 0, timed_out: 0 }, skippedCount: 0,
     });
     expect(fetchChannelRss).toHaveBeenCalledTimes(1);
     await expect(scheduler.getInitializationProgress()).resolves.toEqual({ completed: 1, total: 2, pending: 1 });
@@ -279,6 +333,47 @@ describe('shared feed scheduler', () => {
     }));
   });
 
+  test.each(['manual', 'foreground'])('a competing %s scheduler defers an in-flight channel and can retry after its owner finishes', async (kind) => {
+    const now = 1000;
+    const storage = createStorage([{ channelId: CHANNEL_A, source: 'manual' }]);
+    await storage.putChannelSyncState({ channelId: CHANNEL_A, initializationState: 'complete',
+      activityClass: 'active', nextEligibleCheckAt: 1 });
+    let finish;
+    let started;
+    const fetching = new Promise(resolve => { started = resolve; });
+    const fetchChannelRss = jest.fn(() => {
+      started();
+      return new Promise(resolve => { finish = resolve; });
+    });
+    const owner = new FeedScheduler({ storage, clock: () => now, fetchChannelRss });
+    const contender = new FeedScheduler({ storage, clock: () => now + 1, fetchChannelRss });
+    const running = owner.runManual({ channelIds: [CHANNEL_A] });
+    await fetching;
+    const leaseOwner = storage.state(CHANNEL_A).scanRunId;
+    try {
+      const competing = kind === 'manual'
+        ? await contender.runManual({ channelIds: [CHANNEL_A] })
+        : await contender.runForeground();
+      expect(competing.outcomes).toEqual({ updated: 0, unchanged: 0, failed: 0, timed_out: 0 });
+      expect(competing.skippedCount).toBe(kind === 'manual' ? 1 : 0);
+      expect(fetchChannelRss).toHaveBeenCalledTimes(1);
+      expect(storage.state(CHANNEL_A).scanRunId).toBe(leaseOwner);
+      expect(storage.state(CHANNEL_A).rssAttempts).toBeUndefined();
+    } finally {
+      finish(successfulScan(CHANNEL_A, now));
+      await running;
+    }
+    expect(storage.state(CHANNEL_A)).toMatchObject({ scanRunId: null, scanLeaseUntil: null });
+    expect(storage.state(CHANNEL_A).rssAttempts).toHaveLength(1);
+    fetchChannelRss.mockResolvedValueOnce(successfulScan(CHANNEL_A, now + 1));
+    await expect(contender.runManual({ channelIds: [CHANNEL_A] })).resolves.toMatchObject({
+      skippedCount: 0, outcomes: { unchanged: 1 }
+    });
+    expect(fetchChannelRss).toHaveBeenCalledTimes(2);
+    expect(storage.state(CHANNEL_A).rssAttempts).toHaveLength(2);
+    expect(storage.feedVideos.size).toBe(1);
+  });
+
   test('treats a 404 RSS response as temporary and keeps the channel eligible for backoff retry', async () => {
     const storage = createStorage([{ channelId: CHANNEL_A, source: 'manual' }]);
     await storage.putChannelSyncState({ channelId: CHANNEL_A, initializationState: 'pending', nextEligibleCheckAt: 0 });
@@ -440,6 +535,45 @@ describe('shared feed scheduler', () => {
     await expect(scheduler.runForeground()).resolves.toEqual(expect.objectContaining({ total: 0, completed: 0 }));
     expect(fetchChannelRss).not.toHaveBeenCalled();
     await expect(scheduler.runDormantMaintenance({ pageActive: true, runId: 'idle-owner' })).resolves.toEqual(expect.objectContaining({ ran: true }));
+  });
+
+  test('scans an active channel behind a full batch of overdue low-activity channels', async () => {
+    const channels = Array.from({ length: 31 }, (_, i) => `UCbatch${i}`);
+    const storage = createStorage(channels.map(channelId => ({ channelId, source: 'manual' })));
+    for (const [index, channelId] of channels.entries()) {
+      await storage.putChannelSyncState({ channelId, initializationState: 'complete', lastAttemptAt: 1,
+        activityClass: index < 30 ? 'rare' : 'active', nextEligibleCheckAt: index + 1 });
+    }
+    const fetchChannelRss = jest.fn(async channelId => successfulScan(channelId, 1000));
+    const scheduler = new FeedScheduler({ storage, clock: () => 1000, fetchChannelRss });
+    await expect(scheduler.runForeground()).resolves.toMatchObject({ total: 1, skippedCount: 0 });
+    expect(fetchChannelRss.mock.calls.map(([id]) => id)).toEqual([channels[30]]);
+    await expect(scheduler.runDormantMaintenance({ pageActive: true })).resolves.toMatchObject({ ran: true });
+  });
+
+  test('manual reload checks more than one batch and ignores success intervals but preserves retry backoff and leases', async () => {
+    const channels = Array.from({ length: 34 }, (_, i) => `UCmanual${i}`);
+    const storage = createStorage(channels.map(channelId => ({ channelId, source: 'manual' })));
+    for (const [index, channelId] of channels.entries()) {
+      await storage.putChannelSyncState({ channelId, initializationState: 'complete', lastAttemptAt: 1,
+        activityClass: index % 2 ? 'dormant' : 'active', nextEligibleCheckAt: 999999,
+        retryAfter: index === 32 ? 999999 : null, scanLeaseUntil: index === 33 ? 999999 : null });
+    }
+    const fetchChannelRss = jest.fn(async channelId => channelId === channels[0]
+      ? contracts.createRssScanResult({ channelId, fetchedAt: 1000, error: { code: 'network', message: 'offline' } })
+      : successfulScan(channelId, 1000));
+    const scheduler = new FeedScheduler({ storage, clock: () => 1000, fetchChannelRss });
+    await expect(scheduler.runManual()).resolves.toMatchObject({
+      total: 32, skippedCount: 2, outcomes: { updated: 31, failed: 1, timed_out: 0, unchanged: 0 }
+    });
+    expect(new Set(fetchChannelRss.mock.calls.map(([id]) => id))).toEqual(new Set(channels.slice(0, 32)));
+  });
+
+  test('next automatic wake respects active leases and retry backoff', async () => {
+    const storage = createStorage();
+    await storage.putChannelSyncState({ channelId: CHANNEL_A, nextEligibleCheckAt: 1, scanLeaseUntil: 900 });
+    await storage.putChannelSyncState({ channelId: CHANNEL_B, nextEligibleCheckAt: 2, retryAfter: 800 });
+    await expect(new FeedScheduler({ storage }).getNextEligibleCheckAt()).resolves.toBe(800);
   });
 
   test('runs retention after ingestion across a thousands-record feed without touching durable data', async () => {

@@ -280,6 +280,9 @@
         .subs-add label { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; }
         .subs-add input { flex: 1; min-width: 180px; padding: 9px 10px; color: var(--text); background: var(--chip); border: 1px solid var(--border); border-radius: 6px; }
         .subs-add-status { min-height: 20px; margin: 0 0 12px; color: var(--text-2); font-size: 13px; }
+        .channels-sort-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
+        .channels-sort-controls[hidden] { display: none; }
+        .channels-sort-controls label { color: var(--text-2); font-size: 14px; }
         .subs-list {
             display: flex; flex-direction: column;
             width: 100%;
@@ -1800,6 +1803,17 @@
                     </div>
                 </div>
                 <div class="subs-add-status" id="subscriptionAddStatus" aria-live="polite"></div>
+                <div class="channels-sort-controls" id="channelsSortControls">
+                    <label for="channelsSort" data-i18n="feed_channels_sort">Sort channels</label>
+                    <select id="channelsSort">
+                        <option value="name" data-i18n="feed_channels_sort_name">Name</option>
+                        <option value="followedAt" data-i18n="feed_channels_sort_followed">Date followed</option>
+                        <option value="latestUploadAt" data-i18n="feed_channels_sort_uploaded">Latest upload</option>
+                        <option value="activity" data-i18n="feed_channels_sort_activity">Activity</option>
+                        <option value="lastAttemptAt" data-i18n="feed_channels_sort_checked">Last checked</option>
+                    </select>
+                    <button class="btn" id="channelsSortDirection" type="button">↑ A–Z</button>
+                </div>
                 <div class="subs-list" id="subscriptionsList" role="tabpanel" aria-live="polite"></div>
                 <div class="subs-empty" id="subscriptionsEmpty" style="display:none;">
                     <span data-i18n="feed_no_local_channels">No locally subscribed channels yet. Add a channel above or use Subscribe with re:Watch on YouTube.</span>
