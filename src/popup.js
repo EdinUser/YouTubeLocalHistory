@@ -344,18 +344,24 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (globalSearchInput) {
             globalSearchInput.addEventListener('input', async (e) => {
                 const query = e.target.value;
-                console.log('[Search] Input event:', query);
-                await smartSearch(query);
-
-                // Toggle clear button visibility
                 toggleClearButton(query.length > 0);
+                cancelPendingPopupSearch();
+                if (e.isComposing) return;
+                if (query.trim()) schedulePopupSearch(query);
+                else {
+                    searchQuery = '';
+                    await loadCurrentPages();
+                    if (!globalSearchInput.value.trim()) showRecentSearches();
+                }
             });
 
             globalSearchInput.addEventListener('keydown', async (e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.isComposing) {
+                    cancelPendingPopupSearch();
                     console.log('[Search] Enter pressed with:', e.target.value);
                     await showFullSearchResults(e.target.value);
                 } else if (e.key === 'Escape') {
+                    cancelPendingPopupSearch();
                     // Clear search and suggestions
                     e.target.value = '';
                     searchQuery = '';
@@ -383,6 +389,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Clear button functionality
         if (searchClearBtn) {
             searchClearBtn.addEventListener('click', async () => {
+                cancelPendingPopupSearch();
                 if (globalSearchInput) {
                     globalSearchInput.value = '';
                     globalSearchInput.focus();

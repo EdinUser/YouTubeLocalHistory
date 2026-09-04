@@ -40,7 +40,7 @@ async function main() {
   const fixture = await startServer();
   const session = await launchFirefoxWithExtension({ locale: 'en' });
   try {
-    await setExtensionSettings(session, { aiLabeledVideoHandling: 'dim', debug: false, version: '5.2.0' });
+    await setExtensionSettings(session, { aiLabeledVideoHandling: 'dim', debug: false, version: '5.2.1' });
     await session.driver.get(`${fixture.origin}/ai-label-static`);
     await session.driver.wait(() => session.driver.executeScript(() => document.querySelector('#ai-card')?.classList.contains('ytvht-ai-dimmed')), 15000, 'AI fixture card should be dimmed');
     await session.driver.wait(() => session.driver.executeScript(() => document.querySelector('#regular-card')?.dataset.ytvhtAiStatus === 'unlabeled'), 15000, 'regular fixture card should receive a valid non-AI result');

@@ -15,30 +15,43 @@ If only one YouTube layout fails, include the page type and a screenshot in the 
 
 ## Resume or metadata looks stale
 
-Close and reopen the popup or select **Reload** in the full interface to render current local records. Duration appears only when it is available; playing an older saved video can fill it later.
+Close and reopen the popup, reopen the affected view, or select **Refresh** in the feed to render current local records. Duration appears only when it is available; playing an older saved video can fill it later.
 
 If a History card refreshes, its **Remove** control and three-dot menu should remain present. Report a reproducible disappearance as a UI bug.
 
 ## The feed is empty
 
 1. Open **Channels** and confirm at least one local follow exists.
-2. Select **Check** and watch the scheduler status beside the button.
-3. Allow the initialization scan to finish; existing cached cards should render before it completes.
-4. Open **Subscriptions** or select **Show** to inspect the chronological inventory.
+2. Open **Subscriptions**, select **Reload videos**, and watch the status beside it. For one channel, use **Channels → Check for new videos** on its card.
+3. Allow the check to finish and review its checked, failed, and deferred counts. Existing cached cards should render before initialization completes.
+4. Inspect the Subscriptions inventory. After background or per-channel discoveries, select **Show** to include them in the selected ordering.
 
 Public feeds can be missing, delayed, rate-limited, or temporarily unavailable. A failed channel does not mean your local history was lost.
 
-## Check, Reload, or Show did something unexpected
+## Reload videos, Refresh, or Show did something unexpected
 
-- **Check** performs eligible public feed work.
-- **Reload** only rebuilds the visible interface from local storage.
-- **Show** changes to the chronological Subscriptions inventory.
+- **Reload videos** checks followed channels and updates the list, including channels whose normal successful-check interval has not elapsed.
+- **Refresh** only rebuilds the visible interface from local storage.
+- **Show** opens the complete Subscriptions inventory in its selected upload-date or detection-date order.
+
+A deferred check means a channel is in failure backoff or already has a scan in progress. Repeated clicks do not bypass those limits. Open **Channels → Log** for that channel's recorded RSS attempts and failure details.
 
 Opening Home also regenerates its local ordering; it should not initiate a separate Home-owned request.
+
+## A frequently uploading channel has a stale activity level or distant next check
+
+1. Confirm the installed version is 5.2.1 or later, then reopen the feed after updating. The scheduler repairs obsolete 30-day delays left by older RSS 404 handling.
+2. Open **Channels** and find the channel by **Name**, or sort **Last checked** with oldest first to locate stale or never-checked channels.
+3. Select **Check for new videos** on its card. A successful result refreshes the latest upload, activity, and next-check time.
+4. Open **Log** to see the latest recorded attempts. Failed checks can leave the upload evidence stale; a deferred check has not made a new RSS attempt.
+
+An empty log means there are no recorded RSS reads yet. Repairing an old schedule does not create a synthetic log entry. If the problem persists after a successful check, report the channel URL, installed version, displayed activity and next-check time, and relevant log details.
 
 ## Search cannot find a YouTube video
 
 Feed search is intentionally local. It can find only saved history and cached feed records. Use YouTube itself for remote discovery.
+
+Search waits for a 300 ms pause in typing. Press Enter for an immediate search; clearing the field cancels pending work immediately.
 
 ## A subscription import skipped channels
 

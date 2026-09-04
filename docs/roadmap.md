@@ -129,10 +129,10 @@ assigned to a release version.
 When a planned release becomes testable, development builds may use semantic
 pre-release versions such as:
 
-- `v5.2.0-alpha.1` for incomplete developer testing;
-- `v5.2.0-beta.1` for broader testing of mostly complete behavior;
-- `v5.2.0-rc.1` for an intended release candidate;
-- `v5.2.0` for the stable release.
+- `v5.2.1-alpha.1` for incomplete developer testing;
+- `v5.2.1-beta.1` for broader testing of mostly complete behavior;
+- `v5.2.1-rc.1` for an intended release candidate;
+- `v5.2.1` for the stable release.
 
 Every pre-release should state what is incomplete, list known limitations and
 data risks, explain any backup requirements, and provide a feedback channel.

@@ -30,7 +30,7 @@ async function configure(page, context, mode) {
   await setExtensionSettings(context, {
     aiLabeledVideoHandling: mode,
     debug: false,
-    version: '5.2.0',
+    version: '5.2.1',
   });
   let lookupCount = 0;
   await page.route('https://www.youtube.com/ai-label-static', (route) => route.fulfill({

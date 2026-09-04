@@ -14,7 +14,7 @@ YT re:Watch keeps a private, account-independent YouTube history in your browser
 | Subscriptions | Shows cached subscription videos ordered by upload or detection time |
 | Shorts | Separates watched Shorts from ordinary history |
 | Watch Later | Keeps videos explicitly saved for later, independently of a YouTube account |
-| Channels | Manages local follows and reviewable ignored-channel records |
+| Channels | Sorts local follows, checks individual channels, and shows scan logs and ignored-channel records |
 | Analytics | Summarizes local activity, watch time, completion, and channel patterns |
 | Playlist references | Saves links to YouTube playlists without importing their members |
 | Local playlists | Creates and manages extension-owned playlists without changing YouTube account playlists |
@@ -45,15 +45,19 @@ and Settings.
 
 The feed renders cached local records first.
 
-- **Reload videos** scans eligible followed channels and updates cached feed records.
+- **Reload videos** checks followed channels and updates the visible list, including channels whose normal check is scheduled for later. Failure backoff and checks already in progress are respected; the result reports checked, failed, and deferred channels.
 - **Refresh** rebuilds the visible view from local storage without starting a network scan.
 - **Show** reloads the complete subscription inventory after a scan or import handoff while preserving the selected upload-date or detection-date order.
+
+In **Channels**, use **Check for new videos** for a single channel. A successful check updates its upload history, activity, and next-check time. **Log** shows the latest recorded RSS attempts.
 
 Public YouTube RSS feeds provide new uploads. re:Watch does not use OAuth, mutate the user's YouTube subscriptions, or perform remote search.
 
 ## Local subscriptions and ignored channels
 
 A re:Watch subscription belongs only to the current browser profile. Following or unfollowing a channel does not change the signed-in YouTube account.
+
+Sort followed channels by **Name**, **Date followed**, **Latest upload**, **Activity**, or **Last checked**. The default is Name A–Z; your selected field and direction are remembered. [See the Channels guide](detailed_guide.md#channels) for the ordering rules.
 
 When an imported channel was previously removed, re:Watch keeps a tombstone so later imports do not silently add it again. If such records exist, **Channels → Ignored** appears and lets you restore or permanently forget them. The tab stays hidden when there is nothing to review.
 

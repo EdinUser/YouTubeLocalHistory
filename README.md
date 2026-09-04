@@ -18,7 +18,7 @@ YT re:Watch keeps its history inside your browser profile. It works while you sw
 - **Experimental AI-label handling:** optionally badges, dims, or hides videos that YouTube itself discloses as made with AI.
 - **Local channel follows:** follow or unfollow channels inside re:Watch without changing a YouTube account subscription.
 - **Local feed:** public channel RSS builds a cached Home, chronological Subscriptions, and Shorts inventory.
-- **Channels management:** review followed channels, import subscriptions from Google Takeout, and explicitly restore channels kept in the Ignored list after a local unfollow.
+- **Channels management:** sort followed channels, check individual channels for new uploads, review scan logs, import subscriptions from Google Takeout, and restore channels kept in the Ignored list after a local unfollow.
 - **Local search:** searches saved history, cached feed videos, and channels without sending the typed query to YouTube.
 - **History, Watch Later, and local playlists:** keep viewing records, saved YouTube playlist links, and extension-managed playlists in one full-page interface.
 - **Private analytics:** watch time, completion, hourly/daily activity, top channels, skipped channels, and unfinished long videos are calculated locally.
@@ -47,7 +47,7 @@ The full feed page contains:
 | **Analytics** | Locally calculated watch statistics and insights |
 | **Settings** | Appearance, retention, feed timing, imports, backup/restore, and reset controls |
 
-Home and Subscriptions render stable 50-card pages as you scroll. Subscriptions retains its selected upload-date or detection-date ordering through **Reload view** and **Show**. Checking for new videos is separate from reloading the current local view, so a background scan does not unexpectedly replace or reorder visible cards. When uploads are found, re:Watch offers a deliberate **Show** action.
+Home and Subscriptions render stable 50-card pages as you scroll. Subscriptions retains its selected upload-date or detection-date ordering through **Reload videos**, **Refresh**, and **Show**. **Reload videos** checks followed channels and updates the visible list; channels in failure backoff or already being scanned are deferred. **Refresh** redraws saved records. Background discoveries appear through a **Show** action so they do not unexpectedly replace visible cards.
 
 The compact popup and full-page interface show the installed extension version beside the re:Watch icon, making it easier to identify the active build when reporting a problem.
 
@@ -65,6 +65,10 @@ You can add channels by:
 - importing `subscriptions.csv` from Google Takeout.
 
 A local unfollow stops future scans and removes that channel's cached feed inventory without deleting independent watch history. re:Watch records the choice locally. A later import reports that channel as ignored instead of silently following it again; the user can review it in **Channels → Ignored** and explicitly follow it again.
+
+Channels defaults to **Name A–Z**. Choose **Date followed**, **Latest upload**, **Activity**, or **Last checked**, and use the direction button to reverse the order. The selection is remembered across page reloads. **Check for new videos** checks only that channel and updates its activity and next-check time; **Log** opens its latest recorded RSS attempts. [See the Channels guide](./docs/detailed_guide.md#channels) for sorting details and deferred checks.
+
+Activity is recalculated from observed uploads after successful checks. Strong recent activity promotes a channel promptly; downgrades require a quiet period. Feed and popup search wait 300 ms after typing stops, while Enter and clearing the field act immediately.
 
 The feed is best-effort discovery rather than a mirror of a signed-in YouTube account. Public RSS may not represent membership, age-restricted, region-restricted, removed, or otherwise unavailable videos. YouTube applies its own access rules when a video is opened.
 

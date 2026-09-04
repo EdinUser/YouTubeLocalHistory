@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { By, until } = require('selenium-webdriver');
+const { verifyFeedReloadAndSearch, verifyPopupSearchDebounce, verifyChannelSorting, verifyChannelSortingRestored } = require('../fixtures/feed/runtime-regressions');
 const {
   assertSafeTempProfile,
   discoverFirefoxExtensionUuid,
@@ -254,6 +255,28 @@ async function main() {
       {},
       'extension page should remove browser.storage.local keys'
     );
+
+    const runBrowserRegression = async (verify) => {
+      const result = await session.driver.executeAsyncScript(
+        `const done = arguments[0]; (${verify.toString()})().then(value => done({ value }), error => done({ error: error.message + '\\n' + error.stack }));`
+      );
+      assert.equal(result.error, undefined, result.error);
+      return result.value;
+    };
+    assert.deepEqual(await runBrowserRegression(verifyFeedReloadAndSearch), {
+      automaticScans: 1, manualScans: 31, failed: 1, deferred: 2, searchRenders: 3
+    });
+    assert.deepEqual(await runBrowserRegression(verifyChannelSorting), { orders: 10, field: 'activity', direction: 'asc' });
+    await session.driver.navigate().refresh();
+    await session.driver.wait(async () => session.driver.executeScript(() =>
+      !document.documentElement.classList.contains('app-loading') && !!document.querySelector('#channelsSort')
+    ), 10000, 'feed should finish startup before checking the saved Channels sort');
+    assert.deepEqual(await runBrowserRegression(verifyChannelSortingRestored), { restored: true });
+    await openFirefoxExtensionPage(session, 'popup.html');
+    await session.driver.wait(async () => session.driver.executeScript(() =>
+      !document.body.classList.contains('loading-skeleton') && !!document.querySelector('#ytvhtGlobalSearchInput')
+    ), 10000, 'popup should finish startup before search regression');
+    assert.deepEqual(await runBrowserRegression(verifyPopupSearchDebounce), { searches: ['reload', 'enter'] });
 
     const profileRoot = path.resolve(session.profileDir);
     assert.ok(

@@ -17,6 +17,7 @@ function runtime({ progress, foreground, dormant, nextEligibleCheckAt = Infinity
     getNextEligibleCheckAt: jest.fn(async () => nextEligibleCheckAt),
     runInitialization: jest.fn(async () => progress?.result || { insertedVideoCount: 0 }),
     runForeground: jest.fn(async () => foreground || { total: 0, insertedVideoCount: 0 }),
+    runManual: jest.fn(async () => ({ total: 1, insertedVideoCount: 0 })),
     runDormantMaintenance: jest.fn(async () => dormant || { ran: false, terminal: null }),
   };
   const timers = [];
@@ -132,4 +133,32 @@ test('only advertises scheduler discoveries that remain in the canonical invento
   await expect(context.showRetainedNewFeedVideos(['expired', 'retained', 'retained']))
     .resolves.toEqual(['retained']);
   expect(context.showNewFeedVideos).toHaveBeenCalledWith(['retained']);
+});
+
+test('an overdue state that cannot progress does not schedule a zero-delay loop', async () => {
+  const { context, timers } = runtime({ nextEligibleCheckAt: Date.now() - 1000 });
+  await context.runPageActiveFeedWork();
+  expect(timers[0].delay).toBe(60000);
+});
+
+test('manual reload waits for automatic work and concurrent manual clicks share the requested scan', async () => {
+  const { context, scheduler } = runtime();
+  let finishAutomatic;
+  scheduler.runForeground.mockImplementationOnce(() => new Promise(resolve => { finishAutomatic = resolve; }));
+  const automatic = context.requestPageActiveFeedWork();
+  while (!finishAutomatic) await Promise.resolve();
+  const manual = context.requestPageActiveFeedWork({ manual: true });
+  expect(context.requestPageActiveFeedWork({ manual: true })).toBe(manual);
+  expect(scheduler.runManual).not.toHaveBeenCalled();
+  finishAutomatic({ total: 1, insertedVideoCount: 0 });
+  await automatic;
+  await manual;
+  expect(scheduler.runManual).toHaveBeenCalledTimes(1);
+});
+
+test('automatic failed checks are not reported as up to date', async () => {
+  const { context } = runtime({ foreground: { total: 1, outcomes: { failed: 1 }, insertedVideoCount: 0 } });
+  await context.runPageActiveFeedWork();
+  expect(context.setFeedSyncStatus).toHaveBeenLastCalledWith(
+    'Some channels could not be checked. Try Reload videos for details.', false);
 });

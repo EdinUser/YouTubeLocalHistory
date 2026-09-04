@@ -153,7 +153,7 @@ liveTest('live YouTube /next response marks a known AI-disclosed video', async (
   await setExtensionSettings(context, {
     aiLabeledVideoHandling: 'off',
     debug: false,
-    version: '5.2.0',
+    version: '5.2.1',
   });
   page.on('framenavigated', (frame) => {
     if (frame === page.mainFrame()) console.log(`[live AI canary] navigated to ${frame.url()}`);
@@ -191,7 +191,7 @@ liveTest('live YouTube /next response marks a known AI-disclosed video', async (
   await setExtensionSettings(context, {
     aiLabeledVideoHandling: 'badge',
     debug: false,
-    version: '5.2.0',
+    version: '5.2.1',
   });
   await expect(canaryCard).toBeAttached();
   await expect.poll(() => canaryCard.getAttribute('data-ytvht-ai-status'), { timeout: 30000 }).toBeTruthy();

@@ -5,6 +5,7 @@ const INITIALIZATION_CONTINUATION_DELAY_MS = 5000;
 const DORMANT_MAINTENANCE_WAKE_DELAY_MS = 1000;
 let pageFeedWorkTimer = null;
 let pageFeedWorkPromise = null;
+let manualFeedWorkPromise = null;
 let sharedFeedSchedulerStarted = false;
 let activeInitializationProgress = null;
 let latestPageSyncStatus = { message: '', busy: false };
@@ -30,10 +31,10 @@ function schedulePageFeedWork(delayMs) {
     }, Math.max(0, Number(delayMs || 0)));
 }
 
-async function scheduleNextPageFeedWork(scheduler, regularIntervalMs) {
+async function scheduleNextPageFeedWork(scheduler, regularIntervalMs, minimumDelayMs = 1000) {
     const nextEligibleAt = await scheduler.getNextEligibleCheckAt();
     const retryDelay = Number.isFinite(nextEligibleAt) ? Math.max(0, nextEligibleAt - Date.now()) : Infinity;
-    schedulePageFeedWork(Math.min(Number(regularIntervalMs), retryDelay));
+    schedulePageFeedWork(Math.max(minimumDelayMs, Math.min(Number(regularIntervalMs), retryDelay)));
 }
 
 async function feedRefreshIntervalMs() {
@@ -53,7 +54,7 @@ function restorePageActiveSyncStatus() {
     setFeedSyncStatus(latestPageSyncStatus.message, latestPageSyncStatus.busy);
 }
 
-async function runPageActiveFeedWork() {
+async function runPageActiveFeedWork(options = {}) {
     if (pageFeedWorkPromise) return pageFeedWorkPromise;
     pageFeedWorkPromise = (async () => {
         const scheduler = ensureSharedFeedScheduler();
@@ -68,6 +69,12 @@ async function runPageActiveFeedWork() {
         }
 
         const before = await scheduler.getInitializationProgress();
+        if (options.manual) {
+            setPageActiveSyncStatus(tFeed('feed_checking_uploads', 'Checking for new uploads'), true);
+            const result = await scheduler.runManual();
+            await scheduleNextPageFeedWork(scheduler, intervalMs, 60000);
+            return { result, progress: await scheduler.getInitializationProgress() };
+        }
         if (before.pending > 0) {
             activeInitializationProgress = { completed: before.completed, total: before.total };
             setPageActiveSyncStatus(tFeed(
@@ -112,12 +119,17 @@ async function runPageActiveFeedWork() {
         if (dormantInserted) {
             await showRetainedNewFeedVideos(dormant.terminal.insertedVideoIds || []);
         }
-        const statusBase = result.insertedVideoCount || dormantInserted
+        const failed = Number(result.outcomes?.failed || 0) + Number(result.outcomes?.timed_out || 0) +
+            Number(['failed', 'timed_out'].includes(dormant?.terminal?.outcome));
+        const statusBase = failed || result.skippedCount
+            ? tFeed('feed_check_incomplete', 'Some channels could not be checked. Try Reload videos for details.')
+            : result.insertedVideoCount || dormantInserted
             ? tFeed('feed_new_uploads_found', 'New uploads found')
             : tFeed('feed_up_to_date', 'Up to date');
         setPageActiveSyncStatus(statusBase, false);
         if (dormant && dormant.ran) schedulePageFeedWork(DORMANT_MAINTENANCE_WAKE_DELAY_MS);
-        else await scheduleNextPageFeedWork(scheduler, intervalMs);
+        else await scheduleNextPageFeedWork(scheduler, intervalMs,
+            result.total > 0 && result.skippedCount !== result.total ? 1000 : 60000);
         return { result, progress: before };
     })().finally(() => {
         activeInitializationProgress = null;
@@ -126,8 +138,17 @@ async function runPageActiveFeedWork() {
     return pageFeedWorkPromise;
 }
 
-function requestPageActiveFeedWork() {
-    return pageFeedWorkPromise || runPageActiveFeedWork();
+function requestPageActiveFeedWork(options = {}) {
+    if (manualFeedWorkPromise) return manualFeedWorkPromise;
+    if (!options.manual) return pageFeedWorkPromise || runPageActiveFeedWork();
+    manualFeedWorkPromise = (async () => {
+        clearPageFeedWorkTimer();
+        // Wait for automatic work, then perform the user's requested scan.
+        if (pageFeedWorkPromise) await pageFeedWorkPromise.catch(() => {});
+        clearPageFeedWorkTimer();
+        return runPageActiveFeedWork({ manual: true });
+    })().finally(() => { manualFeedWorkPromise = null; });
+    return manualFeedWorkPromise;
 }
 
 // A scheduler batch reports every RSS record it inserted. Retention runs before
@@ -304,18 +325,40 @@ async function getStartupFeedView() {
     } catch (_) { return 'home'; }
 }
 
+function setupFeedSearch() {
+    const searchInput = document.getElementById('search');
+    let timer = null;
+    const applySearch = () => {
+        clearTimeout(timer);
+        timer = null;
+        searchVisibleLimit = SEARCH_PAGE_SIZE;
+        if (analyticsActive || subscriptionsActive || playlistsActive || historyActive || settingsActive || channelActive || watchLaterActive) showFeed();
+        else render();
+    };
+    const scheduleSearch = (event) => {
+        clearTimeout(timer);
+        if (event.isComposing) return;
+        const query = searchInput.value;
+        if (!query.trim()) { applySearch(); return; }
+        timer = setTimeout(() => {
+            // Navigation may have cleared the query while the timer waited.
+            if (searchInput.value === query) applySearch();
+        }, 300);
+    };
+    searchInput.addEventListener('input', scheduleSearch);
+    searchInput.addEventListener('compositionend', scheduleSearch);
+    searchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.isComposing) applySearch();
+    });
+}
+
 function init() {
     const version = chrome.runtime.getManifest().version;
     const versionLabel = document.getElementById('feedVersion');
     if (versionLabel) versionLabel.textContent = `v${version}`;
 
     const searchInput = document.getElementById('search');
-    searchInput.addEventListener('input', () => {
-        searchVisibleLimit = SEARCH_PAGE_SIZE;
-        // Typing in search means the user wants the feed, not another section.
-        if (analyticsActive || subscriptionsActive || playlistsActive || historyActive || settingsActive || channelActive || watchLaterActive) showFeed();
-        else render();
-    });
+    setupFeedSearch();
     ['searchDate', 'searchDuration', 'searchWatched', 'searchSort'].forEach((id) => {
         const control = document.getElementById(id);
         if (!control) return;

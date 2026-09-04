@@ -56,15 +56,25 @@ From public RSS uploads cached for channels followed in re:Watch. Home arranges
 that local inventory; Subscriptions can order it by upload date or by when
 re:Watch detected it.
 
-### What is the difference between Check, Reload, and Show?
+### What is the difference between Reload videos, Refresh, and Show?
 
-- **Check** scans eligible channel feeds and updates local records.
-- **Reload** redraws from local storage without starting a scan.
+- **Reload videos** checks all followed channels and updates the visible list. It bypasses normal successful-check intervals, but defers channels in failure backoff or already being scanned. Its result reports checked, failed, and deferred counts.
+- **Refresh** redraws from local storage without starting a scan.
 - **Show** reloads the full Subscriptions inventory while retaining its selected upload-date or detection-date order.
+
+For one channel, open **Channels** and select **Check for new videos**. A successful check recalculates its activity and next-check time. **Log** opens its latest recorded RSS attempts.
+
+### How are channels sorted?
+
+Channels defaults to **Name A–Z**. You can choose **Date followed**, **Latest upload**, **Activity**, or **Last checked**, and reverse the direction. Your selection is remembered across reloads. Activity ties use the latest upload first; Last checked, oldest first puts never-checked channels first. [Full sorting details](detailed_guide.md#sort-followed-channels).
+
+### Why can a busy channel look inactive or have an old last-upload date?
+
+Activity and latest-upload dates reflect uploads re:Watch has observed. They can lag while checks fail or are deferred. **Check for new videos** refreshes the evidence and **Log** shows recent results. Strong recent activity promotes a channel promptly; lowering activity requires a quiet period. Version 5.2.1 also repairs obsolete 30-day delays from older RSS 404 handling when the scheduler starts.
 
 ### Does feed search query YouTube?
 
-No. It searches only local history and cached feed records.
+No. It searches only local history and cached feed records. Feed and popup searches wait for a 300 ms pause in typing; Enter and clearing the field take effect immediately.
 
 ### How many videos are on a page?
 

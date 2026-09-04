@@ -79,10 +79,15 @@ Home ranking / chronological Subscriptions
 
 The interface distinguishes network work from presentation:
 
-- Check asks the scheduler to scan eligible channels.
-- Reload reconstructs projections from local storage.
+- **Reload videos** uses a manual scheduler batch over followed channels, bypasses normal successful-check intervals, preserves retry backoff and active leases, and reloads the visible inventory. It reports outcome and deferred counts.
+- **Check for new videos** in Channels uses the same manual path restricted to the selected followed channel. It refreshes the card's state and exposes discoveries through Show.
+- **Refresh** reconstructs projections from local storage.
 - Show reloads the complete subscription inventory without replacing its selected ordering.
 - Opening Home regenerates local ranking without initiating a Home-owned request.
+
+Foreground scheduling excludes rare/dormant and leased channels before applying the batch limit, so they cannot starve eligible foreground work. Page scheduling uses a minimum delay and backs off when no work progresses. At startup, obsolete RSS 404 unavailability markers are repaired under channel leases; independent retry delays and live leases are preserved.
+
+Classification runs after successful RSS ingestion. It retains a bounded sample of 20 upload timestamps and distinguishes sustained frequent daily uploads from a short bulk-upload burst. Strong active/very-active evidence can promote a channel immediately. Downgrades require the class's quiet period and are limited to one step per day using `activityClassChangedAt`, rather than the timestamp of every classification run. The resulting class selects the next successful-check interval. Log reads current `rssAttempts` from storage when opened.
 
 ## Views and pagination
 
@@ -95,6 +100,10 @@ discovered records outside that selection.
 Home and Subscriptions use stable 50-record keyset pages. Page traversal must neither duplicate records nor allow a concurrent ordering change to corrupt the current boundary.
 
 Local search combines saved history and canonical feed records; there is no remote-search fallback.
+
+Channels sorting is separate from Subscriptions video ordering. `feed-subscriptions-view.js` sorts followed-channel projections by name, `followedAt`, `latestUploadAt`, activity, or `lastAttemptAt`. The default is name ascending. The `ytvhtChannelsSort` local-storage preference retains the field and direction; activity ties use newest upload first. Missing upload dates and unknown activity sort last, while never-checked channels lead ascending last-check order.
+
+Feed and popup search debounce typing for 300 ms. Enter executes immediately, and clearing the field cancels pending search work.
 
 ## Cards and incremental updates
 

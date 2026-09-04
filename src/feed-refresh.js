@@ -397,13 +397,27 @@ async function checkForNewVideos() {
     setRefreshUi(true);
     setStatus('', false);
     try {
-        await requestPageActiveFeedWork();
+        const { result } = await requestPageActiveFeedWork({ manual: true });
+        await loadData({ requireCanonicalInventory: true });
+        newlyShownFeedVideoIds = [];
+        await replacePendingFeedDiscovery({ videoIds: [], discoveredAt: 0 });
+        pendingFeedNoticeState = { busy: false, error: '' };
+        refreshActiveFeedDataView();
+        const failed = Number(result.outcomes?.failed || 0) + Number(result.outcomes?.timed_out || 0);
+        const checked = Object.values(result.outcomes || {}).reduce((sum, count) => sum + count, 0);
+        const message = tFeed('feed_reload_summary', 'Checked $1 channels · $2 failed · $3 deferred.', [
+            feedFormatNumber(checked), feedFormatNumber(failed), feedFormatNumber(result.skippedCount || 0)
+        ]);
+        setPageActiveSyncStatus(message, false);
+        setStatus(message, false);
     } catch (e) {
         console.warn('[feed] upload check failed', e && e.message);
-        setStatus(tFeed(
+        const message = tFeed(
             'feed_refresh_failed_status',
             'Could not check for new videos. Please try again.'
-        ), false);
+        );
+        setPageActiveSyncStatus(message, false);
+        setStatus(message, false);
     } finally {
         setRefreshUi(false);
     }
