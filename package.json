@@ -98,6 +98,11 @@
     "selenium-webdriver": "^4.47.0",
     "web-ext": "^10.5.0"
   },
+  "overrides": {
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.3.2"
+    }
+  },
   "browserslist": [
     "last 2 versions",
     "not dead"
