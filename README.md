@@ -132,6 +132,8 @@ cd YouTubeLocalHistory
 npm install
 ```
 
+The `@istanbuljs/load-nyc-config` override in `package.json` uses patched `js-yaml` 4.x to remove the vulnerable `sprintf-js` dependency pulled in by 3.x. Keep this override until the upstream loader updates its dependency.
+
 Prepare browser-specific unpacked builds:
 
 ```bash
