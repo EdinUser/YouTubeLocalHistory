@@ -36,17 +36,25 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
-      - name: Fetch latest release.json from VPS (if present)
+      - name: Configure deployment SSH
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KEY: ${{ secrets.VPS_NEW_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_NEW_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          umask 077
           mkdir -p ~/.ssh
-          echo "$VPS_SSH_KEY" > ~/.ssh/vps_key
-          chmod 600 ~/.ssh/vps_key
-          if ssh -i ~/.ssh/vps_key -p 10222 -o StrictHostKeyChecking=no root@"$VPS_HOST" test -f /var/www/rewatch.kirilov.dev/web/release.json; then
-            scp -P 10222 -i ~/.ssh/vps_key -o StrictHostKeyChecking=no root@"$VPS_HOST":/var/www/rewatch.kirilov.dev/web/release.json ./release.json
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Fetch latest release.json from VPS (if present)
+        env:
+          VPS_HOST: ${{ secrets.VPS_NEW_HOST }}
+          VPS_USER: ${{ secrets.VPS_NEW_USER }}
+        run: |
+          set -euo pipefail
+          if ssh -i ~/.ssh/vps_key -p 22 -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" test -f /var/www/rewatch.kirilov.dev/web/release.json; then
+            scp -P 22 -i ~/.ssh/vps_key -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST":/var/www/rewatch.kirilov.dev/web/release.json ./release.json
           else
             echo "{}" > release.json
           fi
@@ -56,28 +64,17 @@ jobs:
 
       - name: Sync site to VPS (preserve downloads & release.json)
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_NEW_HOST }}
+          VPS_USER: ${{ secrets.VPS_NEW_USER }}
         run: |
           set -euo pipefail
-          mkdir -p ~/.ssh
-          echo "$VPS_SSH_KEY" > ~/.ssh/vps_key
-          chmod 600 ~/.ssh/vps_key
-          rsync -avz --delete \
+          rsync -avz --delete --chmod=D755,F644 \
             --exclude 'downloads/' \
             --exclude 'release.json' \
             --exclude 'community/' \
-            -e "ssh -i ~/.ssh/vps_key -p 10222 -o StrictHostKeyChecking=no" \
-            site/ root@"$VPS_HOST":/var/www/rewatch.kirilov.dev/web/
-
-      - name: Fix ISPConfig permissions
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: 10222
-          script: |
-            chown -R web22:client1 /var/www/rewatch.kirilov.dev/web/
-            find /var/www/rewatch.kirilov.dev/web/ -type d -exec chmod 755 {} \;
-            find /var/www/rewatch.kirilov.dev/web/ -type f -exec chmod 644 {} \;
+            --exclude '/[0-9]*.[0-9]*.[0-9]*/' \
+            --exclude '/stats/' \
+            --exclude '/error/' \
+            --exclude '/.ht*' \
+            -e "ssh -i ~/.ssh/vps_key -p 22 -o StrictHostKeyChecking=yes" \
+            site/ "$VPS_USER@$VPS_HOST":/var/www/rewatch.kirilov.dev/web/
