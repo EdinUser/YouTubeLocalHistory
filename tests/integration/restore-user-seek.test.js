@@ -331,6 +331,30 @@ describe('seek intent detection guards', () => {
     video.dispatchEvent(new Event('seeked'));
   });
 
+  test('does not treat a playlist link as a seek shortcut', async () => {
+    const video = createVideo({ duration: 213, readyState: 1 });
+    createPlayer(video);
+    setupVideoTracking(video);
+    await settle();
+
+    const link = document.createElement('a');
+    link.href = `https://www.youtube.com/watch?v=${VIDEO_ID}&list=PL1234567890`;
+    link.addEventListener('click', (event) => event.preventDefault());
+    document.body.append(link);
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    video.currentTime = USER_SEEK_TIME;
+    video.dispatchEvent(new Event('seeking'));
+    video.dispatchEvent(new Event('seeked'));
+
+    makePlayable(video);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    // `list=` is not a timestamp, so the scheduled restore wins.
+    expect(video.currentTime).toBe(SAVED_TIME);
+    video.dispatchEvent(new Event('seeked'));
+  });
+
   test('ignores modified keyboard shortcuts that cannot move the playhead', async () => {
     const video = createVideo({ duration: 213, readyState: 1 });
     createPlayer(video);

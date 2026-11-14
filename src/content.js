@@ -200,12 +200,14 @@
     // keys, j/l (±10s), Home/End, frame stepping, and number keys (percent).
     const SEEK_INTENT_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'Left', 'Right', 'Home', 'End', 'j', 'l']);
     // Timestamp links in descriptions/comments and the chapter and transcript
-    // panels move the playhead without touching the player's seek bar.
+    // panels move the playhead without touching the player's seek bar. Match
+    // the `t` query parameter exactly; a plain substring match would also hit
+    // `list=` playlist links.
     const SEEK_SHORTCUT_SELECTOR = [
-        'a[href*="t="]',
+        'a[href*="?t="]',
+        'a[href*="&t="]',
         'ytd-macro-markers-list-item-renderer',
-        'ytd-transcript-segment-renderer',
-        'ytd-chapter-list-renderer'
+        'ytd-transcript-segment-renderer'
     ].join(', ');
 
     function isEditableEventTarget(target) {
@@ -239,7 +241,19 @@
     function isSeekShortcutEvent(event) {
         const target = event?.target;
         if (!target || typeof target.closest !== 'function') return false;
-        return !!target.closest(SEEK_SHORTCUT_SELECTOR);
+        const element = target.closest(SEEK_SHORTCUT_SELECTOR);
+        if (!element) return false;
+        if (element.tagName !== 'A') return true;
+        // Selector anchoring can still be fooled by odd URLs, so confirm that
+        // the link really seeks the current video.
+        try {
+            const url = new URL(element.getAttribute('href') || '', window.location.href);
+            if (!url.searchParams.has('t')) return false;
+            const linkVideoId = url.searchParams.get('v');
+            return !linkVideoId || linkVideoId === getVideoId();
+        } catch {
+            return false;
+        }
     }
 
     // Fallback for route changes YouTube does not report through events.
@@ -1199,6 +1213,8 @@
             });
         }
 
+        // Reset the guard window at listener setup so it covers the period
+        // after this video attaches, not page initialization.
         trackingStartedAt = Date.now();
         const guardedSaveTimestamp = async (candidateTime = null) => {
             reconcileTrackedShortsVideoId();
@@ -1646,6 +1662,14 @@
             markUserSeekIntent();
         }, true, document);
         addTrackedEventListener(video, 'pointercancel', () => {
+            playerSeekPointerActive = false;
+        }, true, document);
+        // pointerup can be missed if the drag ends outside the window; clear
+        // the flag so a later text selection is not mistaken for a drag.
+        addTrackedEventListener(video, 'blur', () => {
+            playerSeekPointerActive = false;
+        }, true, window);
+        addTrackedEventListener(video, 'visibilitychange', () => {
             playerSeekPointerActive = false;
         }, true, document);
         addTrackedEventListener(video, 'click', (event) => {
