@@ -180,7 +180,9 @@
     // asked for it.
     const USER_SEEK_INTENT_MS = 1000;
     // A seek this close to the target of an in-flight restore is treated as
-    // the extension's own seek rather than a user redirect.
+    // the extension's own seek rather than a user redirect. This means a user
+    // seek that lands within the tolerance is ignored, but the restore is
+    // about to finish there anyway, so the tradeoff is intentional.
     const RESTORE_SEEK_MATCH_TOLERANCE_SECONDS = 3;
     // YouTube's player controls that move the playhead. Pointer events on the
     // progress bar never reach the <video> element, so intent has to be
@@ -194,9 +196,17 @@
         '.ytp-chapter-hover-container',
         '.ytp-storyboard-framepreview'
     ].join(', ');
-    // YouTube keyboard shortcuts that change the playback position: arrow
+    // YouTube's keyboard shortcuts that change the playback position: arrow
     // keys, j/l (±10s), Home/End, frame stepping, and number keys (percent).
     const SEEK_INTENT_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'Left', 'Right', 'Home', 'End', 'j', 'l']);
+    // Timestamp links in descriptions/comments and the chapter and transcript
+    // panels move the playhead without touching the player's seek bar.
+    const SEEK_SHORTCUT_SELECTOR = [
+        'a[href*="t="]',
+        'ytd-macro-markers-list-item-renderer',
+        'ytd-transcript-segment-renderer',
+        'ytd-chapter-list-renderer'
+    ].join(', ');
 
     function isEditableEventTarget(target) {
         if (!target || target.nodeType !== 1) return false;
@@ -210,6 +220,8 @@
 
     function isSeekIntentKeyboardEvent(event) {
         if (!event || isEditableEventTarget(event.target)) return false;
+        // Ctrl/Alt/Meta combos are browser or OS shortcuts, not player seeks.
+        if (event.ctrlKey || event.altKey || event.metaKey) return false;
         const key = event.key;
         if (!key) return false;
         if (SEEK_INTENT_KEYS.has(key) || SEEK_INTENT_KEYS.has(key.toLowerCase())) return true;
@@ -222,6 +234,12 @@
         const target = event?.target;
         if (!target || typeof target.closest !== 'function') return false;
         return !!target.closest(PLAYER_SEEK_CONTROL_SELECTOR);
+    }
+
+    function isSeekShortcutEvent(event) {
+        const target = event?.target;
+        if (!target || typeof target.closest !== 'function') return false;
+        return !!target.closest(SEEK_SHORTCUT_SELECTOR);
     }
 
     // Fallback for route changes YouTube does not report through events.
@@ -1052,6 +1070,7 @@
         let userInteracted = false;
         let lastUserSeekIntentAt = 0;
         let lastProgrammaticSeekAt = 0;
+        let trackingStartedAt = Date.now();
         let pendingRestore = null;
         let restoreAwaitingMediaChange = false;
         let restoreAttemptInProgress = false;
@@ -1061,6 +1080,9 @@
         const markUserSeekIntent = () => {
             lastUserSeekIntentAt = Date.now();
         };
+        // Set while a pointer drag starts on the seek bar so movement outside
+        // the control still keeps the seek intent fresh.
+        let playerSeekPointerActive = false;
         // The video ID this closure last set up restoration for; used to detect when a
         // reused <video> element switches to a different video (SPA navigation).
         let trackedClosureVideoId = getVideoId();
@@ -1177,7 +1199,7 @@
             });
         }
 
-        let trackingStartedAt = Date.now();
+        trackingStartedAt = Date.now();
         const guardedSaveTimestamp = async (candidateTime = null) => {
             reconcileTrackedShortsVideoId();
             // A seek into a short pre-roll can be clamped. Do not overwrite the
@@ -1609,7 +1631,25 @@
         addTrackedEventListener(video, 'pointerdown', markUserSeekIntent);
         addTrackedEventListener(video, 'keydown', markUserSeekIntent);
         addTrackedEventListener(video, 'pointerdown', (event) => {
-            if (isPlayerSeekControlEvent(event)) markUserSeekIntent();
+            if (!isPlayerSeekControlEvent(event)) return;
+            playerSeekPointerActive = true;
+            markUserSeekIntent();
+        }, true, document);
+        addTrackedEventListener(video, 'pointermove', (event) => {
+            // A drag can last longer than USER_SEEK_INTENT_MS; refresh the
+            // intent while the button is held so the final seek is not stale.
+            if (playerSeekPointerActive && event.buttons > 0) markUserSeekIntent();
+        }, true, document);
+        addTrackedEventListener(video, 'pointerup', () => {
+            if (!playerSeekPointerActive) return;
+            playerSeekPointerActive = false;
+            markUserSeekIntent();
+        }, true, document);
+        addTrackedEventListener(video, 'pointercancel', () => {
+            playerSeekPointerActive = false;
+        }, true, document);
+        addTrackedEventListener(video, 'click', (event) => {
+            if (isSeekShortcutEvent(event) || isPlayerSeekControlEvent(event)) markUserSeekIntent();
         }, true, document);
         addTrackedEventListener(video, 'keydown', (event) => {
             if (isSeekIntentKeyboardEvent(event)) markUserSeekIntent();

@@ -91,6 +91,21 @@ function seekWithKeyboard(video, key, time) {
   video.dispatchEvent(new Event('seeked'));
 }
 
+function dispatchPointerMove(target, buttons = 1) {
+  const event = new Event('pointermove', { bubbles: true });
+  Object.defineProperty(event, 'buttons', { value: buttons });
+  target.dispatchEvent(event);
+}
+
+function seekWithShortcutElement(video, element, time) {
+  element.addEventListener('click', (event) => event.preventDefault());
+  document.body.append(element);
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  video.currentTime = time;
+  video.dispatchEvent(new Event('seeking'));
+  video.dispatchEvent(new Event('seeked'));
+}
+
 describe('user seeks after a restore', () => {
   beforeEach(() => {
     resetVideoTrackingForTests();
@@ -185,6 +200,52 @@ describe('user seeks after a restore', () => {
     expect(getPendingRestoreForTests()).toBeNull();
   });
 
+  test('keeps a seek made at the end of a long progress-bar drag', async () => {
+    const video = createVideo({ duration: 213, readyState: 1 });
+    const { progressBar } = createPlayer(video);
+
+    setupVideoTracking(video);
+    await settle();
+
+    progressBar.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    // Outlast the intent window, then keep dragging. Only the movement keeps
+    // the intent fresh, so this fails without the pointermove listener.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    dispatchPointerMove(progressBar, 1);
+    video.currentTime = USER_SEEK_TIME;
+    video.dispatchEvent(new Event('seeking'));
+    video.dispatchEvent(new Event('seeked'));
+
+    makePlayable(video);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    expect(video.currentTime).toBe(USER_SEEK_TIME);
+    expect(getPendingRestoreForTests()).toBeNull();
+  });
+
+  test.each([
+    ['a timestamp link', () => {
+      const link = document.createElement('a');
+      link.href = `https://www.youtube.com/watch?v=${VIDEO_ID}&t=${USER_SEEK_TIME}s`;
+      return link;
+    }],
+    ['a chapter list item', () => document.createElement('ytd-macro-markers-list-item-renderer')],
+    ['a transcript segment', () => document.createElement('ytd-transcript-segment-renderer')]
+  ])('keeps a seek made by clicking %s', async (_label, createElement) => {
+    const video = createVideo({ duration: 213, readyState: 1 });
+    createPlayer(video);
+
+    setupVideoTracking(video);
+    await settle();
+
+    seekWithShortcutElement(video, createElement(), USER_SEEK_TIME);
+    makePlayable(video);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    expect(video.currentTime).toBe(USER_SEEK_TIME);
+    expect(getPendingRestoreForTests()).toBeNull();
+  });
+
   test('still restores a new video after a user seek on the previous one', async () => {
     const video = createVideo({ duration: 213, readyState: 4 });
     document.body.append(video);
@@ -266,6 +327,28 @@ describe('seek intent detection guards', () => {
     await new Promise((resolve) => setTimeout(resolve, 700));
 
     // The seek had no player-level intent, so the scheduled restore wins.
+    expect(video.currentTime).toBe(SAVED_TIME);
+    video.dispatchEvent(new Event('seeked'));
+  });
+
+  test('ignores modified keyboard shortcuts that cannot move the playhead', async () => {
+    const video = createVideo({ duration: 213, readyState: 1 });
+    createPlayer(video);
+    setupVideoTracking(video);
+    await settle();
+
+    document.body.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      bubbles: true
+    }));
+    video.currentTime = USER_SEEK_TIME;
+    video.dispatchEvent(new Event('seeking'));
+    video.dispatchEvent(new Event('seeked'));
+
+    makePlayable(video);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
     expect(video.currentTime).toBe(SAVED_TIME);
     video.dispatchEvent(new Event('seeked'));
   });
