@@ -1671,7 +1671,8 @@
         addTrackedEventListener(video, 'blur', (event) => {
             if (event.target !== window) return;
             playerSeekPointerActive = false;
-        }, true, window);        addTrackedEventListener(video, 'visibilitychange', () => {
+        }, true, window);
+        addTrackedEventListener(video, 'visibilitychange', () => {
             playerSeekPointerActive = false;
         }, true, document);
         addTrackedEventListener(video, 'click', (event) => {
