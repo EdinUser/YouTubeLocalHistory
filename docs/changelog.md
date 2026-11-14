@@ -1,6 +1,11 @@
 # Changelog
 
-## v5.2.1 — 4 September 2026
+## Unreleased
+
+- Fixed manual backward seeks being immediately undone by saved-position
+  restoration shortly after a video loads.
+
+## v5.2.1 - 4 September 2026
 
 - Added Channels sorting by name, date followed, latest upload, activity, and last
   checked. The selected order and direction are remembered; the default is name A–Z.
