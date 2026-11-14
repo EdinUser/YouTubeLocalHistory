@@ -223,6 +223,34 @@ describe('user seeks after a restore', () => {
     expect(getPendingRestoreForTests()).toBeNull();
   });
 
+  test('keeps a long drag when another element loses focus mid-drag', async () => {
+    const video = createVideo({ duration: 213, readyState: 1 });
+    const { progressBar } = createPlayer(video);
+
+    setupVideoTracking(video);
+    await settle();
+
+    const input = document.createElement('input');
+    document.body.append(input);
+    input.focus();
+
+    progressBar.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    // Starting a drag moves focus away from the previously focused element.
+    // That blur must not end the drag.
+    input.blur();
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    dispatchPointerMove(progressBar, 1);
+    video.currentTime = USER_SEEK_TIME;
+    video.dispatchEvent(new Event('seeking'));
+    video.dispatchEvent(new Event('seeked'));
+
+    makePlayable(video);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    expect(video.currentTime).toBe(USER_SEEK_TIME);
+    expect(getPendingRestoreForTests()).toBeNull();
+  });
+
   test.each([
     ['a timestamp link', () => {
       const link = document.createElement('a');

@@ -1665,11 +1665,13 @@
             playerSeekPointerActive = false;
         }, true, document);
         // pointerup can be missed if the drag ends outside the window; clear
-        // the flag so a later text selection is not mistaken for a drag.
-        addTrackedEventListener(video, 'blur', () => {
+        // the flag so a later text selection is not mistaken for a drag. A
+        // capture listener sees blur from every focused element, so only the
+        // window losing focus may reset an active drag.
+        addTrackedEventListener(video, 'blur', (event) => {
+            if (event.target !== window) return;
             playerSeekPointerActive = false;
-        }, true, window);
-        addTrackedEventListener(video, 'visibilitychange', () => {
+        }, true, window);        addTrackedEventListener(video, 'visibilitychange', () => {
             playerSeekPointerActive = false;
         }, true, document);
         addTrackedEventListener(video, 'click', (event) => {
