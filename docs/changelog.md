@@ -1,9 +1,13 @@
 # Changelog
 
-## Unreleased
+## v5.2.2 — Unreleased
 
 - Fixed manual backward seeks being immediately undone by saved-position
   restoration shortly after a video loads.
+
+Thanks to [@adhdandy](https://github.com/adhdandy) for this fix!
+
+- Updated the development dependency `node-forge` to 1.4.3.
 
 ## v5.2.1 — 4 September 2026
 

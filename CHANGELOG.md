@@ -2,12 +2,18 @@
 
 All notable changes to YT re:Watch will be documented in this file.
 
-## [Unreleased]
+## [5.2.2] - Unreleased
 
 ### Fixed
 
 - Manual seeks now override saved-position restoration, so seeking backward
   shortly after a video loads is no longer immediately undone.
+
+Thanks to [@adhdandy](https://github.com/adhdandy) for this fix!
+
+### Security
+
+- Updated the development dependency `node-forge` to 1.4.3.
 
 ## [5.2.1] - 2026-09-04
 

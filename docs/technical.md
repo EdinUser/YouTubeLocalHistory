@@ -17,6 +17,8 @@ Scripts expose bounded globals because the extension does not use a runtime bund
 
 The content runtime identifies the active video from the YouTube route and active player, waits for meaningful playback, writes progress periodically, and flushes state on navigation or lifecycle changes. Resume compares the saved position with the player position after metadata becomes available.
 
+A detected user seek cancels pending restoration so the selected position can be saved. Seek intent includes player controls, supported keyboard shortcuts, and timestamp, chapter, and transcript links. The fallback restore rechecks the active video and restore state after reading storage, so an in-flight read cannot override a detected seek. These detections depend on YouTube player events and markup.
+
 YouTube reuses player elements during single-page navigation. Tracking state is keyed to the active route/video identity and reset when the identity changes, including Shorts navigation where player and route events can arrive in different orders.
 
 Playlist-aware persistence checks both the global pause setting and a saved reference's ignore flag before writing history.
