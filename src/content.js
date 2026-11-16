@@ -174,6 +174,88 @@
     let pendingRestoreAfterMediaChange = null;
     const RESTORE_MEDIA_SETTLE_MS = 500;
 
+    // A pointer or keyboard action only counts as the cause of a `seeking`
+    // event for this long. YouTube performs its own seeks while loading a
+    // video, so a seek may not opt out of restoration unless the user just
+    // asked for it.
+    const USER_SEEK_INTENT_MS = 1000;
+    // A seek this close to the target of an in-flight restore is treated as
+    // the extension's own seek rather than a user redirect. This means a user
+    // seek that lands within the tolerance is ignored, but the restore is
+    // about to finish there anyway, so the tradeoff is intentional.
+    const RESTORE_SEEK_MATCH_TOLERANCE_SECONDS = 3;
+    // YouTube's player controls that move the playhead. Pointer events on the
+    // progress bar never reach the <video> element, so intent has to be
+    // captured on the player instead.
+    const PLAYER_SEEK_CONTROL_SELECTOR = [
+        '.ytp-progress-bar-container',
+        '.ytp-progress-bar',
+        '.ytp-progress-list',
+        '.ytp-scrubber-container',
+        '.ytp-timed-markers-container',
+        '.ytp-chapter-hover-container',
+        '.ytp-storyboard-framepreview'
+    ].join(', ');
+    // YouTube's keyboard shortcuts that change the playback position: arrow
+    // keys, j/l (±10s), Home/End, frame stepping, and number keys (percent).
+    const SEEK_INTENT_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'Left', 'Right', 'Home', 'End', 'j', 'l']);
+    // Timestamp links in descriptions/comments and the chapter and transcript
+    // panels move the playhead without touching the player's seek bar. Match
+    // the `t` query parameter exactly; a plain substring match would also hit
+    // `list=` playlist links.
+    const SEEK_SHORTCUT_SELECTOR = [
+        'a[href*="?t="]',
+        'a[href*="&t="]',
+        'ytd-macro-markers-list-item-renderer',
+        'ytd-transcript-segment-renderer'
+    ].join(', ');
+
+    function isEditableEventTarget(target) {
+        if (!target || target.nodeType !== 1) return false;
+        const tagName = target.tagName;
+        return tagName === 'INPUT'
+            || tagName === 'TEXTAREA'
+            || tagName === 'SELECT'
+            || target.isContentEditable === true
+            || !!target.closest?.('[contenteditable=""], [contenteditable="true"]');
+    }
+
+    function isSeekIntentKeyboardEvent(event) {
+        if (!event || isEditableEventTarget(event.target)) return false;
+        // Ctrl/Alt/Meta combos are browser or OS shortcuts, not player seeks.
+        if (event.ctrlKey || event.altKey || event.metaKey) return false;
+        const key = event.key;
+        if (!key) return false;
+        if (SEEK_INTENT_KEYS.has(key) || SEEK_INTENT_KEYS.has(key.toLowerCase())) return true;
+        // YouTube jumps to a percentage of the video on number keys and steps
+        // one frame with comma/period.
+        return /^[0-9]$/.test(key) || key === ',' || key === '.';
+    }
+
+    function isPlayerSeekControlEvent(event) {
+        const target = event?.target;
+        if (!target || typeof target.closest !== 'function') return false;
+        return !!target.closest(PLAYER_SEEK_CONTROL_SELECTOR);
+    }
+
+    function isSeekShortcutEvent(event) {
+        const target = event?.target;
+        if (!target || typeof target.closest !== 'function') return false;
+        const element = target.closest(SEEK_SHORTCUT_SELECTOR);
+        if (!element) return false;
+        if (element.tagName !== 'A') return true;
+        // Selector anchoring can still be fooled by odd URLs, so confirm that
+        // the link really seeks the current video.
+        try {
+            const url = new URL(element.getAttribute('href') || '', window.location.href);
+            if (!url.searchParams.has('t')) return false;
+            const linkVideoId = url.searchParams.get('v');
+            return !linkVideoId || linkVideoId === getVideoId();
+        } catch {
+            return false;
+        }
+    }
+
     // Fallback for route changes YouTube does not report through events.
     let lastUrl = window.location.href;
 
@@ -452,9 +534,9 @@
     function cleanupVideoListeners(video) {
         if (videoEventListeners.has(video)) {
             const listeners = videoEventListeners.get(video);
-            listeners.forEach(({ event, handler }) => {
+            listeners.forEach(({ target = video, event, handler, options }) => {
                 try {
-                    video.removeEventListener(event, handler);
+                    target.removeEventListener(event, handler, options);
                 } catch (error) {
                     log('Error removing event listener:', error);
                 }
@@ -480,12 +562,14 @@
     }
 
     // Register listeners so cleanup can detach them on page unload/reuse.
-    function addTrackedEventListener(video, event, handler) {
+    // `target` defaults to the video, but player/document-level listeners are
+    // stored against the video too so they share its cleanup lifecycle.
+    function addTrackedEventListener(video, event, handler, options, target = video) {
         if (!videoEventListeners.has(video)) {
             videoEventListeners.set(video, []);
         }
-        videoEventListeners.get(video).push({ event, handler });
-        video.addEventListener(event, handler);
+        videoEventListeners.get(video).push({ target, event, handler, options });
+        target.addEventListener(event, handler, options);
     }
 
     // Keep per-video observers together with the video they belong to.
@@ -1000,9 +1084,19 @@
         let userInteracted = false;
         let lastUserSeekIntentAt = 0;
         let lastProgrammaticSeekAt = 0;
+        let trackingStartedAt = Date.now();
         let pendingRestore = null;
         let restoreAwaitingMediaChange = false;
         let restoreAttemptInProgress = false;
+        // YouTube's controls sit beside the <video> element, so pointer events
+        // on the seek bar never reach the media element. Track intent on both.
+        const player = video.closest?.('#movie_player') || document.querySelector('#movie_player') || null;
+        const markUserSeekIntent = () => {
+            lastUserSeekIntentAt = Date.now();
+        };
+        // Set while a pointer drag starts on the seek bar so movement outside
+        // the control still keeps the seek intent fresh.
+        let playerSeekPointerActive = false;
         // The video ID this closure last set up restoration for; used to detect when a
         // reused <video> element switches to a different video (SPA navigation).
         let trackedClosureVideoId = getVideoId();
@@ -1022,6 +1116,8 @@
             userInteracted = false;
             timestampLoaded = false;
             lastSaveTime = 0;
+            lastUserSeekIntentAt = 0;
+            trackingStartedAt = Date.now();
             log('[Shorts] Reconciled reused video tracker identity.', {
                 previousVideoId,
                 videoId: routeVideoId
@@ -1117,7 +1213,9 @@
             });
         }
 
-        const trackingStartedAt = Date.now();
+        // Reset the guard window at listener setup so it covers the period
+        // after this video attaches, not page initialization.
+        trackingStartedAt = Date.now();
         const guardedSaveTimestamp = async (candidateTime = null) => {
             reconcileTrackedShortsVideoId();
             // A seek into a short pre-roll can be clamped. Do not overwrite the
@@ -1132,7 +1230,16 @@
             try {
                 const record = await ytStorage.getVideo(videoId);
                 const savedTime = record && typeof record.time === 'number' ? record.time : 0;
-                if (savedTime >= 30 && currentTime < savedTime - 2 && Date.now() - trackingStartedAt < 20000) {
+                // Only protect a position that has not been restored yet. Once
+                // the initial restore is resolved, a backward move is a real
+                // user seek and must be saved, not undone.
+                if (
+                    !timestampLoaded
+                    && !userInteracted
+                    && savedTime >= 30
+                    && currentTime < savedTime - 2
+                    && Date.now() - trackingStartedAt < 20000
+                ) {
                     restoreVideoTime(savedTime, 'save-guard');
                     return;
                 }
@@ -1269,6 +1376,10 @@
                     traceRestore('restore-waiting-for-metadata', { readyState: video.readyState || 0 });
                     await waitForEvent(video, "loadedmetadata", 1000);
                 }
+                if (userInteracted) {
+                    traceRestore('restore-skipped-user-seek', { stage: 'loadedmetadata' });
+                    return;
+                }
 
                 // Pre-roll media has valid metadata but cannot contain the
                 // saved position. Seeking it causes Firefox/YouTube to churn
@@ -1300,6 +1411,10 @@
                         duration: Number.isFinite(video.duration) ? video.duration : 0
                     });
                     await waitForEvent(video, 'canplay', 5000);
+                }
+                if (userInteracted) {
+                    traceRestore('restore-skipped-user-seek', { stage: 'canplay' });
+                    return;
                 }
 
                 if (!isPrimaryVideo(video)) {
@@ -1334,6 +1449,11 @@
                         });
                         return;
                     }
+                }
+
+                if (userInteracted) {
+                    traceRestore('restore-skipped-user-seek', { stage: 'before-seek' });
+                    return;
                 }
 
                 // Double-check after the media becomes playable because
@@ -1403,7 +1523,6 @@
             return true;
         };
 
-        const player = video.closest?.('#movie_player');
         if (player) {
             const adStateObserver = new MutationObserver(resumePendingRestoreAfterAd);
             adStateObserver.observe(player, { attributes: true, attributeFilter: ['class'] });
@@ -1421,6 +1540,17 @@
             restoreAfterNextMediaMetadata();
         }
         
+        // Restore state can be cancelled or resolved while an async read is
+        // pending, so every check after an await must use the current state.
+        const isRestoreSuppressed = () => (
+            timestampLoaded
+            || userInteracted
+            || pendingRestore
+            || restoreAwaitingMediaChange
+            || restoreAttemptInProgress
+            || (hasPendingMediaTransition() && !restoringPendingMedia)
+        );
+
         // Fallback: If video starts playing from 0:00 but we have a saved time, restore it
         // This handles cases where getVideo() failed initially but the video started playing
         const fallbackRestore = async () => {
@@ -1429,12 +1559,18 @@
             
             // YouTube may apply its own partial resume before extension storage
             // is ready. Restore whenever that position is still behind ours.
-            if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia) && video.readyState >= 3) {
+            if (!isRestoreSuppressed() && video.readyState >= 3) {
                 try {
                     const videoId = getVideoId();
                     if (!videoId) return;
 
                     const record = await ytStorage.getVideo(videoId);
+
+                    // The read can take long enough for the user to seek or for
+                    // a media transition to start. Do not seek on stale state.
+                    if (isRestoreSuppressed() || videoId !== getVideoId() || video.readyState < 3) {
+                        return;
+                    }
 
                     if (record && record.time && record.time > 30 && video.currentTime < record.time - 2) {
                         // Only restore if saved time is significant (>30s)
@@ -1455,7 +1591,7 @@
         // Retry after a readiness timeout without racing the initial attempt.
         addTrackedEventListener(video, 'canplay', () => {
             if (resumePendingRestoreAfterAd()) return;
-            if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia)) {
+            if (!isRestoreSuppressed()) {
                 ensureVideoReady().catch(error => log('[RESTORE] Failed on canplay retry:', error));
             }
         });
@@ -1525,26 +1661,73 @@
             const interval = window.location.pathname.startsWith('/shorts/') ? 5 : 15;
             if (currentTime > 0 && currentTime % interval === 0) debouncedSave();
         });
-        addTrackedEventListener(video, 'pointerdown', () => {
-            lastUserSeekIntentAt = Date.now();
-        });
-        addTrackedEventListener(video, 'keydown', () => {
-            lastUserSeekIntentAt = Date.now();
-        });
+        addTrackedEventListener(video, 'pointerdown', markUserSeekIntent);
+        addTrackedEventListener(video, 'keydown', markUserSeekIntent);
+        addTrackedEventListener(video, 'pointerdown', (event) => {
+            if (!isPlayerSeekControlEvent(event)) return;
+            playerSeekPointerActive = true;
+            markUserSeekIntent();
+        }, true, document);
+        addTrackedEventListener(video, 'pointermove', (event) => {
+            // A drag can last longer than USER_SEEK_INTENT_MS; refresh the
+            // intent while the button is held so the final seek is not stale.
+            if (playerSeekPointerActive && event.buttons > 0) markUserSeekIntent();
+        }, true, document);
+        addTrackedEventListener(video, 'pointerup', () => {
+            if (!playerSeekPointerActive) return;
+            playerSeekPointerActive = false;
+            markUserSeekIntent();
+        }, true, document);
+        addTrackedEventListener(video, 'pointercancel', () => {
+            playerSeekPointerActive = false;
+        }, true, document);
+        // pointerup can be missed if the drag ends outside the window; clear
+        // the flag so a later text selection is not mistaken for a drag. A
+        // capture listener sees blur from every focused element, so only the
+        // window losing focus may reset an active drag.
+        addTrackedEventListener(video, 'blur', (event) => {
+            if (event.target !== window) return;
+            playerSeekPointerActive = false;
+        }, true, window);
+        addTrackedEventListener(video, 'visibilitychange', () => {
+            playerSeekPointerActive = false;
+        }, true, document);
+        addTrackedEventListener(video, 'click', (event) => {
+            if (isSeekShortcutEvent(event) || isPlayerSeekControlEvent(event)) markUserSeekIntent();
+        }, true, document);
+        addTrackedEventListener(video, 'keydown', (event) => {
+            if (isSeekIntentKeyboardEvent(event)) markUserSeekIntent();
+        }, true, document);
         addTrackedEventListener(video, 'seeking', () => {
             // YouTube emits seeking events while selecting its initial position
             // and while resetting media after navigation. Only a seek preceded
             // by user input may opt out of restoring extension history.
-            const hasRecentUserSeekIntent = Date.now() - lastUserSeekIntentAt < 1000;
-            if (hasRecentUserSeekIntent && Date.now() - lastProgrammaticSeekAt > 800) {
+            const now = Date.now();
+            const hasRecentUserSeekIntent = now - lastUserSeekIntentAt < USER_SEEK_INTENT_MS;
+            const seekMatchesPendingRestore = !!pendingRestore
+                && Math.abs((video.currentTime || 0) - pendingRestore.targetTime)
+                    <= RESTORE_SEEK_MATCH_TOLERANCE_SECONDS;
+            const isProgrammaticSeek = !!pendingRestore && seekMatchesPendingRestore;
+            if (hasRecentUserSeekIntent && !isProgrammaticSeek) {
+                // The user redirected the playhead. Cancel every pending restore
+                // and let the new position be saved instead of pulled back.
                 userInteracted = true;
+                timestampLoaded = true;
+                pendingRestore = null;
+                restoreAwaitingMediaChange = false;
+                restoringPendingMedia = false;
                 pendingRestoreAfterMediaChange = null;
+                lastSaveTime = 0;
+                traceRestore('user-seek-cancelled-restore', {
+                    currentTime: video.currentTime || 0
+                });
             }
             traceRestore('video-seeking', {
                 currentTime: video.currentTime || 0,
                 hasRecentUserSeekIntent,
                 userInteracted,
-                millisecondsSinceProgrammaticSeek: Date.now() - lastProgrammaticSeekAt,
+                isProgrammaticSeek,
+                millisecondsSinceProgrammaticSeek: now - lastProgrammaticSeekAt,
                 ...getRestoreVideoTraceDetails(video)
             });
             if (saveIntervalId) {
@@ -1605,6 +1788,8 @@
                 trackedClosureVideoId = currentVideoId;
                 userInteracted = false;
                 timestampLoaded = false;
+                lastUserSeekIntentAt = 0;
+                trackingStartedAt = Date.now();
             }
 
             restoreAfterNextMediaMetadata();

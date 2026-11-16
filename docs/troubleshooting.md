@@ -15,6 +15,8 @@ If only one YouTube layout fails, include the page type and a screenshot in the 
 
 ## Resume or metadata looks stale
 
+If a backward seek is immediately undone after a video starts, update to version 5.2.2 or later when available and reload the YouTube tab. If it still happens, report the video page type and how you sought (for example, the progress bar or keyboard).
+
 Close and reopen the popup, reopen the affected view, or select **Refresh** in the feed to render current local records. Duration appears only when it is available; playing an older saved video can fill it later.
 
 If a History card refreshes, its **Remove** control and three-dot menu should remain present. Report a reproducible disappearance as a UI bug.
