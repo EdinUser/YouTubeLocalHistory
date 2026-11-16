@@ -1540,6 +1540,17 @@
             restoreAfterNextMediaMetadata();
         }
         
+        // Restore state can be cancelled or resolved while an async read is
+        // pending, so every check after an await must use the current state.
+        const isRestoreSuppressed = () => (
+            timestampLoaded
+            || userInteracted
+            || pendingRestore
+            || restoreAwaitingMediaChange
+            || restoreAttemptInProgress
+            || (hasPendingMediaTransition() && !restoringPendingMedia)
+        );
+
         // Fallback: If video starts playing from 0:00 but we have a saved time, restore it
         // This handles cases where getVideo() failed initially but the video started playing
         const fallbackRestore = async () => {
@@ -1548,12 +1559,18 @@
             
             // YouTube may apply its own partial resume before extension storage
             // is ready. Restore whenever that position is still behind ours.
-            if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia) && video.readyState >= 3) {
+            if (!isRestoreSuppressed() && video.readyState >= 3) {
                 try {
                     const videoId = getVideoId();
                     if (!videoId) return;
 
                     const record = await ytStorage.getVideo(videoId);
+
+                    // The read can take long enough for the user to seek or for
+                    // a media transition to start. Do not seek on stale state.
+                    if (isRestoreSuppressed() || videoId !== getVideoId() || video.readyState < 3) {
+                        return;
+                    }
 
                     if (record && record.time && record.time > 30 && video.currentTime < record.time - 2) {
                         // Only restore if saved time is significant (>30s)
@@ -1574,7 +1591,7 @@
         // Retry after a readiness timeout without racing the initial attempt.
         addTrackedEventListener(video, 'canplay', () => {
             if (resumePendingRestoreAfterAd()) return;
-            if (!timestampLoaded && !userInteracted && !pendingRestore && !restoreAwaitingMediaChange && !restoreAttemptInProgress && (!hasPendingMediaTransition() || restoringPendingMedia)) {
+            if (!isRestoreSuppressed()) {
                 ensureVideoReady().catch(error => log('[RESTORE] Failed on canplay retry:', error));
             }
         });

@@ -185,6 +185,42 @@ describe('user seeks after a restore', () => {
     expect(getPendingRestoreForTests()).toBeNull();
   });
 
+  test('drops a fallback restore whose storage read resolves after a user seek', async () => {
+    const video = createVideo({ duration: 213, readyState: 4 });
+    const { progressBar } = createPlayer(video);
+
+    let fallbackReadResolve;
+    let markFallbackReadStarted;
+    const fallbackReadStarted = new Promise((resolve) => {
+      markFallbackReadStarted = resolve;
+    });
+    let readCount = 0;
+    global.ytStorage.getVideo.mockImplementation(() => {
+      readCount += 1;
+      // The initial restore gives up on empty reads; the fallback read is
+      // the one that resolves late with the saved position.
+      if (readCount <= 3) return Promise.resolve(null);
+      if (readCount === 4) {
+        markFallbackReadStarted();
+        return new Promise((resolve) => {
+          fallbackReadResolve = () => resolve({ videoId: VIDEO_ID, time: SAVED_TIME });
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    setupVideoTracking(video);
+    await fallbackReadStarted;
+
+    // Redirect the playhead while the fallback storage read is still pending.
+    seekWithProgressBar(video, progressBar, USER_SEEK_TIME);
+    fallbackReadResolve();
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    expect(video.currentTime).toBe(USER_SEEK_TIME);
+    expect(getPendingRestoreForTests()).toBeNull();
+  });
+
   test('recognizes a seek made with YouTube keyboard shortcuts', async () => {
     const video = createVideo({ duration: 213, readyState: 1 });
     createPlayer(video);
